@@ -100,25 +100,26 @@ This matches all six Brain tools. You can verify with `/permissions` in Claude C
 Add the following to `~/.claude/CLAUDE.md` so Claude automatically loads Brain context at the start of every session:
 
 ```markdown
-## AI Brain (Auto-Load)
+## AI Brain (Auto-Load) — Session Start Protocol
 
-An AI Brain (personal knowledge system) is connected via MCP. At the start of each conversation,
-call `brain_load_context` to orient yourself with John's identity, current priorities, and available
-context files. Then selectively load additional files based on the task, per the navigation table
-in the loader. Do not wait to be asked — load context proactively.
+An AI Brain (personal knowledge system) is connected via MCP. At the start of **every**
+conversation, before responding to the first user message, execute this sequence:
+
+1. **Fetch tools:** ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search") — required because Brain tools are deferred in Cowork/Desktop.
+2. **Load context:** Call brain_load_context — returns the loader (navigation table) and NOW.md (current priorities).
+3. **Load task-specific files:** Based on the user's request and the navigation table in the loader, call brain_read_file for relevant files.
+
+Do not wait to be asked. Do not skip this. If tools are already available (e.g., in Claude Code
+where tools aren't deferred), skip step 1 and go straight to step 2.
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).
 
 ### Step 3: User preferences (Claude Desktop / claude.ai — manual)
 
-Claude Desktop and claude.ai do not read `CLAUDE.md`. For these clients, add the following to your **user preferences** (Settings → Profile → User preferences, or equivalent):
+Claude Desktop and claude.ai do not read `CLAUDE.md`. For these clients, add the auto-load directive to your **user preferences** (Settings → Profile → User preferences).
 
-```
-I maintain an AI Brain (personal knowledge system) accessible via MCP. At the start of each
-conversation, load context by calling brain_load_context, then selectively load additional files
-based on the task per the navigation table in the loader. Do not wait to be asked.
-```
+See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste and a verification checklist.
 
 > **Note:** This step requires manual entry in each client's preferences UI. It cannot be automated.
 
