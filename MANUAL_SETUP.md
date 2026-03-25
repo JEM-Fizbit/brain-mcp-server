@@ -11,14 +11,28 @@ These steps require human action in client UIs and cannot be automated by Claude
 **Add this text** (append to any existing preferences):
 
 ```
-I maintain an AI Brain (personal knowledge system) accessible via MCP. At the start of every
-conversation, before responding to my first message, execute this sequence:
+I maintain an AI Brain (personal knowledge system) accessible via MCP. Load it when the
+conversation benefits from personal context — skip it for generic tasks.
 
-1. Fetch Brain tools: ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search") — required because Brain tools may be deferred.
-2. Load context: Call brain_load_context — returns the loader (navigation table) and NOW.md (current priorities).
-3. Load task-specific files: Based on my request and the navigation table in the loader, call brain_read_file for relevant files.
+Load Brain context proactively (don't wait to be asked) when:
+- Writing on my behalf (emails, posts, bios, articles)
+- Career, job search, applications, or professional positioning
+- Work or company context (ERS Genomics, etc.)
+- My software projects
+- Strategy, advice, or decisions requiring my background
+- Anything requiring my voice, preferences, expertise, or personal context
+- I reference "my Brain," "my context," or ask you to load it
 
-Do not wait to be asked. Do not skip this. If Brain tools are already available (not deferred), skip step 1 and go straight to step 2.
+Skip Brain loading when:
+- Generic technical questions with no personal dimension
+- General knowledge or research
+- Pure coding help on unfamiliar codebases
+- I explicitly say not to load it
+
+Load sequence (when loading):
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search")
+2. Call brain_load_context (returns loader navigation table + current priorities)
+3. Call brain_read_file for task-relevant files per the navigation table
 ```
 
 ---
@@ -33,17 +47,18 @@ Claude Code and Cowork read `~/.claude/CLAUDE.md`, which is already configured a
 
 ## Verification Checklist
 
-After completing all setup (automated + manual), verify each client:
+After completing all setup (automated + manual), test with two conversations:
 
-1. Start a **new** conversation (preferences don't hot-reload mid-session)
-2. Claude should automatically fetch Brain tools and call `brain_load_context` before responding
-3. Claude should reference your current priorities from NOW.md in its first response
-4. Ask Claude to search for something in your Brain — it should use `brain_search`
+**Test 1 — Should load Brain:**
+1. Start a new conversation
+2. Ask: "Help me draft a LinkedIn post about AI in biotech"
+3. Claude should automatically fetch Brain tools and call `brain_load_context`
+4. Claude should reference your writing voice and expertise from Brain files
 
-If Claude doesn't auto-load, check:
-- Was the preferences text saved? (Re-open settings and verify it's there)
-- Did you start a **new** conversation? (Changes don't apply to existing sessions)
-- Are the Brain MCP tools in the deferred tools list? (Check the system reminder)
+**Test 2 — Should NOT load Brain:**
+1. Start a new conversation
+2. Ask: "What's the difference between TCP and UDP?"
+3. Claude should answer directly without loading Brain context
 
 ---
 
@@ -55,5 +70,5 @@ These are handled by the README setup and do not need manual action:
 |------|-------|--------|
 | MCP server config | `~/.claude/settings.json` | Automated (JSON config) |
 | Tool pre-authorisation | `~/.claude/settings.json` → `permissions.allow` | Automated (JSON config) |
-| Auto-load directive (Claude Code / Cowork) | `~/.claude/CLAUDE.md` | Automated (file edit) |
-| Auto-load directive (Claude Desktop / web) | User preferences UI | **Manual** |
+| Conditional auto-load directive (Claude Code / Cowork) | `~/.claude/CLAUDE.md` | Automated (file edit) |
+| Conditional auto-load directive (Claude Desktop / web) | User preferences UI | **Manual** |
