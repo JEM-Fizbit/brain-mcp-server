@@ -95,31 +95,38 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 
 This matches all six Brain tools. You can verify with `/permissions` in Claude Code.
 
-### Step 2: Auto-load directive (Claude Code / Cowork)
+### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
-Add the following to `~/.claude/CLAUDE.md` so Claude automatically loads Brain context at the start of every session:
+Add the following to `~/.claude/CLAUDE.md` so Claude loads Brain context **when relevant** — not on every conversation:
 
 ```markdown
-## AI Brain (Auto-Load) — Session Start Protocol
+## AI Brain (Conditional Auto-Load)
 
-An AI Brain (personal knowledge system) is connected via MCP. At the start of **every**
-conversation, before responding to the first user message, execute this sequence:
+An AI Brain (personal knowledge system) is connected via MCP. Load it when the conversation
+benefits from personal context — skip it for generic tasks.
 
-1. **Fetch tools:** ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search") — required because Brain tools are deferred in Cowork/Desktop.
-2. **Load context:** Call brain_load_context — returns the loader (navigation table) and NOW.md (current priorities).
-3. **Load task-specific files:** Based on the user's request and the navigation table in the loader, call brain_read_file for relevant files.
+Load Brain context proactively (don't wait to be asked) when:
+- Writing on the user's behalf, career/professional tasks, work context, personal projects,
+  strategy/advice requiring background, anything needing voice/preferences/expertise,
+  or user references "my Brain" / "my context"
 
-Do not wait to be asked. Do not skip this. If tools are already available (e.g., in Claude Code
-where tools aren't deferred), skip step 1 and go straight to step 2.
+Skip when:
+- Generic technical questions, general knowledge/research, pure coding help,
+  or user explicitly says not to load
+
+Load sequence (when loading):
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search")
+2. Call brain_load_context (returns loader + NOW.md)
+3. Call brain_read_file for task-relevant files per the navigation table
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).
 
 ### Step 3: User preferences (Claude Desktop / claude.ai — manual)
 
-Claude Desktop and claude.ai do not read `CLAUDE.md`. For these clients, add the auto-load directive to your **user preferences** (Settings → Profile → User preferences).
+Claude Desktop and claude.ai do not read `CLAUDE.md`. For these clients, add the conditional auto-load directive to your **user preferences** (Settings → Profile → User preferences).
 
-See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste and a verification checklist.
+See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verification tests, and a troubleshooting checklist.
 
 > **Note:** This step requires manual entry in each client's preferences UI. It cannot be automated.
 
