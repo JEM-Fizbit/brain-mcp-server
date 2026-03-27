@@ -74,8 +74,7 @@ brain-mcp-server/
 │       ├── update.ts     # brain_update_file, brain_commit
 │       ├── status.ts     # brain_list_files, brain_search
 │       └── index.ts      # Tool registration barrel
-├── dist/                 # Compiled output
-└── docs/protocols/       # Synced protocols (don't edit)
+└── dist/                 # Compiled output
 ```
 
 ### Tools (6 total)
