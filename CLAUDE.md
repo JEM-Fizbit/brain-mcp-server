@@ -69,7 +69,7 @@ brain-mcp-server/
 │   │   ├── git.ts        # Git operations (commit, push, pull)
 │   │   ├── log.ts        # Change log operations (append, read, getLastOpDate)
 │   │   ├── lint.ts       # Health checks (bloat, stale, orphans, drift)
-│   │   ├── ingest.ts     # Source ingestion (analyze, record)
+│   │   ├── ingest.ts     # Source ingestion (analyze, save to sources/, record provenance)
 │   │   └── issues.ts     # GitHub issue checks (open maintenance issues)
 │   ├── schemas/
 │   │   └── tools.ts      # Zod schemas for all tool inputs
@@ -79,7 +79,7 @@ brain-mcp-server/
 │       ├── status.ts     # brain_list_files, brain_search
 │       ├── log.ts        # brain_log, brain_read_log
 │       ├── lint.ts       # brain_lint
-│       ├── ingest.ts     # brain_ingest
+│       ├── ingest.ts     # brain_ingest, brain_ingest_complete
 │       └── index.ts      # Tool registration barrel
 └── dist/                 # Compiled output
 ```
