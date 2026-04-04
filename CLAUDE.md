@@ -84,7 +84,7 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (10 total)
+### Tools (11 total)
 
 **Core:**
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue nudges
@@ -98,7 +98,8 @@ brain-mcp-server/
 - `brain_log` — Append an entry to the Brain change log (LOG.md)
 - `brain_read_log` — Read recent change log entries
 - `brain_lint` — Health check: bloat, staleness, orphans, drift. Auto-logs the pass.
-- `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false logs the ingest)
+- `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false saves source to sources/{category}/)
+- `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md)
 
 ---
 
