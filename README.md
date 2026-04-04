@@ -10,12 +10,16 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 
 | Tool | Description |
 |------|-------------|
-| `brain_load_context` | Entry point — returns the loader + NOW.md |
+| `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint and issue nudges |
 | `brain_read_file` | Read a specific Brain file by name |
 | `brain_update_file` | Update a Brain file (replace or append) |
 | `brain_commit` | Git commit changes, optionally push |
 | `brain_list_files` | List all files with staleness metadata |
 | `brain_search` | Search across all Brain files |
+| `brain_log` | Append an entry to the Brain change log |
+| `brain_read_log` | Read recent change log entries |
+| `brain_lint` | Run a health check (bloat, staleness, orphans, drift) |
+| `brain_ingest` | Process a new source into the Brain (dry-run by default) |
 
 ## Requirements
 
@@ -93,7 +97,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-This matches all six Brain tools. You can verify with `/permissions` in Claude Code.
+This matches all ten Brain tools. You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
@@ -115,9 +119,10 @@ Skip when:
   or user explicitly says not to load
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search")
-2. Call brain_load_context (returns loader + NOW.md)
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest")
+2. Call brain_load_context (returns loader + NOW.md + lint/issue nudges)
 3. Call brain_read_file for task-relevant files per the navigation table
+4. If brain_load_context flags a lint nudge or open issues, act accordingly
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).
@@ -133,9 +138,11 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 ## How It Works
 
 1. Claude calls `brain_load_context` at session start (automatically, if configured per above)
-2. The loader file contains a navigation table mapping task types to Brain files
-3. Claude reads the table and requests specific files via `brain_read_file`
+2. The response includes the loader, NOW.md, and nudges (lint overdue, open maintenance issues)
+3. Claude reads the navigation table and requests specific files via `brain_read_file`
 4. Edits are written via `brain_update_file`, then committed via `brain_commit`
+5. New information is processed via `brain_ingest` (dry-run analysis, then guided updates)
+6. Changes are tracked via `brain_log`; health is checked via `brain_lint`
 
 The routing logic lives in the loader (a Markdown file you maintain), not in code. The server is content-agnostic — it knows nothing about your specific Brain content, only how to serve Markdown files.
 
