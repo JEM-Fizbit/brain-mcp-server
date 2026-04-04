@@ -24,6 +24,20 @@ export const LOG_OP_TYPES = [
 ] as const;
 export type LogOpType = (typeof LOG_OP_TYPES)[number];
 
+export const SOURCES_DIR = "sources";
+export const SOURCES_INDEX = "SOURCES.md";
+export const SOURCE_CATEGORIES = [
+  "bios",
+  "cv",
+  "writing_samples",
+  "photos",
+  "articles",
+  "meeting_notes",
+  "correspondence",
+  "other",
+] as const;
+export type SourceCategory = (typeof SOURCE_CATEGORIES)[number];
+
 /** Staleness thresholds in days */
 export const STALENESS = {
   NOW: 7,

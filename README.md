@@ -19,7 +19,8 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
 | `brain_lint` | Run a health check (bloat, staleness, orphans, drift) |
-| `brain_ingest` | Process a new source into the Brain (dry-run by default) |
+| `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
+| `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md) |
 
 ## Requirements
 
@@ -97,7 +98,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-This matches all ten Brain tools. You can verify with `/permissions` in Claude Code.
+This matches all eleven Brain tools. You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 

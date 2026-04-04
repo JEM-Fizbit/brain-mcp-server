@@ -58,15 +58,42 @@ export const ReadLogSchema = z.object({
     .describe("Number of recent log entries to return. Default: 20."),
 });
 
+const sourceCategoryEnum = z.enum([
+  "bios",
+  "cv",
+  "writing_samples",
+  "photos",
+  "articles",
+  "meeting_notes",
+  "correspondence",
+  "other",
+]);
+
 export const IngestSchema = z.object({
   source_content: z
     .string()
     .describe("The text content of the source to ingest."),
   source_label: z
     .string()
-    .describe("A short label for the source (e.g. 'CV update March 2026', 'Board meeting notes')."),
+    .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
+  category: sourceCategoryEnum
+    .describe("Source category — determines which subfolder in sources/ the file is saved to."),
   dry_run: z
     .boolean()
     .default(true)
-    .describe("If true (default), returns an analysis plan without writing. Set false to log the ingest and record files touched."),
+    .describe("If true (default), returns analysis plan without saving. If false, saves the source file to sources/{category}/ and returns the saved file path."),
+});
+
+export const IngestCompleteSchema = z.object({
+  source_label: z
+    .string()
+    .describe("Label of the source that was ingested."),
+  category: sourceCategoryEnum
+    .describe("Source category."),
+  source_file: z
+    .string()
+    .describe("Path to the saved source file (returned by brain_ingest with dry_run=false)."),
+  files_touched: z
+    .array(z.string())
+    .describe("Brain files that were updated from this source."),
 });
