@@ -65,25 +65,40 @@ brain-mcp-server/
 │   ├── index.ts          # Entry point, server init, transport
 │   ├── constants.ts      # Paths, limits, config
 │   ├── services/
-│   │   ├── brain.ts      # Brain filesystem operations
-│   │   └── git.ts        # Git operations (commit, push, pull)
+│   │   ├── brain.ts      # Brain filesystem operations + loadContext with nudges
+│   │   ├── git.ts        # Git operations (commit, push, pull)
+│   │   ├── log.ts        # Change log operations (append, read, getLastOpDate)
+│   │   ├── lint.ts       # Health checks (bloat, stale, orphans, drift)
+│   │   ├── ingest.ts     # Source ingestion (analyze, record)
+│   │   └── issues.ts     # GitHub issue checks (open maintenance issues)
 │   ├── schemas/
 │   │   └── tools.ts      # Zod schemas for all tool inputs
 │   └── tools/
 │       ├── context.ts    # brain_load_context, brain_read_file
 │       ├── update.ts     # brain_update_file, brain_commit
 │       ├── status.ts     # brain_list_files, brain_search
+│       ├── log.ts        # brain_log, brain_read_log
+│       ├── lint.ts       # brain_lint
+│       ├── ingest.ts     # brain_ingest
 │       └── index.ts      # Tool registration barrel
 └── dist/                 # Compiled output
 ```
 
-### Tools (6 total)
-- `brain_load_context` — Entry point: returns loader + NOW.md
+### Tools (10 total)
+
+**Core:**
+- `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue nudges
 - `brain_read_file` — Read a specific Brain file by name
 - `brain_update_file` — Write changes to a Brain file
 - `brain_commit` — Git commit (optionally push)
 - `brain_list_files` — List all files with staleness metadata
 - `brain_search` — Search across all Brain files
+
+**Operations:**
+- `brain_log` — Append an entry to the Brain change log (LOG.md)
+- `brain_read_log` — Read recent change log entries
+- `brain_lint` — Health check: bloat, staleness, orphans, drift. Auto-logs the pass.
+- `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false logs the ingest)
 
 ---
 
@@ -92,6 +107,7 @@ brain-mcp-server/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BRAIN_DIR` | Path to Brain markdown files directory | `~/Projects/ai-brain-jem/brain` |
+| `BRAIN_GITHUB_REPO` | GitHub repo for issue checks (owner/name) | `JEM-Fizbit/ai-brain-jem` |
 
 ---
 
