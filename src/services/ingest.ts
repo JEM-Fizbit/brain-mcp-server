@@ -73,6 +73,42 @@ export async function analyzeForIngest(
 }
 
 /**
+ * Read source content from a file path.
+ * Validates the path exists and is readable.
+ */
+export async function readSourceFromPath(sourcePath: string): Promise<string> {
+  try {
+    return await fs.readFile(sourcePath, "utf-8");
+  } catch {
+    throw new Error(`Cannot read source file: ${sourcePath}`);
+  }
+}
+
+/**
+ * Resolve source content from either inline content or a file path.
+ * Exactly one must be provided.
+ */
+export async function resolveSourceContent(
+  sourceContent?: string,
+  sourcePath?: string
+): Promise<string> {
+  if (sourceContent && sourcePath) {
+    throw new Error(
+      "Provide source_content OR source_path, not both."
+    );
+  }
+  if (!sourceContent && !sourcePath) {
+    throw new Error(
+      "Provide either source_content (inline text) or source_path (path to file on disk)."
+    );
+  }
+  if (sourcePath) {
+    return readSourceFromPath(sourcePath);
+  }
+  return sourceContent!;
+}
+
+/**
  * Save a source file to the sources/ directory under the given category.
  * Creates the category subfolder if it doesn't exist.
  * Returns the relative path to the saved file.

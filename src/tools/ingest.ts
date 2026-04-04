@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IngestSchema, IngestCompleteSchema } from "../schemas/tools.js";
 import {
   analyzeForIngest,
+  resolveSourceContent,
   saveSource,
   recordIngest,
 } from "../services/ingest.js";
@@ -9,10 +10,12 @@ import {
 export function registerIngestTools(server: McpServer): void {
   server.tool(
     "brain_ingest",
-    "Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections — rather than making ad-hoc edits. With dry_run=true (default), returns an analysis plan showing all Brain files, available categories, and instructions. With dry_run=false, saves the source file to sources/{category}/ and returns the saved path. After updating Brain files, call brain_ingest_complete to record provenance.",
+    "Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections — rather than making ad-hoc edits. Accepts source_content (inline text) OR source_path (absolute file path — preferred for large documents to avoid MCP parameter size limits). With dry_run=true (default), returns analysis plan. With dry_run=false, saves source to sources/{category}/. After updating Brain files, call brain_ingest_complete to record provenance.",
     IngestSchema.shape,
-    async ({ source_content, source_label, category, dry_run }) => {
+    async ({ source_content, source_path, source_label, category, dry_run }) => {
       try {
+        const content = await resolveSourceContent(source_content, source_path);
+
         if (dry_run) {
           const analysis = await analyzeForIngest(source_label);
           const result = [
@@ -20,9 +23,9 @@ export function registerIngestTools(server: McpServer): void {
             "",
             "---",
             "",
-            "## Source content to ingest:",
+            `## Source content to ingest (${content.length} chars):`,
             "",
-            source_content,
+            content,
           ].join("\n");
 
           return { content: [{ type: "text", text: result }] };
@@ -30,7 +33,7 @@ export function registerIngestTools(server: McpServer): void {
 
         // dry_run=false: save the source file
         const savedPath = await saveSource(
-          source_content,
+          content,
           source_label,
           category
         );
