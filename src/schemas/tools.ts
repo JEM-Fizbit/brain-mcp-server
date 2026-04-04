@@ -72,7 +72,12 @@ const sourceCategoryEnum = z.enum([
 export const IngestSchema = z.object({
   source_content: z
     .string()
-    .describe("The text content of the source to ingest."),
+    .optional()
+    .describe("The text content of the source to ingest. Use this OR source_path, not both."),
+  source_path: z
+    .string()
+    .optional()
+    .describe("Absolute path to a source file on disk. The server reads it directly — avoids MCP parameter size limits for large documents. Use this OR source_content, not both."),
   source_label: z
     .string()
     .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
