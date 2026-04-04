@@ -8,7 +8,10 @@ import {
   ACTIVE_PATTERNS,
   IDENTITY_PATTERNS,
   MAX_SEARCH_RESULTS,
+  LINT_NUDGE_DAYS,
 } from "../constants.js";
+import * as log from "./log.js";
+import { getOpenMaintenanceIssues } from "./issues.js";
 
 export interface BrainFile {
   name: string;
@@ -58,13 +61,62 @@ export async function loadContext(): Promise<string> {
     );
   }
 
-  return [
+  const parts = [
     `--- FILE: ${LOADER_FILE} ---`,
     loader.trim(),
     "",
     `--- FILE: ${NOW_FILE} ---`,
     now.trim(),
-  ].join("\n");
+  ];
+
+  // Lint nudge: check when brain_lint was last run
+  try {
+    const lastLint = await log.getLastOpDate("LINT");
+    if (!lastLint) {
+      parts.push(
+        "",
+        "⚠️ brain_lint has never been run. Consider running brain_lint to check Brain health."
+      );
+    } else {
+      const daysSince = Math.floor(
+        (Date.now() - lastLint.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysSince > LINT_NUDGE_DAYS) {
+        parts.push(
+          "",
+          `⚠️ Last brain_lint was ${daysSince} days ago. Consider running brain_lint before proceeding.`
+        );
+      }
+    }
+  } catch {
+    // LOG.md doesn't exist yet — nudge to run lint
+    parts.push(
+      "",
+      "⚠️ brain_lint has never been run. Consider running brain_lint to check Brain health."
+    );
+  }
+
+  // Open maintenance issues nudge
+  try {
+    const issues = await getOpenMaintenanceIssues();
+    if (issues.length > 0) {
+      parts.push(
+        "",
+        `📋 ${issues.length} open Brain maintenance issue(s) requiring review:`
+      );
+      for (const issue of issues) {
+        parts.push(`  - #${issue.number}: ${issue.title} — ${issue.url}`);
+      }
+      parts.push(
+        "",
+        "Ask John if he'd like to review and address these now. With explicit approval, read the issue, implement fixes, and commit/push."
+      );
+    }
+  } catch {
+    // GitHub check failed — not critical, continue without nudge
+  }
+
+  return parts.join("\n");
 }
 
 export async function readFile(filename: string): Promise<string> {
@@ -100,7 +152,7 @@ export async function updateFile(
   return `Updated ${filename}: ${lines} lines, ${stat.size} bytes`;
 }
 
-async function listFileNames(): Promise<string[]> {
+export async function listFileNames(): Promise<string[]> {
   const entries = await fs.readdir(BRAIN_DIR, { withFileTypes: true });
   const files: string[] = [];
 
@@ -122,7 +174,7 @@ async function listFileNames(): Promise<string[]> {
   return files.sort();
 }
 
-function getStalenessThreshold(filename: string): number {
+export function getStalenessThreshold(filename: string): number {
   const base = path.basename(filename);
   if (base === NOW_FILE) return STALENESS.NOW;
   if (ACTIVE_PATTERNS.some((p) => p.test(base))) return STALENESS.ACTIVE;

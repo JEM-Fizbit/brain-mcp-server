@@ -9,6 +9,20 @@ export const CHARACTER_LIMIT = 50_000;
 export const LOADER_FILE = "00_loader.md";
 export const NOW_FILE = "NOW.md";
 export const MAX_SEARCH_RESULTS = 50;
+export const LOG_FILE = "LOG.md";
+export const LINE_LIMIT = 200;
+export const LINT_NUDGE_DAYS = 30;
+export const GITHUB_REPO =
+  process.env.BRAIN_GITHUB_REPO || "JEM-Fizbit/ai-brain-jem";
+export const LOG_OP_TYPES = [
+  "INGEST",
+  "UPDATE",
+  "LINT",
+  "CREATE",
+  "SPLIT",
+  "PRUNE",
+] as const;
+export type LogOpType = (typeof LOG_OP_TYPES)[number];
 
 /** Staleness thresholds in days */
 export const STALENESS = {
