@@ -10,7 +10,7 @@ import {
 export function registerIngestTools(server: McpServer): void {
   server.tool(
     "brain_ingest",
-    "Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections — rather than making ad-hoc edits. Accepts source_content (inline text) OR source_path (absolute file path — preferred for large documents to avoid MCP parameter size limits). With dry_run=true (default), returns analysis plan. With dry_run=false, saves source to sources/{category}/. After updating Brain files, call brain_ingest_complete to record provenance.",
+    "Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections — rather than making ad-hoc edits. IMPORTANT: For documents over 500 words, ALWAYS use source_path (absolute file path) instead of source_content to avoid MCP timeout. Write the content to a temp file first, then pass the path. source_content is only for short text (a few paragraphs). With dry_run=true (default), returns analysis plan. With dry_run=false, saves source to sources/{category}/. After updating Brain files, call brain_ingest_complete to record provenance.",
     IngestSchema.shape,
     async ({ source_content, source_path, source_label, category, dry_run }) => {
       try {

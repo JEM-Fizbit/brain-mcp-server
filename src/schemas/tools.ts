@@ -73,11 +73,11 @@ export const IngestSchema = z.object({
   source_content: z
     .string()
     .optional()
-    .describe("The text content of the source to ingest. Use this OR source_path, not both."),
+    .describe("Short text to ingest (under 500 words only). For longer content, use source_path instead to avoid MCP timeouts."),
   source_path: z
     .string()
     .optional()
-    .describe("Absolute path to a source file on disk. The server reads it directly — avoids MCP parameter size limits for large documents. Use this OR source_content, not both."),
+    .describe("PREFERRED for documents over 500 words. Absolute path to a file on disk — the server reads it directly. Write content to a temp file first (e.g. /tmp/source.md), then pass the path here."),
   source_label: z
     .string()
     .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
