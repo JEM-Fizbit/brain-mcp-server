@@ -67,16 +67,14 @@ export async function getLastOpDate(
   await ensureLogFile();
 
   const content = await fs.readFile(LOG_PATH, "utf-8");
-  const pattern = new RegExp(
-    `^## \\[(\\d{4}-\\d{2}-\\d{2})\\] ${opType}`,
-    "gm"
-  );
+  const pattern = new RegExp(`^## \\[(\\d{4}-\\d{2}-\\d{2})\\] ${opType}`);
 
-  let lastDate: string | null = null;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(content)) !== null) {
-    lastDate = match[1];
+  // Log is append-only (newest at bottom) — scan from end, return first match
+  const entries = content.split(/(?=^## \[)/m);
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const match = entries[i].match(pattern);
+    if (match) return new Date(match[1]);
   }
 
-  return lastDate ? new Date(lastDate) : null;
+  return null;
 }

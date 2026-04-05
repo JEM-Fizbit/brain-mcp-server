@@ -11,6 +11,7 @@ export const NOW_FILE = "NOW.md";
 export const MAX_SEARCH_RESULTS = 50;
 export const LOG_FILE = "LOG.md";
 export const LINE_LIMIT = 200;
+export const DOMAIN_PACK_LIMIT = 20;
 export const LINT_NUDGE_DAYS = 30;
 export const GITHUB_REPO =
   process.env.BRAIN_GITHUB_REPO || "JEM-Fizbit/ai-brain-jem";
@@ -57,4 +58,13 @@ export const ACTIVE_PATTERNS = [
 export const IDENTITY_PATTERNS = [
   /^01_/,   // identity
   /^04_/,   // credentials
+];
+
+/** Section headers in 05_projects.md indicating inactive/non-priority projects (drift skip) */
+export const INACTIVE_SECTION_PATTERNS = [
+  /maintenance/i,
+  /archived/i,
+  /concept/i,
+  /early.stage/i,
+  /stable/i,
 ];

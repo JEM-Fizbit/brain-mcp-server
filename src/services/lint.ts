@@ -8,6 +8,8 @@ import {
   STALENESS,
   ACTIVE_PATTERNS,
   IDENTITY_PATTERNS,
+  INACTIVE_SECTION_PATTERNS,
+  DOMAIN_PACK_LIMIT,
 } from "../constants.js";
 import { listFileNames, getStalenessThreshold } from "./brain.js";
 import * as log from "./log.js";
@@ -107,23 +109,33 @@ export async function runLint(): Promise<LintReport> {
     const projectsPath = path.join(BRAIN_DIR, "05_projects.md");
     try {
       const projectsContent = await fs.readFile(projectsPath, "utf-8");
-      const projectsLower = projectsContent.toLowerCase();
+      const lines = projectsContent.split("\n");
+      let currentSection = "";
 
-      // Extract project names from 05_projects.md (lines starting with ## or ###)
-      const projectHeadings = projectsContent
-        .split("\n")
-        .filter((l) => /^#{2,3}\s/.test(l))
-        .map((l) => l.replace(/^#{2,3}\s+/, "").trim());
+      for (const line of lines) {
+        // Track current ## section (category header)
+        const h2Match = line.match(/^##\s+(.+)/);
+        if (h2Match) {
+          currentSection = h2Match[1].trim();
+          continue;
+        }
 
-      for (const project of projectHeadings) {
+        // Only drift-check ### project headings (not ## category headers)
+        const h3Match = line.match(/^###\s+(.+)/);
+        if (!h3Match) continue;
+
+        const project = h3Match[1].trim();
         const projectLower = project.toLowerCase();
-        // If a project is in 05_projects.md but never mentioned in NOW.md,
-        // it might be inactive — flag for review
-        if (
-          projectLower.length > 3 &&
-          !nowLower.includes(projectLower) &&
-          !projectLower.includes("---")
-        ) {
+
+        if (projectLower.length <= 3 || projectLower.includes("---")) continue;
+
+        // Skip projects under inactive sections (Archived, Maintenance, etc.)
+        const isInactiveSection = INACTIVE_SECTION_PATTERNS.some((p) =>
+          p.test(currentSection)
+        );
+        if (isInactiveSection) continue;
+
+        if (!nowLower.includes(projectLower)) {
           drift.push(
             `Project "${project}" in 05_projects.md not mentioned in NOW.md — still active?`
           );
@@ -146,7 +158,7 @@ export async function runLint(): Promise<LintReport> {
     }
   }
   for (const [dir, count] of dirCounts) {
-    if (count > 15) {
+    if (count > DOMAIN_PACK_LIMIT) {
       largeDomainPacks.push({ dir, count });
     }
   }
@@ -192,7 +204,7 @@ export function formatLintReport(report: LintReport): string {
 
   // Bloat
   if (report.bloat.length > 0) {
-    sections.push("## Bloat (files exceeding 200 lines)");
+    sections.push(`## Bloat (files exceeding ${LINE_LIMIT} lines)`);
     for (const { file, lines } of report.bloat) {
       sections.push(`- ${file}: ${lines} lines`);
     }
@@ -228,7 +240,7 @@ export function formatLintReport(report: LintReport): string {
 
   // Large domain packs
   if (report.largeDomainPacks.length > 0) {
-    sections.push("## Large domain packs (consider splitting)");
+    sections.push(`## Large domain packs (>${DOMAIN_PACK_LIMIT} files)`);
     for (const { dir, count } of report.largeDomainPacks) {
       sections.push(`- ${dir}/: ${count} files`);
     }
