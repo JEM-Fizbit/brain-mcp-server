@@ -135,7 +135,14 @@ export async function runLint(): Promise<LintReport> {
         );
         if (isInactiveSection) continue;
 
-        if (!nowLower.includes(projectLower)) {
+        // Split on common delimiters (—, (, ,) and match any segment
+        const segments = projectLower
+          .split(/\s*[—–\-\(\),\/]\s*/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 3);
+
+        const mentioned = segments.some((seg) => nowLower.includes(seg));
+        if (!mentioned) {
           drift.push(
             `Project "${project}" in 05_projects.md not mentioned in NOW.md — still active?`
           );
