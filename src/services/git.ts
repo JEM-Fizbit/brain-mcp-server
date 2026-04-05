@@ -28,7 +28,8 @@ export async function commit(
   // Get commit info
   const hash = await git("rev-parse", "--short", "HEAD");
   const diffStat = await git("diff", "--stat", "HEAD~1", "HEAD");
-  const filesChanged = diffStat.split("\n").length - 1;
+  const statMatch = diffStat.match(/(\d+) files? changed/);
+  const filesChanged = statMatch ? parseInt(statMatch[1], 10) : 1;
 
   // Optionally push
   let pushStatus: string;

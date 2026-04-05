@@ -11,7 +11,7 @@ import {
   LINT_NUDGE_DAYS,
 } from "../constants.js";
 import * as log from "./log.js";
-import { getOpenMaintenanceIssues } from "./issues.js";
+import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
 
 export interface BrainFile {
   name: string;
@@ -46,9 +46,12 @@ export async function loadContext(): Promise<string> {
   const loaderPath = path.join(BRAIN_DIR, LOADER_FILE);
   const nowPath = path.join(BRAIN_DIR, NOW_FILE);
 
-  const [loader, now] = await Promise.all([
+  // Fetch everything in parallel: core files + nudge data
+  const [loader, now, lastLint, issues] = await Promise.all([
     fs.readFile(loaderPath, "utf-8").catch(() => null),
     fs.readFile(nowPath, "utf-8").catch(() => null),
+    log.getLastOpDate("LINT").catch((): null => null),
+    getOpenMaintenanceIssues().catch((): OpenIssue[] => []),
   ]);
 
   if (!loader || !now) {
@@ -69,51 +72,37 @@ export async function loadContext(): Promise<string> {
     now.trim(),
   ];
 
-  // Lint nudge: check when brain_lint was last run
-  try {
-    const lastLint = await log.getLastOpDate("LINT");
-    if (!lastLint) {
-      parts.push(
-        "",
-        "⚠️ brain_lint has never been run. Consider running brain_lint to check Brain health."
-      );
-    } else {
-      const daysSince = Math.floor(
-        (Date.now() - lastLint.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (daysSince > LINT_NUDGE_DAYS) {
-        parts.push(
-          "",
-          `⚠️ Last brain_lint was ${daysSince} days ago. Consider running brain_lint before proceeding.`
-        );
-      }
-    }
-  } catch {
-    // LOG.md doesn't exist yet — nudge to run lint
+  // Lint nudge
+  if (!lastLint) {
     parts.push(
       "",
       "⚠️ brain_lint has never been run. Consider running brain_lint to check Brain health."
     );
+  } else {
+    const daysSince = Math.floor(
+      (Date.now() - lastLint.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (daysSince > LINT_NUDGE_DAYS) {
+      parts.push(
+        "",
+        `⚠️ Last brain_lint was ${daysSince} days ago. Consider running brain_lint before proceeding.`
+      );
+    }
   }
 
   // Open maintenance issues nudge
-  try {
-    const issues = await getOpenMaintenanceIssues();
-    if (issues.length > 0) {
-      parts.push(
-        "",
-        `📋 ${issues.length} open Brain maintenance issue(s) requiring review:`
-      );
-      for (const issue of issues) {
-        parts.push(`  - #${issue.number}: ${issue.title} — ${issue.url}`);
-      }
-      parts.push(
-        "",
-        "Ask John if he'd like to review and address these now. With explicit approval, read the issue, implement fixes, and commit/push."
-      );
+  if (issues.length > 0) {
+    parts.push(
+      "",
+      `📋 ${issues.length} open Brain maintenance issue(s) requiring review:`
+    );
+    for (const issue of issues) {
+      parts.push(`  - #${issue.number}: ${issue.title} — ${issue.url}`);
     }
-  } catch {
-    // GitHub check failed — not critical, continue without nudge
+    parts.push(
+      "",
+      "Ask John if he'd like to review and address these now. With explicit approval, read the issue, implement fixes, and commit/push."
+    );
   }
 
   return parts.join("\n");
@@ -147,8 +136,11 @@ export async function updateFile(
     await fs.writeFile(filePath, content, "utf-8");
   }
 
-  const stat = await fs.stat(filePath);
-  const lines = content.split("\n").length;
+  const [stat, fullContent] = await Promise.all([
+    fs.stat(filePath),
+    fs.readFile(filePath, "utf-8"),
+  ]);
+  const lines = fullContent.split("\n").length;
   return `Updated ${filename}: ${lines} lines, ${stat.size} bytes`;
 }
 
