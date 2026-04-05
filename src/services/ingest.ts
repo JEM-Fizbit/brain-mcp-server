@@ -57,9 +57,12 @@ export async function analyzeForIngest(
     "### Next steps:",
     "- Use `brain_read_file` to read any files you expect the source touches",
     "- Get human approval for proposed changes",
-    "- Call `brain_ingest` with `dry_run=false` and a `category` to save the source",
-    "- Use `brain_update_file` to make changes to Brain files",
-    "- Call `brain_ingest_complete` to record provenance (which Brain files were updated)",
+    "- **For large documents (over 500 words or non-text files):**",
+    "  1. Save original file to `sources/{category}/{YYYY-MM-DD}_{slug}.{ext}` using Desktop Commander write_file",
+    "  2. Save markdown conversion to `sources/{category}/{YYYY-MM-DD}_{slug}.md` using Desktop Commander write_file",
+    "  3. Update Brain files via `brain_update_file`",
+    "  4. Call `brain_ingest_complete` with both file paths and Brain files touched",
+    "- **For short text (under 500 words):** Call `brain_ingest` with `dry_run=false` and `source_content`",
     "- Run `brain_lint` after ingesting to check for inconsistencies",
   ].join("\n");
 
@@ -135,12 +138,14 @@ export async function saveSource(
 
 /**
  * Record a completed ingest: append to LOG.md and SOURCES.md index.
+ * Supports dual-format storage (original + markdown).
  */
 export async function recordIngest(
   sourceLabel: string,
   category: SourceCategory,
-  sourceFile: string,
-  filesTouched: string[]
+  mdFile: string,
+  filesTouched: string[],
+  originalFile?: string
 ): Promise<string> {
   // Append to LOG.md
   await log.appendLog(
@@ -151,28 +156,28 @@ export async function recordIngest(
 
   // Append row to SOURCES.md
   const indexPath = path.join(BRAIN_DIR, SOURCES_INDEX);
-  const row = `| ${formatDate()} | ${sourceLabel} | ${category} | \`${sourceFile}\` | ${filesTouched.map((f) => `\`${f}\``).join(", ")} |`;
+  const originalCol = originalFile ? `\`${originalFile}\`` : "—";
+  const row = `| ${formatDate()} | ${sourceLabel} | ${category} | ${originalCol} | \`${mdFile}\` | ${filesTouched.map((f) => `\`${f}\``).join(", ")} |`;
 
   try {
     const content = await fs.readFile(indexPath, "utf-8");
-    // Append after the table header (find the last |...| line or the header separator)
     const updatedContent = content.trimEnd() + "\n" + row + "\n";
     await fs.writeFile(indexPath, updatedContent, "utf-8");
   } catch {
-    // SOURCES.md doesn't exist — shouldn't happen but handle gracefully
     const header = [
       "# Source Index",
       "",
       "Registry of all primary sources ingested into the Brain.",
       "Each entry links a source file to the Brain files it informed.",
       "",
-      "| Date | Label | Category | File | Brain files touched |",
-      "|------|-------|----------|------|-------------------|",
+      "| Date | Label | Category | Original | Markdown | Brain files touched |",
+      "|------|-------|----------|----------|----------|-------------------|",
       row,
       "",
     ].join("\n");
     await fs.writeFile(indexPath, header, "utf-8");
   }
 
-  return `Ingest recorded: ${sourceLabel} → ${sourceFile} (${filesTouched.length} Brain files touched)`;
+  const files = originalFile ? `${originalFile} + ${mdFile}` : mdFile;
+  return `Ingest recorded: ${sourceLabel} → ${files} (${filesTouched.length} Brain files touched)`;
 }

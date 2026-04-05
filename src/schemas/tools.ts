@@ -73,11 +73,11 @@ export const IngestSchema = z.object({
   source_content: z
     .string()
     .optional()
-    .describe("Short text to ingest (under 500 words only). For longer content, use source_path instead to avoid MCP timeouts."),
+    .describe("Short text only (under 500 words). For larger content, save to sources/ via Desktop Commander and omit this."),
   source_path: z
     .string()
     .optional()
-    .describe("PREFERRED for documents over 500 words. Absolute path to a file on disk — the server reads it directly. Write content to a temp file first (e.g. /tmp/source.md), then pass the path here."),
+    .describe("Absolute path to a file on disk. Server reads it directly."),
   source_label: z
     .string()
     .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
@@ -86,7 +86,7 @@ export const IngestSchema = z.object({
   dry_run: z
     .boolean()
     .default(true)
-    .describe("If true (default), returns analysis plan without saving. If false, saves the source file to sources/{category}/ and returns the saved file path."),
+    .describe("If true (default), returns analysis plan — no content needed, you already read the document. If false, saves source .md (requires source_content or source_path)."),
 });
 
 export const IngestCompleteSchema = z.object({
@@ -95,9 +95,13 @@ export const IngestCompleteSchema = z.object({
     .describe("Label of the source that was ingested."),
   category: sourceCategoryEnum
     .describe("Source category."),
-  source_file: z
+  original_file: z
     .string()
-    .describe("Path to the saved source file (returned by brain_ingest with dry_run=false)."),
+    .optional()
+    .describe("Path to original format file in sources/ (e.g. .docx, .pdf). Omit if source was plain text."),
+  md_file: z
+    .string()
+    .describe("Path to the markdown version in sources/."),
   files_touched: z
     .array(z.string())
     .describe("Brain files that were updated from this source."),

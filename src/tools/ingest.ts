@@ -10,33 +10,52 @@ import {
 export function registerIngestTools(server: McpServer): void {
   server.tool(
     "brain_ingest",
-    "Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections — rather than making ad-hoc edits. IMPORTANT: For documents over 500 words, ALWAYS use source_path (absolute file path) instead of source_content to avoid MCP timeout. Write the content to a temp file first, then pass the path. source_content is only for short text (a few paragraphs). With dry_run=true (default), returns analysis plan. With dry_run=false, saves source to sources/{category}/. After updating Brain files, call brain_ingest_complete to record provenance.",
+    `Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections.
+
+LARGE DOCUMENTS (over 500 words or non-text files):
+1. Save the original file to sources/{category}/{YYYY-MM-DD}_{slug}.{ext} using Desktop Commander write_file
+2. Save a markdown conversion alongside it as .md using Desktop Commander write_file
+3. Call this tool with dry_run=true (NO content params) to get the analysis plan
+4. Update Brain files, then call brain_ingest_complete with both file paths
+
+SHORT TEXT (under 500 words): Pass source_content directly with dry_run=false.
+
+NEVER pass large text as source_content — it will timeout the MCP transport.`,
     IngestSchema.shape,
     async ({ source_content, source_path, source_label, category, dry_run }) => {
       try {
-        const content = await resolveSourceContent(source_content, source_path);
-
         if (dry_run) {
           const analysis = await analyzeForIngest(source_label);
-          const result = [
-            analysis.instructions,
-            "",
-            "---",
-            "",
-            `## Source content to ingest (${content.length} chars):`,
-            "",
-            content,
-          ].join("\n");
 
-          return { content: [{ type: "text", text: result }] };
+          // If content was provided, include it (short text only)
+          const contentSection =
+            source_content || source_path
+              ? await (async () => {
+                  const content = await resolveSourceContent(
+                    source_content,
+                    source_path
+                  );
+                  return [
+                    "",
+                    "---",
+                    "",
+                    `## Source content (${content.length} chars):`,
+                    "",
+                    content,
+                  ].join("\n");
+                })()
+              : "";
+
+          return {
+            content: [
+              { type: "text", text: analysis.instructions + contentSection },
+            ],
+          };
         }
 
-        // dry_run=false: save the source file
-        const savedPath = await saveSource(
-          content,
-          source_label,
-          category
-        );
+        // dry_run=false: save the source .md file
+        const content = await resolveSourceContent(source_content, source_path);
+        const savedPath = await saveSource(content, source_label, category);
 
         const result = [
           `Source saved: \`${savedPath}\``,
@@ -59,15 +78,16 @@ export function registerIngestTools(server: McpServer): void {
 
   server.tool(
     "brain_ingest_complete",
-    "Record a completed ingest. Call this after saving the source (brain_ingest dry_run=false) and updating Brain files. Appends provenance to SOURCES.md and logs the ingest.",
+    "Record a completed ingest. Call this after saving the source and updating Brain files. Records provenance in SOURCES.md (original + markdown paths) and logs the ingest.",
     IngestCompleteSchema.shape,
-    async ({ source_label, category, source_file, files_touched }) => {
+    async ({ source_label, category, original_file, md_file, files_touched }) => {
       try {
         const result = await recordIngest(
           source_label,
           category,
-          source_file,
-          files_touched
+          md_file,
+          files_touched,
+          original_file
         );
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
