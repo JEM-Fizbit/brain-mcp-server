@@ -89,6 +89,8 @@ export const IngestSchema = z.object({
     .describe("If true (default), returns analysis plan — no content needed, you already read the document. If false, saves source .md (requires source_content or source_path)."),
 });
 
+export const ScanInboxSchema = z.object({});
+
 export const IngestCompleteSchema = z.object({
   source_label: z
     .string()
