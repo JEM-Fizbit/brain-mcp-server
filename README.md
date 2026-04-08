@@ -10,7 +10,7 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 
 | Tool | Description |
 |------|-------------|
-| `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint and issue nudges |
+| `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint, issue, and inbox nudges |
 | `brain_read_file` | Read a specific Brain file by name |
 | `brain_update_file` | Update a Brain file (replace or append) |
 | `brain_commit` | Git commit changes, optionally push |
@@ -21,6 +21,7 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 | `brain_lint` | Run a health check (bloat, staleness, orphans, drift) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md) |
+| `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
 
 ## Requirements
 
@@ -98,7 +99,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-This matches all eleven Brain tools. You can verify with `/permissions` in Claude Code.
+This matches all twelve Brain tools. You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
@@ -120,7 +121,7 @@ Skip when:
   or user explicitly says not to load
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest")
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context (returns loader + NOW.md + lint/issue nudges)
 3. Call brain_read_file for task-relevant files per the navigation table
 4. If brain_load_context flags a lint nudge or open issues, act accordingly
@@ -139,7 +140,7 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 ## How It Works
 
 1. Claude calls `brain_load_context` at session start (automatically, if configured per above)
-2. The response includes the loader, NOW.md, and nudges (lint overdue, open maintenance issues)
+2. The response includes the loader, NOW.md, and nudges (lint overdue, open maintenance issues, pending inbox files)
 3. Claude reads the navigation table and requests specific files via `brain_read_file`
 4. Edits are written via `brain_update_file`, then committed via `brain_commit`
 5. New information is processed via `brain_ingest` (dry-run analysis, then guided updates)
@@ -156,6 +157,7 @@ The MCP server works from any Claude client, but different tasks suit different 
 | Using Brain in conversation | **Chat** (any client with MCP) | All read/write tools work over stdio — no uploads needed |
 | Small updates (NOW.md, tasks, journal) | **Chat** | `brain_update_file` + `brain_commit` handle it directly |
 | Large document ingestion | **Cowork or Code** | Multi-step workflow needs filesystem access to `sources/` |
+| Drop-folder ingestion | **Any** (via scheduled task) | Drop files into `inbox/`, daily task processes them automatically |
 | Server code maintenance | **Code** | Iterative build-test-commit cycle |
 | Brain repo git operations | **Code** | Shell access for rebasing, conflict resolution, pushing |
 
