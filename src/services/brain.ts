@@ -12,6 +12,7 @@ import {
 } from "../constants.js";
 import * as log from "./log.js";
 import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
+import { scanInbox } from "./inbox.js";
 
 export interface BrainFile {
   name: string;
@@ -47,11 +48,12 @@ export async function loadContext(): Promise<string> {
   const nowPath = path.join(BRAIN_DIR, NOW_FILE);
 
   // Fetch everything in parallel: core files + nudge data
-  const [loader, now, lastLint, issues] = await Promise.all([
+  const [loader, now, lastLint, issues, inboxFiles] = await Promise.all([
     fs.readFile(loaderPath, "utf-8").catch(() => null),
     fs.readFile(nowPath, "utf-8").catch(() => null),
     log.getLastOpDate("LINT").catch((): null => null),
     getOpenMaintenanceIssues().catch((): OpenIssue[] => []),
+    scanInbox().catch((): [] => []),
   ]);
 
   if (!loader || !now) {
@@ -102,6 +104,14 @@ export async function loadContext(): Promise<string> {
     parts.push(
       "",
       "Ask John if he'd like to review and address these now. With explicit approval, read the issue, implement fixes, and commit/push."
+    );
+  }
+
+  // Inbox nudge
+  if (inboxFiles.length > 0) {
+    parts.push(
+      "",
+      `📥 ${inboxFiles.length} file(s) pending in Brain inbox. Use brain_scan_inbox to review, or wait for scheduled processing.`
     );
   }
 

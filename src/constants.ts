@@ -27,6 +27,7 @@ export type LogOpType = (typeof LOG_OP_TYPES)[number];
 
 export const SOURCES_DIR = "sources";
 export const SOURCES_INDEX = "SOURCES.md";
+export const INBOX_DIR = "inbox";
 export const SOURCE_CATEGORIES = [
   "bios",
   "cv",
