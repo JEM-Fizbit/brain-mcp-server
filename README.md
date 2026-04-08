@@ -147,6 +147,22 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 
 The routing logic lives in the loader (a Markdown file you maintain), not in code. The server is content-agnostic — it knows nothing about your specific Brain content, only how to serve Markdown files.
 
+## Recommended Workflow
+
+The MCP server works from any Claude client, but different tasks suit different clients:
+
+| Activity | Best client | Why |
+|---|---|---|
+| Using Brain in conversation | **Chat** (any client with MCP) | All read/write tools work over stdio — no uploads needed |
+| Small updates (NOW.md, tasks, journal) | **Chat** | `brain_update_file` + `brain_commit` handle it directly |
+| Large document ingestion | **Cowork or Code** | Multi-step workflow needs filesystem access to `sources/` |
+| Server code maintenance | **Code** | Iterative build-test-commit cycle |
+| Brain repo git operations | **Code** | Shell access for rebasing, conflict resolution, pushing |
+
+**Chat** is the primary interface for day-to-day Brain usage — loading context, searching, editing files, committing. **Cowork** or **Code** are needed when the workflow requires direct filesystem access (e.g., saving source documents) or agentic multi-step operations. **Code** is the right tool for maintaining the server codebase itself.
+
+For the full methodology, see the [AI Brain Primer](https://github.com/JEM-Fizbit/ai-brain-primer).
+
 ## Related Projects
 
 - **[ai-brain-primer](https://github.com/JEM-Fizbit/ai-brain-primer)** — Framework and methodology for building an AI Brain
