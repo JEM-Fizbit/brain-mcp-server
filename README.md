@@ -18,7 +18,7 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 | `brain_search` | Search across all Brain files |
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
-| `brain_lint` | Run a health check (bloat, staleness, orphans, drift) |
+| `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
@@ -148,6 +148,8 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 
 The routing logic lives in the loader (a Markdown file you maintain), not in code. The server is content-agnostic — it knows nothing about your specific Brain content, only how to serve Markdown files.
 
+Brain files use `[[backlinks]]` (Obsidian-style wikilinks) to cross-reference each other. During ingest, the LLM maintains these links across all affected files. The lint process checks for orphan content files (zero inbound backlinks). The Brain directory can be opened as an Obsidian vault for graph view and backlink navigation.
+
 ## Recommended Workflow
 
 The MCP server works from any Claude client, but different tasks suit different clients:
@@ -160,6 +162,7 @@ The MCP server works from any Claude client, but different tasks suit different 
 | Drop-folder ingestion | **Any** (via scheduled task) | Drop files into `inbox/`, daily task processes them automatically |
 | Server code maintenance | **Code** | Iterative build-test-commit cycle |
 | Brain repo git operations | **Code** | Shell access for rebasing, conflict resolution, pushing |
+| Graph view & knowledge mapping | **Obsidian** | Open `brain/` as a vault for graph visualization, backlink navigation, and orphan detection |
 
 **Chat** is the primary interface for day-to-day Brain usage — loading context, searching, editing files, committing. **Cowork** or **Code** are needed when the workflow requires direct filesystem access (e.g., saving source documents) or agentic multi-step operations. **Code** is the right tool for maintaining the server codebase itself.
 
