@@ -70,6 +70,7 @@ brain-mcp-server/
 │   │   ├── log.ts        # Change log operations (append, read, getLastOpDate)
 │   │   ├── lint.ts       # Health checks (bloat, stale, orphans, drift)
 │   │   ├── ingest.ts     # Source ingestion (analyze, save to sources/, record provenance)
+│   │   ├── inbox.ts      # Inbox scanning (list pending files in inbox/)
 │   │   └── issues.ts     # GitHub issue checks (open maintenance issues)
 │   ├── schemas/
 │   │   └── tools.ts      # Zod schemas for all tool inputs
@@ -80,14 +81,15 @@ brain-mcp-server/
 │       ├── log.ts        # brain_log, brain_read_log
 │       ├── lint.ts       # brain_lint
 │       ├── ingest.ts     # brain_ingest, brain_ingest_complete
+│       ├── inbox.ts      # brain_scan_inbox
 │       └── index.ts      # Tool registration barrel
 └── dist/                 # Compiled output
 ```
 
-### Tools (11 total)
+### Tools (12 total)
 
 **Core:**
-- `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue nudges
+- `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
 - `brain_read_file` — Read a specific Brain file by name
 - `brain_update_file` — Write changes to a Brain file
 - `brain_commit` — Git commit (optionally push)
@@ -100,6 +102,7 @@ brain-mcp-server/
 - `brain_lint` — Health check: bloat, staleness, orphans, drift. Auto-logs the pass.
 - `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false saves source to sources/{category}/)
 - `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md)
+- `brain_scan_inbox` — List files pending in the inbox/ drop-folder for processing
 
 ---
 
