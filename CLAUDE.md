@@ -91,7 +91,7 @@ brain-mcp-server/
 **Core:**
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
 - `brain_read_file` — Read a specific Brain file by name
-- `brain_update_file` — Write changes to a Brain file
+- `brain_update_file` — Write changes to a Brain file (replace, append, or patch with find-and-replace)
 - `brain_commit` — Git commit (optionally push)
 - `brain_list_files` — List all files with staleness metadata
 - `brain_search` — Search across all Brain files
@@ -101,7 +101,7 @@ brain-mcp-server/
 - `brain_read_log` — Read recent change log entries
 - `brain_lint` — Health check: bloat, staleness, orphans, drift. Auto-logs the pass.
 - `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false saves source to sources/{category}/)
-- `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md)
+- `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md, optionally deletes inbox file via `inbox_file` param)
 - `brain_scan_inbox` — List files pending in the inbox/ drop-folder for processing
 
 ---

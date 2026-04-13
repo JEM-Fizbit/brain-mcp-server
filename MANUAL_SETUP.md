@@ -11,8 +11,9 @@ These steps require human action in client UIs and cannot be automated by Claude
 **Add this text** (append to any existing preferences):
 
 ```
-I maintain an AI Brain (personal knowledge system) accessible via MCP. Load it when the
-conversation benefits from personal context — skip it for generic tasks.
+I prefer communication that is clear, concise, objective and evidence-based. Don't just agree with me to be agreeable; it's more important to be intellectually grounded.
+
+I maintain an AI Brain (personal knowledge system) accessible via MCP. Load it when the conversation benefits from personal context — skip it for generic tasks.
 
 Load Brain context proactively (don't wait to be asked) when:
 - Writing on my behalf (emails, posts, bios, articles)
@@ -30,9 +31,23 @@ Skip Brain loading when:
 - I explicitly say not to load it
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+1. Fetch tools (if deferred):
+ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context (returns loader navigation table + current priorities + nudges for overdue lint or pending inbox files)
 3. Call brain_read_file for task-relevant files per the navigation table
+4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work
+
+Brain file editing:
+- brain_update_file supports three modes: "replace" (full overwrite), "append" (add to end), "patch" (surgical find-and-replace using old_content + content parameters). Prefer "patch" for section-level edits to avoid accidentally overwriting entire files.
+
+Ingestion protocol (for new source documents):
+1. Save original file to /Users/johnemilad/Projects/ai-brain-jem/sources/{category}/{YYYY-MM-DD}_{slug}.{ext} via Desktop Commander write_file (always use this absolute path, not container paths)
+2. Save a markdown conversion alongside it as .md
+3. Update Brain files via brain_update_file
+4. Call brain_ingest_complete with both file paths, the list of Brain files touched, and the inbox_file parameter (original inbox filename) so the inbox file is automatically deleted after provenance is recorded
+5. Never pass large text as source_content — it will timeout the MCP transport
+
+Source categories: bios, cv (formal CVs/resumes only), career_history (track records, deal sheets, directorships, publications), assessments (psychometrics, 360 feedback, coaching), writing_samples, meeting_notes, photos, other
 ```
 
 ---
