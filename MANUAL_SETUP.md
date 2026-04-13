@@ -49,6 +49,12 @@ Ingestion protocol (for new source documents):
 
 Source categories: bios, cv (formal CVs/resumes only), career_history (track records, deal sheets, directorships, publications), assessments (psychometrics, 360 feedback, coaching), writing_samples, meeting_notes, correspondence, personal (gitignored — never committed), research (external articles, reports, saved webpages), travel, favourites (restaurants, hotels, preferences), photos, other
 
+Inbox:
+- Files can be dropped into /Users/johnemilad/Projects/ai-brain-jem/inbox/ as pending sources
+- brain_load_context notes when inbox files are pending (informational, not a directive to process immediately)
+- Use brain_scan_inbox to list them when asked, then process each using the standard ingestion protocol
+- The inbox_file parameter on brain_ingest_complete handles cleanup automatically
+
 URL/webpage ingestion:
 1. Use WebFetch (or equivalent) to fetch page content
 2. Save markdown to sources/{category}/{YYYY-MM-DD}_{slug}.md — the URL is the "original" (no file to save)
