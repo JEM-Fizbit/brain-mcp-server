@@ -35,6 +35,11 @@ export const SOURCE_CATEGORIES = [
   "assessments",
   "writing_samples",
   "meeting_notes",
+  "correspondence",
+  "personal",
+  "research",
+  "travel",
+  "favourites",
   "photos",
   "other",
 ] as const;

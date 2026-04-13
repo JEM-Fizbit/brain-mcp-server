@@ -47,7 +47,12 @@ Ingestion protocol (for new source documents):
 4. Call brain_ingest_complete with both file paths, the list of Brain files touched, and the inbox_file parameter (original inbox filename) so the inbox file is automatically deleted after provenance is recorded
 5. Never pass large text as source_content — it will timeout the MCP transport
 
-Source categories: bios, cv (formal CVs/resumes only), career_history (track records, deal sheets, directorships, publications), assessments (psychometrics, 360 feedback, coaching), writing_samples, meeting_notes, photos, other
+Source categories: bios, cv (formal CVs/resumes only), career_history (track records, deal sheets, directorships, publications), assessments (psychometrics, 360 feedback, coaching), writing_samples, meeting_notes, correspondence, personal (gitignored — never committed), research (external articles, reports, saved webpages), travel, favourites (restaurants, hotels, preferences), photos, other
+
+URL/webpage ingestion:
+1. Use WebFetch (or equivalent) to fetch page content
+2. Save markdown to sources/{category}/{YYYY-MM-DD}_{slug}.md — the URL is the "original" (no file to save)
+3. Update Brain files, then call brain_ingest_complete with md_file path and URL noted in source_label
 ```
 
 ---
