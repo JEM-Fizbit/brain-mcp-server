@@ -134,11 +134,30 @@ export async function readFile(filename: string): Promise<string> {
 export async function updateFile(
   filename: string,
   content: string,
-  mode: "replace" | "append"
+  mode: "replace" | "append" | "patch",
+  old_content?: string
 ): Promise<string> {
   const filePath = resolveFilePath(filename);
 
-  if (mode === "append") {
+  if (mode === "patch") {
+    if (!old_content) {
+      throw new Error("patch mode requires old_content parameter");
+    }
+    const existing = await fs.readFile(filePath, "utf-8");
+    const occurrences = existing.split(old_content).length - 1;
+    if (occurrences === 0) {
+      throw new Error(
+        `old_content not found in ${filename}. Ensure the text matches exactly (including whitespace and newlines).`
+      );
+    }
+    if (occurrences > 1) {
+      throw new Error(
+        `old_content found ${occurrences} times in ${filename}. It must be unique. Provide more surrounding context to disambiguate.`
+      );
+    }
+    const updated = existing.replace(old_content, content);
+    await fs.writeFile(filePath, updated, "utf-8");
+  } else if (mode === "append") {
     const existing = await fs.readFile(filePath, "utf-8").catch(() => "");
     const separator = existing.endsWith("\n") ? "" : "\n";
     await fs.writeFile(filePath, existing + separator + content, "utf-8");

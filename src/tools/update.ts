@@ -8,9 +8,9 @@ export function registerUpdateTools(server: McpServer): void {
     "brain_update_file",
     "Update a Brain file. Writes to disk but does NOT auto-commit — call brain_commit separately after edits.",
     UpdateFileSchema.shape,
-    async ({ filename, content, mode }) => {
+    async ({ filename, content, mode, old_content }) => {
       try {
-        const result = await brain.updateFile(filename, content, mode);
+        const result = await brain.updateFile(filename, content, mode, old_content);
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {

@@ -16,8 +16,12 @@ export const UpdateFileSchema = z.object({
     .string()
     .describe("The new content to write to the file."),
   mode: z
-    .enum(["replace", "append"])
-    .describe('"replace" overwrites the file entirely. "append" adds to the end.'),
+    .enum(["replace", "append", "patch"])
+    .describe('"replace" overwrites the file entirely. "append" adds to the end. "patch" does find-and-replace: content is the new text, old_content is the text to find and replace.'),
+  old_content: z
+    .string()
+    .optional()
+    .describe("Required for patch mode. The exact text to find and replace. Must match uniquely in the file."),
 });
 
 export const CommitSchema = z.object({
