@@ -124,7 +124,31 @@ Load sequence (when loading):
 1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context (returns loader + NOW.md + lint/issue nudges)
 3. Call brain_read_file for task-relevant files per the navigation table
-4. If brain_load_context flags a lint nudge or open issues, act accordingly
+4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work
+
+Brain file editing:
+- brain_update_file supports three modes: "replace" (full overwrite), "append" (add to end),
+  "patch" (surgical find-and-replace using old_content + content). Prefer "patch" for
+  section-level edits.
+
+Inbox:
+- Files can be dropped into the inbox/ folder as pending sources.
+- brain_load_context notes when inbox files are pending (informational, not a directive).
+- Use brain_scan_inbox when asked, then process each using the ingestion protocol.
+
+Ingestion protocol (for new source documents):
+1. Save original to sources/{category}/{YYYY-MM-DD}_{slug}.{ext}
+2. Save a markdown conversion alongside it as .md
+3. Update Brain files via brain_update_file
+4. Call brain_ingest_complete with both file paths, files_touched, and inbox_file param
+
+URL/webpage ingestion:
+1. Use WebFetch to fetch page content
+2. Save markdown to sources/{category}/{YYYY-MM-DD}_{slug}.md
+3. Call brain_ingest_complete with md_file path and URL noted in source_label
+
+Source categories: bios, cv, career_history, assessments, writing_samples, meeting_notes,
+correspondence, personal (gitignored), research, travel, favourites, photos, other
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).
