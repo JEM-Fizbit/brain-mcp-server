@@ -12,7 +12,7 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 |------|-------------|
 | `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint, issue, and inbox nudges |
 | `brain_read_file` | Read a specific Brain file by name |
-| `brain_update_file` | Update a Brain file (replace or append) |
+| `brain_update_file` | Update a Brain file (replace, append, or patch) |
 | `brain_commit` | Git commit changes, optionally push |
 | `brain_list_files` | List all files with staleness metadata |
 | `brain_search` | Search across all Brain files |
@@ -20,7 +20,7 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 | `brain_read_log` | Read recent change log entries |
 | `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
-| `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md) |
+| `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
 
 ## Requirements
@@ -121,7 +121,7 @@ Skip when:
   or user explicitly says not to load
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context (returns loader + NOW.md + lint/issue nudges)
 3. Call brain_read_file for task-relevant files per the navigation table
 4. If brain_load_context flags a lint nudge or open issues, act accordingly
