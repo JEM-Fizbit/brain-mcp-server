@@ -31,6 +31,8 @@ export const INBOX_DIR = "inbox";
 export const SOURCE_CATEGORIES = [
   "bios",
   "cv",
+  "career_history",
+  "assessments",
   "writing_samples",
   "photos",
   "articles",

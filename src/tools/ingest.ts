@@ -5,6 +5,7 @@ import {
   resolveSourceContent,
   saveSource,
   recordIngest,
+  deleteInboxFile,
 } from "../services/ingest.js";
 
 export function registerIngestTools(server: McpServer): void {
@@ -80,7 +81,7 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
     "brain_ingest_complete",
     "Record a completed ingest. Call this after saving the source and updating Brain files. Records provenance in SOURCES.md (original + markdown paths) and logs the ingest.",
     IngestCompleteSchema.shape,
-    async ({ source_label, category, original_file, md_file, files_touched }) => {
+    async ({ source_label, category, original_file, md_file, files_touched, inbox_file }) => {
       try {
         const result = await recordIngest(
           source_label,
@@ -89,7 +90,14 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
           files_touched,
           original_file
         );
-        return { content: [{ type: "text", text: result }] };
+
+        // Clean up inbox file if provided
+        let inboxResult = "";
+        if (inbox_file) {
+          inboxResult = await deleteInboxFile(inbox_file);
+        }
+
+        return { content: [{ type: "text", text: result + inboxResult }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],

@@ -65,6 +65,8 @@ export const ReadLogSchema = z.object({
 const sourceCategoryEnum = z.enum([
   "bios",
   "cv",
+  "career_history",
+  "assessments",
   "writing_samples",
   "photos",
   "articles",
@@ -111,4 +113,8 @@ export const IngestCompleteSchema = z.object({
   files_touched: z
     .array(z.string())
     .describe("Brain files that were updated from this source."),
+  inbox_file: z
+    .string()
+    .optional()
+    .describe("Filename of the original inbox file to delete after ingestion (e.g. 'My Document.pdf'). Relative to inbox/ directory. If provided, the file is deleted from the inbox after provenance is recorded."),
 });

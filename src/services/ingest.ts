@@ -181,3 +181,27 @@ export async function recordIngest(
   const files = originalFile ? `${originalFile} + ${mdFile}` : mdFile;
   return `Ingest recorded: ${sourceLabel} → ${files} (${filesTouched.length} Brain files touched)`;
 }
+
+/**
+ * Delete a file from the inbox after successful ingestion.
+ * Validates the filename to prevent path traversal.
+ */
+export async function deleteInboxFile(filename: string): Promise<string> {
+  // Security: no path separators allowed
+  if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
+    throw new Error(`Invalid inbox filename: ${filename}. Must be a plain filename, no path separators.`);
+  }
+
+  const inboxDir = path.resolve(BRAIN_DIR, "..", "inbox");
+  const filePath = path.join(inboxDir, filename);
+
+  try {
+    await fs.unlink(filePath);
+    return `\nInbox file deleted: ${filename}`;
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      return `\nInbox file not found (already removed?): ${filename}`;
+    }
+    throw new Error(`Failed to delete inbox file ${filename}: ${err.message}`);
+  }
+}
