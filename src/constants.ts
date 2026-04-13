@@ -34,10 +34,8 @@ export const SOURCE_CATEGORIES = [
   "career_history",
   "assessments",
   "writing_samples",
-  "photos",
-  "articles",
   "meeting_notes",
-  "correspondence",
+  "photos",
   "other",
 ] as const;
 export type SourceCategory = (typeof SOURCE_CATEGORIES)[number];

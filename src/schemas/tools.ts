@@ -68,10 +68,8 @@ const sourceCategoryEnum = z.enum([
   "career_history",
   "assessments",
   "writing_samples",
-  "photos",
-  "articles",
   "meeting_notes",
-  "correspondence",
+  "photos",
   "other",
 ]);
 
