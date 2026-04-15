@@ -77,7 +77,7 @@ brain-mcp-server/
 │   └── tools/
 │       ├── context.ts    # brain_load_context, brain_read_file
 │       ├── update.ts     # brain_update_file, brain_commit
-│       ├── status.ts     # brain_list_files, brain_search
+│       ├── status.ts     # brain_list_files, brain_search, brain_list_sources
 │       ├── log.ts        # brain_log, brain_read_log
 │       ├── lint.ts       # brain_lint
 │       ├── ingest.ts     # brain_ingest, brain_ingest_complete
@@ -86,15 +86,16 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (12 total)
+### Tools (13 total)
 
 **Core:**
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
-- `brain_read_file` — Read a specific Brain file by name
+- `brain_read_file` — Read a specific Brain file by name. Accepts `scope`: "brain" (default) or "sources" to read from the source archive instead.
 - `brain_update_file` — Write changes to a Brain file (replace, append, or patch with find-and-replace)
 - `brain_commit` — Git commit (optionally push)
-- `brain_list_files` — List all files with staleness metadata
-- `brain_search` — Search across all Brain files
+- `brain_list_files` — List all Brain vault files with staleness metadata
+- `brain_list_sources` — List files in the source archive, optionally filtered by category
+- `brain_search` — Search across files. Accepts `scope`: "brain" (default), "sources", or "all".
 
 **Operations:**
 - `brain_log` — Append an entry to the Brain change log (LOG.md)

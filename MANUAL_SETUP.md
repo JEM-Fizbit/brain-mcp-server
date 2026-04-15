@@ -32,33 +32,17 @@ Skip Brain loading when:
 
 Load sequence (when loading):
 1. Fetch tools (if deferred):
-ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context (returns loader navigation table + current priorities + nudges for overdue lint or pending inbox files)
 3. Call brain_read_file for task-relevant files per the navigation table
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work
 
-Brain file editing:
-- brain_update_file supports three modes: "replace" (full overwrite), "append" (add to end), "patch" (surgical find-and-replace using old_content + content parameters). Prefer "patch" for section-level edits to avoid accidentally overwriting entire files.
+Reading source archives:
+- brain_read_file and brain_search accept a `scope` parameter: "brain" (default, vault only), "sources" (source archives only), or "all" (both; search only).
+- Use scope="sources" or "all" when the brain vault pointer references a source file, or when you need the full original document (bio variants, CVs, meeting notes, etc.).
+- Use brain_list_sources to enumerate available source files by category.
 
-Ingestion protocol (for new source documents):
-1. Save original file to /Users/johnemilad/Projects/ai-brain-jem/sources/{category}/{YYYY-MM-DD}_{slug}.{ext} via Desktop Commander write_file (always use this absolute path, not container paths)
-2. Save a markdown conversion alongside it as .md
-3. Update Brain files via brain_update_file
-4. Call brain_ingest_complete with both file paths, the list of Brain files touched, and the inbox_file parameter (original inbox filename) so the inbox file is automatically deleted after provenance is recorded
-5. Never pass large text as source_content — it will timeout the MCP transport
-
-Source categories: bios, cv (formal CVs/resumes only), career_history (track records, deal sheets, directorships, publications), assessments (psychometrics, 360 feedback, coaching), writing_samples, meeting_notes, correspondence, personal (gitignored — never committed), research (external articles, reports, saved webpages), travel, favourites (restaurants, hotels, preferences), photos, other
-
-Inbox:
-- Files can be dropped into /Users/johnemilad/Projects/ai-brain-jem/inbox/ as pending sources
-- brain_load_context notes when inbox files are pending (informational, not a directive to process immediately)
-- Use brain_scan_inbox to list them when asked, then process each using the standard ingestion protocol
-- The inbox_file parameter on brain_ingest_complete handles cleanup automatically
-
-URL/webpage ingestion:
-1. Use WebFetch (or equivalent) to fetch page content
-2. Save markdown to sources/{category}/{YYYY-MM-DD}_{slug}.md — the URL is the "original" (no file to save)
-3. Update Brain files, then call brain_ingest_complete with md_file path and URL noted in source_label
+Ingestion and inbox protocols are documented in the Brain loader (00_loader.md) — follow the checklist items there.
 ```
 
 ---

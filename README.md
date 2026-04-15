@@ -11,17 +11,20 @@ Gives Claude persistent, context-aware access to a collection of Markdown files 
 | Tool | Description |
 |------|-------------|
 | `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint, issue, and inbox nudges |
-| `brain_read_file` | Read a specific Brain file by name |
+| `brain_read_file` | Read a specific file. Accepts `scope` = `brain` (default) or `sources` to read from the sources/ archive |
 | `brain_update_file` | Update a Brain file (replace, append, or patch) |
 | `brain_commit` | Git commit changes, optionally push |
-| `brain_list_files` | List all files with staleness metadata |
-| `brain_search` | Search across all Brain files |
+| `brain_list_files` | List all Brain files with staleness metadata |
+| `brain_list_sources` | List files in the sources/ archive, with optional category filter |
+| `brain_search` | Search for keywords. Accepts `scope` = `brain` (default), `sources`, or `all` |
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
 | `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
+
+The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). Claude escalates scope automatically when a query implicates original material rather than a Brain summary.
 
 ## Requirements
 
@@ -114,41 +117,23 @@ benefits from personal context — skip it for generic tasks.
 Load Brain context proactively (don't wait to be asked) when:
 - Writing on the user's behalf, career/professional tasks, work context, personal projects,
   strategy/advice requiring background, anything needing voice/preferences/expertise,
-  or user references "my Brain" / "my context"
+  user references "my Brain" / "my context", or user attaches a document or asks to ingest.
 
 Skip when:
 - Generic technical questions, general knowledge/research, pure coding help,
-  or user explicitly says not to load
+  or user explicitly says not to load.
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
-2. Call brain_load_context (returns loader + NOW.md + lint/issue nudges)
-3. Call brain_read_file for task-relevant files per the navigation table
-4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+2. Call brain_load_context — returns the loader navigation table, current priorities, and nudges (lint overdue, inbox pending). The loader contains the full ingestion protocol, source categories, and file-editing rules; follow it.
+3. Call brain_read_file for task-relevant files per the navigation table.
+4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work.
 
-Brain file editing:
-- brain_update_file supports three modes: "replace" (full overwrite), "append" (add to end),
-  "patch" (surgical find-and-replace using old_content + content). Prefer "patch" for
-  section-level edits.
+Reading source archives:
+- brain_read_file and brain_search accept scope = "brain" (default, vault only), "sources", or "all" (search only). Escalate scope automatically when a query implicates original ingested material rather than a Brain summary.
+- Use brain_list_sources (optional category filter) to discover source files.
 
-Inbox:
-- Files can be dropped into the inbox/ folder as pending sources.
-- brain_load_context notes when inbox files are pending (informational, not a directive).
-- Use brain_scan_inbox when asked, then process each using the ingestion protocol.
-
-Ingestion protocol (for new source documents):
-1. Save original to sources/{category}/{YYYY-MM-DD}_{slug}.{ext}
-2. Save a markdown conversion alongside it as .md
-3. Update Brain files via brain_update_file
-4. Call brain_ingest_complete with both file paths, files_touched, and inbox_file param
-
-URL/webpage ingestion:
-1. Use WebFetch to fetch page content
-2. Save markdown to sources/{category}/{YYYY-MM-DD}_{slug}.md
-3. Call brain_ingest_complete with md_file path and URL noted in source_label
-
-Source categories: bios, cv, career_history, assessments, writing_samples, meeting_notes,
-correspondence, personal (gitignored), research, travel, favourites, photos, other
+Inbox: files dropped into the inbox/ folder are pending sources. Use brain_scan_inbox when asked, then process each using the ingestion protocol in the loader. The inbox_file parameter on brain_ingest_complete handles cleanup.
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).
