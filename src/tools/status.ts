@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SearchSchema } from "../schemas/tools.js";
+import { SearchSchema, ListSourcesSchema } from "../schemas/tools.js";
 import * as brain from "../services/brain.js";
 import * as git from "../services/git.js";
 
@@ -42,12 +42,37 @@ export function registerStatusTools(server: McpServer): void {
 
   server.tool(
     "brain_search",
-    "Search across all Brain files for a keyword or pattern (case-insensitive).",
+    'Search for a keyword or pattern (case-insensitive). By default searches Brain files only (fast, summarised knowledge). Pass scope="sources" to search the sources/ archive (original ingested documents), or scope="all" to search both. Escalate scope when the query concerns specific documents, correspondence, or when a brain-only search returns no matches on something expected to exist.',
     SearchSchema.shape,
-    async ({ query }) => {
+    async ({ query, scope }) => {
       try {
-        const result = await brain.search(query);
+        const result = await brain.search(query, scope);
         return { content: [{ type: "text", text: result }] };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: String(error) }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "brain_list_sources",
+    "List files in the sources/ archive. Optionally filter by category (bios, cv, assessments, meeting_notes, writing_samples, analysis, correspondence, personal, research, etc.). Use to discover what ingested material is available before calling brain_read_file with scope=\"sources\".",
+    ListSourcesSchema.shape,
+    async ({ category }) => {
+      try {
+        const files = await brain.listSources(category);
+        const text =
+          files.length > 0
+            ? (category
+                ? `Sources in ${category}/:\n`
+                : "All sources:\n") + files.join("\n")
+            : category
+              ? `No source files in ${category}/.`
+              : "No source files found.";
+        return { content: [{ type: "text", text }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],
