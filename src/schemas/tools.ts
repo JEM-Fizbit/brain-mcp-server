@@ -50,6 +50,15 @@ export const SearchSchema = z.object({
     .describe(
       'Where to search. "brain" (default) searches Brain files only — fast, focused on summarised knowledge. "sources" searches the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, correspondence, etc.). "all" searches both. Escalate to "sources" or "all" when the query concerns specific documents, past correspondence, assessment details, or when brain_search returns no matches on something you expect to exist.'
     ),
+  max_results: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .default(50)
+    .describe(
+      "Maximum number of matches to return. Default 50, ceiling 500. Raise when a default search hits the truncation footer and you need more coverage."
+    ),
 });
 
 export const ListSourcesSchema = z.object({

@@ -9,6 +9,9 @@ import {
   ACTIVE_PATTERNS,
   IDENTITY_PATTERNS,
   MAX_SEARCH_RESULTS,
+  MAX_SEARCH_RESULTS_CEILING,
+  SEARCH_LINE_CHAR_LIMIT,
+  SEARCH_TOTAL_CHAR_LIMIT,
   LINT_NUDGE_DAYS,
   SOURCE_CATEGORIES,
   type SourceCategory,
@@ -284,10 +287,18 @@ export async function listFiles(): Promise<BrainFile[]> {
 
 export async function search(
   query: string,
-  scope: SearchScope = "brain"
+  scope: SearchScope = "brain",
+  maxResults: number = MAX_SEARCH_RESULTS
 ): Promise<string> {
   const lowerQuery = query.toLowerCase();
   const matches: string[] = [];
+  const cap = Math.min(
+    Math.max(1, Math.floor(maxResults)),
+    MAX_SEARCH_RESULTS_CEILING
+  );
+  let totalChars = 0;
+  let linesTruncated = 0;
+  let stoppedByBudget = false;
 
   const searchRoots: { root: string; prefix: string; files: string[] }[] = [];
   if (scope === "brain" || scope === "all") {
@@ -305,32 +316,54 @@ export async function search(
     });
   }
 
-  for (const { root, prefix, files } of searchRoots) {
+  outer: for (const { root, prefix, files } of searchRoots) {
     for (const name of files) {
-      if (matches.length >= MAX_SEARCH_RESULTS) break;
+      if (matches.length >= cap) break outer;
       const filePath = path.join(root, name);
       const content = await fs.readFile(filePath, "utf-8").catch(() => "");
       const lines = content.split("\n");
       for (let i = 0; i < lines.length; i++) {
-        if (matches.length >= MAX_SEARCH_RESULTS) break;
-        if (lines[i].toLowerCase().includes(lowerQuery)) {
-          matches.push(`${prefix}${name}:${i + 1}: ${lines[i].trim()}`);
+        if (matches.length >= cap) break outer;
+        const line = lines[i];
+        if (!line.toLowerCase().includes(lowerQuery)) continue;
+        let trimmed = line.trim();
+        if (trimmed.length > SEARCH_LINE_CHAR_LIMIT) {
+          trimmed = trimmed.slice(0, SEARCH_LINE_CHAR_LIMIT) + "…";
+          linesTruncated++;
         }
+        const entry = `${prefix}${name}:${i + 1}: ${trimmed}`;
+        if (totalChars + entry.length + 1 > SEARCH_TOTAL_CHAR_LIMIT) {
+          stoppedByBudget = true;
+          break outer;
+        }
+        matches.push(entry);
+        totalChars += entry.length + 1;
       }
     }
-    if (matches.length >= MAX_SEARCH_RESULTS) break;
   }
 
   const result = matches.join("\n");
-  const truncated =
-    matches.length >= MAX_SEARCH_RESULTS
-      ? `\n\n(Results truncated at ${MAX_SEARCH_RESULTS} matches)`
-      : "";
+  const notes: string[] = [];
+  if (stoppedByBudget) {
+    notes.push(
+      `Results truncated at ${Math.round(SEARCH_TOTAL_CHAR_LIMIT / 1000)}KB total size — narrow your query for full coverage.`
+    );
+  } else if (matches.length >= cap) {
+    notes.push(
+      `Results truncated at ${cap} matches — raise max_results (ceiling ${MAX_SEARCH_RESULTS_CEILING}) or narrow your query.`
+    );
+  }
+  if (linesTruncated > 0) {
+    notes.push(
+      `${linesTruncated} line${linesTruncated === 1 ? "" : "s"} trimmed at ${SEARCH_LINE_CHAR_LIMIT} chars (ends with …) — read the file for full content.`
+    );
+  }
+  const footer = notes.length > 0 ? `\n\n(${notes.join(" ")})` : "";
 
   const scopeLabel =
     scope === "brain" ? "Brain" : scope === "sources" ? "sources" : "Brain + sources";
 
   return matches.length > 0
-    ? `Found ${matches.length} matches for "${query}" in ${scopeLabel}:\n\n${result}${truncated}`
+    ? `Found ${matches.length} matches for "${query}" in ${scopeLabel}:\n\n${result}${footer}`
     : `No matches found for "${query}" in ${scopeLabel}`;
 }
