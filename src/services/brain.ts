@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   BRAIN_DIR,
+  SOURCES_ROOT,
   LOADER_FILE,
   NOW_FILE,
   STALENESS,
@@ -9,6 +10,8 @@ import {
   IDENTITY_PATTERNS,
   MAX_SEARCH_RESULTS,
   LINT_NUDGE_DAYS,
+  SOURCE_CATEGORIES,
+  type SourceCategory,
 } from "../constants.js";
 import * as log from "./log.js";
 import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
@@ -41,6 +44,44 @@ function resolveFilePath(filename: string): string {
     throw new Error("Path traversal detected");
   }
   return resolved;
+}
+
+function resolveSourcePath(filename: string): string {
+  validateFilename(filename);
+  const resolved = path.resolve(SOURCES_ROOT, filename);
+  if (!resolved.startsWith(path.resolve(SOURCES_ROOT))) {
+    throw new Error("Path traversal detected");
+  }
+  return resolved;
+}
+
+export type ReadScope = "brain" | "sources";
+export type SearchScope = "brain" | "sources" | "all";
+
+async function listSourceFileNames(category?: SourceCategory): Promise<string[]> {
+  const files: string[] = [];
+  try {
+    const rootEntries = await fs.readdir(SOURCES_ROOT, { withFileTypes: true });
+    for (const entry of rootEntries) {
+      if (!entry.isDirectory()) continue;
+      if (category && entry.name !== category) continue;
+      if (!SOURCE_CATEGORIES.includes(entry.name as SourceCategory)) continue;
+      const subPath = path.join(SOURCES_ROOT, entry.name);
+      const subEntries = await fs.readdir(subPath, { withFileTypes: true });
+      for (const sub of subEntries) {
+        if (sub.isFile() && sub.name.endsWith(".md")) {
+          files.push(path.join(entry.name, sub.name));
+        }
+      }
+    }
+  } catch {
+    // SOURCES_ROOT may not exist; return empty
+  }
+  return files.sort();
+}
+
+export async function listSources(category?: SourceCategory): Promise<string[]> {
+  return listSourceFileNames(category);
 }
 
 export async function loadContext(): Promise<string> {
@@ -118,15 +159,21 @@ export async function loadContext(): Promise<string> {
   return parts.join("\n");
 }
 
-export async function readFile(filename: string): Promise<string> {
-  const filePath = resolveFilePath(filename);
+export async function readFile(
+  filename: string,
+  scope: ReadScope = "brain"
+): Promise<string> {
+  const filePath =
+    scope === "sources" ? resolveSourcePath(filename) : resolveFilePath(filename);
 
   try {
     return await fs.readFile(filePath, "utf-8");
   } catch {
-    const available = await listFileNames();
+    const available =
+      scope === "sources" ? await listSourceFileNames() : await listFileNames();
+    const label = scope === "sources" ? "source files" : "Brain files";
     throw new Error(
-      `File not found: ${filename}. Available files:\n${available.join("\n")}`
+      `File not found in ${label}: ${filename}. Available files:\n${available.join("\n")}`
     );
   }
 }
@@ -235,24 +282,43 @@ export async function listFiles(): Promise<BrainFile[]> {
   return results;
 }
 
-export async function search(query: string): Promise<string> {
-  const fileNames = await listFileNames();
+export async function search(
+  query: string,
+  scope: SearchScope = "brain"
+): Promise<string> {
   const lowerQuery = query.toLowerCase();
   const matches: string[] = [];
 
-  for (const name of fileNames) {
-    if (matches.length >= MAX_SEARCH_RESULTS) break;
+  const searchRoots: { root: string; prefix: string; files: string[] }[] = [];
+  if (scope === "brain" || scope === "all") {
+    searchRoots.push({
+      root: BRAIN_DIR,
+      prefix: "",
+      files: await listFileNames(),
+    });
+  }
+  if (scope === "sources" || scope === "all") {
+    searchRoots.push({
+      root: SOURCES_ROOT,
+      prefix: "sources/",
+      files: await listSourceFileNames(),
+    });
+  }
 
-    const filePath = path.join(BRAIN_DIR, name);
-    const content = await fs.readFile(filePath, "utf-8");
-    const lines = content.split("\n");
-
-    for (let i = 0; i < lines.length; i++) {
+  for (const { root, prefix, files } of searchRoots) {
+    for (const name of files) {
       if (matches.length >= MAX_SEARCH_RESULTS) break;
-      if (lines[i].toLowerCase().includes(lowerQuery)) {
-        matches.push(`${name}:${i + 1}: ${lines[i].trim()}`);
+      const filePath = path.join(root, name);
+      const content = await fs.readFile(filePath, "utf-8").catch(() => "");
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (matches.length >= MAX_SEARCH_RESULTS) break;
+        if (lines[i].toLowerCase().includes(lowerQuery)) {
+          matches.push(`${prefix}${name}:${i + 1}: ${lines[i].trim()}`);
+        }
       }
     }
+    if (matches.length >= MAX_SEARCH_RESULTS) break;
   }
 
   const result = matches.join("\n");
@@ -261,7 +327,10 @@ export async function search(query: string): Promise<string> {
       ? `\n\n(Results truncated at ${MAX_SEARCH_RESULTS} matches)`
       : "";
 
+  const scopeLabel =
+    scope === "brain" ? "Brain" : scope === "sources" ? "sources" : "Brain + sources";
+
   return matches.length > 0
-    ? `Found ${matches.length} matches for "${query}":\n\n${result}${truncated}`
-    : `No matches found for "${query}"`;
+    ? `Found ${matches.length} matches for "${query}" in ${scopeLabel}:\n\n${result}${truncated}`
+    : `No matches found for "${query}" in ${scopeLabel}`;
 }

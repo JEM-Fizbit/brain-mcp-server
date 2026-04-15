@@ -22,11 +22,11 @@ export function registerContextTools(server: McpServer): void {
 
   server.tool(
     "brain_read_file",
-    "Read a specific Brain file by name. Use after brain_load_context to fetch files referenced in the loader.",
+    'Read a specific file. By default reads from the Brain vault (scope="brain"). Pass scope="sources" to read from the sources/ archive (bios, assessments, meeting notes, writing samples, etc.) when the original ingested material is needed rather than a Brain summary.',
     ReadFileSchema.shape,
-    async ({ filename }) => {
+    async ({ filename, scope }) => {
       try {
-        const content = await brain.readFile(filename);
+        const content = await brain.readFile(filename, scope);
         return { content: [{ type: "text", text: content }] };
       } catch (error) {
         return {

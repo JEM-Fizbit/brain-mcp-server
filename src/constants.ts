@@ -5,6 +5,11 @@ export const BRAIN_DIR =
   process.env.BRAIN_DIR ||
   path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
 
+/** Root of the sources/ directory (sibling to brain/). */
+export const SOURCES_ROOT =
+  process.env.BRAIN_SOURCES_DIR ||
+  path.join(path.dirname(BRAIN_DIR), "sources");
+
 export const CHARACTER_LIMIT = 50_000;
 export const LOADER_FILE = "00_loader.md";
 export const NOW_FILE = "NOW.md";
@@ -34,6 +39,7 @@ export const SOURCE_CATEGORIES = [
   "career_history",
   "assessments",
   "writing_samples",
+  "analysis",
   "meeting_notes",
   "correspondence",
   "personal",

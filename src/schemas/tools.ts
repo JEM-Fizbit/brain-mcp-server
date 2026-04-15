@@ -4,7 +4,13 @@ export const ReadFileSchema = z.object({
   filename: z
     .string()
     .describe(
-      'The filename to read (e.g., "01_identity.md"). Relative to BRAIN_DIR, no path traversal.'
+      'The filename to read. For scope="brain" (default): relative to BRAIN_DIR (e.g., "01_identity.md", "Reference_ERS_Brain_Context/00_load_first.md"). For scope="sources": relative to SOURCES_ROOT (e.g., "bios/2026-04-15_kruk_trustee_bio.md"). No path traversal.'
+    ),
+  scope: z
+    .enum(["brain", "sources"])
+    .default("brain")
+    .describe(
+      'Where to read from. "brain" (default) reads from the Brain vault. "sources" reads from the sources/ archive (bios, assessments, meeting notes, writing samples, etc.). Use "sources" when you need the original ingested material rather than a Brain summary — e.g., full KRUK bio text, a past meeting transcript, or an ingested assessment.'
     ),
 });
 
@@ -37,7 +43,35 @@ export const CommitSchema = z.object({
 export const SearchSchema = z.object({
   query: z
     .string()
-    .describe("Search term (case-insensitive substring match across all Brain files)."),
+    .describe("Search term (case-insensitive substring match)."),
+  scope: z
+    .enum(["brain", "sources", "all"])
+    .default("brain")
+    .describe(
+      'Where to search. "brain" (default) searches Brain files only — fast, focused on summarised knowledge. "sources" searches the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, correspondence, etc.). "all" searches both. Escalate to "sources" or "all" when the query concerns specific documents, past correspondence, assessment details, or when brain_search returns no matches on something you expect to exist.'
+    ),
+});
+
+export const ListSourcesSchema = z.object({
+  category: z
+    .enum([
+      "bios",
+      "cv",
+      "career_history",
+      "assessments",
+      "writing_samples",
+      "analysis",
+      "meeting_notes",
+      "correspondence",
+      "personal",
+      "research",
+      "travel",
+      "favourites",
+      "photos",
+      "other",
+    ])
+    .optional()
+    .describe("Optional category to filter by. If omitted, returns all source files across all categories."),
 });
 
 export const LogSchema = z.object({
@@ -68,6 +102,7 @@ const sourceCategoryEnum = z.enum([
   "career_history",
   "assessments",
   "writing_samples",
+  "analysis",
   "meeting_notes",
   "correspondence",
   "personal",
