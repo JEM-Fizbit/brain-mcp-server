@@ -10,6 +10,7 @@ import {
   ACTIVE_PATTERNS,
   IDENTITY_PATTERNS,
   INACTIVE_SECTION_PATTERNS,
+  ACTIVE_SECTION_PATTERNS,
   DOMAIN_PACK_LIMIT,
 } from "../constants.js";
 import { listFileNames, getStalenessThreshold } from "./brain.js";
@@ -22,6 +23,7 @@ export interface LintReport {
   drift: string[];
   largeDomainPacks: { dir: string; count: number }[];
   suggestedSemanticChecks: string[];
+  warnings: string[];
 }
 
 /** Extract all .md file references from a markdown file */
@@ -99,54 +101,71 @@ export async function runLint(): Promise<LintReport> {
     }
   }
 
-  // Drift detection: check NOW.md mentions against project/role files
+  // Drift detection: check NOW.md mentions against Active project sections
   const drift: string[] = [];
+  const warnings: string[] = [];
   try {
     const nowPath = path.join(BRAIN_DIR, NOW_FILE);
     const nowContent = await fs.readFile(nowPath, "utf-8");
     const nowLower = nowContent.toLowerCase();
 
-    // Check if projects file exists and cross-reference
     const projectsPath = path.join(BRAIN_DIR, "05_projects.md");
     try {
       const projectsContent = await fs.readFile(projectsPath, "utf-8");
       const lines = projectsContent.split("\n");
-      let currentSection = "";
 
+      // First pass: build {section: [project headings]} map.
+      const sections = new Map<string, string[]>();
+      let currentSection = "";
       for (const line of lines) {
-        // Track current ## section (category header)
         const h2Match = line.match(/^##\s+(.+)/);
         if (h2Match) {
           currentSection = h2Match[1].trim();
+          if (!sections.has(currentSection)) sections.set(currentSection, []);
           continue;
         }
-
-        // Only drift-check ### project headings (not ## category headers)
         const h3Match = line.match(/^###\s+(.+)/);
-        if (!h3Match) continue;
-
+        if (!h3Match || !currentSection) continue;
         const project = h3Match[1].trim();
+        if (project.length <= 3 || project.includes("---")) continue;
+        sections.get(currentSection)!.push(project);
+      }
+
+      const activeSections = [...sections.keys()].filter((name) =>
+        ACTIVE_SECTION_PATTERNS.some((p) => p.test(name))
+      );
+
+      const checkProject = (project: string) => {
         const projectLower = project.toLowerCase();
-
-        if (projectLower.length <= 3 || projectLower.includes("---")) continue;
-
-        // Skip projects under inactive sections (Archived, Maintenance, etc.)
-        const isInactiveSection = INACTIVE_SECTION_PATTERNS.some((p) =>
-          p.test(currentSection)
-        );
-        if (isInactiveSection) continue;
-
-        // Split on common delimiters (—, (, ,) and match any segment
         const segments = projectLower
           .split(/\s*[—–\-\(\),\/]\s*/)
           .map((s) => s.trim())
           .filter((s) => s.length > 3);
-
         const mentioned = segments.some((seg) => nowLower.includes(seg));
         if (!mentioned) {
           drift.push(
             `Project "${project}" in 05_projects.md not mentioned in NOW.md — still active?`
           );
+        }
+      };
+
+      if (activeSections.length > 0) {
+        // Active-section scoping: only drift-check projects under Active sections.
+        for (const section of activeSections) {
+          for (const project of sections.get(section)!) checkProject(project);
+        }
+      } else {
+        // Defensive fallback: no parseable Active section. Warn and use the
+        // legacy inactive-section filter so drift checks still surface signal
+        // rather than crashing or going silent.
+        warnings.push(
+          "Drift check: no Active section found in 05_projects.md (expected a heading matching /active/i). " +
+            "Falling back to legacy filter — every project not under an inactive section will be drift-checked. " +
+            "Add an Active section header to 05_projects.md to silence this warning."
+        );
+        for (const [section, projects] of sections) {
+          if (INACTIVE_SECTION_PATTERNS.some((p) => p.test(section))) continue;
+          for (const project of projects) checkProject(project);
         }
       }
     } catch {
@@ -190,7 +209,15 @@ export async function runLint(): Promise<LintReport> {
     "Verify active roles in 04_active_roles.md match current state in NOW.md"
   );
 
-  return { bloat, stale, orphans, drift, largeDomainPacks, suggestedSemanticChecks };
+  return {
+    bloat,
+    stale,
+    orphans,
+    drift,
+    largeDomainPacks,
+    suggestedSemanticChecks,
+    warnings,
+  };
 }
 
 export function formatLintReport(report: LintReport): string {
@@ -209,6 +236,15 @@ export function formatLintReport(report: LintReport): string {
       ? "**All clear** — no structural issues detected.\n"
       : `**${issueCount} issue(s) found:**\n`
   );
+
+  // Warnings (e.g. drift fallback when no Active section is parseable)
+  if (report.warnings.length > 0) {
+    sections.push("## Warnings");
+    for (const w of report.warnings) {
+      sections.push(`- ${w}`);
+    }
+    sections.push("");
+  }
 
   // Bloat
   if (report.bloat.length > 0) {
