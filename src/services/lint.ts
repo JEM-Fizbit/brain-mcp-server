@@ -5,6 +5,7 @@ import {
   LOADER_FILE,
   NOW_FILE,
   LINE_LIMIT,
+  BLOAT_EXEMPT,
   STALENESS,
   ACTIVE_PATTERNS,
   IDENTITY_PATTERNS,
@@ -64,7 +65,7 @@ export async function runLint(): Promise<LintReport> {
     const lines = content.split("\n").length;
     fileLinesMap.set(name, lines);
 
-    if (lines > LINE_LIMIT) {
+    if (lines > LINE_LIMIT && !BLOAT_EXEMPT.has(path.basename(name))) {
       bloat.push({ file: name, lines });
     }
 

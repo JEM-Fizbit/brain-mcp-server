@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "test": "npm run build && node --test test/"
   },
   "keywords": ["mcp", "ai-brain", "markdown", "context", "claude"],
   "author": "JEM-Fizbit",

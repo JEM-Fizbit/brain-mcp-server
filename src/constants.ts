@@ -19,6 +19,10 @@ export const SEARCH_LINE_CHAR_LIMIT = 5000;
 export const SEARCH_TOTAL_CHAR_LIMIT = 150_000;
 export const LOG_FILE = "LOG.md";
 export const LINE_LIMIT = 200;
+
+/** Operational/audit files exempt from the bloat check — growth is the design intent. */
+export const BLOAT_EXEMPT = new Set<string>(["LOG.md", "SOURCES.md"]);
+
 export const DOMAIN_PACK_LIMIT = 20;
 export const LINT_NUDGE_DAYS = 30;
 export const GITHUB_REPO =
