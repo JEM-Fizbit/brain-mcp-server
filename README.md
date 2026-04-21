@@ -102,7 +102,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-This matches all twelve Brain tools. You can verify with `/permissions` in Claude Code.
+This matches all thirteen Brain tools. You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
@@ -124,7 +124,7 @@ Skip when:
   or user explicitly says not to load.
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_files,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context — returns the loader navigation table, current priorities, and nudges (lint overdue, inbox pending). The loader contains the full ingestion protocol, source categories, and file-editing rules; follow it.
 3. Call brain_read_file for task-relevant files per the navigation table.
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work.

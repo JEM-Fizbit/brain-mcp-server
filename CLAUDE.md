@@ -17,15 +17,6 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript, stdio transpo
 
 ---
 
-## Synced Protocols (via knowhub)
-
-Files in `docs/protocols/` are synced from the central [ai-knowledge](https://github.com/JEM-Fizbit/ai-knowledge) repo and **will be overwritten on commit**. To update a protocol: edit in `~/Projects/ai-knowledge/protocols/`, push, then run `knowhub` here.
-
-**Protocols synced to this project:**
-- `GIT_CONVENTIONS.md` - Commits, branches, PRs
-
----
-
 ## Tech Stack
 
 | Component | Technology |
