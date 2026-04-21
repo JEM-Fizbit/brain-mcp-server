@@ -87,3 +87,14 @@ export const INACTIVE_SECTION_PATTERNS = [
   /early.stage/i,
   /stable/i,
 ];
+
+/**
+ * Section headers in 05_projects.md indicating active projects that should be
+ * cross-checked against NOW.md. Only projects under matching sections are
+ * drift-checked; everything else (Stable, Concept, Infrastructure, Content,
+ * Archived, etc.) is exempt by design.
+ *
+ * If 05_projects.md has no section matching any of these, runLint emits a
+ * warning and falls back to INACTIVE_SECTION_PATTERNS filtering.
+ */
+export const ACTIVE_SECTION_PATTERNS = [/active/i];
