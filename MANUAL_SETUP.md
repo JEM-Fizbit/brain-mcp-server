@@ -18,7 +18,7 @@ I maintain an AI Brain (personal knowledge system) accessible via MCP. Load it w
 Load Brain context proactively (don't wait to be asked) when:
 - Writing on my behalf (emails, posts, bios, articles)
 - Career, job search, applications, or professional positioning
-- Work or company context (ERS Genomics, etc.)
+- Work or company context (your employer, current role, ongoing initiatives)
 - My software projects
 - Strategy, advice, or decisions requiring my background
 - Anything requiring my voice, preferences, expertise, or personal context
