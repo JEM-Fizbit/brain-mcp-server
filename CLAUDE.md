@@ -17,6 +17,25 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript, stdio transpo
 
 ---
 
+## Roadmap & Backlog System
+
+This project uses the layered roadmap/backlog/spec system. Universal protocol: [ai-knowledge/protocols/ROADMAP_AND_BACKLOG.md](https://github.com/JEM-Fizbit/ai-knowledge/blob/main/protocols/ROADMAP_AND_BACKLOG.md). Triggers are semantic — invoke whenever the user gestures at open work (capture, retrieval, promotion, ship); don't wait for the literal word "backlog."
+
+### Sources (this project)
+
+- `BACKLOG.md` — lightweight one-line capture (canonical inbox).
+- `docs/specs/NNN-slug.md` — promoted work briefs; archive at `docs/specs/archive/`.
+- `docs/DECISIONS.md` — locked design decisions with rationale.
+
+Minimum-stack adoption: no strategic roadmap or audit-doc layers configured. Add later via `.backlogrc` if the project grows enough to need them.
+
+### Verification commands (cite in every spec)
+
+- `npm run build` — TypeScript compile (use for type-only changes)
+- `npm test` — build + Node test runner (use for any logic change)
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
