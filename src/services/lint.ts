@@ -12,6 +12,8 @@ import {
   INACTIVE_SECTION_PATTERNS,
   ACTIVE_SECTION_PATTERNS,
   DOMAIN_PACK_LIMIT,
+  WORKING_DIR,
+  WORKING_INDEX_FILE,
 } from "../constants.js";
 import { listFileNames, getStalenessThreshold } from "./brain.js";
 import * as log from "./log.js";
@@ -22,8 +24,60 @@ export interface LintReport {
   orphans: string[];
   drift: string[];
   largeDomainPacks: { dir: string; count: number }[];
+  unindexedWorkingBinaries: string[];
   suggestedSemanticChecks: string[];
   warnings: string[];
+}
+
+/**
+ * Scan `working/` for non-markdown, non-.gitkeep files and verify each is
+ * registered in `working/INDEX.md` with a `## {filename}` H2 section. Binaries
+ * aren't indexed by brain_search, so the INDEX entry is what makes them
+ * discoverable from inside a Brain session.
+ */
+async function findUnindexedWorkingBinaries(): Promise<string[]> {
+  const workingDir = path.join(BRAIN_DIR, WORKING_DIR);
+  let entries: string[];
+  try {
+    entries = await fs.readdir(workingDir);
+  } catch {
+    return [];
+  }
+
+  const binaries = entries.filter((name) => {
+    if (name === WORKING_INDEX_FILE) return false;
+    if (name === ".gitkeep" || name === ".DS_Store") return false;
+    if (name.toLowerCase().endsWith(".md")) return false;
+    return true;
+  });
+
+  if (binaries.length === 0) return [];
+
+  let indexContent = "";
+  try {
+    indexContent = await fs.readFile(
+      path.join(workingDir, WORKING_INDEX_FILE),
+      "utf-8"
+    );
+  } catch {
+    // INDEX.md missing entirely — every binary is unindexed.
+    return binaries.map((b) => `${WORKING_DIR}/${b}`);
+  }
+
+  const indexedFilenames = new Set<string>();
+  const h2Pattern = /^##\s+(.+?)\s*$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = h2Pattern.exec(indexContent)) !== null) {
+    indexedFilenames.add(match[1].trim());
+  }
+
+  const unindexed: string[] = [];
+  for (const binary of binaries) {
+    if (!indexedFilenames.has(binary)) {
+      unindexed.push(`${WORKING_DIR}/${binary}`);
+    }
+  }
+  return unindexed;
 }
 
 /** Extract all .md file references from a markdown file */
@@ -175,6 +229,9 @@ export async function runLint(): Promise<LintReport> {
     // NOW.md doesn't exist, skip
   }
 
+  // Unindexed working binaries
+  const unindexedWorkingBinaries = await findUnindexedWorkingBinaries();
+
   // Large domain packs
   const largeDomainPacks: LintReport["largeDomainPacks"] = [];
   const dirCounts = new Map<string, number>();
@@ -215,6 +272,7 @@ export async function runLint(): Promise<LintReport> {
     orphans,
     drift,
     largeDomainPacks,
+    unindexedWorkingBinaries,
     suggestedSemanticChecks,
     warnings,
   };
@@ -229,7 +287,8 @@ export function formatLintReport(report: LintReport): string {
     report.stale.length +
     report.orphans.length +
     report.drift.length +
-    report.largeDomainPacks.length;
+    report.largeDomainPacks.length +
+    report.unindexedWorkingBinaries.length;
 
   sections.push(
     issueCount === 0
@@ -280,6 +339,21 @@ export function formatLintReport(report: LintReport): string {
       sections.push(`- ${item}`);
     }
     sections.push("");
+  }
+
+  // Unindexed working binaries
+  if (report.unindexedWorkingBinaries.length > 0) {
+    sections.push(
+      "## Unindexed working binaries (missing from working/INDEX.md)"
+    );
+    for (const file of report.unindexedWorkingBinaries) {
+      sections.push(`- ${file}`);
+    }
+    sections.push(
+      "",
+      "Add a `## <filename>` section to `working/INDEX.md` describing each binary (purpose, key terms, schema, how to read/edit). Without it, brain_search cannot discover the artifact.",
+      ""
+    );
   }
 
   // Large domain packs
