@@ -5,7 +5,7 @@ import * as log from "../services/log.js";
 export function registerLintTools(server: McpServer): void {
   server.tool(
     "brain_lint",
-    "Run a health check on the Brain. Detects bloat (>200 lines), stale files, orphans (unreferenced in loader), drift (NOW.md vs project/role files), large domain packs, and unindexed working binaries (non-markdown files in working/ missing from working/INDEX.md). Returns a report with suggested next steps.",
+    "Run a health check on the Brain. Detects bloat (>200 lines), stale files, orphans (unreferenced in loader), drift (NOW.md vs project/role files), large domain packs, unindexed working binaries (non-markdown files in working/ missing from working/INDEX.md), and journal rotation due (JOURNAL.md past ~500 lines or ~80 KB — surfaces the rotation procedure in archive/INDEX.md). Returns a report with suggested next steps.",
     {},
     async () => {
       try {
@@ -19,7 +19,8 @@ export function registerLintTools(server: McpServer): void {
           report.orphans.length +
           report.drift.length +
           report.largeDomainPacks.length +
-          report.unindexedWorkingBinaries.length;
+          report.unindexedWorkingBinaries.length +
+          (report.journalRotation ? 1 : 0);
 
         await log.appendLog(
           "LINT",
