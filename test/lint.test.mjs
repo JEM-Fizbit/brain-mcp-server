@@ -119,3 +119,64 @@ test("drift falls back with warning when no Active section is present", async ()
   const drift = report.drift.join("\n");
   assert.match(drift, /UnknownProject/, "fallback should use prior behaviour and flag unmentioned projects");
 });
+
+async function writeBinary(name, bytes) {
+  const full = path.join(tmpDir, name);
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.writeFile(full, Buffer.from(bytes));
+}
+
+test("unindexed working binaries are flagged when INDEX.md is missing", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+  });
+  await writeBinary("working/Tracker.xlsx", [0x50, 0x4b]);
+
+  const report = await runLint();
+  assert.deepEqual(
+    report.unindexedWorkingBinaries,
+    ["working/Tracker.xlsx"],
+    "binary with no INDEX.md should be flagged"
+  );
+});
+
+test("indexed working binary passes; unindexed sibling flagged", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+    "working/INDEX.md": [
+      "# Working Artifacts Index",
+      "",
+      "## Tracker.xlsx",
+      "Indexed and discoverable.",
+      "",
+    ].join("\n"),
+  });
+  await writeBinary("working/Tracker.xlsx", [0x50, 0x4b]);
+  await writeBinary("working/Orphan.pdf", [0x25, 0x50, 0x44, 0x46]);
+
+  const report = await runLint();
+  assert.deepEqual(
+    report.unindexedWorkingBinaries,
+    ["working/Orphan.pdf"],
+    "only the binary missing from INDEX.md should be flagged"
+  );
+});
+
+test("working/ markdown drafts and .gitkeep do not require INDEX entries", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+    "working/INDEX.md": "# Working Artifacts Index\n",
+    "working/draft.md": "# Draft\n\nFreeform working markdown.\n",
+    "working/.gitkeep": "",
+  });
+
+  const report = await runLint();
+  assert.deepEqual(
+    report.unindexedWorkingBinaries,
+    [],
+    "markdown drafts and .gitkeep must not be flagged"
+  );
+});
