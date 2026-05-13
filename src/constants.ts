@@ -42,6 +42,19 @@ export const SOURCES_INDEX = "SOURCES.md";
 export const INBOX_DIR = "inbox";
 export const WORKING_DIR = "working";
 export const WORKING_INDEX_FILE = "INDEX.md";
+
+/**
+ * Journal rotation thresholds. JOURNAL.md is a durable narrative timeline; when
+ * it exceeds either threshold the lint check surfaces a rotation reminder
+ * pointing at `brain/archive/INDEX.md`. Size-triggered (not calendar-triggered)
+ * so cadence auto-scales with actual volume. See JOURNAL.md 2026-05-13 entry.
+ */
+export const JOURNAL_FILE = "JOURNAL.md";
+export const JOURNAL_ARCHIVE_DIR = "archive";
+export const JOURNAL_ARCHIVE_INDEX = "INDEX.md";
+export const JOURNAL_LINE_LIMIT = 500;
+export const JOURNAL_BYTE_LIMIT = 80 * 1024;
+
 export const SOURCE_CATEGORIES = [
   "bios",
   "cv",

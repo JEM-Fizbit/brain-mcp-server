@@ -14,6 +14,11 @@ import {
   DOMAIN_PACK_LIMIT,
   WORKING_DIR,
   WORKING_INDEX_FILE,
+  JOURNAL_FILE,
+  JOURNAL_ARCHIVE_DIR,
+  JOURNAL_ARCHIVE_INDEX,
+  JOURNAL_LINE_LIMIT,
+  JOURNAL_BYTE_LIMIT,
 } from "../constants.js";
 import { listFileNames, getStalenessThreshold } from "./brain.js";
 import * as log from "./log.js";
@@ -25,6 +30,13 @@ export interface LintReport {
   drift: string[];
   largeDomainPacks: { dir: string; count: number }[];
   unindexedWorkingBinaries: string[];
+  journalRotation:
+    | {
+        lines: number;
+        bytes: number;
+        triggeredBy: "lines" | "bytes" | "both";
+      }
+    | null;
   suggestedSemanticChecks: string[];
   warnings: string[];
 }
@@ -78,6 +90,35 @@ async function findUnindexedWorkingBinaries(): Promise<string[]> {
     }
   }
   return unindexed;
+}
+
+/**
+ * Check whether `JOURNAL.md` has grown past the rotation threshold. JOURNAL is
+ * a durable narrative timeline; once it crosses ~500 lines or ~80 KB the
+ * rotation procedure in `brain/archive/INDEX.md` should be run to move older
+ * entries into a numbered archive segment. Size-triggered so cadence auto-
+ * scales with actual usage volume.
+ */
+async function checkJournalRotation(): Promise<LintReport["journalRotation"]> {
+  const journalPath = path.join(BRAIN_DIR, JOURNAL_FILE);
+  let content: string;
+  let bytes: number;
+  try {
+    const stat = await fs.stat(journalPath);
+    bytes = stat.size;
+    content = await fs.readFile(journalPath, "utf-8");
+  } catch {
+    return null;
+  }
+
+  const lines = content.split("\n").length;
+  const overLines = lines > JOURNAL_LINE_LIMIT;
+  const overBytes = bytes > JOURNAL_BYTE_LIMIT;
+  if (!overLines && !overBytes) return null;
+
+  const triggeredBy: "lines" | "bytes" | "both" =
+    overLines && overBytes ? "both" : overLines ? "lines" : "bytes";
+  return { lines, bytes, triggeredBy };
 }
 
 /** Extract all .md file references from a markdown file */
@@ -232,6 +273,9 @@ export async function runLint(): Promise<LintReport> {
   // Unindexed working binaries
   const unindexedWorkingBinaries = await findUnindexedWorkingBinaries();
 
+  // Journal rotation threshold
+  const journalRotation = await checkJournalRotation();
+
   // Large domain packs
   const largeDomainPacks: LintReport["largeDomainPacks"] = [];
   const dirCounts = new Map<string, number>();
@@ -273,6 +317,7 @@ export async function runLint(): Promise<LintReport> {
     drift,
     largeDomainPacks,
     unindexedWorkingBinaries,
+    journalRotation,
     suggestedSemanticChecks,
     warnings,
   };
@@ -288,7 +333,8 @@ export function formatLintReport(report: LintReport): string {
     report.orphans.length +
     report.drift.length +
     report.largeDomainPacks.length +
-    report.unindexedWorkingBinaries.length;
+    report.unindexedWorkingBinaries.length +
+    (report.journalRotation ? 1 : 0);
 
   sections.push(
     issueCount === 0
@@ -339,6 +385,25 @@ export function formatLintReport(report: LintReport): string {
       sections.push(`- ${item}`);
     }
     sections.push("");
+  }
+
+  // Journal rotation
+  if (report.journalRotation) {
+    const { lines, bytes, triggeredBy } = report.journalRotation;
+    const kb = (bytes / 1024).toFixed(1);
+    const limitKb = (JOURNAL_BYTE_LIMIT / 1024).toFixed(0);
+    const reason =
+      triggeredBy === "lines"
+        ? `${lines} lines (threshold ${JOURNAL_LINE_LIMIT})`
+        : triggeredBy === "bytes"
+        ? `${kb} KB (threshold ${limitKb} KB)`
+        : `${lines} lines and ${kb} KB (thresholds ${JOURNAL_LINE_LIMIT} lines / ${limitKb} KB)`;
+    sections.push(
+      "## Journal rotation due",
+      `- ${JOURNAL_FILE} has reached ${reason}.`,
+      `- Run the rotation procedure in \`${JOURNAL_ARCHIVE_DIR}/${JOURNAL_ARCHIVE_INDEX}\`: cut ≈30 days back at a date header, move older entries into \`${JOURNAL_ARCHIVE_DIR}/JOURNAL-YYYY-NN.md\`, register the segment in \`${JOURNAL_ARCHIVE_DIR}/${JOURNAL_ARCHIVE_INDEX}\` with date range + one-line summary, and log the rotation in LOG.md as an UPDATE op.`,
+      ""
+    );
   }
 
   // Unindexed working binaries

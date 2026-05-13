@@ -180,3 +180,55 @@ test("working/ markdown drafts and .gitkeep do not require INDEX entries", async
     "markdown drafts and .gitkeep must not be flagged"
   );
 });
+
+test("journal rotation: under threshold does not flag", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+    "JOURNAL.md": ["# Journal", "", "### 2026-05-13", "- A short entry.", ""].join("\n"),
+  });
+
+  const report = await runLint();
+  assert.equal(
+    report.journalRotation,
+    null,
+    "small JOURNAL must not trigger rotation reminder"
+  );
+});
+
+test("journal rotation: line count over threshold flags with lines reason", async () => {
+  // 600 short lines: comfortably over 500 lines, well under 80 KB.
+  const body = Array.from({ length: 600 }, (_, i) => `- entry ${i + 1}`).join("\n");
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+    "JOURNAL.md": `# Journal\n\n${body}\n`,
+  });
+
+  const report = await runLint();
+  assert.ok(report.journalRotation, "should flag rotation");
+  assert.equal(report.journalRotation.triggeredBy, "lines");
+  assert.ok(
+    report.journalRotation.lines > 500,
+    "line count should exceed the 500-line threshold"
+  );
+});
+
+test("journal rotation: byte size over threshold flags with bytes reason", async () => {
+  // ~100 KB of content split across only ~50 lines: trips bytes, not lines.
+  const fatLine = "x".repeat(2000);
+  const body = Array.from({ length: 50 }, () => fatLine).join("\n");
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n",
+    "JOURNAL.md": `# Journal\n\n${body}\n`,
+  });
+
+  const report = await runLint();
+  assert.ok(report.journalRotation, "should flag rotation");
+  assert.equal(report.journalRotation.triggeredBy, "bytes");
+  assert.ok(
+    report.journalRotation.bytes > 80 * 1024,
+    "byte size should exceed the 80 KB threshold"
+  );
+});
