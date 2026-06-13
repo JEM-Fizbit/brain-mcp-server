@@ -17,6 +17,8 @@ This is the Phase 2 hosted target for a single `ai-brain-jem` Brain. It gives re
 
 The Brain server needs a git-capable Node runtime with durable filesystem state. Fly Volumes are mounted like ordinary directories and persist app state across deploys and restarts. For this Phase 2 deployment, run one Machine with one attached volume; Fly volumes are tied to a specific host and are not automatically replicated.
 
+Hosted mutating tools run with `BRAIN_AUTO_SYNC=true` and `BRAIN_AUTO_PUSH=true`, so successful writes commit and push back to `ai-brain-jem` before returning. Tool responses include an `Auto-sync:` line with the commit/push result. This keeps the hosted workflow close to the old local-file ergonomics while still preserving git history.
+
 ## One-Time Setup
 
 Create or update a GitHub OAuth app for the hosted callback:
@@ -138,9 +140,11 @@ Expected first authenticated tool checks:
 - `brain_list_brains`
 - `brain_describe` with `brain_id=ai-brain-jem`
 - `brain_load_context`
+- a small `brain_log` or `brain_update_file` write should return `Auto-sync: Committed ... Pushed to origin.`
 
 ## Notes
 
 - Keep `auto_stop_machines = "off"` for Phase 2. OAuth state and filesystem writes are simplest while one Machine stays warm.
 - If the app name changes, update `app`, `MCP_OAUTH_PUBLIC_BASE`, and GitHub OAuth callback URL together.
 - Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted.
+- Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.

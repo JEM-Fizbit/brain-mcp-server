@@ -65,6 +65,9 @@ npx @modelcontextprotocol/inspector node dist/index.js
 | `GITHUB_ALLOWED_EMAILS` | Comma-separated email allowlist for fallback owner access | unset |
 | `BRAIN_PLATFORM_CONFIG` | Registry JSON path for hosted/multi-Brain mode | `~/.config/brain-platform/registry.json` |
 | `BRAIN_PLATFORM_STATE_ROOT` | File-backed OAuth state root | `~/.config/brain-platform/state` |
+| `BRAIN_AUTO_SYNC` | When true, successful mutating Brain tools automatically commit changes | unset / false |
+| `BRAIN_AUTO_PUSH` | When auto-sync is enabled, push commits to origin unless set false | true |
+| `BRAIN_DATE_TIME_ZONE` | IANA timezone used for Brain log/source dates | `TZ` or `UTC` |
 
 ## Hosted HTTP Deployment
 

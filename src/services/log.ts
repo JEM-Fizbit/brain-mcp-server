@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { LOG_FILE, type LogOpType } from "../constants.js";
+import { brainDate } from "./date.js";
 import { getBrainPaths } from "./registry.js";
 
 const LOG_HEADER = `# Brain Change Log
@@ -26,10 +27,6 @@ async function ensureLogFile(brainId?: string): Promise<string> {
   return filePath;
 }
 
-function formatDate(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
 export async function appendLog(
   opType: LogOpType,
   filesTouched: string[],
@@ -37,16 +34,17 @@ export async function appendLog(
   brainId?: string
 ): Promise<string> {
   const filePath = await ensureLogFile(brainId);
+  const date = brainDate();
 
   const entry = [
     "",
-    `## [${formatDate()}] ${opType} | ${summary}`,
+    `## [${date}] ${opType} | ${summary}`,
     `Files: ${filesTouched.join(", ")}`,
     "",
   ].join("\n");
 
   await fs.appendFile(filePath, entry, "utf-8");
-  return `Logged: [${formatDate()}] ${opType} | ${summary}`;
+  return `Logged: [${date}] ${opType} | ${summary}`;
 }
 
 export async function readLog(

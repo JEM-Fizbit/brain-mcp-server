@@ -1,5 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { UpdateFileSchema, CommitSchema } from "../schemas/tools.js";
+import {
+  autoSyncMessage,
+  maybeAutoSync,
+} from "../services/auto-sync.js";
 import * as brain from "../services/brain.js";
 import * as git from "../services/git.js";
 import {
@@ -11,7 +15,7 @@ import {
 export function registerUpdateTools(server: McpServer): void {
   server.tool(
     "brain_update_file",
-    "Update a Brain file. Writes to disk but does NOT auto-commit — call brain_commit separately after edits.",
+    "Update a Brain file. Hosted deployments may auto-commit and push after successful writes; otherwise call brain_commit separately after edits.",
     UpdateFileSchema.shape,
     async ({ brain_id, filename, content, mode, old_content }, extra) => {
       try {
@@ -24,7 +28,12 @@ export function registerUpdateTools(server: McpServer): void {
           old_content,
           ctx.brainId
         );
-        return { content: [{ type: "text", text: result }] };
+        const sync = await maybeAutoSync(
+          ctx.brainId,
+          autoSyncMessage("UPDATE", filename),
+          authorIdentity(ctx)
+        );
+        return { content: [{ type: "text", text: result + sync }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],
