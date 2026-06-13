@@ -1,10 +1,10 @@
 # brain-mcp-server
 
-A generic MCP server that serves Markdown-based AI Brain files to any MCP-compatible Claude client.
+A generic MCP server that serves Markdown-based AI Brain files to any MCP-compatible client.
 
 ## What It Does
 
-Gives Claude persistent, context-aware access to a collection of Markdown files (an "AI Brain") via the [Model Context Protocol](https://modelcontextprotocol.io). Supports reading, writing, searching, and git-backed versioning — all over local stdio transport.
+Gives MCP clients persistent, context-aware access to a collection of Markdown files (an "AI Brain") via the [Model Context Protocol](https://modelcontextprotocol.io). Supports reading, writing, searching, git-backed versioning, local stdio transport, and hosted HTTP transport with GitHub OAuth.
 
 ## Tools
 
@@ -53,6 +53,34 @@ npx @modelcontextprotocol/inspector node dist/index.js
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BRAIN_DIR` | Absolute path to your Brain markdown files directory | `~/Projects/ai-brain-jem/brain` |
+| `BRAIN_SOURCES_DIR` | Absolute path to your source archive directory | sibling `sources/` next to `BRAIN_DIR` |
+| `TRANSPORT` | `stdio` by default, or `http` for hosted/HTTP mode | unset / stdio |
+| `HOST` or `MCP_HTTP_HOST` | HTTP bind host when `TRANSPORT=http` | `127.0.0.1` |
+| `PORT` | HTTP bind port and local OAuth base fallback | `3000` |
+| `MCP_OAUTH_PUBLIC_BASE` | Public HTTPS base URL for hosted OAuth and MCP metadata | `http://127.0.0.1:$PORT` |
+| `MCP_OAUTH_SIGNING_SECRET` | Required in HTTP mode. HS256 access-token signing secret | unset |
+| `GITHUB_OAUTH_CLIENT_ID` | Required in HTTP mode. GitHub OAuth app client ID | unset |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Required in HTTP mode. GitHub OAuth app client secret | unset |
+| `GITHUB_ALLOWED_LOGINS` | Comma-separated GitHub login allowlist for fallback owner access | unset |
+| `GITHUB_ALLOWED_EMAILS` | Comma-separated email allowlist for fallback owner access | unset |
+| `BRAIN_PLATFORM_CONFIG` | Registry JSON path for hosted/multi-Brain mode | `~/.config/brain-platform/registry.json` |
+| `BRAIN_PLATFORM_STATE_ROOT` | File-backed OAuth state root | `~/.config/brain-platform/state` |
+
+## Hosted HTTP Deployment
+
+Remote-only clients need a public HTTPS MCP endpoint; `127.0.0.1` only works for clients running on the same laptop. The Phase 2 target is a Node runtime with a persistent filesystem volume for the Brain repo, OAuth state, and semantic index.
+
+This repo includes:
+
+- `Dockerfile` for a git-capable Node runtime
+- `fly.toml` for the first Fly.io target, `jem-brain-mcp`
+- [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
+
+Hosted endpoint shape:
+
+```text
+https://jem-brain-mcp.fly.dev/mcp
+```
 
 ## Client Setup
 

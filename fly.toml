@@ -1,0 +1,52 @@
+app = "jem-brain-mcp"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  TRANSPORT = "http"
+  HOST = "0.0.0.0"
+  PORT = "8080"
+  MCP_OAUTH_PUBLIC_BASE = "https://jem-brain-mcp.fly.dev"
+  GITHUB_OAUTH_CALLBACK_PATH = "/authorize/github/callback"
+  BRAIN_ID = "ai-brain-jem"
+  BRAIN_DIR = "/data/brains/ai-brain-jem/brain"
+  BRAIN_SOURCES_DIR = "/data/brains/ai-brain-jem/sources"
+  BRAIN_GITHUB_REPO = "JEM-Fizbit/ai-brain-jem"
+  BRAIN_PLATFORM_CONFIG = "/data/config/registry.json"
+  BRAIN_PLATFORM_STATE_ROOT = "/data/state"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 50
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[mounts]
+  source = "brain_data"
+  destination = "/data"
+  initial_size = "10gb"
+  snapshot_retention = 14
+  auto_extend_size_threshold = 80
+  auto_extend_size_increment = "5GB"
+  auto_extend_size_limit = "30GB"
+
+[vm]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb"

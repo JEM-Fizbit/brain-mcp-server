@@ -235,7 +235,7 @@ Recommended registry shape:
         "brain_dir": "/data/brains/ai-brain-jem/brain",
         "sources_dir": "/data/brains/ai-brain-jem/sources",
         "inbox_dir": "/data/brains/ai-brain-jem/inbox",
-        "remote": "git@github-personal:JEM-Fizbit/ai-brain-jem.git"
+        "remote": "git@github.com:JEM-Fizbit/ai-brain-jem.git"
       },
       "vector_backend": "sqlite-vec",
       "vector_scope": ["sources"],
