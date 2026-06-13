@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { BRAIN_DIR, LOG_FILE, type LogOpType } from "../constants.js";
-
-const LOG_PATH = path.join(BRAIN_DIR, LOG_FILE);
+import { LOG_FILE, type LogOpType } from "../constants.js";
+import { getBrainPaths } from "./registry.js";
 
 const LOG_HEADER = `# Brain Change Log
 
@@ -12,12 +11,19 @@ Format: \`## [YYYY-MM-DD] OP_TYPE | Summary\` followed by files touched.
 ---
 `;
 
-async function ensureLogFile(): Promise<void> {
+async function logPath(brainId?: string): Promise<string> {
+  const { brainDir } = await getBrainPaths(brainId);
+  return path.join(brainDir, LOG_FILE);
+}
+
+async function ensureLogFile(brainId?: string): Promise<string> {
+  const filePath = await logPath(brainId);
   try {
-    await fs.access(LOG_PATH);
+    await fs.access(filePath);
   } catch {
-    await fs.writeFile(LOG_PATH, LOG_HEADER, "utf-8");
+    await fs.writeFile(filePath, LOG_HEADER, "utf-8");
   }
+  return filePath;
 }
 
 function formatDate(): string {
@@ -27,9 +33,10 @@ function formatDate(): string {
 export async function appendLog(
   opType: LogOpType,
   filesTouched: string[],
-  summary: string
+  summary: string,
+  brainId?: string
 ): Promise<string> {
-  await ensureLogFile();
+  const filePath = await ensureLogFile(brainId);
 
   const entry = [
     "",
@@ -38,14 +45,17 @@ export async function appendLog(
     "",
   ].join("\n");
 
-  await fs.appendFile(LOG_PATH, entry, "utf-8");
+  await fs.appendFile(filePath, entry, "utf-8");
   return `Logged: [${formatDate()}] ${opType} | ${summary}`;
 }
 
-export async function readLog(limit: number = 20): Promise<string> {
-  await ensureLogFile();
+export async function readLog(
+  limit: number = 20,
+  brainId?: string
+): Promise<string> {
+  const filePath = await ensureLogFile(brainId);
 
-  const content = await fs.readFile(LOG_PATH, "utf-8");
+  const content = await fs.readFile(filePath, "utf-8");
   const entries = content.split(/(?=^## \[)/m).filter((e) => e.startsWith("## ["));
 
   if (entries.length === 0) {
@@ -62,11 +72,12 @@ export async function readLog(limit: number = 20): Promise<string> {
 }
 
 export async function getLastOpDate(
-  opType: LogOpType
+  opType: LogOpType,
+  brainId?: string
 ): Promise<Date | null> {
-  await ensureLogFile();
+  const filePath = await ensureLogFile(brainId);
 
-  const content = await fs.readFile(LOG_PATH, "utf-8");
+  const content = await fs.readFile(filePath, "utf-8");
   const pattern = new RegExp(`^## \\[(\\d{4}-\\d{2}-\\d{2})\\] ${opType}`);
 
   // Log is append-only (newest at bottom) — scan from end, return first match

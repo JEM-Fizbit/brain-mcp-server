@@ -1,15 +1,17 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ReadFileSchema } from "../schemas/tools.js";
+import { LoadContextSchema, ReadFileSchema } from "../schemas/tools.js";
 import * as brain from "../services/brain.js";
+import { resolveToolBrain } from "../services/request-context.js";
 
 export function registerContextTools(server: McpServer): void {
   server.tool(
     "brain_load_context",
     "Load the Brain loader (navigation table) and NOW.md — the entry point for every session. Returns the minimum context needed to orient and determine which additional files to request.",
-    {},
-    async () => {
+    LoadContextSchema.shape,
+    async ({ brain_id }, extra) => {
       try {
-        const content = await brain.loadContext();
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const content = await brain.loadContext(ctx.brainId);
         return { content: [{ type: "text", text: content }] };
       } catch (error) {
         return {
@@ -24,9 +26,10 @@ export function registerContextTools(server: McpServer): void {
     "brain_read_file",
     'Read a specific file. By default reads from the Brain vault (scope="brain"). Pass scope="sources" to read from the sources/ archive (bios, assessments, meeting notes, writing samples, etc.) when the original ingested material is needed rather than a Brain summary.',
     ReadFileSchema.shape,
-    async ({ filename, scope }) => {
+    async ({ brain_id, filename, scope }, extra) => {
       try {
-        const content = await brain.readFile(filename, scope);
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const content = await brain.readFile(filename, scope, ctx.brainId);
         return { content: [{ type: "text", text: content }] };
       } catch (error) {
         return {

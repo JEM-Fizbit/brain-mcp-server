@@ -1,8 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  BRAIN_DIR,
-  SOURCES_ROOT,
   LOADER_FILE,
   NOW_FILE,
   STALENESS,
@@ -19,6 +17,7 @@ import {
 import * as log from "./log.js";
 import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
 import { scanInbox } from "./inbox.js";
+import { getBrainPaths } from "./registry.js";
 
 export interface BrainFile {
   name: string;
@@ -40,19 +39,19 @@ function validateFilename(filename: string): void {
   }
 }
 
-function resolveFilePath(filename: string): string {
+function resolveFilePath(root: string, filename: string): string {
   validateFilename(filename);
-  const resolved = path.resolve(BRAIN_DIR, filename);
-  if (!resolved.startsWith(path.resolve(BRAIN_DIR))) {
+  const resolved = path.resolve(root, filename);
+  if (!resolved.startsWith(path.resolve(root))) {
     throw new Error("Path traversal detected");
   }
   return resolved;
 }
 
-function resolveSourcePath(filename: string): string {
+function resolveSourcePath(root: string, filename: string): string {
   validateFilename(filename);
-  const resolved = path.resolve(SOURCES_ROOT, filename);
-  if (!resolved.startsWith(path.resolve(SOURCES_ROOT))) {
+  const resolved = path.resolve(root, filename);
+  if (!resolved.startsWith(path.resolve(root))) {
     throw new Error("Path traversal detected");
   }
   return resolved;
@@ -61,15 +60,19 @@ function resolveSourcePath(filename: string): string {
 export type ReadScope = "brain" | "sources";
 export type SearchScope = "brain" | "sources" | "all";
 
-async function listSourceFileNames(category?: SourceCategory): Promise<string[]> {
+async function listSourceFileNames(
+  category?: SourceCategory,
+  brainId?: string
+): Promise<string[]> {
   const files: string[] = [];
+  const { sourcesRoot } = await getBrainPaths(brainId);
   try {
-    const rootEntries = await fs.readdir(SOURCES_ROOT, { withFileTypes: true });
+    const rootEntries = await fs.readdir(sourcesRoot, { withFileTypes: true });
     for (const entry of rootEntries) {
       if (!entry.isDirectory()) continue;
       if (category && entry.name !== category) continue;
       if (!SOURCE_CATEGORIES.includes(entry.name as SourceCategory)) continue;
-      const subPath = path.join(SOURCES_ROOT, entry.name);
+      const subPath = path.join(sourcesRoot, entry.name);
       const subEntries = await fs.readdir(subPath, { withFileTypes: true });
       for (const sub of subEntries) {
         if (sub.isFile() && sub.name.endsWith(".md")) {
@@ -83,21 +86,25 @@ async function listSourceFileNames(category?: SourceCategory): Promise<string[]>
   return files.sort();
 }
 
-export async function listSources(category?: SourceCategory): Promise<string[]> {
-  return listSourceFileNames(category);
+export async function listSources(
+  category?: SourceCategory,
+  brainId?: string
+): Promise<string[]> {
+  return listSourceFileNames(category, brainId);
 }
 
-export async function loadContext(): Promise<string> {
-  const loaderPath = path.join(BRAIN_DIR, LOADER_FILE);
-  const nowPath = path.join(BRAIN_DIR, NOW_FILE);
+export async function loadContext(brainId?: string): Promise<string> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const loaderPath = path.join(brainDir, LOADER_FILE);
+  const nowPath = path.join(brainDir, NOW_FILE);
 
   // Fetch everything in parallel: core files + nudge data
   const [loader, now, lastLint, issues, inboxFiles] = await Promise.all([
     fs.readFile(loaderPath, "utf-8").catch(() => null),
     fs.readFile(nowPath, "utf-8").catch(() => null),
-    log.getLastOpDate("LINT").catch((): null => null),
+    log.getLastOpDate("LINT", brainId).catch((): null => null),
     getOpenMaintenanceIssues().catch((): OpenIssue[] => []),
-    scanInbox().catch((): [] => []),
+    scanInbox(brainId).catch((): [] => []),
   ]);
 
   if (!loader || !now) {
@@ -106,7 +113,7 @@ export async function loadContext(): Promise<string> {
     if (!now) missing.push(NOW_FILE);
     throw new Error(
       `Missing required Brain files: ${missing.join(", ")}. ` +
-        `Ensure BRAIN_DIR (${BRAIN_DIR}) contains these files.`
+        `Ensure Brain directory (${brainDir}) contains these files.`
     );
   }
 
@@ -164,16 +171,22 @@ export async function loadContext(): Promise<string> {
 
 export async function readFile(
   filename: string,
-  scope: ReadScope = "brain"
+  scope: ReadScope = "brain",
+  brainId?: string
 ): Promise<string> {
+  const { brainDir, sourcesRoot } = await getBrainPaths(brainId);
   const filePath =
-    scope === "sources" ? resolveSourcePath(filename) : resolveFilePath(filename);
+    scope === "sources"
+      ? resolveSourcePath(sourcesRoot, filename)
+      : resolveFilePath(brainDir, filename);
 
   try {
     return await fs.readFile(filePath, "utf-8");
   } catch {
     const available =
-      scope === "sources" ? await listSourceFileNames() : await listFileNames();
+      scope === "sources"
+        ? await listSourceFileNames(undefined, brainId)
+        : await listFileNames(brainId);
     const label = scope === "sources" ? "source files" : "Brain files";
     throw new Error(
       `File not found in ${label}: ${filename}. Available files:\n${available.join("\n")}`
@@ -185,9 +198,11 @@ export async function updateFile(
   filename: string,
   content: string,
   mode: "replace" | "append" | "patch",
-  old_content?: string
+  old_content?: string,
+  brainId?: string
 ): Promise<string> {
-  const filePath = resolveFilePath(filename);
+  const { brainDir } = await getBrainPaths(brainId);
+  const filePath = resolveFilePath(brainDir, filename);
 
   if (mode === "patch") {
     if (!old_content) {
@@ -223,8 +238,9 @@ export async function updateFile(
   return `Updated ${filename}: ${lines} lines, ${stat.size} bytes`;
 }
 
-export async function listFileNames(): Promise<string[]> {
-  const entries = await fs.readdir(BRAIN_DIR, { withFileTypes: true });
+export async function listFileNames(brainId?: string): Promise<string[]> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const entries = await fs.readdir(brainDir, { withFileTypes: true });
   const files: string[] = [];
 
   for (const entry of entries) {
@@ -232,7 +248,7 @@ export async function listFileNames(): Promise<string[]> {
       files.push(entry.name);
     }
     if (entry.isDirectory()) {
-      const subPath = path.join(BRAIN_DIR, entry.name);
+      const subPath = path.join(brainDir, entry.name);
       const subEntries = await fs.readdir(subPath, { withFileTypes: true });
       for (const sub of subEntries) {
         if (sub.isFile() && sub.name.endsWith(".md")) {
@@ -253,13 +269,14 @@ export function getStalenessThreshold(filename: string): number {
   return STALENESS.DEFAULT;
 }
 
-export async function listFiles(): Promise<BrainFile[]> {
-  const fileNames = await listFileNames();
+export async function listFiles(brainId?: string): Promise<BrainFile[]> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const fileNames = await listFileNames(brainId);
   const now = Date.now();
 
   const results = await Promise.all(
     fileNames.map(async (name) => {
-      const filePath = path.join(BRAIN_DIR, name);
+      const filePath = path.join(brainDir, name);
       const [stat, content] = await Promise.all([
         fs.stat(filePath),
         fs.readFile(filePath, "utf-8"),
@@ -288,8 +305,10 @@ export async function listFiles(): Promise<BrainFile[]> {
 export async function search(
   query: string,
   scope: SearchScope = "brain",
-  maxResults: number = MAX_SEARCH_RESULTS
+  maxResults: number = MAX_SEARCH_RESULTS,
+  brainId?: string
 ): Promise<string> {
+  const { brainDir, sourcesRoot } = await getBrainPaths(brainId);
   const lowerQuery = query.toLowerCase();
   const matches: string[] = [];
   const cap = Math.min(
@@ -303,16 +322,16 @@ export async function search(
   const searchRoots: { root: string; prefix: string; files: string[] }[] = [];
   if (scope === "brain" || scope === "all") {
     searchRoots.push({
-      root: BRAIN_DIR,
+      root: brainDir,
       prefix: "",
-      files: await listFileNames(),
+      files: await listFileNames(brainId),
     });
   }
   if (scope === "sources" || scope === "all") {
     searchRoots.push({
-      root: SOURCES_ROOT,
+      root: sourcesRoot,
       prefix: "sources/",
-      files: await listSourceFileNames(),
+      files: await listSourceFileNames(undefined, brainId),
     });
   }
 

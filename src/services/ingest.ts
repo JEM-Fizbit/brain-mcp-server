@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  BRAIN_DIR,
   SOURCES_DIR,
   SOURCES_INDEX,
   SOURCE_CATEGORIES,
@@ -9,6 +8,7 @@ import {
 } from "../constants.js";
 import { listFileNames } from "./brain.js";
 import * as log from "./log.js";
+import { getBrainPaths } from "./registry.js";
 
 export interface IngestAnalysis {
   sourceLabel: string;
@@ -36,9 +36,10 @@ function formatDate(): string {
  * so Claude can determine which files the source touches.
  */
 export async function analyzeForIngest(
-  sourceLabel: string
+  sourceLabel: string,
+  brainId?: string
 ): Promise<IngestAnalysis> {
-  const files = await listFileNames();
+  const files = await listFileNames(brainId);
 
   const instructions = [
     `## Ingest Analysis: ${sourceLabel}`,
@@ -119,10 +120,11 @@ export async function resolveSourceContent(
 export async function saveSource(
   sourceContent: string,
   sourceLabel: string,
-  category: SourceCategory
+  category: SourceCategory,
+  brainId?: string
 ): Promise<string> {
-  const sourcesPath = path.resolve(BRAIN_DIR, "..", SOURCES_DIR);
-  const categoryPath = path.join(sourcesPath, category);
+  const { sourcesRoot } = await getBrainPaths(brainId);
+  const categoryPath = path.join(sourcesRoot, category);
 
   // Create category subfolder if needed
   await fs.mkdir(categoryPath, { recursive: true });
@@ -145,17 +147,20 @@ export async function recordIngest(
   category: SourceCategory,
   mdFile: string,
   filesTouched: string[],
-  originalFile?: string
+  originalFile?: string,
+  brainId?: string
 ): Promise<string> {
   // Append to LOG.md
   await log.appendLog(
     "INGEST",
     filesTouched,
-    `Ingested: ${sourceLabel} (${category})`
+    `Ingested: ${sourceLabel} (${category})`,
+    brainId
   );
 
   // Append row to SOURCES.md
-  const indexPath = path.join(BRAIN_DIR, SOURCES_INDEX);
+  const { brainDir } = await getBrainPaths(brainId);
+  const indexPath = path.join(brainDir, SOURCES_INDEX);
   const originalCol = originalFile ? `\`${originalFile}\`` : "—";
   const row = `| ${formatDate()} | ${sourceLabel} | ${category} | ${originalCol} | \`${mdFile}\` | ${filesTouched.map((f) => `\`${f}\``).join(", ")} |`;
 
@@ -186,13 +191,16 @@ export async function recordIngest(
  * Delete a file from the inbox after successful ingestion.
  * Validates the filename to prevent path traversal.
  */
-export async function deleteInboxFile(filename: string): Promise<string> {
+export async function deleteInboxFile(
+  filename: string,
+  brainId?: string
+): Promise<string> {
   // Security: no path separators allowed
   if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
     throw new Error(`Invalid inbox filename: ${filename}. Must be a plain filename, no path separators.`);
   }
 
-  const inboxDir = path.resolve(BRAIN_DIR, "..", "inbox");
+  const { inboxDir } = await getBrainPaths(brainId);
   const filePath = path.join(inboxDir, filename);
 
   try {

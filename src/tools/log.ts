@@ -1,15 +1,23 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LogSchema, ReadLogSchema } from "../schemas/tools.js";
 import * as log from "../services/log.js";
+import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
 
 export function registerLogTools(server: McpServer): void {
   server.tool(
     "brain_log",
     "Append an entry to the Brain change log. Use after making updates to record what changed and why.",
     LogSchema.shape,
-    async ({ opType, filesTouched, summary }) => {
+    async ({ brain_id, opType, filesTouched, summary }, extra) => {
       try {
-        const result = await log.appendLog(opType, filesTouched, summary);
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
+        const result = await log.appendLog(
+          opType,
+          filesTouched,
+          summary,
+          ctx.brainId
+        );
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {
@@ -24,9 +32,10 @@ export function registerLogTools(server: McpServer): void {
     "brain_read_log",
     "Read recent entries from the Brain change log. Shows what was ingested, updated, or linted and when.",
     ReadLogSchema.shape,
-    async ({ limit }) => {
+    async ({ brain_id, limit }, extra) => {
       try {
-        const result = await log.readLog(limit);
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const result = await log.readLog(limit, ctx.brainId);
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {

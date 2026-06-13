@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { BRAIN_DIR, INBOX_DIR } from "../constants.js";
+import { getBrainPaths } from "./registry.js";
 
 export interface InboxFile {
   name: string;
@@ -11,8 +11,9 @@ export interface InboxFile {
 /**
  * Resolve the inbox directory path (sibling to brain/, like sources/).
  */
-function getInboxPath(): string {
-  return path.resolve(BRAIN_DIR, "..", INBOX_DIR);
+async function getInboxPath(brainId?: string): Promise<string> {
+  const { inboxDir } = await getBrainPaths(brainId);
+  return inboxDir;
 }
 
 /**
@@ -21,8 +22,8 @@ function getInboxPath(): string {
  * Filters out hidden files, .gitkeep, and directories.
  * Returns files sorted by modified date (newest first).
  */
-export async function scanInbox(): Promise<InboxFile[]> {
-  const inboxPath = getInboxPath();
+export async function scanInbox(brainId?: string): Promise<InboxFile[]> {
+  const inboxPath = await getInboxPath(brainId);
 
   // Create inbox dir if missing (no-op if exists)
   await fs.mkdir(inboxPath, { recursive: true });
