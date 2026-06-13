@@ -38,7 +38,10 @@ async function validateAuthorizeParams(
   params: AuthorizeParams,
   config: OauthConfig,
   state: StateProvider
-): Promise<{ ok: true; client: any; scopes: string[] } | { ok: false; fatal?: boolean; error: string; description: string }> {
+): Promise<
+  | { ok: true; client: any; scopes: string[]; resource: string }
+  | { ok: false; fatal?: boolean; error: string; description: string }
+> {
   if (!params.client_id) {
     return { ok: false, fatal: true, error: "invalid_request", description: "client_id is required" };
   }
@@ -55,7 +58,9 @@ async function validateAuthorizeParams(
   if (params.code_challenge_method !== "S256" || !/^[A-Za-z0-9\-_]{43}$/.test(params.code_challenge)) {
     return { ok: false, error: "invalid_request", description: "PKCE S256 code_challenge is required" };
   }
-  if (!isResourceMatch(params.resource, config.resourceUri)) {
+  const effectiveResource = params.resource || config.resourceUri;
+  const normalizedResource = normalizeResource(effectiveResource);
+  if (!normalizedResource || !isResourceMatch(effectiveResource, config.resourceUri)) {
     return { ok: false, error: "invalid_target", description: "resource does not match this server" };
   }
 
@@ -65,7 +70,7 @@ async function validateAuthorizeParams(
       return { ok: false, error: "invalid_scope", description: `unsupported scope: ${scope}` };
     }
   }
-  return { ok: true, client, scopes };
+  return { ok: true, client, scopes, resource: normalizedResource };
 }
 
 export async function handleAuthorizeGet(
@@ -106,7 +111,7 @@ export async function handleAuthorizeGet(
   const now = Math.floor(Date.now() / 1000);
   await state.put("oauth_states", oauthState, {
     ...params,
-    resource: normalizeResource(params.resource),
+    resource: validation.resource,
     created_at: now,
     expires_at: now + config.oauthStateTtlSec,
   });
