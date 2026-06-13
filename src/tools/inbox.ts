@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ScanInboxSchema } from "../schemas/tools.js";
 import { scanInbox } from "../services/inbox.js";
+import { resolveToolBrain } from "../services/request-context.js";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -13,9 +14,10 @@ export function registerInboxTools(server: McpServer): void {
     "brain_scan_inbox",
     "List files pending in the Brain inbox. Drop files into the inbox/ folder for processing. Returns filenames, sizes, and dates.",
     ScanInboxSchema.shape,
-    async () => {
+    async ({ brain_id }, extra) => {
       try {
-        const files = await scanInbox();
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const files = await scanInbox(ctx.brainId);
 
         if (files.length === 0) {
           return {

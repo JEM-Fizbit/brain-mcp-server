@@ -1,17 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SearchSchema, ListSourcesSchema } from "../schemas/tools.js";
+import { SearchSchema, ListSourcesSchema, ListFilesSchema } from "../schemas/tools.js";
 import * as brain from "../services/brain.js";
 import * as git from "../services/git.js";
+import { resolveToolBrain } from "../services/request-context.js";
 
 export function registerStatusTools(server: McpServer): void {
   server.tool(
     "brain_list_files",
     "List all Brain files with metadata: line count, last modified date, size, and staleness warnings.",
-    {},
-    async () => {
+    ListFilesSchema.shape,
+    async ({ brain_id }, extra) => {
       try {
-        const files = await brain.listFiles();
-        const gitStatus = await git.getStatus();
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const files = await brain.listFiles(ctx.brainId);
+        const gitStatus = await git.getStatusForBrain(ctx.brainId);
 
         const header = "| File | Lines | Size | Last Modified | Status |";
         const separator = "|------|-------|------|---------------|--------|";
@@ -44,9 +46,10 @@ export function registerStatusTools(server: McpServer): void {
     "brain_search",
     'Search for a keyword or pattern (case-insensitive). By default searches Brain files only (fast, summarised knowledge). Pass scope="sources" to search the sources/ archive (original ingested documents), or scope="all" to search both. Escalate scope when the query concerns specific documents, correspondence, or when a brain-only search returns no matches on something expected to exist. Default max_results is 50 (ceiling 500); raise when the truncation footer indicates more matches exist. Per-line length is capped at 5000 chars (edge-case safety net; truncated lines end with … and the footer notes how many were trimmed).',
     SearchSchema.shape,
-    async ({ query, scope, max_results }) => {
+    async ({ brain_id, query, scope, max_results }, extra) => {
       try {
-        const result = await brain.search(query, scope, max_results);
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const result = await brain.search(query, scope, max_results, ctx.brainId);
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {
@@ -61,9 +64,10 @@ export function registerStatusTools(server: McpServer): void {
     "brain_list_sources",
     "List files in the sources/ archive. Optionally filter by category (bios, cv, assessments, meeting_notes, writing_samples, analysis, correspondence, personal, research, etc.). Use to discover what ingested material is available before calling brain_read_file with scope=\"sources\".",
     ListSourcesSchema.shape,
-    async ({ category }) => {
+    async ({ brain_id, category }, extra) => {
       try {
-        const files = await brain.listSources(category);
+        const ctx = await resolveToolBrain(brain_id, extra);
+        const files = await brain.listSources(category, ctx.brainId);
         const text =
           files.length > 0
             ? (category

@@ -7,6 +7,7 @@ import {
   recordIngest,
   deleteInboxFile,
 } from "../services/ingest.js";
+import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
 
 export function registerIngestTools(server: McpServer): void {
   server.tool(
@@ -23,10 +24,11 @@ SHORT TEXT (under 500 words): Pass source_content directly with dry_run=false.
 
 NEVER pass large text as source_content — it will timeout the MCP transport.`,
     IngestSchema.shape,
-    async ({ source_content, source_path, source_label, category, dry_run }) => {
+    async ({ brain_id, source_content, source_path, source_label, category, dry_run }, extra) => {
       try {
+        const ctx = await resolveToolBrain(brain_id, extra);
         if (dry_run) {
-          const analysis = await analyzeForIngest(source_label);
+          const analysis = await analyzeForIngest(source_label, ctx.brainId);
 
           // If content was provided, include it (short text only)
           const contentSection =
@@ -55,8 +57,14 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
         }
 
         // dry_run=false: save the source .md file
+        assertWriteRole(ctx);
         const content = await resolveSourceContent(source_content, source_path);
-        const savedPath = await saveSource(content, source_label, category);
+        const savedPath = await saveSource(
+          content,
+          source_label,
+          category,
+          ctx.brainId
+        );
 
         const result = [
           `Source saved: \`${savedPath}\``,
@@ -81,20 +89,23 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
     "brain_ingest_complete",
     "Record a completed ingest. Call this after saving the source and updating Brain files. Records provenance in SOURCES.md (original + markdown paths) and logs the ingest.",
     IngestCompleteSchema.shape,
-    async ({ source_label, category, original_file, md_file, files_touched, inbox_file }) => {
+    async ({ brain_id, source_label, category, original_file, md_file, files_touched, inbox_file }, extra) => {
       try {
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
         const result = await recordIngest(
           source_label,
           category,
           md_file,
           files_touched,
-          original_file
+          original_file,
+          ctx.brainId
         );
 
         // Clean up inbox file if provided
         let inboxResult = "";
         if (inbox_file) {
-          inboxResult = await deleteInboxFile(inbox_file);
+          inboxResult = await deleteInboxFile(inbox_file, ctx.brainId);
         }
 
         return { content: [{ type: "text", text: result + inboxResult }] };

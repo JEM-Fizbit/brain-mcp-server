@@ -1,16 +1,15 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerAllTools } from "./tools/index.js";
 import { BRAIN_DIR } from "./constants.js";
-
-const server = new McpServer({
-  name: "brain-mcp-server",
-  version: "1.0.0",
-});
-
-registerAllTools(server);
+import { createBrainMcpServer } from "./mcp-server.js";
 
 async function main(): Promise<void> {
+  if (process.env.TRANSPORT === "http") {
+    const { startHttpServer } = await import("./http/server.js");
+    await startHttpServer();
+    return;
+  }
+
+  const server = createBrainMcpServer();
   const transport = new StdioServerTransport();
   console.error(`[brain-mcp-server] Starting with BRAIN_DIR: ${BRAIN_DIR}`);
   await server.connect(transport);

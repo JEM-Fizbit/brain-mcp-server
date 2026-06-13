@@ -1,6 +1,28 @@
 import { z } from "zod";
 
-export const ReadFileSchema = z.object({
+export const BrainIdSchema = z.object({
+  brain_id: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,62}$/)
+    .optional()
+    .describe(
+      "Brain identifier. Optional when you have access to exactly one Brain."
+    ),
+});
+
+export const LoadContextSchema = BrainIdSchema;
+export const ListFilesSchema = BrainIdSchema;
+export const LintSchema = BrainIdSchema;
+export const ScanInboxSchema = BrainIdSchema;
+export const ListBrainsSchema = z.object({});
+export const DescribeBrainSchema = BrainIdSchema.extend({
+  brain_id: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]{1,62}$/)
+    .describe("Brain identifier to describe."),
+});
+
+export const ReadFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
     .describe(
@@ -14,7 +36,7 @@ export const ReadFileSchema = z.object({
     ),
 });
 
-export const UpdateFileSchema = z.object({
+export const UpdateFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
     .describe("The filename to update. Must end in .md."),
@@ -30,7 +52,7 @@ export const UpdateFileSchema = z.object({
     .describe("Required for patch mode. The exact text to find and replace. Must match uniquely in the file."),
 });
 
-export const CommitSchema = z.object({
+export const CommitSchema = BrainIdSchema.extend({
   message: z
     .string()
     .describe("The git commit message."),
@@ -40,7 +62,7 @@ export const CommitSchema = z.object({
     .describe("Whether to push to remote after committing. Default: false."),
 });
 
-export const SearchSchema = z.object({
+export const SearchSchema = BrainIdSchema.extend({
   query: z
     .string()
     .describe("Search term (case-insensitive substring match)."),
@@ -61,7 +83,20 @@ export const SearchSchema = z.object({
     ),
 });
 
-export const ListSourcesSchema = z.object({
+export const SemanticIndexSchema = BrainIdSchema;
+
+export const SemanticSearchSchema = BrainIdSchema.extend({
+  query: z.string().describe("Semantic search query."),
+  top_k: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .default(5)
+    .describe("Number of semantic matches to return. Default 5, ceiling 20."),
+});
+
+export const ListSourcesSchema = BrainIdSchema.extend({
   category: z
     .enum([
       "bios",
@@ -83,7 +118,7 @@ export const ListSourcesSchema = z.object({
     .describe("Optional category to filter by. If omitted, returns all source files across all categories."),
 });
 
-export const LogSchema = z.object({
+export const LogSchema = BrainIdSchema.extend({
   opType: z
     .enum(["INGEST", "UPDATE", "LINT", "CREATE", "SPLIT", "PRUNE"])
     .describe("The type of operation to log."),
@@ -95,7 +130,7 @@ export const LogSchema = z.object({
     .describe("Brief description of what was done."),
 });
 
-export const ReadLogSchema = z.object({
+export const ReadLogSchema = BrainIdSchema.extend({
   limit: z
     .number()
     .int()
@@ -122,7 +157,7 @@ const sourceCategoryEnum = z.enum([
   "other",
 ]);
 
-export const IngestSchema = z.object({
+export const IngestSchema = BrainIdSchema.extend({
   source_content: z
     .string()
     .optional()
@@ -142,9 +177,7 @@ export const IngestSchema = z.object({
     .describe("If true (default), returns analysis plan — no content needed, you already read the document. If false, saves source .md (requires source_content or source_path)."),
 });
 
-export const ScanInboxSchema = z.object({});
-
-export const IngestCompleteSchema = z.object({
+export const IngestCompleteSchema = BrainIdSchema.extend({
   source_label: z
     .string()
     .describe("Label of the source that was ingested."),

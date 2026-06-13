@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  BRAIN_DIR,
   LOADER_FILE,
   NOW_FILE,
   LINE_LIMIT,
@@ -22,6 +21,7 @@ import {
 } from "../constants.js";
 import { listFileNames, getStalenessThreshold } from "./brain.js";
 import * as log from "./log.js";
+import { getBrainPaths } from "./registry.js";
 
 export interface LintReport {
   bloat: { file: string; lines: number }[];
@@ -47,8 +47,9 @@ export interface LintReport {
  * aren't indexed by brain_search, so the INDEX entry is what makes them
  * discoverable from inside a Brain session.
  */
-async function findUnindexedWorkingBinaries(): Promise<string[]> {
-  const workingDir = path.join(BRAIN_DIR, WORKING_DIR);
+async function findUnindexedWorkingBinaries(brainId?: string): Promise<string[]> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const workingDir = path.join(brainDir, WORKING_DIR);
   let entries: string[];
   try {
     entries = await fs.readdir(workingDir);
@@ -99,8 +100,9 @@ async function findUnindexedWorkingBinaries(): Promise<string[]> {
  * entries into a numbered archive segment. Size-triggered so cadence auto-
  * scales with actual usage volume.
  */
-async function checkJournalRotation(): Promise<LintReport["journalRotation"]> {
-  const journalPath = path.join(BRAIN_DIR, JOURNAL_FILE);
+async function checkJournalRotation(brainId?: string): Promise<LintReport["journalRotation"]> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const journalPath = path.join(brainDir, JOURNAL_FILE);
   let content: string;
   let bytes: number;
   try {
@@ -122,8 +124,12 @@ async function checkJournalRotation(): Promise<LintReport["journalRotation"]> {
 }
 
 /** Extract all .md file references from a markdown file */
-async function extractFileReferences(filename: string): Promise<Set<string>> {
-  const filePath = path.join(BRAIN_DIR, filename);
+async function extractFileReferences(
+  filename: string,
+  brainId?: string
+): Promise<Set<string>> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const filePath = path.join(brainDir, filename);
   const content = await fs.readFile(filePath, "utf-8");
   const refs = new Set<string>();
 
@@ -143,8 +149,9 @@ async function extractFileReferences(filename: string): Promise<Set<string>> {
   return refs;
 }
 
-export async function runLint(): Promise<LintReport> {
-  const allFiles = await listFileNames();
+export async function runLint(brainId?: string): Promise<LintReport> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const allFiles = await listFileNames(brainId);
   const now = Date.now();
 
   const bloat: LintReport["bloat"] = [];
@@ -153,7 +160,7 @@ export async function runLint(): Promise<LintReport> {
 
   // Check bloat and staleness for all files
   for (const name of allFiles) {
-    const filePath = path.join(BRAIN_DIR, name);
+    const filePath = path.join(brainDir, name);
     const [stat, content] = await Promise.all([
       fs.stat(filePath),
       fs.readFile(filePath, "utf-8"),
@@ -176,7 +183,7 @@ export async function runLint(): Promise<LintReport> {
   }
 
   // Orphan detection: files not referenced in 00_loader.md
-  const loaderRefs = await extractFileReferences(LOADER_FILE);
+  const loaderRefs = await extractFileReferences(LOADER_FILE, brainId);
   const orphans: string[] = [];
   for (const name of allFiles) {
     const base = path.basename(name);
@@ -200,11 +207,11 @@ export async function runLint(): Promise<LintReport> {
   const drift: string[] = [];
   const warnings: string[] = [];
   try {
-    const nowPath = path.join(BRAIN_DIR, NOW_FILE);
+    const nowPath = path.join(brainDir, NOW_FILE);
     const nowContent = await fs.readFile(nowPath, "utf-8");
     const nowLower = nowContent.toLowerCase();
 
-    const projectsPath = path.join(BRAIN_DIR, "05_projects.md");
+      const projectsPath = path.join(brainDir, "05_projects.md");
     try {
       const projectsContent = await fs.readFile(projectsPath, "utf-8");
       const lines = projectsContent.split("\n");
@@ -271,10 +278,10 @@ export async function runLint(): Promise<LintReport> {
   }
 
   // Unindexed working binaries
-  const unindexedWorkingBinaries = await findUnindexedWorkingBinaries();
+  const unindexedWorkingBinaries = await findUnindexedWorkingBinaries(brainId);
 
   // Journal rotation threshold
-  const journalRotation = await checkJournalRotation();
+  const journalRotation = await checkJournalRotation(brainId);
 
   // Large domain packs
   const largeDomainPacks: LintReport["largeDomainPacks"] = [];
