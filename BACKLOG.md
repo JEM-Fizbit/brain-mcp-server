@@ -14,5 +14,5 @@
 
 <!-- backlog items below; newest first -->
 
+- Revisit Brain Platform storage architecture after hosted Fly pilot: compare git-backed filesystem working copies against a cloud database/content-store backend for reliability, security, mobile/remote access, backups, and operational cost.
 - **Brain Platform Phase 1+2** (cloud, multi-tenant): HTTP transport + `BrainStore`/`BrainSemanticSearch` + `brain_id` + OAuth (GitHub IdP) + Tier 1 vector. Lift substrate from `~/Projects/slack-mcp-server/`. Kickoff: `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md` → spec `docs/specs/001-*`.
-
