@@ -38,14 +38,20 @@ fly volumes create brain_data --app jem-brain-mcp --region sin --size 10 --snaps
 Set runtime secrets. Do not commit these values.
 
 ```bash
+ssh-keygen -t ed25519 -C "brain-mcp-fly-deploy" -f /tmp/brain-mcp-fly-deploy-key -N ""
+# Add /tmp/brain-mcp-fly-deploy-key.pub to JEM-Fizbit/ai-brain-jem as a read/write deploy key.
+
 fly secrets set \
   MCP_OAUTH_SIGNING_SECRET="$(openssl rand -base64 48)" \
   GITHUB_OAUTH_CLIENT_ID="<hosted-github-oauth-client-id>" \
   GITHUB_OAUTH_CLIENT_SECRET="<hosted-github-oauth-client-secret>" \
   GITHUB_ALLOWED_LOGINS="JEM-Fizbit" \
   GITHUB_ALLOWED_EMAILS="johnemilad@hotmail.com" \
+  BRAIN_DEPLOY_KEY="$(base64 -i /tmp/brain-mcp-fly-deploy-key)" \
   --app jem-brain-mcp
 ```
+
+`BRAIN_DEPLOY_KEY` is mounted into the Machine with `[[files]]`; the container entrypoint copies it into `/root/.ssh/id_ed25519`, fixes permissions, and adds `github.com` to `known_hosts`.
 
 ## Volume Bootstrap
 
@@ -61,16 +67,12 @@ Inside the Machine:
 
 ```bash
 mkdir -p /data/brains /data/config /data/state
-mkdir -p /root/.ssh
-chmod 700 /root/.ssh
-ssh-keyscan github.com >> /root/.ssh/known_hosts
-
-# Install a private deploy key for JEM-Fizbit/ai-brain-jem here before cloning.
-# The matching public key should be added to the GitHub repo as a deploy key.
-# chmod 600 /root/.ssh/id_ed25519
 
 cd /data/brains
 git clone git@github.com:JEM-Fizbit/ai-brain-jem.git ai-brain-jem
+git -C ai-brain-jem config user.name "Brain MCP Server"
+git -C ai-brain-jem config user.email "brain-mcp-server@users.noreply.github.com"
+git -C ai-brain-jem config commit.gpgsign false
 cat > /data/config/registry.json <<'JSON'
 {
   "version": 1,

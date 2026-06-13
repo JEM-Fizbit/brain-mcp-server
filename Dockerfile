@@ -25,6 +25,9 @@ RUN npm ci --omit=dev \
 
 COPY --from=build /app/dist ./dist
 COPY README.md LICENSE ./
+COPY scripts/fly-entrypoint.sh ./scripts/fly-entrypoint.sh
+RUN chmod +x ./scripts/fly-entrypoint.sh
 
 EXPOSE 8080
+ENTRYPOINT ["/app/scripts/fly-entrypoint.sh"]
 CMD ["npm", "start"]
