@@ -13,3 +13,6 @@
 ---
 
 <!-- backlog items below; newest first -->
+
+- **Brain Platform Phase 1+2** (cloud, multi-tenant): HTTP transport + `BrainStore`/`BrainSemanticSearch` + `brain_id` + OAuth (GitHub IdP) + Tier 1 vector. Lift substrate from `~/Projects/slack-mcp-server/`. Kickoff: `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md` → spec `docs/specs/001-*`.
+
