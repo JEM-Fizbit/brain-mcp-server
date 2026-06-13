@@ -7,6 +7,7 @@ import {
   type SourceCategory,
 } from "../constants.js";
 import { listFileNames } from "./brain.js";
+import { brainDate } from "./date.js";
 import * as log from "./log.js";
 import { getBrainPaths } from "./registry.js";
 
@@ -24,10 +25,6 @@ function slugify(label: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
-}
-
-function formatDate(): string {
-  return new Date().toISOString().split("T")[0];
 }
 
 /**
@@ -129,7 +126,7 @@ export async function saveSource(
   // Create category subfolder if needed
   await fs.mkdir(categoryPath, { recursive: true });
 
-  const filename = `${formatDate()}_${slugify(sourceLabel)}.md`;
+  const filename = `${brainDate()}_${slugify(sourceLabel)}.md`;
   const filePath = path.join(categoryPath, filename);
   const relativePath = path.join(SOURCES_DIR, category, filename);
 
@@ -162,7 +159,7 @@ export async function recordIngest(
   const { brainDir } = await getBrainPaths(brainId);
   const indexPath = path.join(brainDir, SOURCES_INDEX);
   const originalCol = originalFile ? `\`${originalFile}\`` : "—";
-  const row = `| ${formatDate()} | ${sourceLabel} | ${category} | ${originalCol} | \`${mdFile}\` | ${filesTouched.map((f) => `\`${f}\``).join(", ")} |`;
+  const row = `| ${brainDate()} | ${sourceLabel} | ${category} | ${originalCol} | \`${mdFile}\` | ${filesTouched.map((f) => `\`${f}\``).join(", ")} |`;
 
   try {
     const content = await fs.readFile(indexPath, "utf-8");

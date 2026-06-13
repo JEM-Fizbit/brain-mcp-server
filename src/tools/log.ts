@@ -1,7 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LogSchema, ReadLogSchema } from "../schemas/tools.js";
+import {
+  autoSyncMessage,
+  maybeAutoSync,
+} from "../services/auto-sync.js";
 import * as log from "../services/log.js";
-import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
+import {
+  assertWriteRole,
+  authorIdentity,
+  resolveToolBrain,
+} from "../services/request-context.js";
 
 export function registerLogTools(server: McpServer): void {
   server.tool(
@@ -18,7 +26,12 @@ export function registerLogTools(server: McpServer): void {
           summary,
           ctx.brainId
         );
-        return { content: [{ type: "text", text: result }] };
+        const sync = await maybeAutoSync(
+          ctx.brainId,
+          autoSyncMessage("LOG", summary),
+          authorIdentity(ctx)
+        );
+        return { content: [{ type: "text", text: result + sync }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],

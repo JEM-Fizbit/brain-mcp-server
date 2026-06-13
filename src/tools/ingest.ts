@@ -1,13 +1,22 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IngestSchema, IngestCompleteSchema } from "../schemas/tools.js";
 import {
+  autoSyncEnabled,
+  autoSyncMessage,
+  maybeAutoSync,
+} from "../services/auto-sync.js";
+import {
   analyzeForIngest,
   resolveSourceContent,
   saveSource,
   recordIngest,
   deleteInboxFile,
 } from "../services/ingest.js";
-import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
+import {
+  assertWriteRole,
+  authorIdentity,
+  resolveToolBrain,
+} from "../services/request-context.js";
 
 export function registerIngestTools(server: McpServer): void {
   server.tool(
@@ -65,14 +74,22 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
           category,
           ctx.brainId
         );
+        const sync = await maybeAutoSync(
+          ctx.brainId,
+          autoSyncMessage("SOURCE", source_label),
+          authorIdentity(ctx)
+        );
 
         const result = [
           `Source saved: \`${savedPath}\``,
+          sync.trim(),
           "",
           "Next steps:",
           "1. Use `brain_read_file` and `brain_update_file` to update Brain files",
           "2. Call `brain_ingest_complete` with the source details and list of Brain files touched",
-          "3. Call `brain_commit` to commit all changes",
+          autoSyncEnabled()
+            ? "3. Hosted auto-sync is enabled; each successful write reports its commit/push status."
+            : "3. Call `brain_commit` to commit all changes",
         ].join("\n");
 
         return { content: [{ type: "text", text: result }] };
@@ -107,8 +124,13 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
         if (inbox_file) {
           inboxResult = await deleteInboxFile(inbox_file, ctx.brainId);
         }
+        const sync = await maybeAutoSync(
+          ctx.brainId,
+          autoSyncMessage("INGEST", source_label),
+          authorIdentity(ctx)
+        );
 
-        return { content: [{ type: "text", text: result + inboxResult }] };
+        return { content: [{ type: "text", text: result + inboxResult + sync }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],
