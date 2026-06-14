@@ -252,6 +252,7 @@ Required baseline:
 
 - `brain` remains a private schema with no grants to `anon`, `authenticated`, or `public`;
 - all `brain.*` tables have RLS enabled;
+- server-side runtime access uses the dedicated `brain_runtime` role or a login role inheriting it;
 - no public/client RLS policies are added until the hosted access model is explicitly designed;
 - `brain-artifacts` remains a private Storage bucket;
 - service role keys, database passwords, and privileged connection strings are stored only in secret managers;

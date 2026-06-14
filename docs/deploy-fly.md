@@ -28,9 +28,12 @@ Apply the Supabase migrations and security gate before deploying the hosted MCP 
 ```text
 db/migrations/2026-06-14_001_hosted_brain_postgres.sql
 db/migrations/2026-06-14_002_harden_hosted_brain_advisors.sql
+db/migrations/2026-06-14_003_brain_runtime_role.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 docs/security/hosted-brain-supabase-security-gate.md
 ```
+
+Migration `003` creates a no-login `brain_runtime` role with Brain-schema table grants and matching RLS policies. Create a separate login role/user for the hosted runtime, grant it membership in `brain_runtime`, and use that login in `BRAIN_REVISION_DATABASE_URL`. For Supabase pooler URLs, preserve the tenant suffix in the username format, for example `brain_runtime_user.<project-ref>`. Keep the database owner and Supabase service-role database credentials for administration only.
 
 Create or update a GitHub OAuth app for the hosted callback:
 
@@ -57,7 +60,7 @@ fly secrets set \
   GITHUB_ALLOWED_LOGINS="JEM-Fizbit" \
   GITHUB_ALLOWED_EMAILS="johnemilad@hotmail.com" \
   BRAIN_REVISION_STORE="postgres" \
-  BRAIN_REVISION_DATABASE_URL="<privileged-postgres-url>" \
+  BRAIN_REVISION_DATABASE_URL="<brain-runtime-postgres-url>" \
   BRAIN_ARTIFACT_STORE="supabase" \
   BRAIN_SUPABASE_URL="https://<project-ref>.supabase.co" \
   BRAIN_SUPABASE_SERVICE_ROLE_KEY="<server-side-secret-key>" \
