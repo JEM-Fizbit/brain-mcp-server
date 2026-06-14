@@ -82,6 +82,12 @@ function artifactFromRow(row: SourceArtifactRow): SourceArtifactRecord {
   };
 }
 
+function normalizeSourcePath(sourcePath: string): string {
+  return sourcePath
+    .replace(/^sources\//, "")
+    .replace(/^brain\/working\//, "working/");
+}
+
 export class PostgresSourceMetadataStore implements SourceMetadataStore {
   readonly pool: Pool;
 
@@ -243,6 +249,9 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
       `,
       [brainId, category || null]
     );
-    return result.rows.map((row) => row.path).filter(Boolean);
+    return result.rows
+      .map((row) => row.path)
+      .filter(Boolean)
+      .map(normalizeSourcePath);
   }
 }

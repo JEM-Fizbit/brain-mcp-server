@@ -40,17 +40,17 @@ test("RevisionBrainStore lists hosted source metadata when source store is prese
   const store = new RevisionBrainStore(
     new MemoryRevisionStore(),
     sourceStore({
-      assessments: ["sources/assessments/profile.pdf"],
-      photos: ["sources/photos/headshot.jpg"],
+      assessments: ["assessments/profile.pdf"],
+      photos: ["photos/headshot.jpg"],
     })
   );
 
   assert.deepEqual(await store.listSources("ai-brain-jem", "assessments"), [
-    "sources/assessments/profile.pdf",
+    "assessments/profile.pdf",
   ]);
   assert.deepEqual(await store.listFiles("ai-brain-jem", "sources"), [
-    "sources/assessments/profile.pdf",
-    "sources/photos/headshot.jpg",
+    "assessments/profile.pdf",
+    "photos/headshot.jpg",
   ]);
 });
 
@@ -58,13 +58,13 @@ test("RevisionBrainStore searches hosted source paths from metadata", async () =
   const store = new RevisionBrainStore(
     new MemoryRevisionStore(),
     sourceStore({
-      assessments: ["sources/assessments/profile.pdf"],
-      photos: ["sources/photos/headshot.jpg"],
+      assessments: ["assessments/profile.pdf"],
+      photos: ["photos/headshot.jpg"],
     })
   );
 
   assert.equal(
     await store.searchFiles("ai-brain-jem", "headshot", "sources", 5),
-    "sources:sources/photos/headshot.jpg"
+    "sources:photos/headshot.jpg"
   );
 });

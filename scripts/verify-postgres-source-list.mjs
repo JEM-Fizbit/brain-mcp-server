@@ -13,10 +13,9 @@ if (!databaseUrl) {
 }
 
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
-const store = new RevisionBrainStore(
-  new PostgresRevisionStore(databaseUrl),
-  new PostgresSourceMetadataStore(databaseUrl)
-);
+const revisionStore = new PostgresRevisionStore(databaseUrl);
+const sourceStore = new PostgresSourceMetadataStore(databaseUrl);
+const store = new RevisionBrainStore(revisionStore, sourceStore);
 
 try {
   const all = await store.listSources(brainId);
@@ -41,8 +40,5 @@ try {
   );
   console.log("[source-list] PASS: Postgres-backed source listing verified");
 } finally {
-  await Promise.allSettled([
-    store["revisionStore"]?.close?.(),
-    store["sourceStore"]?.close?.(),
-  ]);
+  await Promise.allSettled([revisionStore.close(), sourceStore.close()]);
 }

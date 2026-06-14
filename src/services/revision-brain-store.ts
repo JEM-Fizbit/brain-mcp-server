@@ -105,16 +105,22 @@ export class RevisionBrainStore implements BrainStore {
       const results = await this.revisionStore.searchFiles(brainId, query, {
         maxResults: cap,
       });
-      lines.push(...results.map((result) => {
-      const rawLine =
-        result.line.length > SEARCH_LINE_CHAR_LIMIT
-          ? `${result.line.slice(0, SEARCH_LINE_CHAR_LIMIT)}...`
-          : result.line;
-      return `${result.filename}:${result.lineNumber}: ${rawLine}`;
-      }));
+      lines.push(
+        ...results.map((result) => {
+          const rawLine =
+            result.line.length > SEARCH_LINE_CHAR_LIMIT
+              ? `${result.line.slice(0, SEARCH_LINE_CHAR_LIMIT)}...`
+              : result.line;
+          return `${result.filename}:${result.lineNumber}: ${rawLine}`;
+        })
+      );
     }
 
-    if (lines.length < cap && this.sourceStore && (scope === "sources" || scope === "all")) {
+    if (
+      lines.length < cap &&
+      this.sourceStore &&
+      (scope === "sources" || scope === "all")
+    ) {
       const lowerQuery = query.toLowerCase();
       const paths = await this.sourceStore.listSourcePaths(brainId);
       for (const sourcePath of paths) {
