@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "sync": "node dist/sync/cli.js",
+    "sync:watch": "npm run build && node dist/sync/cli.js watch",
     "sync:smoke:postgres": "npm run build && node scripts/smoke-postgres-sync.mjs",
     "sync:canary:postgres": "npm run build && BRAIN_REVISION_STORE=postgres BRAIN_SYNC_INCLUDE_FILES=00_loader.md npm run sync -- push",
     "sync:seed:core:postgres": "npm run build && node scripts/seed-core-postgres.mjs",

@@ -175,3 +175,35 @@ test("sync CLI can restrict push to explicit include files", async () => {
     /File not found/
   );
 });
+
+test("sync CLI watch runs finite sync cycles for automation harnesses", async () => {
+  const config = dirs("watch");
+  await writeBrainFile(config.brainDir, "NOW.md", "Watch local push\n");
+
+  const { stdout } = await exec(process.execPath, [cliPath, "watch"], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ai-brain-jem",
+      BRAIN_DIR: config.brainDir,
+      BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_STORE_FILE: config.storeFile,
+      BRAIN_REVISION_STORE: "file",
+      BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_SYNC_INTERVAL_MS: "250",
+      BRAIN_SYNC_WATCH_CYCLES: "2",
+    },
+  });
+  const outputs = stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+
+  assert.equal(outputs.length, 2);
+  assert.equal(outputs[0].command, "watch");
+  assert.equal(outputs[0].cycle, 1);
+  assert.equal(outputs[0].config.databaseUrl, "missing");
+  assert.deepEqual(outputs[0].report.pushed, ["NOW.md"]);
+  assert.equal(outputs[1].cycle, 2);
+  assert.equal(outputs[1].report.conflicts.length, 0);
+});

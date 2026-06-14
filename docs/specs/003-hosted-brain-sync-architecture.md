@@ -327,6 +327,14 @@ BRAIN_SYNC_INCLUDE_FILES=NOW.md npm run sync -- push
 
 The include list is comma-separated and applies to push, pull, and once. This prevents accidental whole-Brain sync during pilot verification.
 
+For an interim automatic local mirror, the CLI also supports a polling watch loop:
+
+```bash
+npm run sync -- watch
+```
+
+`BRAIN_SYNC_INTERVAL_MS` controls the interval. `BRAIN_SYNC_WATCH_CYCLES` can bound the loop for smoke tests or scheduled jobs. This is not yet a product decision that the permanent local sync surface must be a daemon, launchd service, or MCP-adjacent subprocess; it is the minimal loop needed to exercise the local-first sync contract without manual push/pull rituals.
+
 Pilot verification on 2026-06-14:
 
 - temporary smoke Brain push/status/pull round trip passed against Supabase Postgres;
@@ -412,12 +420,13 @@ Before hosted becomes recommended/default again:
 2. Add an in-memory or SQLite `RevisionStore` test provider.
 3. Add `LocalSyncAgent` one-shot push/pull tests against a temporary Markdown tree.
 4. Prove local-to-hosted, hosted-to-local, and conflict-blocked tests without git.
-5. Add latency instrumentation to the sync and hosted MCP paths.
-6. Wire hosted HTTP tools to `RevisionStore` for read/update paths.
-7. Add optional async git export after clean sync.
-8. Run parity tests against the local stdio baseline.
-9. Only then re-enable `brain-hosted` as a controlled test connector.
-10. Promote hosted only after the full local-first contract passes.
+5. Add an interim polling `watch` command so the one-shot agent can run continuously before the final daemonization choice.
+6. Add latency instrumentation to the sync and hosted MCP paths.
+7. Wire hosted HTTP tools to `RevisionStore` for read/update paths.
+8. Add optional async git export after clean sync.
+9. Run parity tests against the local stdio baseline.
+10. Only then re-enable `brain-hosted` as a controlled test connector.
+11. Promote hosted only after the full local-first contract passes.
 
 ## Open Questions
 

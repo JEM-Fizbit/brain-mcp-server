@@ -5,7 +5,7 @@ import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import type { RevisionStore } from "./types.js";
 
-type SyncCommand = "push" | "pull" | "once" | "status";
+type SyncCommand = "push" | "pull" | "once" | "status" | "watch";
 type RevisionStoreProvider = "file" | "postgres";
 
 interface SyncCliConfig {
@@ -16,6 +16,8 @@ interface SyncCliConfig {
   revisionStore: RevisionStoreProvider;
   databaseUrl?: string;
   includeFiles?: string[];
+  watchIntervalMs: number;
+  watchCycles?: number;
 }
 
 interface StoreHandle {
@@ -25,7 +27,7 @@ interface StoreHandle {
 
 function usage(): string {
   return [
-    "Usage: node dist/sync/cli.js <push|pull|once|status>",
+    "Usage: node dist/sync/cli.js <push|pull|once|status|watch>",
     "",
     "Environment:",
     "  BRAIN_ID                  Brain id (default: ai-brain-jem)",
@@ -33,6 +35,8 @@ function usage(): string {
     "  BRAIN_SYNC_STATE_FILE     Local sync metadata JSON path",
     "  BRAIN_SYNC_STORE_FILE     File-backed hosted revision store path",
     "  BRAIN_SYNC_INCLUDE_FILES  Optional comma-separated .md file list",
+    "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
+    "  BRAIN_SYNC_WATCH_CYCLES   Optional finite watch cycles for tests/jobs",
     "  BRAIN_REVISION_STORE      Revision store provider: file|postgres",
     "  BRAIN_REVISION_DATABASE_URL",
     "                            Required when BRAIN_REVISION_STORE=postgres",
@@ -66,11 +70,22 @@ function readConfig(): SyncCliConfig {
     revisionStore,
     databaseUrl: process.env.BRAIN_REVISION_DATABASE_URL,
     includeFiles: includeFiles && includeFiles.length > 0 ? includeFiles : undefined,
+    watchIntervalMs: Math.max(
+      250,
+      Number(process.env.BRAIN_SYNC_INTERVAL_MS || 5000)
+    ),
+    watchCycles: process.env.BRAIN_SYNC_WATCH_CYCLES
+      ? Math.max(1, Number(process.env.BRAIN_SYNC_WATCH_CYCLES))
+      : undefined,
   };
 }
 
 function writeJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeJsonLine(value: unknown): void {
+  process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
 function outputConfig(config: SyncCliConfig): Omit<SyncCliConfig, "databaseUrl"> & {
@@ -100,6 +115,10 @@ function createStore(config: SyncCliConfig): StoreHandle {
     store: new FileRevisionStore(config.storeFile),
     close: async () => undefined,
   };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function run(command: SyncCommand): Promise<void> {
@@ -147,6 +166,33 @@ async function run(command: SyncCommand): Promise<void> {
       return;
     }
 
+    if (command === "watch") {
+      let stopped = false;
+      const stop = () => {
+        stopped = true;
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+      try {
+        let cycle = 0;
+        while (!stopped) {
+          cycle += 1;
+          writeJsonLine({
+            command,
+            cycle,
+            config: outputConfig(config),
+            report: await agent.syncOnce(),
+          });
+          if (config.watchCycles && cycle >= config.watchCycles) break;
+          await sleep(config.watchIntervalMs);
+        }
+      } finally {
+        process.off("SIGINT", stop);
+        process.off("SIGTERM", stop);
+      }
+      return;
+    }
+
     const [state, hostedFiles, openConflicts] = await Promise.all([
       agent.loadState(),
       store.listFiles(config.brainId),
@@ -166,7 +212,7 @@ async function run(command: SyncCommand): Promise<void> {
 
 async function main(): Promise<void> {
   const command = process.argv[2] as SyncCommand | undefined;
-  if (!command || !["push", "pull", "once", "status"].includes(command)) {
+  if (!command || !["push", "pull", "once", "status", "watch"].includes(command)) {
     process.stderr.write(`${usage()}\n`);
     process.exitCode = 2;
     return;
