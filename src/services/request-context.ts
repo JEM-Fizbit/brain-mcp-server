@@ -10,6 +10,7 @@ import {
   type BrainPrincipal,
   type BrainRole,
 } from "./registry.js";
+import type { RevisionActor } from "../sync/types.js";
 
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification> | undefined;
 
@@ -49,6 +50,16 @@ export function authorIdentity(ctx: ToolBrainContext): string | undefined {
       : `${ctx.principal.providerUserId}+${ctx.principal.provider}@users.noreply.github.com`);
 
   return `${name} <${email}>`;
+}
+
+export function revisionActor(ctx: ToolBrainContext): RevisionActor | undefined {
+  if (ctx.principal.provider === "stdio") return undefined;
+  return {
+    provider: ctx.principal.provider,
+    id: ctx.principal.providerUserId,
+    name: ctx.principal.name || ctx.principal.login,
+    email: ctx.principal.email,
+  };
 }
 
 export async function listBrainsForExtra(extra?: ToolExtra): Promise<

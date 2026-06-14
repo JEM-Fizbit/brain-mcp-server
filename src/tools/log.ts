@@ -6,8 +6,13 @@ import {
 } from "../services/auto-sync.js";
 import * as log from "../services/log.js";
 import {
+  activeBrainStore,
+  revisionStoreModeEnabled,
+} from "../services/active-brain-store.js";
+import {
   assertWriteRole,
   authorIdentity,
+  revisionActor,
   resolveToolBrain,
 } from "../services/request-context.js";
 
@@ -20,17 +25,22 @@ export function registerLogTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertWriteRole(ctx);
-        const result = await log.appendLog(
-          opType,
-          filesTouched,
-          summary,
-          ctx.brainId
-        );
-        const sync = await maybeAutoSync(
-          ctx.brainId,
-          autoSyncMessage("LOG", summary),
-          authorIdentity(ctx)
-        );
+        const result = revisionStoreModeEnabled()
+          ? await activeBrainStore().appendLog(
+              ctx.brainId,
+              opType,
+              filesTouched,
+              summary,
+              revisionActor(ctx)
+            )
+          : await log.appendLog(opType, filesTouched, summary, ctx.brainId);
+        const sync = revisionStoreModeEnabled()
+          ? ""
+          : await maybeAutoSync(
+              ctx.brainId,
+              autoSyncMessage("LOG", summary),
+              authorIdentity(ctx)
+            );
         return { content: [{ type: "text", text: result + sync }] };
       } catch (error) {
         return {
