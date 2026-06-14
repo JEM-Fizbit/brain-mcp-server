@@ -1,0 +1,84 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "..");
+const brainRoot =
+  process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
+const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
+const syncDir = path.resolve(brainDir, "..", ".brain-sync");
+const label = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
+const intervalSeconds = Number(process.env.BRAIN_SYNC_LAUNCHD_INTERVAL_SECONDS || 5);
+const outputPath =
+  process.env.BRAIN_SYNC_LAUNCHD_PLIST ||
+  path.join(repoRoot, "tmp", `${label}.plist`);
+
+function xmlEscape(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${xmlEscape(label)}</string>
+
+  <key>WorkingDirectory</key>
+  <string>${xmlEscape(repoRoot)}</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>npm</string>
+    <string>run</string>
+    <string>sync</string>
+    <string>--</string>
+    <string>watch</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BRAIN_DIR</key>
+    <string>${xmlEscape(brainDir)}</string>
+    <key>BRAIN_SYNC_INTERVAL_MS</key>
+    <string>${xmlEscape(String(intervalSeconds * 1000))}</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>${Math.max(1, intervalSeconds)}</integer>
+
+  <key>StandardOutPath</key>
+  <string>${xmlEscape(path.join(syncDir, "launchd.out.log"))}</string>
+  <key>StandardErrorPath</key>
+  <string>${xmlEscape(path.join(syncDir, "launchd.err.log"))}</string>
+</dict>
+</plist>
+`;
+
+await fs.mkdir(path.dirname(outputPath), { recursive: true });
+await fs.writeFile(outputPath, plist, "utf-8");
+console.log(
+  JSON.stringify(
+    {
+      outputPath,
+      label,
+      brainDir,
+      intervalSeconds,
+      note: "Review before copying to ~/Library/LaunchAgents and loading with launchctl.",
+    },
+    null,
+    2
+  )
+);

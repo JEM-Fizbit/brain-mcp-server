@@ -129,6 +129,27 @@ The sync CLI uses an atomic lock file to prevent overlapping local mirror runs. 
 
 Use `npm run sync -- summary` for routine operator checks. It reports compact counts and cursor status. Use `npm run sync -- status` only when the full tracked-file and hosted-head payload is needed for debugging.
 
+On macOS, generate a reviewable launchd plist for the local mirror loop:
+
+```bash
+npm run sync:launchd:plist
+```
+
+The script writes `tmp/com.jem.brain-sync.plist` by default. Review it, then install manually if appropriate:
+
+```bash
+cp tmp/com.jem.brain-sync.plist ~/Library/LaunchAgents/com.jem.brain-sync.plist
+launchctl load ~/Library/LaunchAgents/com.jem.brain-sync.plist
+```
+
+Unload it with:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.jem.brain-sync.plist
+```
+
+The plist runs `npm run sync -- watch`, relies on the repo `.env.local` for private Supabase settings, and writes logs under the Brain `.brain-sync/` directory.
+
 After any deployment that changes schema, RLS, functions, Storage, or user-data access, rerun the security gate in `docs/security/hosted-brain-supabase-security-gate.md`.
 
 ## Notes
