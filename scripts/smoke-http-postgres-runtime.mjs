@@ -202,7 +202,7 @@ const search = await callTool("brain_search", {
   query,
   max_results: 5,
 });
-assert.doesNotEqual(search, "No matches found.");
+assert.notEqual(search, "No matches found.");
 
 const sources = await callTool("brain_list_sources", { brain_id: brainId });
 let sourceManifestChecked = false;
