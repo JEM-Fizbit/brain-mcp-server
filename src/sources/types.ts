@@ -45,6 +45,12 @@ export interface SourceArtifactRecord {
   createdAt: string;
 }
 
+export interface SourceManifestRecord {
+  source: SourceRecord;
+  artifacts: SourceArtifactRecord[];
+  paths: string[];
+}
+
 export interface RecordSourceArtifactInput {
   sourceId: string;
   artifactKind: SourceArtifactKind;
@@ -79,4 +85,8 @@ export interface SourceMetadataStore {
   recordArtifactText(input: RecordArtifactTextInput): Promise<void>;
   listArtifacts(sourceId: string): Promise<SourceArtifactRecord[]>;
   listSourcePaths(brainId: string, category?: string): Promise<string[]>;
+  listSourceManifests(
+    brainId: string,
+    category?: string
+  ): Promise<SourceManifestRecord[]>;
 }

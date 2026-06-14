@@ -16,7 +16,11 @@ import type {
 } from "./brain-store.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
 import type { ConflictRecord, RevisionStore } from "../sync/types.js";
-import type { SourceMetadataStore } from "../sources/types.js";
+import type {
+  SourceArtifactRecord,
+  SourceManifestRecord,
+  SourceMetadataStore,
+} from "../sources/types.js";
 
 function validateFilename(filename: string): void {
   if (path.isAbsolute(filename)) {
@@ -45,6 +49,41 @@ function clampMaxResults(value?: number): number {
   );
 }
 
+function formatArtifact(artifact: SourceArtifactRecord): string {
+  return [
+    `- kind: ${artifact.artifactKind}`,
+    `  original_filename: ${artifact.originalFilename || "-"}`,
+    `  mime_type: ${artifact.mimeType || "-"}`,
+    `  byte_size: ${artifact.byteSize ?? "-"}`,
+    `  retention_status: ${artifact.retentionStatus}`,
+    `  storage_bucket: ${artifact.storageBucket || "-"}`,
+    `  storage_path: ${artifact.storagePath || "-"}`,
+    `  content_sha256: ${artifact.contentSha256 || "-"}`,
+    `  external_provider: ${artifact.externalProvider || "-"}`,
+    `  external_id: ${artifact.externalId || "-"}`,
+  ].join("\n");
+}
+
+function formatSourceManifest(manifest: SourceManifestRecord): string {
+  return [
+    `# Source Manifest: ${manifest.source.label}`,
+    "",
+    `source_id: ${manifest.source.id}`,
+    `category: ${manifest.source.category}`,
+    `status: ${manifest.source.status}`,
+    `source_date: ${manifest.source.sourceDate || "-"}`,
+    `provenance_note: ${manifest.source.provenanceNote || "-"}`,
+    `paths: ${manifest.paths.length ? manifest.paths.join(", ") : "-"}`,
+    "",
+    "Artifacts:",
+    manifest.artifacts.length
+      ? manifest.artifacts.map(formatArtifact).join("\n")
+      : "- none",
+    "",
+    "Note: hosted source reads currently return metadata only. Original bytes remain in private artifact storage until an explicit download/signed-URL policy is implemented.",
+  ].join("\n");
+}
+
 export class RevisionBrainStore implements BrainStore {
   constructor(
     private readonly revisionStore: RevisionStore,
@@ -62,7 +101,18 @@ export class RevisionBrainStore implements BrainStore {
     scope: ReadScope = "brain"
   ): Promise<string> {
     if (scope !== "brain") {
-      throw new Error("Revision store harness does not serve sources/ yet.");
+      if (!this.sourceStore) {
+        throw new Error("Revision store has no source metadata provider.");
+      }
+      const requested = filename.replace(/^sources\//, "");
+      const manifests = await this.sourceStore.listSourceManifests(brainId);
+      const manifest = manifests.find((candidate) =>
+        candidate.paths.includes(requested)
+      );
+      if (!manifest) {
+        throw new Error(`Source manifest not found in hosted metadata: ${filename}`);
+      }
+      return formatSourceManifest(manifest);
     }
     validateFilename(filename);
     return (await this.revisionStore.readFile(brainId, filename)).content;

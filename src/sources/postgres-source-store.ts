@@ -5,6 +5,7 @@ import type {
   RecordArtifactTextInput,
   RecordSourceArtifactInput,
   SourceArtifactRecord,
+  SourceManifestRecord,
   SourceMetadataStore,
   SourceRecord,
 } from "./types.js";
@@ -45,6 +46,26 @@ interface SourceArtifactRow {
   retention_status: SourceArtifactRecord["retentionStatus"];
   metadata: Record<string, unknown>;
   created_at: Date;
+}
+
+interface SourceManifestRow extends SourceRow {
+  source_created_at: Date;
+  source_updated_at: Date;
+  artifact_id: string | null;
+  source_id_row: string | null;
+  artifact_kind: SourceArtifactRecord["artifactKind"] | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  external_url: string | null;
+  external_provider: string | null;
+  external_id: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  byte_size: string | number | null;
+  content_sha256: string | null;
+  retention_status: SourceArtifactRecord["retentionStatus"] | null;
+  artifact_metadata: Record<string, unknown> | null;
+  artifact_created_at: Date | null;
 }
 
 function sourceFromRow(row: SourceRow): SourceRecord {
@@ -231,27 +252,109 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
   }
 
   async listSourcePaths(brainId: string, category?: string): Promise<string[]> {
-    const result = await this.pool.query<{ path: string }>(
+    const manifests = await this.listSourceManifests(brainId, category);
+    return Array.from(
+      new Set(manifests.flatMap((manifest) => manifest.paths).filter(Boolean))
+    ).sort();
+  }
+
+  async listSourceManifests(
+    brainId: string,
+    category?: string
+  ): Promise<SourceManifestRecord[]> {
+    const result = await this.pool.query<SourceManifestRow>(
       `
-        select distinct
-          coalesce(
-            a.metadata->>'local_path',
-            a.external_id,
-            a.storage_path,
-            s.metadata->>'local_path',
-            s.label
-          ) as path
+        select
+          s.id,
+          s.brain_id,
+          s.category,
+          s.label,
+          s.status,
+          s.source_date,
+          s.provenance_note,
+          s.metadata,
+          s.created_at as source_created_at,
+          s.updated_at as source_updated_at,
+          a.id as artifact_id,
+          a.source_id as source_id_row,
+          a.artifact_kind,
+          a.storage_bucket,
+          a.storage_path,
+          a.external_url,
+          a.external_provider,
+          a.external_id,
+          a.original_filename,
+          a.mime_type,
+          a.byte_size,
+          a.content_sha256,
+          a.retention_status,
+          a.metadata as artifact_metadata,
+          a.created_at as artifact_created_at
         from brain.sources s
         left join brain.source_artifacts a on a.source_id = s.id
         where s.brain_id = $1
           and ($2::text is null or s.category = $2)
-        order by path
+        order by s.category, s.label, a.created_at desc nulls last
       `,
       [brainId, category || null]
     );
-    return result.rows
-      .map((row) => row.path)
-      .filter(Boolean)
-      .map(normalizeSourcePath);
+
+    const manifests = new Map<string, SourceManifestRecord>();
+    for (const row of result.rows) {
+      let manifest = manifests.get(row.id);
+      if (!manifest) {
+        manifest = {
+          source: sourceFromRow({
+            id: row.id,
+            brain_id: row.brain_id,
+            category: row.category,
+            label: row.label,
+            status: row.status,
+            source_date: row.source_date,
+            provenance_note: row.provenance_note,
+            metadata: row.metadata,
+            created_at: row.source_created_at,
+            updated_at: row.source_updated_at,
+          }),
+          artifacts: [],
+          paths: [],
+        };
+        manifests.set(row.id, manifest);
+      }
+
+      if (!row.artifact_id) continue;
+      const artifact = artifactFromRow({
+        id: row.artifact_id,
+        source_id: row.source_id_row || row.id,
+        artifact_kind: row.artifact_kind || "original",
+        storage_bucket: row.storage_bucket,
+        storage_path: row.storage_path,
+        external_url: row.external_url,
+        external_provider: row.external_provider,
+        external_id: row.external_id,
+        original_filename: row.original_filename,
+        mime_type: row.mime_type,
+        byte_size: row.byte_size,
+        content_sha256: row.content_sha256,
+        retention_status: row.retention_status || "pointer_only",
+        metadata: row.artifact_metadata || {},
+        created_at: row.artifact_created_at || row.source_created_at,
+      });
+      manifest.artifacts.push(artifact);
+      const displayPath =
+        artifact.metadata.local_path ||
+        artifact.externalId ||
+        artifact.storagePath ||
+        manifest.source.metadata.local_path ||
+        manifest.source.label;
+      if (typeof displayPath === "string" && displayPath) {
+        manifest.paths.push(normalizeSourcePath(displayPath));
+      }
+    }
+
+    for (const manifest of manifests.values()) {
+      manifest.paths = Array.from(new Set(manifest.paths)).sort();
+    }
+    return Array.from(manifests.values());
   }
 }

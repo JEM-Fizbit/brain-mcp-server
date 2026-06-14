@@ -291,6 +291,15 @@ test("HTTP MCP source list stays empty for file revision harness without source 
   assert.equal(sources, "No source files found.");
 });
 
+test("HTTP MCP source read reports missing source metadata without provider", async () => {
+  const harness = await setupHarness("source-read-missing-provider");
+  const result = await callTool(harness, "brain_read_file", {
+    filename: "photos/headshot.jpg",
+    scope: "sources",
+  });
+  assert.match(result, /Revision store has no source metadata provider/);
+});
+
 test("HTTP MCP exposes hosted sync status and conflict listing", async () => {
   const harness = await setupHarness("sync-status");
 

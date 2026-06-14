@@ -271,6 +271,8 @@ Recommended source model:
 
 For JEM, original source artifacts can live in a private Supabase Storage bucket. For ERS, SharePoint/OneDrive may remain canonical for some business documents. In that case Postgres stores a SharePoint/Graph pointer plus metadata; Supabase Storage stores an immutable snapshot only when the Brain needs retained evidence or remote-only access independent of SharePoint availability.
 
+Hosted `brain_read_file` with `scope="sources"` returns a source artifact metadata manifest at this stage. It does not stream original binary bytes or create signed URLs until a separate artifact download/access policy is designed and approved.
+
 ## Runtime Configuration
 
 The first hosted Brain Supabase target is a new dedicated project in John's private Supabase org. It is a pilot/control project for rebuilding hosted MCP correctly, not the long-term ERS production owner.

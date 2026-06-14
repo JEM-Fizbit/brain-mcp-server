@@ -101,6 +101,7 @@ Expected first authenticated tool checks:
 - `brain_list_conflicts` should show open sync conflicts or report none.
 - `brain_search` should search hosted Markdown revisions from Postgres.
 - `brain_list_sources` should show source manifests from Postgres.
+- `brain_read_file` with `scope="sources"` should return a metadata manifest, not private artifact bytes.
 - A small hosted write should create a Postgres revision without invoking git.
 
 From a shell with hosted Supabase secrets set, the direct HTTP-handler smoke script exercises those same authenticated MCP paths without printing secrets:

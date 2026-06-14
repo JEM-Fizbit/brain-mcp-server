@@ -33,6 +33,44 @@ function sourceStore(pathsByCategory) {
       if (category) return pathsByCategory[category] || [];
       return Object.values(pathsByCategory).flat().sort();
     },
+    async listSourceManifests() {
+      return Object.entries(pathsByCategory).flatMap(([category, paths]) =>
+        paths.map((sourcePath, index) => ({
+          source: {
+            id: `${category}-${index}`,
+            brainId: "ai-brain-jem",
+            category,
+            label: sourcePath,
+            status: "processed",
+            sourceDate: null,
+            provenanceNote: null,
+            metadata: {},
+            createdAt: "2026-06-14T00:00:00.000Z",
+            updatedAt: "2026-06-14T00:00:00.000Z",
+          },
+          artifacts: [
+            {
+              id: `${category}-${index}-artifact`,
+              sourceId: `${category}-${index}`,
+              artifactKind: "original",
+              storageBucket: "brain-artifacts",
+              storagePath: `brains/ai-brain-jem/${sourcePath}`,
+              externalUrl: null,
+              externalProvider: null,
+              externalId: null,
+              originalFilename: path.basename(sourcePath),
+              mimeType: "application/octet-stream",
+              byteSize: 123,
+              contentSha256: "a".repeat(64),
+              retentionStatus: "active",
+              metadata: { local_path: `sources/${sourcePath}` },
+              createdAt: "2026-06-14T00:00:00.000Z",
+            },
+          ],
+          paths: [sourcePath],
+        }))
+      );
+    },
   };
 }
 
@@ -67,4 +105,23 @@ test("RevisionBrainStore searches hosted source paths from metadata", async () =
     await store.searchFiles("ai-brain-jem", "headshot", "sources", 5),
     "sources:photos/headshot.jpg"
   );
+});
+
+test("RevisionBrainStore reads hosted source manifests from metadata", async () => {
+  const store = new RevisionBrainStore(
+    new MemoryRevisionStore(),
+    sourceStore({
+      photos: ["photos/headshot.jpg"],
+    })
+  );
+
+  const manifest = await store.readFile(
+    "ai-brain-jem",
+    "sources/photos/headshot.jpg",
+    "sources"
+  );
+  assert.match(manifest, /# Source Manifest: photos\/headshot\.jpg/);
+  assert.match(manifest, /storage_bucket: brain-artifacts/);
+  assert.match(manifest, /original_filename: headshot\.jpg/);
+  assert.match(manifest, /metadata only/);
 });
