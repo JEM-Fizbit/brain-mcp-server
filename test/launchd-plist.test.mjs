@@ -16,11 +16,11 @@ after(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
 });
 
-test("launchd plist uses absolute Node and npm CLI paths", async () => {
+test("launchd plist runs the sync CLI with an absolute Node path", async () => {
   const outputPath = path.join(tmpRoot, "com.example.brain-sync.plist");
   const brainRoot = path.join(tmpRoot, "ai-brain");
   const nodePath = "/opt/example/bin/node";
-  const npmCliPath = "/opt/example/lib/node_modules/npm/bin/npm-cli.js";
+  const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
 
   const { stdout } = await exec(process.execPath, [scriptPath], {
     env: {
@@ -28,7 +28,7 @@ test("launchd plist uses absolute Node and npm CLI paths", async () => {
       BRAIN_REPO_ROOT: brainRoot,
       BRAIN_SYNC_LAUNCHD_LABEL: "com.example.brain-sync",
       BRAIN_SYNC_LAUNCHD_NODE: nodePath,
-      BRAIN_SYNC_LAUNCHD_NPM_CLI: npmCliPath,
+      BRAIN_SYNC_LAUNCHD_SYNC_CLI: syncCliPath,
       BRAIN_SYNC_LAUNCHD_PLIST: outputPath,
     },
   });
@@ -38,10 +38,11 @@ test("launchd plist uses absolute Node and npm CLI paths", async () => {
 
   assert.equal(result.outputPath, outputPath);
   assert.equal(result.nodePath, nodePath);
-  assert.equal(result.npmCliPath, npmCliPath);
+  assert.equal(result.syncCliPath, syncCliPath);
   assert.match(plist, new RegExp(`<string>${nodePath}</string>`));
-  assert.match(plist, new RegExp(`<string>${npmCliPath}</string>`));
+  assert.match(plist, new RegExp(`<string>${syncCliPath}</string>`));
   assert.doesNotMatch(plist, /<string>\/usr\/bin\/env<\/string>/);
   assert.doesNotMatch(plist, /<string>npm<\/string>/);
+  assert.doesNotMatch(plist, /<string>run<\/string>/);
   assert.match(plist, new RegExp(`<string>${path.join(brainRoot, "brain")}</string>`));
 });
