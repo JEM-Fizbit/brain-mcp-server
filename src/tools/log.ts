@@ -43,12 +43,12 @@ export function registerLogTools(server: McpServer): void {
 
   server.tool(
     "brain_read_log",
-    "Read recent entries from the Brain change log. Shows what was ingested, updated, or linted and when.",
+    "Read entries from the newest-first Brain change log. Use limit and offset to page through older entries.",
     ReadLogSchema.shape,
-    async ({ brain_id, limit }, extra) => {
+    async ({ brain_id, limit, offset }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const result = await log.readLog(limit, ctx.brainId);
+        const result = await log.readLog(limit, ctx.brainId, offset);
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {

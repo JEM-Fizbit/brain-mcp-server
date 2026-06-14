@@ -62,7 +62,8 @@ export async function appendLog(
 
 export async function readLog(
   limit: number = 20,
-  brainId?: string
+  brainId?: string,
+  offset: number = 0
 ): Promise<string> {
   const filePath = await ensureLogFile(brainId);
 
@@ -73,11 +74,21 @@ export async function readLog(
     return "No log entries yet.";
   }
 
-  const recent = entries.slice(0, limit);
-  const header =
-    entries.length > limit
-      ? `Showing newest ${limit} of ${entries.length} entries:\n\n`
-      : "";
+  const start = Math.max(0, offset);
+  const recent = entries.slice(start, start + limit);
+
+  if (recent.length === 0) {
+    return `No log entries at offset ${start}. Total entries: ${entries.length}.`;
+  }
+
+  const end = start + recent.length;
+  let header = "";
+  if (entries.length > limit || start > 0) {
+    header =
+      start === 0
+        ? `Showing newest ${recent.length} of ${entries.length} entries:\n\n`
+        : `Showing entries ${start + 1}-${end} of ${entries.length} (newest first):\n\n`;
+  }
 
   return header + recent.join("\n").trim();
 }
