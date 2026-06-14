@@ -14,6 +14,7 @@ process.env.BRAIN_REVISION_STORE = "postgres";
 
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
 const iterations = Number(process.env.BRAIN_HTTP_BENCH_ITERATIONS || 5);
+const warmup = process.env.BRAIN_HTTP_BENCH_WARMUP !== "0";
 const baseUrl = process.env.BRAIN_HTTP_BENCH_BASE_URL || "http://127.0.0.1:3000";
 const resourceUri = `${baseUrl}/mcp`;
 const config = {
@@ -246,6 +247,7 @@ const scenarios = [
 const scenarioResults = {};
 for (const scenario of scenarios) {
   scenarioResults[scenario.name] = [];
+  if (warmup) await callTool(scenario.tool, scenario.args);
   for (let i = 0; i < iterations; i += 1) {
     const result = await callTool(scenario.tool, scenario.args);
     scenarioResults[scenario.name].push(result.durationMs);
@@ -258,6 +260,7 @@ console.log(
       ok: true,
       brainId,
       iterations,
+      warmup,
       scenarios: Object.fromEntries(
         Object.entries(scenarioResults).map(([name, values]) => [
           name,

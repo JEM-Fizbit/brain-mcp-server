@@ -14,6 +14,7 @@ import {
   assertHttpRuntimeConfig,
   runtimeStatus,
 } from "../services/runtime-config.js";
+import { warmActiveBrainStore } from "../services/active-brain-store.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -268,6 +269,13 @@ export async function handleHttpRequest(
 
 export async function startHttpServer(): Promise<void> {
   assertHttpRuntimeConfig();
+  if (process.env.BRAIN_HTTP_WARMUP !== "0") {
+    const startedAt = performance.now();
+    await warmActiveBrainStore();
+    log("INFO", "hosted Brain store warmed", {
+      duration_ms: Number((performance.now() - startedAt).toFixed(3)),
+    });
+  }
 
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
