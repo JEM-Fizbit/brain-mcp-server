@@ -7,6 +7,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "upload-source-artifacts-postgres.mjs"
+);
 
 test("artifact storage paths are immutable, content addressed, and safe", async () => {
   const { artifactStoragePath } = await import(
@@ -88,4 +94,12 @@ test("LocalArtifactStore copies file artifacts without mutable names", async () 
     await fs.readFile(path.join(root, artifact.storagePath)),
     Buffer.from("%PDF fake\n")
   );
+});
+
+test("source artifact byte upload requires explicit admin mode", async () => {
+  const script = await fs.readFile(uploadScriptPath, "utf-8");
+
+  assert.match(script, /BRAIN_ARTIFACT_BYTE_ACCESS/);
+  assert.match(script, /byteAccess !== "admin"/);
+  assert.match(script, /BRAIN_SUPABASE_SERVICE_ROLE_KEY/);
 });

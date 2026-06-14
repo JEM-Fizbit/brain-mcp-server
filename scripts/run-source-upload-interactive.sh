@@ -15,5 +15,6 @@ fi
 
 export BRAIN_SUPABASE_URL="${BRAIN_SUPABASE_URL:-https://omnwbcdtmtvxasgdmvwr.supabase.co}"
 export BRAIN_SUPABASE_STORAGE_BUCKET="${BRAIN_SUPABASE_STORAGE_BUCKET:-brain-artifacts}"
+export BRAIN_ARTIFACT_BYTE_ACCESS=admin
 
 npm run sources:upload:postgres
