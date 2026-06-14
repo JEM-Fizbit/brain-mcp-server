@@ -101,6 +101,14 @@ Expected first authenticated tool checks:
 - `brain_list_sources` should show source manifests from Postgres.
 - A small hosted write should create a Postgres revision without invoking git.
 
+From a shell with hosted Supabase secrets set, the direct HTTP-handler smoke script exercises those same authenticated MCP paths without printing secrets:
+
+```bash
+npm run smoke:http:postgres
+```
+
+By default this does not write to the Brain. To include a tiny hosted write, set `BRAIN_HTTP_SMOKE_WRITE=1`; it writes `HOSTED_RUNTIME_SMOKE.md`.
+
 After any deployment that changes schema, RLS, functions, Storage, or user-data access, rerun the security gate in `docs/security/hosted-brain-supabase-security-gate.md`.
 
 ## Notes

@@ -15,6 +15,7 @@
     "sync:verify:core:postgres": "npm run build && node scripts/verify-core-postgres.mjs",
     "sync:seed:all-markdown:postgres": "npm run build && node scripts/seed-all-markdown-postgres.mjs",
     "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
+    "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
     "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",
     "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
