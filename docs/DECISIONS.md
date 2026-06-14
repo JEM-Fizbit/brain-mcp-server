@@ -8,6 +8,66 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-14 — Treat Supabase security as a pre-ingestion gate
+
+**Decision:** Before continuing hosted Brain migration work with sensitive data, record and pass a Supabase security gate for the pilot project. The gate requires the `brain` schema to remain private, Brain tables to have RLS enabled with no public/client policies, the artifact bucket to remain private, security advisors to be free of active WARN/ERROR findings, and privileged credentials to stay out of chat, docs, commits, logs, and screenshots.
+
+**Why:** Hosted Brain will contain private Markdown revisions, source provenance, extracted source text, and original artifacts. The main leak risk at this stage is not anonymous database access, but accidentally exposing privileged Supabase credentials or widening schema/API access before the hosted access model is designed.
+
+**Alternatives rejected:** Importing sensitive data before checking grants, RLS, policies, Storage privacy, and advisor output. Treating private bucket status alone as sufficient. Adding broad `anon`/`authenticated` grants early for convenience. Treating the private-org pilot as production security approval for the future ERS-owned project.
+
+**Related:** `docs/security/hosted-brain-supabase-security-gate.md`; `docs/specs/003-hosted-brain-sync-architecture.md`; `db/migrations/2026-06-14_002_harden_hosted_brain_advisors.sql`.
+
+---
+
+## 2026-06-14 — Use a dedicated Supabase project and preserve ERS account portability
+
+**Decision:** Create a new dedicated Supabase project for hosted Brain in John's private Supabase org for the first MCP rebuild/pilot, then migrate to an ERS-owned Supabase project before ERS production cutover. Existing application projects such as Promptalis, Social Creator, Fizbit-DM, or TeachMeIn5 must not host Brain production state.
+
+**Why:** Brain storage will contain private Markdown revisions, source provenance, original artifacts, and future ERS-owned operational data. Starting in John's private org is the fastest controlled pilot path, but ERS production data must be owned by ERS, with billing, access control, audit, and account continuity separated from John's personal/private Supabase account. A dedicated project also keeps migration, backup, RLS, Storage, and lifecycle policies clean.
+
+**Alternatives rejected:** Reusing an existing Supabase app project; hard-coding project refs, org ids, bucket URLs, or account-specific assumptions into the server; treating the private-org pilot as final ERS production infrastructure; using a shared Supabase project for unrelated applications and Brain state.
+
+**Related:** `docs/specs/003-hosted-brain-sync-architecture.md`; prior decision "2026-06-14 — Use Postgres plus Supabase Storage for production hosted Brain state".
+
+---
+
+## 2026-06-14 — Use immutable Supabase Storage object paths for source artifacts
+
+**Decision:** Store Brain source artifacts in a private Supabase Storage bucket named `brain-artifacts` using immutable object paths that include Brain id, source id, artifact kind, content hash, and sanitized original filename. Postgres stores the manifest row and provenance; object uploads default to `upsert=false`.
+
+**Why:** Source artifacts are evidence, not mutable working files. Immutable paths prevent silent overwrites, avoid stale CDN/cache behavior, make duplicate detection checksum-driven, and keep the Postgres revision path focused on Markdown state and metadata. This also works for large/binary inputs while allowing SharePoint/OneDrive pointers where those systems remain canonical.
+
+**Alternatives rejected:** Mutable object names such as `latest.pdf`; using Storage as the source of truth for curated Markdown revisions; storing binary content directly in Postgres; making the artifact bucket public.
+
+**Related:** `docs/specs/003-hosted-brain-sync-architecture.md`; `db/migrations/2026-06-14_001_hosted_brain_postgres.sql`.
+
+---
+
+## 2026-06-14 — Use Postgres plus Supabase Storage for production hosted Brain state
+
+**Decision:** Use Postgres as the production `RevisionStore` and metadata database, with Supabase Storage private buckets for original binary/source artifacts. Curated Markdown revisions, sync cursors, conflicts, source provenance, extracted text, and future semantic chunks live in Postgres; PDFs, DOCX files, images, audio, and other original binaries live in object storage with Postgres manifest rows.
+
+**Why:** Brain file revisions need transactional compare-and-swap writes, conflict tracking, audit metadata, cursors, and future RLS/pgvector support. Original source artifacts need blob/object semantics, retention metadata, checksums, and private access control without bloating database backups or mixing binary storage into the hot revision path. Supabase is a good fit because it provides managed Postgres plus integrated private Storage, while still leaving room for self-hosting or a Mac mini Postgres later.
+
+**Alternatives rejected:** Storing original binaries as Postgres `bytea` except for tiny test fixtures. Using Supabase Storage as the authority for Markdown revisions. Treating SharePoint/OneDrive as the universal platform store; it remains an ERS collaboration/canonical-source adapter where appropriate, not the core Brain revision engine. Continuing with file-backed JSON beyond local harness tests.
+
+**Related:** `docs/specs/003-hosted-brain-sync-architecture.md`; prior decision "2026-06-14 — Rebuild hosted Brain around replicated revisions, not git hot path".
+
+---
+
+## 2026-06-14 — Rebuild hosted Brain around replicated revisions, not git hot path
+
+**Decision:** Rebuild hosted Brain sync around a hosted revision store plus local sync agent, with local Markdown preserved as a first-class editing surface and git demoted to async backup/export/history rather than live sync transport.
+
+**Why:** The Fly/git pilot made remote MCP reachable but failed the local-first product contract: hosted writes did not automatically update the local Markdown Brain, local edits had no automatic hosted propagation path, and git push/pull semantics created drift and latency risk. A revision store with compare-and-swap writes, local sync cursors, and explicit conflicts directly addresses the required hosted-to-local, local-to-hosted, dirty-file block, and latency-instrumented acceptance tests.
+
+**Alternatives rejected:** Continuing to patch the Fly hosted working copy as the default architecture. Treating GitHub as the live sync fabric because it already provides backup/history. Making local Markdown a stale export of a cloud-only Brain. Re-enabling `brain-hosted` as an active Codex connector before the sync contract passes.
+
+**Related:** `docs/specs/003-hosted-brain-sync-architecture.md`; `docs/specs/002-local-first-hosted-sync-contract.md`; prior decision "2026-06-14 — Revert Codex to local Brain MCP while hosted is rebuilt".
+
+---
+
 ## 2026-06-14 — Revert Codex to local Brain MCP while hosted is rebuilt
 
 **Decision:** Remove the experimental `brain-hosted` MCP registration from Codex and keep the existing local stdio `brain` MCP as the active/default Brain path while the hosted architecture is rebuilt against the local-first sync contract.

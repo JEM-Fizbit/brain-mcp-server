@@ -118,6 +118,15 @@ export const ListSourcesSchema = BrainIdSchema.extend({
     .describe("Optional category to filter by. If omitted, returns all source files across all categories."),
 });
 
+export const SyncStatusSchema = BrainIdSchema;
+
+export const ListConflictsSchema = BrainIdSchema.extend({
+  status: z
+    .enum(["open", "resolved", "superseded"])
+    .default("open")
+    .describe("Conflict status to list. Defaults to open."),
+});
+
 export const LogSchema = BrainIdSchema.extend({
   opType: z
     .enum(["INGEST", "UPDATE", "LINT", "CREATE", "SPLIT", "PRUNE"])
