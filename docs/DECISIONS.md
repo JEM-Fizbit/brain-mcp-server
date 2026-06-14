@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-14 — Revert Codex to local Brain MCP while hosted is rebuilt
+
+**Decision:** Remove the experimental `brain-hosted` MCP registration from Codex and keep the existing local stdio `brain` MCP as the active/default Brain path while the hosted architecture is rebuilt against the local-first sync contract.
+
+**Why:** The hosted pilot introduced regressions against the actual working baseline: higher latency, hosted writes that did not automatically update the local Markdown working surface, and an unclear path for local edits to sync back to hosted clients. Remote/mobile access remains required, but it cannot come at the cost of the current local MCP behavior.
+
+**Alternatives rejected:** Continuing to use hosted MCP as the default while fixing sync later. Treating Fly/GitHub availability as sufficient proof of Brain platform success. Removing the hosted work entirely; it remains a useful pilot and deployment reference, but not the load-bearing connector.
+
+**Related:** `docs/specs/002-local-first-hosted-sync-contract.md`; prior decision "2026-06-14 — Put git-backed hosted Brain architecture under review".
+
+---
+
 ## 2026-06-14 — Put git-backed hosted Brain architecture under review
 
 **Decision:** Do not treat the Fly + git working-copy pilot as the settled architecture. Further hosted Brain work must satisfy the local-first hosted sync contract before it is considered successful, and git's role must be re-derived from requirements rather than inherited from the local-only backup workflow.
