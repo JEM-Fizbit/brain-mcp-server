@@ -1,7 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SearchSchema, ListSourcesSchema, ListFilesSchema } from "../schemas/tools.js";
-import * as brain from "../services/brain.js";
 import * as git from "../services/git.js";
+import {
+  activeBrainStore,
+  activeStoreStatus,
+  asFileMetadata,
+  revisionStoreModeEnabled,
+} from "../services/active-brain-store.js";
 import { resolveToolBrain } from "../services/request-context.js";
 
 export function registerStatusTools(server: McpServer): void {
@@ -12,8 +17,12 @@ export function registerStatusTools(server: McpServer): void {
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const files = await brain.listFiles(ctx.brainId);
-        const gitStatus = await git.getStatusForBrain(ctx.brainId);
+        const files = asFileMetadata(
+          await activeBrainStore().listFiles(ctx.brainId)
+        );
+        const statusFooter = revisionStoreModeEnabled()
+          ? activeStoreStatus()
+          : await git.getStatusForBrain(ctx.brainId);
 
         const header = "| File | Lines | Size | Last Modified | Status |";
         const separator = "|------|-------|------|---------------|--------|";
@@ -31,7 +40,7 @@ export function registerStatusTools(server: McpServer): void {
         });
 
         const table = [header, separator, ...rows].join("\n");
-        const result = `${table}\n\n---\n${gitStatus}`;
+        const result = `${table}\n\n---\n${statusFooter}`;
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {
@@ -49,7 +58,12 @@ export function registerStatusTools(server: McpServer): void {
     async ({ brain_id, query, scope, max_results }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const result = await brain.search(query, scope, max_results, ctx.brainId);
+        const result = await activeBrainStore().searchFiles(
+          ctx.brainId,
+          query,
+          scope,
+          max_results
+        );
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {
@@ -67,7 +81,7 @@ export function registerStatusTools(server: McpServer): void {
     async ({ brain_id, category }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const files = await brain.listSources(category, ctx.brainId);
+        const files = await activeBrainStore().listSources(ctx.brainId, category);
         const text =
           files.length > 0
             ? (category

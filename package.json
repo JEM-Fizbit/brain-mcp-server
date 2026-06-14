@@ -8,18 +8,38 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
+    "sync": "node dist/sync/cli.js",
+    "sync:smoke:postgres": "npm run build && node scripts/smoke-postgres-sync.mjs",
+    "sync:canary:postgres": "npm run build && BRAIN_REVISION_STORE=postgres BRAIN_SYNC_INCLUDE_FILES=00_loader.md npm run sync -- push",
+    "sync:seed:core:postgres": "npm run build && node scripts/seed-core-postgres.mjs",
+    "sync:verify:core:postgres": "npm run build && node scripts/verify-core-postgres.mjs",
+    "sync:seed:all-markdown:postgres": "npm run build && node scripts/seed-all-markdown-postgres.mjs",
+    "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
+    "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
+    "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",
+    "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
+    "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "test": "npm run build && node --test"
   },
-  "keywords": ["mcp", "ai-brain", "markdown", "context", "claude"],
+  "keywords": [
+    "mcp",
+    "ai-brain",
+    "markdown",
+    "context",
+    "claude"
+  ],
   "author": "JEM-Fizbit",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "@supabase/supabase-js": "^2.108.1",
+    "pg": "^8.21.0",
     "zod": "^3.24.4"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.8.3"
   }
 }
