@@ -275,6 +275,14 @@ For JEM, original source artifacts can live in a private Supabase Storage bucket
 
 The first hosted Brain Supabase target is a new dedicated project in John's private Supabase org. It is a pilot/control project for rebuilding hosted MCP correctly, not the long-term ERS production owner.
 
+Pilot configuration:
+
+- Supabase organization: `ERSG Prototypes`
+- Project: `brain-platform-pilot`
+- Project ref: `omnwbcdtmtvxasgdmvwr`
+- Region: West Europe/London
+- Private artifact bucket: `brain-artifacts`
+
 ERS production cutover requires a separate ERS-owned Supabase project. The application must treat Supabase project refs, URLs, keys, bucket names, and database URLs as deployment configuration. Do not bake John's private org, project ref, or account assumptions into code, migrations, object paths, OAuth callbacks, or Brain ids.
 
 Local/default harness:
@@ -411,8 +419,7 @@ Before hosted becomes recommended/default again:
 
 ## Open Questions
 
-- What exact name should we give the dedicated private-org Supabase pilot project?
-- What are the exact private Storage bucket names and retention policies for JEM sources?
+- What retention policy should apply to JEM source originals and derived artifacts in `brain-artifacts`?
 - Should local sync run as a long-lived daemon, launchd service, MCP-adjacent subprocess, or manual one-shot command before daemonization?
 - How should conflict resolution be exposed to remote-only mobile clients without encouraging blind overwrites?
 - What is the exact latency target for sync propagation on JEM: seconds, low tens of seconds, or task-dependent?
