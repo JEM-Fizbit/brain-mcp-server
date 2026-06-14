@@ -270,9 +270,42 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
   assert.equal(outputs[0].command, "watch");
   assert.equal(outputs[0].cycle, 1);
   assert.equal(outputs[0].config.databaseUrl, "missing");
-  assert.deepEqual(outputs[0].report.pushed, ["NOW.md"]);
+  assert.equal(outputs[0].config.watchOutput, "summary");
+  assert.equal(outputs[0].report.pushed, 1);
+  assert.equal(outputs[0].report.pulled, 0);
+  assert.equal(outputs[0].report.conflicts, 0);
+  assert.deepEqual(outputs[0].report.conflictFiles, []);
+  assert.equal(typeof outputs[0].report.totalMs, "number");
   assert.equal(outputs[1].cycle, 2);
-  assert.equal(outputs[1].report.conflicts.length, 0);
+  assert.equal(outputs[1].report.conflicts, 0);
+});
+
+test("sync CLI watch can emit full reports for debugging", async () => {
+  const config = dirs("watch-full");
+  await writeBrainFile(config.brainDir, "NOW.md", "Watch full local push\n");
+
+  const { stdout } = await exec(process.execPath, [cliPath, "watch"], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ai-brain-jem",
+      BRAIN_DIR: config.brainDir,
+      BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_STORE_FILE: config.storeFile,
+      BRAIN_REVISION_STORE: "file",
+      BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_SYNC_INTERVAL_MS: "250",
+      BRAIN_SYNC_WATCH_CYCLES: "1",
+      BRAIN_SYNC_WATCH_OUTPUT: "full",
+    },
+  });
+  const output = JSON.parse(stdout.trim());
+
+  assert.equal(output.command, "watch");
+  assert.equal(output.config.watchOutput, "full");
+  assert.deepEqual(output.report.pushed, ["NOW.md"]);
+  assert.equal(output.report.conflicts.length, 0);
+  assert.ok(output.report.timings.some((timing) => timing.phase === "total"));
 });
 
 test("sync CLI fails fast when another sync lock exists", async () => {

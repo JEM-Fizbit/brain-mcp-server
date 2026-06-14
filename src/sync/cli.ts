@@ -5,7 +5,7 @@ import { BRAIN_DIR } from "../constants.js";
 import { FileRevisionStore } from "./file-revision-store.js";
 import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
-import type { RevisionStore } from "./types.js";
+import type { LocalSyncReport, RevisionStore } from "./types.js";
 
 type SyncCommand = "push" | "pull" | "once" | "status" | "summary" | "watch";
 type RevisionStoreProvider = "file" | "postgres";
@@ -21,6 +21,7 @@ interface SyncCliConfig {
   includeFiles?: string[];
   watchIntervalMs: number;
   watchCycles?: number;
+  watchOutput: "summary" | "full";
 }
 
 interface StoreHandle {
@@ -72,6 +73,7 @@ function usage(): string {
     "  BRAIN_SYNC_INCLUDE_FILES  Optional comma-separated .md file list",
     "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
     "  BRAIN_SYNC_WATCH_CYCLES   Optional finite watch cycles for tests/jobs",
+    "  BRAIN_SYNC_WATCH_OUTPUT   Watch output mode: summary|full (default: summary)",
     "  BRAIN_REVISION_STORE      Revision store provider: file|postgres",
     "  BRAIN_REVISION_DATABASE_URL",
     "                            Required when BRAIN_REVISION_STORE=postgres",
@@ -122,6 +124,8 @@ function readConfig(): SyncCliConfig {
     watchCycles: process.env.BRAIN_SYNC_WATCH_CYCLES
       ? Math.max(1, Number(process.env.BRAIN_SYNC_WATCH_CYCLES))
       : undefined,
+    watchOutput:
+      process.env.BRAIN_SYNC_WATCH_OUTPUT === "full" ? "full" : "summary",
   };
 }
 
@@ -139,6 +143,20 @@ function outputConfig(config: SyncCliConfig): Omit<SyncCliConfig, "databaseUrl">
   return {
     ...config,
     databaseUrl: config.databaseUrl ? "set" : "missing",
+  };
+}
+
+function summarizeReport(report: LocalSyncReport) {
+  const totalTiming = report.timings.find(
+    (timing) => timing.operation === "sync" && timing.phase === "total"
+  );
+  return {
+    pushed: report.pushed.length,
+    pulled: report.pulled.length,
+    unchanged: report.unchanged.length,
+    conflicts: report.conflicts.length,
+    conflictFiles: report.conflicts.map((conflict) => conflict.filename),
+    totalMs: totalTiming?.ms ?? null,
   };
 }
 
@@ -264,11 +282,13 @@ async function runWithConfig(
         let cycle = 0;
         while (!stopped) {
           cycle += 1;
+          const report = await agent.syncOnce();
           writeJsonLine({
             command,
             cycle,
             config: outputConfig(config),
-            report: await agent.syncOnce(),
+            report:
+              config.watchOutput === "full" ? report : summarizeReport(report),
           });
           if (config.watchCycles && cycle >= config.watchCycles) break;
           await sleep(config.watchIntervalMs);
