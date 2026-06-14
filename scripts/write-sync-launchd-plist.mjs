@@ -10,9 +10,22 @@ const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
 const syncDir = path.resolve(brainDir, "..", ".brain-sync");
 const label = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const intervalSeconds = Number(process.env.BRAIN_SYNC_LAUNCHD_INTERVAL_SECONDS || 5);
+const nodePath = process.env.BRAIN_SYNC_LAUNCHD_NODE || process.execPath;
+const npmCliPath =
+  process.env.BRAIN_SYNC_LAUNCHD_NPM_CLI || process.env.npm_execpath;
 const outputPath =
   process.env.BRAIN_SYNC_LAUNCHD_PLIST ||
   path.join(repoRoot, "tmp", `${label}.plist`);
+
+if (!path.isAbsolute(nodePath)) {
+  throw new Error(`BRAIN_SYNC_LAUNCHD_NODE must be absolute: ${nodePath}`);
+}
+
+if (!npmCliPath || !path.isAbsolute(npmCliPath)) {
+  throw new Error(
+    "Unable to resolve an absolute npm CLI path. Run this script with npm, or set BRAIN_SYNC_LAUNCHD_NPM_CLI."
+  );
+}
 
 function xmlEscape(value) {
   return String(value)
@@ -36,8 +49,8 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/env</string>
-    <string>npm</string>
+    <string>${xmlEscape(nodePath)}</string>
+    <string>${xmlEscape(npmCliPath)}</string>
     <string>run</string>
     <string>sync</string>
     <string>--</string>
@@ -76,6 +89,8 @@ console.log(
       label,
       brainDir,
       intervalSeconds,
+      nodePath,
+      npmCliPath,
       note: "Review before copying to ~/Library/LaunchAgents and loading with launchctl.",
     },
     null,
