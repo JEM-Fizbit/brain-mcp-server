@@ -9,6 +9,10 @@ import { handleAuthorizeGet, handleGitHubCallback } from "../oauth/github.js";
 import { handleToken } from "../oauth/token.js";
 import { makeFileStateProvider, type StateProvider } from "../oauth/state.js";
 import { resolveAuth, wwwAuthenticateHeader } from "./mcp-auth.js";
+import {
+  assertHttpRuntimeConfig,
+  runtimeStatus,
+} from "../services/runtime-config.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -161,6 +165,7 @@ export async function handleHttpRequest(
           token_endpoint: ctx.config.tokenEndpoint,
           registration_endpoint: ctx.config.registrationEndpoint,
         },
+        runtime: runtimeStatus(),
       });
       return;
     }
@@ -239,6 +244,8 @@ export async function handleHttpRequest(
 }
 
 export async function startHttpServer(): Promise<void> {
+  assertHttpRuntimeConfig();
+
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
   const ctx: HttpContext = {

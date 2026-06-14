@@ -83,6 +83,8 @@ curl -s https://jem-brain-mcp.fly.dev/health | jq .
 curl -i https://jem-brain-mcp.fly.dev/.well-known/oauth-protected-resource/mcp
 ```
 
+`/health` should report `runtime.revisionStore=postgres`, `runtime.artifactStore=supabase`, and `runtime.gitHotPath=disabled`. It must not include database URLs, Supabase keys, or other secret values.
+
 Then enroll a remote MCP client against:
 
 ```text

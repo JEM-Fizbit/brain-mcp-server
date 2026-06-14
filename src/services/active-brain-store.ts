@@ -19,7 +19,29 @@ export function revisionStoreModeEnabled(): boolean {
   return revisionStoreProvider() !== "filesystem";
 }
 
+let cachedStore:
+  | {
+      key: string;
+      store: BrainStore;
+    }
+  | undefined;
+
+function activeBrainStoreCacheKey(): string {
+  const provider = revisionStoreProvider();
+  if (provider === "postgres") {
+    return `postgres:${process.env.BRAIN_REVISION_DATABASE_URL || ""}`;
+  }
+  if (provider === "file") {
+    return `file:${revisionStoreFile() || ""}`;
+  }
+  return "filesystem";
+}
+
 export function activeBrainStore(): BrainStore {
+  const key = activeBrainStoreCacheKey();
+  if (cachedStore?.key === key) return cachedStore.store;
+
+  let store: BrainStore;
   if (revisionStoreProvider() === "postgres") {
     const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
     if (!databaseUrl) {
@@ -27,15 +49,17 @@ export function activeBrainStore(): BrainStore {
         "BRAIN_REVISION_DATABASE_URL is required when BRAIN_REVISION_STORE=postgres"
       );
     }
-    return new RevisionBrainStore(
+    store = new RevisionBrainStore(
       new PostgresRevisionStore(databaseUrl),
       new PostgresSourceMetadataStore(databaseUrl)
     );
+  } else {
+    const filePath = revisionStoreFile();
+    store = filePath ? revisionBrainStoreFromFile(filePath) : filesystemBrainStore;
   }
 
-  const filePath = revisionStoreFile();
-  if (filePath) return revisionBrainStoreFromFile(filePath);
-  return filesystemBrainStore;
+  cachedStore = { key, store };
+  return store;
 }
 
 export async function loadContextFromActiveStore(brainId: string): Promise<string> {
