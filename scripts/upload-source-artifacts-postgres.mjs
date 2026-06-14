@@ -10,6 +10,7 @@ const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const supabaseUrl = process.env.BRAIN_SUPABASE_URL || "https://omnwbcdtmtvxasgdmvwr.supabase.co";
 const serviceRoleKey = process.env.BRAIN_SUPABASE_SERVICE_ROLE_KEY;
 const bucket = process.env.BRAIN_SUPABASE_STORAGE_BUCKET || "brain-artifacts";
+const byteAccess = process.env.BRAIN_ARTIFACT_BYTE_ACCESS || "metadata_only";
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
 const brainRoot =
   process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
@@ -20,6 +21,13 @@ const limit = process.env.BRAIN_SOURCE_UPLOAD_LIMIT
 if (!databaseUrl) {
   console.error(
     "BRAIN_REVISION_DATABASE_URL is missing. Set it before uploading source artifacts."
+  );
+  process.exit(2);
+}
+
+if (byteAccess !== "admin") {
+  console.error(
+    "BRAIN_ARTIFACT_BYTE_ACCESS=admin is required for source artifact byte uploads."
   );
   process.exit(2);
 }

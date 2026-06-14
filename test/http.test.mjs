@@ -118,6 +118,7 @@ test("health reports non-secret runtime store modes", async () => {
         transport: "http",
         revisionStore: "postgres",
         artifactStore: "supabase",
+        artifactByteAccess: "metadata_only",
         gitHotPath: "disabled",
         autoSyncEnabled: false,
       });
@@ -145,13 +146,30 @@ test("HTTP Postgres runtime requires Supabase artifact storage config", async ()
   );
 });
 
-test("HTTP Supabase artifact runtime fails fast on missing server-side secrets", async () => {
+test("HTTP Supabase artifact metadata runtime does not require service role key", async () => {
+  await withEnv(
+    {
+      TRANSPORT: "http",
+      BRAIN_REVISION_STORE: "postgres",
+      BRAIN_REVISION_DATABASE_URL: "postgresql://example.invalid/postgres",
+      BRAIN_ARTIFACT_STORE: "supabase",
+      BRAIN_SUPABASE_URL: "https://example.supabase.co",
+      BRAIN_SUPABASE_SERVICE_ROLE_KEY: undefined,
+    },
+    async () => {
+      assert.doesNotThrow(() => assertHttpRuntimeConfig());
+    }
+  );
+});
+
+test("HTTP Supabase artifact admin byte access fails fast without service role key", async () => {
   await withEnv(
     {
       TRANSPORT: "http",
       BRAIN_REVISION_STORE: "postgres",
       BRAIN_REVISION_DATABASE_URL: undefined,
       BRAIN_ARTIFACT_STORE: "supabase",
+      BRAIN_ARTIFACT_BYTE_ACCESS: "admin",
       BRAIN_SUPABASE_URL: "https://example.supabase.co",
       BRAIN_SUPABASE_SERVICE_ROLE_KEY: undefined,
     },

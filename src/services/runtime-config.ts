@@ -12,8 +12,15 @@ export interface RuntimeStatus {
   transport: "http" | "stdio";
   revisionStore: "filesystem" | "file" | "postgres";
   artifactStore: "filesystem" | "supabase";
+  artifactByteAccess: "metadata_only" | "admin";
   gitHotPath: "disabled" | "filesystem";
   autoSyncEnabled: boolean;
+}
+
+export function artifactByteAccessMode(): RuntimeStatus["artifactByteAccess"] {
+  return process.env.BRAIN_ARTIFACT_BYTE_ACCESS === "admin"
+    ? "admin"
+    : "metadata_only";
 }
 
 export function runtimeStatus(): RuntimeStatus {
@@ -21,6 +28,7 @@ export function runtimeStatus(): RuntimeStatus {
     transport: process.env.TRANSPORT === "http" ? "http" : "stdio",
     revisionStore: revisionStoreProvider(),
     artifactStore: artifactStoreProvider(),
+    artifactByteAccess: artifactByteAccessMode(),
     gitHotPath: revisionStoreModeEnabled() ? "disabled" : "filesystem",
     autoSyncEnabled: truthy(process.env.BRAIN_AUTO_SYNC),
   };
@@ -43,7 +51,10 @@ export function assertHttpRuntimeConfig(): void {
 
   if (status.artifactStore === "supabase") {
     if (!process.env.BRAIN_SUPABASE_URL) missing.push("BRAIN_SUPABASE_URL");
-    if (!process.env.BRAIN_SUPABASE_SERVICE_ROLE_KEY) {
+    if (
+      status.artifactByteAccess === "admin" &&
+      !process.env.BRAIN_SUPABASE_SERVICE_ROLE_KEY
+    ) {
       missing.push("BRAIN_SUPABASE_SERVICE_ROLE_KEY");
     }
   }

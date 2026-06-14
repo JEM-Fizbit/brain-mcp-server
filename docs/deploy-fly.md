@@ -62,12 +62,14 @@ fly secrets set \
   BRAIN_REVISION_STORE="postgres" \
   BRAIN_REVISION_DATABASE_URL="<brain-runtime-postgres-url>" \
   BRAIN_ARTIFACT_STORE="supabase" \
+  BRAIN_ARTIFACT_BYTE_ACCESS="metadata_only" \
   BRAIN_SUPABASE_URL="https://<project-ref>.supabase.co" \
-  BRAIN_SUPABASE_SERVICE_ROLE_KEY="<server-side-secret-key>" \
   BRAIN_SUPABASE_STORAGE_BUCKET="brain-artifacts" \
   BRAIN_HTTP_TIMING_LOGS="1" \
   --app jem-brain-mcp
 ```
+
+Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source metadata/search. Add it only for an ingestion/admin process with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`, such as source artifact byte upload. Hosted MCP source reads currently return manifests and extracted text, not original bytes.
 
 Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for the Supabase-backed hosted runtime. Those belong to the retired git hot path.
 
