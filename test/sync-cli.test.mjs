@@ -157,6 +157,22 @@ test("sync CLI status reports state, hosted files, and open conflicts", async ()
   assert.equal(output.openConflicts[0].filename, "NOW.md");
 });
 
+test("sync CLI summary reports compact counts without file payloads", async () => {
+  const config = dirs("summary");
+  await writeBrainFile(config.brainDir, "NOW.md", "CLI summary base\n");
+  await runCli("push", config);
+
+  const output = await runCli("summary", config);
+
+  assert.equal(output.command, "summary");
+  assert.equal(output.state.version, 1);
+  assert.equal(output.state.trackedFiles, 1);
+  assert.equal(output.hostedFiles, 1);
+  assert.equal(output.openConflicts, 0);
+  assert.equal(typeof output.latestHostedCursor, "string");
+  assert.equal("files" in output.state, false);
+});
+
 test("sync CLI loads local env files before reading config", async () => {
   const config = dirs("local-env");
   const cwd = path.dirname(config.brainDir);

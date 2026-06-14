@@ -7,7 +7,7 @@ import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import type { RevisionStore } from "./types.js";
 
-type SyncCommand = "push" | "pull" | "once" | "status" | "watch";
+type SyncCommand = "push" | "pull" | "once" | "status" | "summary" | "watch";
 type RevisionStoreProvider = "file" | "postgres";
 
 interface SyncCliConfig {
@@ -61,7 +61,7 @@ function loadLocalEnv(rootDir = process.cwd()): void {
 
 function usage(): string {
   return [
-    "Usage: node dist/sync/cli.js <push|pull|once|status|watch>",
+    "Usage: node dist/sync/cli.js <push|pull|once|status|summary|watch>",
     "",
     "Environment:",
     "  BRAIN_ID                  Brain id (default: ai-brain-jem)",
@@ -285,6 +285,27 @@ async function runWithConfig(
       store.listFiles(config.brainId),
       store.listConflicts(config.brainId, "open"),
     ]);
+    if (command === "summary") {
+      writeJson({
+        command,
+        config: outputConfig(config),
+        state: {
+          version: state.version,
+          clientId: state.clientId,
+          cursor: state.cursor,
+          trackedFiles: Object.keys(state.files).length,
+        },
+        hostedFiles: hostedFiles.length,
+        openConflicts: openConflicts.length,
+        latestHostedCursor:
+          hostedFiles
+            .map((file) => file.cursor)
+            .filter(Boolean)
+            .sort()
+            .at(-1) || null,
+      });
+      return;
+    }
     writeJson({
       command,
       config: outputConfig(config),
@@ -300,7 +321,10 @@ async function runWithConfig(
 async function main(): Promise<void> {
   loadLocalEnv();
   const command = process.argv[2] as SyncCommand | undefined;
-  if (!command || !["push", "pull", "once", "status", "watch"].includes(command)) {
+  if (
+    !command ||
+    !["push", "pull", "once", "status", "summary", "watch"].includes(command)
+  ) {
     process.stderr.write(`${usage()}\n`);
     process.exitCode = 2;
     return;
