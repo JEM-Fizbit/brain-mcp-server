@@ -8,6 +8,7 @@ const LOG_HEADER = `# Brain Change Log
 
 Append-only record of ingests, updates, lint passes, and structural changes.
 Format: \`## [YYYY-MM-DD] OP_TYPE | Summary\` followed by files touched.
+Ordering: newest entry first; insert new entries directly below this preamble.
 
 ---
 `;
@@ -37,13 +38,25 @@ export async function appendLog(
   const date = brainDate();
 
   const entry = [
-    "",
     `## [${date}] ${opType} | ${summary}`,
     `Files: ${filesTouched.join(", ")}`,
     "",
   ].join("\n");
 
-  await fs.appendFile(filePath, entry, "utf-8");
+  const content = await fs.readFile(filePath, "utf-8");
+  const divider = "\n---\n";
+  const dividerIndex = content.indexOf(divider);
+
+  if (dividerIndex === -1) {
+    await fs.writeFile(filePath, `${entry}\n${content}`.trimEnd() + "\n", "utf-8");
+  } else {
+    const insertAt = dividerIndex + divider.length;
+    const prefix = content.slice(0, insertAt);
+    const rest = content.slice(insertAt).trimStart();
+    const next = rest ? `${prefix}\n${entry}\n${rest}` : `${prefix}\n${entry}`;
+    await fs.writeFile(filePath, next, "utf-8");
+  }
+
   return `Logged: [${date}] ${opType} | ${summary}`;
 }
 
@@ -60,10 +73,10 @@ export async function readLog(
     return "No log entries yet.";
   }
 
-  const recent = entries.slice(-limit);
+  const recent = entries.slice(0, limit);
   const header =
     entries.length > limit
-      ? `Showing last ${limit} of ${entries.length} entries:\n\n`
+      ? `Showing newest ${limit} of ${entries.length} entries:\n\n`
       : "";
 
   return header + recent.join("\n").trim();
@@ -78,10 +91,10 @@ export async function getLastOpDate(
   const content = await fs.readFile(filePath, "utf-8");
   const pattern = new RegExp(`^## \\[(\\d{4}-\\d{2}-\\d{2})\\] ${opType}`);
 
-  // Log is append-only (newest at bottom) — scan from end, return first match
+  // Log is newest-first — scan from top, return first match.
   const entries = content.split(/(?=^## \[)/m);
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const match = entries[i].match(pattern);
+  for (const entry of entries) {
+    const match = entry.match(pattern);
     if (match) return new Date(match[1]);
   }
 
