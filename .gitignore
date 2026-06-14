@@ -3,5 +3,6 @@ dist/
 .DS_Store
 .env
 .env.local
+tmp/
 *.tsbuildinfo
 .claude/worktrees/
