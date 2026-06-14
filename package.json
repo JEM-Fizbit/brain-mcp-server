@@ -15,6 +15,7 @@
     "sync:seed:core:postgres": "npm run build && node scripts/seed-core-postgres.mjs",
     "sync:verify:core:postgres": "npm run build && node scripts/verify-core-postgres.mjs",
     "sync:seed:all-markdown:postgres": "npm run build && node scripts/seed-all-markdown-postgres.mjs",
+    "sync:launchd:plist": "node scripts/write-sync-launchd-plist.mjs",
     "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
