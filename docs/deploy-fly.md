@@ -148,7 +148,7 @@ Unload it with:
 launchctl unload ~/Library/LaunchAgents/com.jem.brain-sync.plist
 ```
 
-The plist runs `npm run sync -- watch` through absolute Node and npm CLI paths captured when the plist is generated, relies on the repo `.env.local` for private Supabase settings, and writes logs under the Brain `.brain-sync/` directory. Regenerate the plist after changing Node/npm installations.
+The plist runs the compiled sync CLI directly through the absolute Node path captured when the plist is generated, relies on the repo `.env.local` for private Supabase settings, and writes logs under the Brain `.brain-sync/` directory. Run `npm run build` before regenerating the plist, and regenerate it after changing Node installations.
 
 After any deployment that changes schema, RLS, functions, Storage, or user-data access, rerun the security gate in `docs/security/hosted-brain-supabase-security-gate.md`.
 
