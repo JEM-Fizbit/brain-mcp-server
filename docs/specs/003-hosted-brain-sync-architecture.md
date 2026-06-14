@@ -409,7 +409,7 @@ The hosted runtime benchmark can be run from a local operator shell with Supabas
 npm run bench:http:postgres
 ```
 
-The benchmark calls read-only MCP tools repeatedly through the HTTP handler and reports duration summaries without printing Brain content or credentials. On 2026-06-14, after removing an N+1 read in hosted `brain_list_files`, the live pilot measured `brain_list_files` at ~239 ms median over five iterations, down from ~2.7 s median before the optimization. `brain_read_file` and Brain search were also in the ~225-235 ms median range, while extracted source-text search measured ~453 ms median. Cold/p95 spikes around list operations remain visible and should guide the next latency pass.
+The benchmark calls read-only MCP tools repeatedly through the HTTP handler and reports duration summaries without printing Brain content or credentials. On 2026-06-14, after removing an N+1 read in hosted `brain_list_files`, the live pilot measured `brain_list_files` at ~239 ms median over five iterations, down from ~2.7 s median before the optimization. A follow-up shared the Postgres connection pool across revision and source metadata stores, bringing `brain_list_sources` p95 from ~1.6 s to ~249 ms. `brain_read_file` and Brain search were in the ~225-255 ms median range, while extracted source-text search measured ~453-492 ms median. The main remaining cold spike is first Postgres connection setup on the first read scenario.
 
 ## Acceptance Tests
 

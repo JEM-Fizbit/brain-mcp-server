@@ -62,3 +62,16 @@ test("activeBrainStore refreshes cached store when Postgres connection config ch
     }
   );
 });
+
+test("activeBrainStore shares one Postgres pool across revision and source stores", async () => {
+  await withEnv(
+    {
+      BRAIN_REVISION_STORE: "postgres",
+      BRAIN_REVISION_DATABASE_URL: "postgresql://postgres@example-shared.invalid/postgres",
+    },
+    async () => {
+      const store = activeBrainStore();
+      assert.equal(store.revisionStore.pool, store.sourceStore.pool);
+    }
+  );
+});

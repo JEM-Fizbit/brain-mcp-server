@@ -1,9 +1,12 @@
+import pg from "pg";
 import { LOADER_FILE, NOW_FILE } from "../constants.js";
 import { filesystemBrainStore, type BrainStore, type FileMetadata } from "./brain-store.js";
 import { RevisionBrainStore } from "./revision-brain-store.js";
 import { revisionBrainStoreFromFile } from "./revision-brain-store.js";
 import { PostgresRevisionStore } from "../sync/postgres-revision-store.js";
 import { PostgresSourceMetadataStore } from "../sources/postgres-source-store.js";
+
+const { Pool } = pg;
 
 export function revisionStoreFile(): string | undefined {
   return process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE;
@@ -49,9 +52,10 @@ export function activeBrainStore(): BrainStore {
         "BRAIN_REVISION_DATABASE_URL is required when BRAIN_REVISION_STORE=postgres"
       );
     }
+    const pool = new Pool({ connectionString: databaseUrl });
     store = new RevisionBrainStore(
-      new PostgresRevisionStore(databaseUrl),
-      new PostgresSourceMetadataStore(databaseUrl)
+      new PostgresRevisionStore(pool),
+      new PostgresSourceMetadataStore(pool)
     );
   } else {
     const filePath = revisionStoreFile();
