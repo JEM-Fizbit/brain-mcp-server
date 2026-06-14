@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-14 — Remove git hot path from Fly hosted runtime config
+
+**Decision:** The committed Fly runtime config, Docker image, and entrypoint must represent the Supabase-backed hosted Brain runtime, not the retired git working-copy pilot. Fly must not mount a deploy key, install SSH/git only for hosted writes, or enable `BRAIN_AUTO_SYNC`/`BRAIN_AUTO_PUSH` for the Supabase-backed server.
+
+**Why:** Documentation already retired the hosted git hot path, but executable deployment files still preserved it. That mismatch could accidentally redeploy the old architecture with sensitive Brain data and recreate local/hosted drift. Keeping deployment-specific Supabase URLs and credentials in Fly secrets also preserves the future ERS-owned Supabase cutover path.
+
+**Alternatives rejected:** Leaving the old Fly config as a historical artifact; keeping deploy-key support in the image "just in case"; committing the pilot Supabase project URL into `fly.toml`; treating docs as sufficient protection against deploying the wrong runtime.
+
+**Related:** `fly.toml`; `Dockerfile`; `scripts/fly-entrypoint.sh`; `docs/deploy-fly.md`; `docs/specs/003-hosted-brain-sync-architecture.md`.
+
+---
+
 ## 2026-06-14 — Keep artifact byte access out of the normal hosted runtime
 
 **Decision:** Normal hosted Brain runtime may use Supabase Storage as the artifact authority while running in `BRAIN_ARTIFACT_BYTE_ACCESS=metadata_only` mode, without a Supabase service-role key. Service-role-backed Storage byte access is restricted to explicit ingestion/admin operations with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`.

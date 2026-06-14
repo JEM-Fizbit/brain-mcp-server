@@ -1,10 +1,12 @@
 # 001 - Brain Platform Phase 1+2
 
-**Status:** in-progress
+**Status:** superseded by `docs/specs/002-local-first-hosted-sync-contract.md` and `docs/specs/003-hosted-brain-sync-architecture.md`
 **Source:** BACKLOG.md line "Brain Platform Phase 1+2 (cloud, multi-tenant): HTTP transport + `BrainStore`/`BrainSemanticSearch` + `brain_id` + OAuth (GitHub IdP) + Tier 1 vector. Lift substrate from `~/Projects/slack-mcp-server/`. Kickoff: `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md` -> spec `docs/specs/001-*`."
 **Roadmap link:** `ai-brain-jem/docs/PLAN_brain_roadmap.md`, JEM Phase 1+2
-**Decisions impact:** proposes the Phase 2 hosting target and locks the first GitHub IdP shape if approved
-**Related:** `docs/brain-platform-kickoff-prompt.md`; `ai-brain-jem/docs/SPEC_brain_mcp_server.md`; `ai-brain-jem/docs/SPEC_brain_platform.md`
+**Decisions impact:** historical Phase 1+2 gate; do not use its git-backed hosting target for new hosted Brain architecture work
+**Related:** `docs/brain-platform-kickoff-prompt.md`; `ai-brain-jem/docs/SPEC_brain_mcp_server.md`; `ai-brain-jem/docs/SPEC_brain_platform.md`; `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/specs/003-hosted-brain-sync-architecture.md`
+
+> Supersession note, 2026-06-14: this draft captured the original hosted HTTP/OAuth platform lift and the first Fly pilot shape. Its git-capable persistent-filesystem hosting assumptions are now retired. Use spec 002 for the local-first sync contract and spec 003 for the Supabase Postgres + private Storage hosted architecture. Historical references below to deploy keys, hosted working copies, and git-capable runtimes are preserved as context, not current implementation guidance.
 
 ## Problem
 
