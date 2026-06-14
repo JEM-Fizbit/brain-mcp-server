@@ -202,8 +202,23 @@ const search = await callTool("brain_search", {
 assert.doesNotEqual(search, "No matches found.");
 
 const sources = await callTool("brain_list_sources", { brain_id: brainId });
+let sourceManifestChecked = false;
 if (process.env.BRAIN_HTTP_SMOKE_EXPECT_SOURCES !== "0") {
   assert.match(sources, /All sources:/);
+  const sourcePath = sources
+    .split("\n")
+    .slice(1)
+    .map((line) => line.trim())
+    .find(Boolean);
+  assert.ok(sourcePath, "expected at least one listed source path");
+  const manifest = await callTool("brain_read_file", {
+    brain_id: brainId,
+    filename: sourcePath,
+    scope: "sources",
+  });
+  assert.match(manifest, /# Source Manifest:/);
+  assert.match(manifest, /metadata only/);
+  sourceManifestChecked = true;
 }
 
 let writeStatus = "skipped";
@@ -236,6 +251,7 @@ console.log(
       syncStatusChecked: true,
       searchQuery: query,
       sourcesListed: !sources.includes("No source files found."),
+      sourceManifestChecked,
       write: writeStatus,
     },
     null,
