@@ -23,6 +23,8 @@ function headOf(revision: RevisionContent): FileHead {
     filename: revision.filename,
     revisionId: revision.revisionId,
     contentHash: revision.contentHash,
+    lineCount: revision.content.split("\n").length,
+    byteCount: Buffer.byteLength(revision.content, "utf-8"),
     updatedAt: revision.updatedAt,
     origin: revision.origin,
     actor: revision.actor,

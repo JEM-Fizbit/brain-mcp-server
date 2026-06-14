@@ -12,6 +12,8 @@ export interface FileHead {
   filename: string;
   revisionId: string;
   contentHash: string;
+  lineCount?: number;
+  byteCount?: number;
   updatedAt: string;
   origin: RevisionOrigin;
   actor?: RevisionActor;

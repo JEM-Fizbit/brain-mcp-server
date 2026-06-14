@@ -12,6 +12,47 @@ const { RevisionBrainStore } = await import(
   path.join(__dirname, "..", "dist", "services", "revision-brain-store.js")
 );
 
+function metricHeadStore() {
+  return {
+    async getHead() {
+      return null;
+    },
+    async readFile() {
+      throw new Error("listFiles should not read file contents when head metrics exist");
+    },
+    async listFiles() {
+      return [
+        {
+          brainId: "ai-brain-jem",
+          filename: "00_loader.md",
+          revisionId: "rev_1",
+          contentHash: "a".repeat(64),
+          lineCount: 3,
+          byteCount: 42,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+          origin: "local_agent",
+          cursor: "1",
+        },
+      ];
+    },
+    async searchFiles() {
+      return [];
+    },
+    async proposeRevision() {
+      throw new Error("not implemented");
+    },
+    async listChanges() {
+      return { changes: [], nextCursor: null };
+    },
+    async recordConflict() {
+      throw new Error("not implemented");
+    },
+    async listConflicts() {
+      return [];
+    },
+  };
+}
+
 function sourceStore(pathsByCategory) {
   return {
     async createSource() {
@@ -89,6 +130,20 @@ function sourceStore(pathsByCategory) {
     },
   };
 }
+
+test("RevisionBrainStore lists hosted files without rereading content when head metrics exist", async () => {
+  const store = new RevisionBrainStore(metricHeadStore());
+
+  assert.deepEqual(await store.listFiles("ai-brain-jem"), [
+    {
+      name: "00_loader.md",
+      lines: 3,
+      bytes: 42,
+      lastModified: new Date("2026-06-14T00:00:00.000Z"),
+      staleDays: null,
+    },
+  ]);
+});
 
 test("RevisionBrainStore lists hosted source metadata when source store is present", async () => {
   const store = new RevisionBrainStore(

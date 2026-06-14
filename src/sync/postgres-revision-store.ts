@@ -67,6 +67,14 @@ function actorFromRow(row: RevisionRow): RevisionActor | undefined {
   };
 }
 
+function lineCount(content: string): number {
+  return content.split("\n").length;
+}
+
+function byteCount(content: string): number {
+  return Buffer.byteLength(content, "utf-8");
+}
+
 function revisionFromRow(row: RevisionRow): RevisionContent {
   return {
     brainId: row.brain_id,
@@ -90,6 +98,8 @@ function headFromRow(row: HeadRow | RevisionRow): FileHead {
     filename: row.filename,
     revisionId: row.id,
     contentHash: row.content_sha256,
+    lineCount: lineCount(row.content),
+    byteCount: byteCount(row.content),
     updatedAt,
     origin: row.origin,
     actor: actorFromRow(row),

@@ -403,6 +403,14 @@ Acceptance should be based on measured end-to-end user-visible loops, not only s
 
 The hosted HTTP runtime can emit coarse MCP request timings with `BRAIN_HTTP_TIMING_LOGS=1`. These logs include method, path, status, and duration only; they intentionally omit request bodies, authorization headers, database URLs, and Supabase keys.
 
+The hosted runtime benchmark can be run from a local operator shell with Supabase secrets loaded:
+
+```bash
+npm run bench:http:postgres
+```
+
+The benchmark calls read-only MCP tools repeatedly through the HTTP handler and reports duration summaries without printing Brain content or credentials. On 2026-06-14, after removing an N+1 read in hosted `brain_list_files`, the live pilot measured `brain_list_files` at ~239 ms median over five iterations, down from ~2.7 s median before the optimization. `brain_read_file` and Brain search were also in the ~225-235 ms median range, while extracted source-text search measured ~453 ms median. Cold/p95 spikes around list operations remain visible and should guide the next latency pass.
+
 ## Acceptance Tests
 
 Before hosted becomes recommended/default again:
@@ -429,7 +437,7 @@ Current coverage in this branch:
 | Dirty hosted block | Covered in harness | Stale local writes create conflict records instead of overwriting newer hosted heads. |
 | No git hot path | Covered in harness | Revision-store read/write/sync tests pass without git; hosted runtime disables git hot path in health/status. |
 | Git export recovery | Deferred | Git export is intentionally not in the hot path yet. |
-| Latency budget | Partial | Sync phase timings are recorded; optional hosted HTTP MCP timing logs are available with `BRAIN_HTTP_TIMING_LOGS=1`. |
+| Latency budget | Partial | Sync phase timings are recorded; optional hosted HTTP MCP timing logs are available with `BRAIN_HTTP_TIMING_LOGS=1`; `npm run bench:http:postgres` now records repeatable read-path benchmarks. |
 | Surface parity plan | Partial | HTTP MCP smoke covers authenticated remote tool calls; Claude/Codex connector re-enablement remains controlled follow-up. |
 | ERS path accounted for | Partial | Supabase project portability and SharePoint/OneDrive risks are documented; direct ERS adapter is not implemented. |
 

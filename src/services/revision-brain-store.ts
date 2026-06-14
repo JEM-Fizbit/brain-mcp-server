@@ -15,7 +15,7 @@ import type {
   WriteMode,
 } from "./brain-store.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
-import type { ConflictRecord, RevisionStore } from "../sync/types.js";
+import type { ConflictRecord, FileHead, RevisionStore } from "../sync/types.js";
 import type {
   SourceArtifactRecord,
   SourceManifestRecord,
@@ -47,6 +47,31 @@ function clampMaxResults(value?: number): number {
     Math.max(1, Math.floor(value || MAX_SEARCH_RESULTS)),
     MAX_SEARCH_RESULTS_CEILING
   );
+}
+
+async function fileMetadataFromHead(
+  store: RevisionBrainStore,
+  brainId: string,
+  head: FileHead
+): Promise<FileMetadata> {
+  if (head.lineCount !== undefined && head.byteCount !== undefined) {
+    return {
+      name: head.filename,
+      lines: head.lineCount,
+      bytes: head.byteCount,
+      lastModified: new Date(head.updatedAt),
+      staleDays: null,
+    };
+  }
+
+  const content = await store.readFile(brainId, head.filename);
+  return {
+    name: head.filename,
+    lines: lineCount(content),
+    bytes: byteCount(content),
+    lastModified: new Date(head.updatedAt),
+    staleDays: null,
+  };
 }
 
 function formatArtifact(artifact: SourceArtifactRecord): string {
@@ -125,16 +150,7 @@ export class RevisionBrainStore implements BrainStore {
     if (scope === "sources") return this.listSources(brainId);
     const heads = await this.revisionStore.listFiles(brainId);
     return Promise.all(
-      heads.map(async (head) => {
-        const content = await this.readFile(brainId, head.filename);
-        return {
-          name: head.filename,
-          lines: lineCount(content),
-          bytes: byteCount(content),
-          lastModified: new Date(head.updatedAt),
-          staleDays: null,
-        };
-      })
+      heads.map((head) => fileMetadataFromHead(this, brainId, head))
     );
   }
 
