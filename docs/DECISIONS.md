@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-14 — Use a dedicated Brain runtime database role
+
+**Decision:** Use a no-login `brain_runtime` Postgres role as the server-side database access boundary for hosted Brain revision/source metadata traffic. Dedicated runtime login roles may inherit `brain_runtime`; browser/client roles (`anon`, `authenticated`, `public`) must not receive Brain schema access.
+
+**Why:** The hosted runtime needs transactional read/write access to private Brain tables while preserving the decision that Brain data is not exposed through Supabase client roles or the public Data API. A dedicated runtime role avoids routine use of the database owner/service-role connection for revision traffic and keeps the future ERS production cutover portable.
+
+**Alternatives rejected:** Continuing to use a privileged database owner connection for all hosted runtime queries; granting `anon`/`authenticated` table access before the end-user access model is designed; using `BYPASSRLS` for the runtime role; putting Brain tables into an exposed schema.
+
+**Related:** `db/migrations/2026-06-14_003_brain_runtime_role.sql`; `docs/security/hosted-brain-supabase-security-gate.md`; `docs/specs/003-hosted-brain-sync-architecture.md`.
+
+---
+
 ## 2026-06-14 — Treat Supabase security as a pre-ingestion gate
 
 **Decision:** Before continuing hosted Brain migration work with sensitive data, record and pass a Supabase security gate for the pilot project. The gate requires the `brain` schema to remain private, Brain tables to have RLS enabled with no public/client policies, the artifact bucket to remain private, security advisors to be free of active WARN/ERROR findings, and privileged credentials to stay out of chat, docs, commits, logs, and screenshots.
