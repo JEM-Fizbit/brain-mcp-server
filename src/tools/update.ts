@@ -4,8 +4,11 @@ import {
   autoSyncMessage,
   maybeAutoSync,
 } from "../services/auto-sync.js";
-import * as brain from "../services/brain.js";
 import * as git from "../services/git.js";
+import {
+  activeBrainStore,
+  revisionStoreModeEnabled,
+} from "../services/active-brain-store.js";
 import {
   assertWriteRole,
   authorIdentity,
@@ -21,18 +24,20 @@ export function registerUpdateTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertWriteRole(ctx);
-        const result = await brain.updateFile(
+        const result = await activeBrainStore().writeFile(
+          ctx.brainId,
           filename,
           content,
           mode,
-          old_content,
-          ctx.brainId
+          old_content
         );
-        const sync = await maybeAutoSync(
-          ctx.brainId,
-          autoSyncMessage("UPDATE", filename),
-          authorIdentity(ctx)
-        );
+        const sync = revisionStoreModeEnabled()
+          ? ""
+          : await maybeAutoSync(
+              ctx.brainId,
+              autoSyncMessage("UPDATE", filename),
+              authorIdentity(ctx)
+            );
         return { content: [{ type: "text", text: result + sync }] };
       } catch (error) {
         return {
@@ -51,12 +56,16 @@ export function registerUpdateTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertWriteRole(ctx);
-        const result = await git.commit(
-          message,
-          push,
-          ctx.brainId,
-          authorIdentity(ctx)
-        );
+        const result = revisionStoreModeEnabled()
+          ? (
+              await activeBrainStore().commit(
+                ctx.brainId,
+                message,
+                authorIdentity(ctx),
+                push
+              )
+            ).message
+          : await git.commit(message, push, ctx.brainId, authorIdentity(ctx));
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {

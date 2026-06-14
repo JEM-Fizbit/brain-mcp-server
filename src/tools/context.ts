@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LoadContextSchema, ReadFileSchema } from "../schemas/tools.js";
-import * as brain from "../services/brain.js";
+import {
+  activeBrainStore,
+  loadContextFromActiveStore,
+} from "../services/active-brain-store.js";
 import { resolveToolBrain } from "../services/request-context.js";
 
 export function registerContextTools(server: McpServer): void {
@@ -11,7 +14,7 @@ export function registerContextTools(server: McpServer): void {
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const content = await brain.loadContext(ctx.brainId);
+        const content = await loadContextFromActiveStore(ctx.brainId);
         return { content: [{ type: "text", text: content }] };
       } catch (error) {
         return {
@@ -29,7 +32,11 @@ export function registerContextTools(server: McpServer): void {
     async ({ brain_id, filename, scope }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const content = await brain.readFile(filename, scope, ctx.brainId);
+        const content = await activeBrainStore().readFile(
+          ctx.brainId,
+          filename,
+          scope
+        );
         return { content: [{ type: "text", text: content }] };
       } catch (error) {
         return {

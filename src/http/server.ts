@@ -1,4 +1,5 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
+import { performance } from "node:perf_hooks";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createBrainMcpServer } from "../mcp-server.js";
@@ -9,6 +10,10 @@ import { handleAuthorizeGet, handleGitHubCallback } from "../oauth/github.js";
 import { handleToken } from "../oauth/token.js";
 import { makeFileStateProvider, type StateProvider } from "../oauth/state.js";
 import { resolveAuth, wwwAuthenticateHeader } from "./mcp-auth.js";
+import {
+  assertHttpRuntimeConfig,
+  runtimeStatus,
+} from "../services/runtime-config.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -25,6 +30,22 @@ function log(level: string, message: string, extra?: unknown): void {
     ? `[${new Date().toISOString()}] ${level} ${message} ${JSON.stringify(extra)}`
     : `[${new Date().toISOString()}] ${level} ${message}`;
   (level === "ERROR" ? console.error : console.log)(line);
+}
+
+function logRequestTiming(
+  level: "INFO" | "ERROR",
+  message: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+  startedAt: number
+): void {
+  if (process.env.BRAIN_HTTP_TIMING_LOGS !== "1") return;
+  log(level, message, {
+    method: req.method,
+    path: new URL(req.url || "/", "http://127.0.0.1").pathname,
+    status: res.statusCode,
+    duration_ms: Number((performance.now() - startedAt).toFixed(3)),
+  });
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown, headers?: Record<string, string>): void {
@@ -83,8 +104,10 @@ async function handleMcp(
   res: ServerResponse,
   ctx: HttpContext
 ): Promise<void> {
+  const startedAt = performance.now();
   if (req.method !== "POST") {
     methodNotAllowed(res, "POST");
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
     return;
   }
 
@@ -100,6 +123,7 @@ async function handleMcp(
       },
       { "WWW-Authenticate": wwwAuthenticateHeader(ctx.config, auth.reason) }
     );
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
     return;
   }
   req.auth = auth.authInfo;
@@ -109,6 +133,7 @@ async function handleMcp(
     rawBody = await readRawBody(req, MAX_BODY_BYTES);
   } catch {
     sendText(res, 413, "body too large");
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
     return;
   }
 
@@ -121,6 +146,7 @@ async function handleMcp(
       id: null,
       error: { code: -32700, message: `parse error: ${error.message}` },
     });
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
     return;
   }
 
@@ -134,6 +160,7 @@ async function handleMcp(
   } finally {
     await transport.close().catch(() => undefined);
     await server.close().catch(() => undefined);
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
   }
 }
 
@@ -161,6 +188,7 @@ export async function handleHttpRequest(
           token_endpoint: ctx.config.tokenEndpoint,
           registration_endpoint: ctx.config.registrationEndpoint,
         },
+        runtime: runtimeStatus(),
       });
       return;
     }
@@ -239,6 +267,8 @@ export async function handleHttpRequest(
 }
 
 export async function startHttpServer(): Promise<void> {
+  assertHttpRuntimeConfig();
+
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
   const ctx: HttpContext = {

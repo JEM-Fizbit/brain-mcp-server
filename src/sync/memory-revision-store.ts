@@ -1,0 +1,234 @@
+import { contentHash } from "./hash.js";
+import type {
+  ChangePage,
+  ChangeRecord,
+  ConflictInput,
+  ConflictRecord,
+  FileHead,
+  RevisionContent,
+  RevisionProposal,
+  RevisionProposalResult,
+  RevisionStore,
+  SearchOptions,
+  SearchResult,
+} from "./types.js";
+
+function key(brainId: string, filename: string): string {
+  return `${brainId}\0${filename}`;
+}
+
+function headOf(revision: RevisionContent): FileHead {
+  return {
+    brainId: revision.brainId,
+    filename: revision.filename,
+    revisionId: revision.revisionId,
+    contentHash: revision.contentHash,
+    lineCount: revision.content.split("\n").length,
+    byteCount: Buffer.byteLength(revision.content, "utf-8"),
+    updatedAt: revision.updatedAt,
+    origin: revision.origin,
+    actor: revision.actor,
+    cursor: revision.cursor,
+  };
+}
+
+export interface MemoryRevisionStoreSnapshot {
+  heads: RevisionContent[];
+  revisions: RevisionContent[];
+  changes: ChangeRecord[];
+  conflicts: ConflictRecord[];
+  revisionSeq: number;
+  cursorSeq: number;
+  conflictSeq: number;
+}
+
+export class MemoryRevisionStore implements RevisionStore {
+  private heads = new Map<string, RevisionContent>();
+  private revisions = new Map<string, RevisionContent>();
+  private changes: ChangeRecord[] = [];
+  private conflicts: ConflictRecord[] = [];
+  private revisionSeq = 0;
+  private cursorSeq = 0;
+  private conflictSeq = 0;
+
+  constructor(snapshot?: MemoryRevisionStoreSnapshot) {
+    if (!snapshot) return;
+    this.heads = new Map(
+      snapshot.heads.map((head) => [key(head.brainId, head.filename), head])
+    );
+    this.revisions = new Map(
+      snapshot.revisions.map((revision) => [revision.revisionId, revision])
+    );
+    this.changes = [...snapshot.changes];
+    this.conflicts = [...snapshot.conflicts];
+    this.revisionSeq = snapshot.revisionSeq;
+    this.cursorSeq = snapshot.cursorSeq;
+    this.conflictSeq = snapshot.conflictSeq;
+  }
+
+  snapshot(): MemoryRevisionStoreSnapshot {
+    return {
+      heads: Array.from(this.heads.values()),
+      revisions: Array.from(this.revisions.values()),
+      changes: [...this.changes],
+      conflicts: [...this.conflicts],
+      revisionSeq: this.revisionSeq,
+      cursorSeq: this.cursorSeq,
+      conflictSeq: this.conflictSeq,
+    };
+  }
+
+  async getHead(brainId: string, filename: string): Promise<FileHead | null> {
+    const head = this.heads.get(key(brainId, filename));
+    return head ? headOf(head) : null;
+  }
+
+  async readFile(brainId: string, filename: string): Promise<RevisionContent> {
+    const head = this.heads.get(key(brainId, filename));
+    if (!head) {
+      throw new Error(`File not found in hosted revision store: ${filename}`);
+    }
+    return head;
+  }
+
+  async listFiles(brainId: string): Promise<FileHead[]> {
+    return Array.from(this.heads.values())
+      .filter((head) => head.brainId === brainId)
+      .map(headOf)
+      .sort((a, b) => a.filename.localeCompare(b.filename));
+  }
+
+  async searchFiles(
+    brainId: string,
+    query: string,
+    options: SearchOptions = {}
+  ): Promise<SearchResult[]> {
+    const lowerQuery = query.toLowerCase();
+    const maxResults = Math.max(1, Math.min(options.maxResults || 50, 500));
+    const results: SearchResult[] = [];
+
+    for (const head of Array.from(this.heads.values()).sort((a, b) =>
+      a.filename.localeCompare(b.filename)
+    )) {
+      if (head.brainId !== brainId) continue;
+      const lines = head.content.split("\n");
+      for (let index = 0; index < lines.length; index += 1) {
+        if (!lines[index].toLowerCase().includes(lowerQuery)) continue;
+        results.push({
+          filename: head.filename,
+          lineNumber: index + 1,
+          line: lines[index],
+        });
+        if (results.length >= maxResults) return results;
+      }
+    }
+
+    return results;
+  }
+
+  async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
+    const fileKey = key(input.brainId, input.filename);
+    const current = this.heads.get(fileKey) || null;
+    const nextHash = contentHash(input.content);
+
+    if (current && current.contentHash === nextHash) {
+      return {
+        ok: true,
+        status: "unchanged",
+        head: headOf(current),
+        revision: current,
+      };
+    }
+
+    if (
+      (current && input.baseRevisionId !== current.revisionId) ||
+      (!current && input.baseRevisionId !== null)
+    ) {
+      const conflict = await this.recordConflict({
+        brainId: input.brainId,
+        filename: input.filename,
+        localBaseRevisionId: input.baseRevisionId,
+        remoteHeadRevisionId: current?.revisionId || null,
+        localContentHash: nextHash,
+        remoteContentHash: current?.contentHash || null,
+        localOrigin: input.origin,
+        remoteOrigin: current?.origin,
+        localActor: input.actor,
+        remoteActor: current?.actor,
+      });
+      return {
+        ok: false,
+        status: "conflict",
+        conflict,
+        currentHead: current ? headOf(current) : null,
+      };
+    }
+
+    const revisionId = `rev_${++this.revisionSeq}`;
+    const cursor = String(++this.cursorSeq);
+    const updatedAt = new Date().toISOString();
+    const revision: RevisionContent = {
+      brainId: input.brainId,
+      filename: input.filename,
+      revisionId,
+      parentRevisionId: current?.revisionId || null,
+      contentHash: nextHash,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+      cursor,
+      content: input.content,
+    };
+    this.revisions.set(revisionId, revision);
+    this.heads.set(fileKey, revision);
+    this.changes.push({
+      cursor,
+      brainId: input.brainId,
+      filename: input.filename,
+      revisionId,
+      contentHash: nextHash,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+    });
+
+    return {
+      ok: true,
+      status: "accepted",
+      head: headOf(revision),
+      revision,
+    };
+  }
+
+  async listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {
+    const since = sinceCursor ? Number(sinceCursor) : 0;
+    const changes = this.changes.filter(
+      (change) => change.brainId === brainId && Number(change.cursor) > since
+    );
+    return {
+      changes,
+      nextCursor: changes.at(-1)?.cursor || sinceCursor || null,
+    };
+  }
+
+  async recordConflict(input: ConflictInput): Promise<ConflictRecord> {
+    const conflict: ConflictRecord = {
+      ...input,
+      conflictId: `conflict_${++this.conflictSeq}`,
+      createdAt: new Date().toISOString(),
+      status: "open",
+    };
+    this.conflicts.push(conflict);
+    return conflict;
+  }
+
+  async listConflicts(
+    brainId: string,
+    status?: "open" | "resolved" | "superseded"
+  ): Promise<ConflictRecord[]> {
+    return this.conflicts.filter(
+      (conflict) =>
+        conflict.brainId === brainId && (!status || conflict.status === status)
+    );
+  }
+}

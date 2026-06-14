@@ -8,10 +8,12 @@ import { registerIngestTools } from "./ingest.js";
 import { registerInboxTools } from "./inbox.js";
 import { registerRegistryTools } from "./registry.js";
 import { registerSemanticTools } from "./semantic.js";
+import { registerSyncTools } from "./sync.js";
 
 export function registerAllTools(server: McpServer): void {
   registerRegistryTools(server);
   registerSemanticTools(server);
+  registerSyncTools(server);
   registerContextTools(server);
   registerUpdateTools(server);
   registerStatusTools(server);

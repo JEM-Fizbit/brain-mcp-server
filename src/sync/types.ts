@@ -1,0 +1,153 @@
+export type RevisionOrigin = "local_agent" | "hosted_mcp" | "import" | "system";
+
+export interface RevisionActor {
+  provider: string;
+  id: string;
+  name?: string;
+  email?: string;
+}
+
+export interface FileHead {
+  brainId: string;
+  filename: string;
+  revisionId: string;
+  contentHash: string;
+  lineCount?: number;
+  byteCount?: number;
+  updatedAt: string;
+  origin: RevisionOrigin;
+  actor?: RevisionActor;
+  cursor: string;
+}
+
+export interface RevisionContent extends FileHead {
+  parentRevisionId: string | null;
+  content: string;
+}
+
+export interface RevisionProposal {
+  brainId: string;
+  filename: string;
+  baseRevisionId: string | null;
+  content: string;
+  origin: RevisionOrigin;
+  actor?: RevisionActor;
+}
+
+export interface ConflictInput {
+  brainId: string;
+  filename: string;
+  localBaseRevisionId: string | null;
+  remoteHeadRevisionId: string | null;
+  localContentHash: string;
+  remoteContentHash: string | null;
+  localOrigin: RevisionOrigin;
+  remoteOrigin?: RevisionOrigin;
+  localActor?: RevisionActor;
+  remoteActor?: RevisionActor;
+}
+
+export interface ConflictRecord extends ConflictInput {
+  conflictId: string;
+  createdAt: string;
+  status: "open" | "resolved" | "superseded";
+}
+
+export interface RevisionAccepted {
+  ok: true;
+  status: "accepted" | "unchanged";
+  head: FileHead;
+  revision: RevisionContent;
+}
+
+export interface RevisionConflict {
+  ok: false;
+  status: "conflict";
+  conflict: ConflictRecord;
+  currentHead: FileHead | null;
+}
+
+export type RevisionProposalResult = RevisionAccepted | RevisionConflict;
+
+export interface SearchOptions {
+  maxResults?: number;
+}
+
+export interface SearchResult {
+  filename: string;
+  lineNumber: number;
+  line: string;
+}
+
+export interface ChangeRecord {
+  cursor: string;
+  brainId: string;
+  filename: string;
+  revisionId: string;
+  contentHash: string;
+  updatedAt: string;
+  origin: RevisionOrigin;
+  actor?: RevisionActor;
+}
+
+export interface ChangePage {
+  changes: ChangeRecord[];
+  nextCursor: string | null;
+}
+
+export interface RevisionStore {
+  getHead(brainId: string, filename: string): Promise<FileHead | null>;
+  readFile(brainId: string, filename: string): Promise<RevisionContent>;
+  listFiles(brainId: string): Promise<FileHead[]>;
+  searchFiles(
+    brainId: string,
+    query: string,
+    options?: SearchOptions
+  ): Promise<SearchResult[]>;
+  proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult>;
+  listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage>;
+  recordConflict(input: ConflictInput): Promise<ConflictRecord>;
+  listConflicts(
+    brainId: string,
+    status?: "open" | "resolved" | "superseded"
+  ): Promise<ConflictRecord[]>;
+}
+
+export interface LocalFileSyncState {
+  revisionId: string | null;
+  contentHash: string | null;
+  localHash: string | null;
+}
+
+export interface LocalSyncState {
+  version: 1;
+  clientId: string;
+  cursor: string | null;
+  files: Record<string, LocalFileSyncState>;
+}
+
+export type SyncOperation = "push" | "pull" | "sync";
+export type SyncTimingPhase =
+  | "total"
+  | "state_read"
+  | "state_write"
+  | "local_scan"
+  | "local_read"
+  | "local_write"
+  | "revision_store_read"
+  | "revision_store_write"
+  | "revision_store_list";
+
+export interface SyncTiming {
+  operation: SyncOperation;
+  phase: SyncTimingPhase;
+  ms: number;
+}
+
+export interface LocalSyncReport {
+  pushed: string[];
+  pulled: string[];
+  unchanged: string[];
+  conflicts: ConflictRecord[];
+  timings: SyncTiming[];
+}
