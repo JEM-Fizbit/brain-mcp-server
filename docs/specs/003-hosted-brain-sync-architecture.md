@@ -255,6 +255,8 @@ Required baseline:
 - server-side runtime access uses the dedicated `brain_runtime` role or a login role inheriting it;
 - no public/client RLS policies are added until the hosted access model is explicitly designed;
 - `brain-artifacts` remains a private Storage bucket;
+- normal hosted runtime uses artifact metadata/extracted text only and does not require a Supabase service-role key;
+- artifact byte upload/download requires an explicit admin/ingestion mode until a narrower download authorization model is designed;
 - service role keys, database passwords, and privileged connection strings are stored only in secret managers;
 - Supabase advisors are rerun after migrations that touch schema, RLS, functions, Storage, or user data.
 

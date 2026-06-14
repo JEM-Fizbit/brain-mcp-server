@@ -40,7 +40,7 @@ This gate does not approve broad client-side access, public API access, or produ
 
 Supabase Storage tables may show grants for Supabase's standard `anon` and `authenticated` roles. That does not make Brain artifacts public by itself. Storage object access is still gated by Storage RLS policies and bucket privacy. For this pilot, no policies grant anonymous or authenticated users access to `brain-artifacts` objects.
 
-The service role, database owner, Supabase project owners, dedicated `brain_runtime` database logins, and privileged database connection strings can still access Brain data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk. Prefer a dedicated `brain_runtime` login for `BRAIN_REVISION_DATABASE_URL`; the Supabase service-role API key remains needed for private Storage artifact operations until a narrower artifact access model is designed.
+The service role, database owner, Supabase project owners, dedicated `brain_runtime` database logins, and privileged database connection strings can still access Brain data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk. Prefer a dedicated `brain_runtime` login for `BRAIN_REVISION_DATABASE_URL`. Normal hosted runtime source access is metadata/extracted-text only and does not require `BRAIN_SUPABASE_SERVICE_ROLE_KEY`; set `BRAIN_ARTIFACT_BYTE_ACCESS=admin` and provide the service key only for ingestion/admin byte operations.
 
 ## Required Handling Rules
 
@@ -51,7 +51,7 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - Do not grant `anon` or `authenticated` access to `brain` tables during ingestion or sync implementation.
 - Do not use the database owner or Supabase service-role database connection for routine hosted Brain revision traffic after a dedicated `brain_runtime` login is available.
 - Run Supabase security advisors after each migration that touches schemas, functions, RLS, Storage, or user data.
-- Source artifact byte uploads require `BRAIN_SUPABASE_SERVICE_ROLE_KEY` in a local/deployment secret. Do not paste it into chat or commit it to the repository.
+- Source artifact byte uploads require `BRAIN_ARTIFACT_BYTE_ACCESS=admin` plus `BRAIN_SUPABASE_SERVICE_ROLE_KEY` in a local/deployment secret. Do not paste it into chat or commit it to the repository.
 
 ## Before Production Cutover
 
@@ -59,7 +59,7 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - Re-run this gate against the ERS project and record the project ref.
 - Create an ERS-owned dedicated database login that inherits `brain_runtime`, and use it for `BRAIN_REVISION_DATABASE_URL`.
 - Define the end-user access model before adding RLS policies.
-- Decide the narrower artifact access model that can replace broad server-side service-role Storage access.
+- Decide the narrower artifact download model before exposing original bytes through hosted MCP.
 - Confirm backup, retention, audit, and artifact deletion requirements for ERS-owned data.
 
 ## Verification Queries

@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-14 — Keep artifact byte access out of the normal hosted runtime
+
+**Decision:** Normal hosted Brain runtime may use Supabase Storage as the artifact authority while running in `BRAIN_ARTIFACT_BYTE_ACCESS=metadata_only` mode, without a Supabase service-role key. Service-role-backed Storage byte access is restricted to explicit ingestion/admin operations with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`.
+
+**Why:** Hosted source tools currently expose Postgres manifests and extracted text, not original binary bytes. Requiring a broad Storage service key in the public hosted MCP runtime increases blast radius without providing runtime value. Separating metadata/search from byte upload/download lets the runtime use the narrower `brain_runtime` database login while keeping original artifact byte handling behind explicit operator/admin paths.
+
+**Alternatives rejected:** Requiring `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for every hosted runtime process; exposing signed URLs or raw artifact bytes before the download authorization model is designed; treating Supabase Storage object access as equivalent to Postgres metadata access.
+
+**Related:** `docs/security/hosted-brain-supabase-security-gate.md`; `docs/deploy-fly.md`; `src/services/runtime-config.ts`.
+
+---
+
 ## 2026-06-14 — Use a dedicated Brain runtime database role
 
 **Decision:** Use a no-login `brain_runtime` Postgres role as the server-side database access boundary for hosted Brain revision/source metadata traffic. Dedicated runtime login roles may inherit `brain_runtime`; browser/client roles (`anon`, `authenticated`, `public`) must not receive Brain schema access.
