@@ -12,20 +12,14 @@ primary_region = "sin"
   MCP_OAUTH_PUBLIC_BASE = "https://jem-brain-mcp.fly.dev"
   GITHUB_OAUTH_CALLBACK_PATH = "/authorize/github/callback"
   BRAIN_ID = "ai-brain-jem"
-  BRAIN_DIR = "/data/brains/ai-brain-jem/brain"
-  BRAIN_SOURCES_DIR = "/data/brains/ai-brain-jem/sources"
-  BRAIN_GITHUB_REPO = "JEM-Fizbit/ai-brain-jem"
   BRAIN_PLATFORM_CONFIG = "/data/config/registry.json"
   BRAIN_PLATFORM_STATE_ROOT = "/data/state"
-  BRAIN_AUTO_SYNC = "true"
-  BRAIN_AUTO_PUSH = "true"
+  BRAIN_REVISION_STORE = "postgres"
+  BRAIN_ARTIFACT_STORE = "supabase"
+  BRAIN_ARTIFACT_BYTE_ACCESS = "metadata_only"
+  BRAIN_SUPABASE_STORAGE_BUCKET = "brain-artifacts"
+  BRAIN_HTTP_TIMING_LOGS = "1"
   BRAIN_DATE_TIME_ZONE = "Asia/Ho_Chi_Minh"
-  GIT_COMMITTER_NAME = "Brain MCP Server"
-  GIT_COMMITTER_EMAIL = "brain-mcp-server@users.noreply.github.com"
-
-[[files]]
-  guest_path = "/run/secrets/brain_deploy_key"
-  secret_name = "BRAIN_DEPLOY_KEY"
 
 [http_service]
   internal_port = 8080

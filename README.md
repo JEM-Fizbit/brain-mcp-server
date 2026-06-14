@@ -71,12 +71,12 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 ## Hosted HTTP Deployment
 
-Remote-only clients need a public HTTPS MCP endpoint; `127.0.0.1` only works for clients running on the same laptop. The Phase 2 target is a Node runtime with a persistent filesystem volume for the Brain repo, OAuth state, and semantic index.
+Remote-only clients need a public HTTPS MCP endpoint; `127.0.0.1` only works for clients running on the same laptop. The current hosted rebuild targets a Node runtime that serves OAuth and MCP over HTTPS while storing Brain revisions in Supabase Postgres and source artifacts in private Supabase Storage. The local Markdown Brain remains the baseline and is mirrored through the sync contract rather than by a hosted git checkout.
 
 This repo includes:
 
-- `Dockerfile` for a git-capable Node runtime
-- `fly.toml` for the first Fly.io target, `jem-brain-mcp`
+- `Dockerfile` for the hosted Node runtime
+- `fly.toml` for the first Supabase-backed Fly.io target, `jem-brain-mcp`
 - [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
 
 Hosted endpoint shape:
