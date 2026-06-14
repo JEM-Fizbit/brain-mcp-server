@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const { activeBrainStore, activeStoreStatus } = await import(
+const { activeBrainStore, activeStoreStatus, warmActiveBrainStore } = await import(
   path.join(__dirname, "..", "dist", "services", "active-brain-store.js")
 );
 
@@ -72,6 +72,19 @@ test("activeBrainStore shares one Postgres pool across revision and source store
     async () => {
       const store = activeBrainStore();
       assert.equal(store.revisionStore.pool, store.sourceStore.pool);
+    }
+  );
+});
+
+test("warmActiveBrainStore is a no-op for filesystem mode", async () => {
+  await withEnv(
+    {
+      BRAIN_REVISION_STORE: undefined,
+      BRAIN_REVISION_DATABASE_URL: undefined,
+      BRAIN_EXPERIMENTAL_REVISION_STORE_FILE: undefined,
+    },
+    async () => {
+      await warmActiveBrainStore("ai-brain-jem");
     }
   );
 });

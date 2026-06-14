@@ -66,6 +66,18 @@ export function activeBrainStore(): BrainStore {
   return store;
 }
 
+export async function warmActiveBrainStore(
+  brainId = process.env.BRAIN_ID || "ai-brain-jem"
+): Promise<void> {
+  if (revisionStoreProvider() !== "postgres") return;
+  const store = activeBrainStore();
+  await Promise.all([
+    store.listFiles(brainId),
+    store.listSources(brainId),
+    store.syncStatus(brainId),
+  ]);
+}
+
 export async function loadContextFromActiveStore(brainId: string): Promise<string> {
   const store = activeBrainStore();
   const [loader, now] = await Promise.all([

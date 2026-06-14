@@ -403,6 +403,8 @@ Acceptance should be based on measured end-to-end user-visible loops, not only s
 
 The hosted HTTP runtime can emit coarse MCP request timings with `BRAIN_HTTP_TIMING_LOGS=1`. These logs include method, path, status, and duration only; they intentionally omit request bodies, authorization headers, database URLs, and Supabase keys.
 
+In HTTP mode, `BRAIN_HTTP_WARMUP` defaults to enabled. Startup warms the active hosted Brain store by listing files, sources, and sync status before accepting traffic. Set `BRAIN_HTTP_WARMUP=0` only when deliberately measuring or debugging cold-start behavior.
+
 The hosted runtime benchmark can be run from a local operator shell with Supabase secrets loaded:
 
 ```bash
@@ -410,6 +412,8 @@ npm run bench:http:postgres
 ```
 
 The benchmark calls read-only MCP tools repeatedly through the HTTP handler and reports duration summaries without printing Brain content or credentials. On 2026-06-14, after removing an N+1 read in hosted `brain_list_files`, the live pilot measured `brain_list_files` at ~239 ms median over five iterations, down from ~2.7 s median before the optimization. A follow-up shared the Postgres connection pool across revision and source metadata stores, bringing `brain_list_sources` p95 from ~1.6 s to ~249 ms. `brain_read_file` and Brain search were in the ~225-255 ms median range, while extracted source-text search measured ~453-492 ms median. The main remaining cold spike is first Postgres connection setup on the first read scenario.
+
+By default, the benchmark also runs one unmeasured warmup call per scenario. Set `BRAIN_HTTP_BENCH_WARMUP=0` when cold-start timings are the thing being measured. With benchmark warmup enabled on 2026-06-14, the live pilot measured Brain read/search/list operations at ~230-247 ms median and extracted source-text search at ~472 ms median over five iterations.
 
 ## Acceptance Tests
 
