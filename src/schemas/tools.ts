@@ -137,7 +137,13 @@ export const ReadLogSchema = BrainIdSchema.extend({
     .min(1)
     .max(100)
     .default(20)
-    .describe("Number of recent log entries to return. Default: 20."),
+    .describe("Number of log entries to return from the newest-first stream. Default: 20. Maximum: 100 per page."),
+  offset: z
+    .number()
+    .int()
+    .min(0)
+    .default(0)
+    .describe("Number of newest-first log entries to skip before returning results. Use with limit for pagination. Default: 0."),
 });
 
 const sourceCategoryEnum = z.enum([

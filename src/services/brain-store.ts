@@ -47,7 +47,7 @@ export interface BrainStore {
     filesTouched: string[],
     summary: string
   ): Promise<string>;
-  readLog(brainId: string, limit?: number): Promise<string>;
+  readLog(brainId: string, limit?: number, offset?: number): Promise<string>;
   commit(
     brainId: string,
     message: string,
@@ -110,8 +110,8 @@ export class FilesystemBrainStore implements BrainStore {
     return log.appendLog(opType, filesTouched, summary, brainId);
   }
 
-  readLog(brainId: string, limit?: number): Promise<string> {
-    return log.readLog(limit, brainId);
+  readLog(brainId: string, limit?: number, offset?: number): Promise<string> {
+    return log.readLog(limit, brainId, offset);
   }
 
   async commit(
