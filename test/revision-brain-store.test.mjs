@@ -71,6 +71,22 @@ function sourceStore(pathsByCategory) {
         }))
       );
     },
+    async searchArtifactText(_brainId, query, maxResults) {
+      const rows = [
+        {
+          sourceId: "assessment-1",
+          sourceLabel: "assessment.pdf",
+          artifactId: "assessment-1-artifact",
+          path: "assessments/profile.pdf",
+          textFormat: "plain_text",
+          lineNumber: 12,
+          line: "The profile mentions greenhouse governance and risk controls.",
+        },
+      ];
+      return rows
+        .filter((row) => row.line.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, maxResults);
+    },
   };
 }
 
@@ -104,6 +120,21 @@ test("RevisionBrainStore searches hosted source paths from metadata", async () =
   assert.equal(
     await store.searchFiles("ai-brain-jem", "headshot", "sources", 5),
     "sources:photos/headshot.jpg"
+  );
+});
+
+test("RevisionBrainStore searches hosted source extracted text before path metadata", async () => {
+  const store = new RevisionBrainStore(
+    new MemoryRevisionStore(),
+    sourceStore({
+      assessments: ["assessments/profile.pdf"],
+      photos: ["photos/headshot.jpg"],
+    })
+  );
+
+  assert.equal(
+    await store.searchFiles("ai-brain-jem", "greenhouse", "sources", 5),
+    "sources:assessments/profile.pdf:12: The profile mentions greenhouse governance and risk controls."
   );
 });
 

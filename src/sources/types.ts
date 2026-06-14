@@ -51,6 +51,16 @@ export interface SourceManifestRecord {
   paths: string[];
 }
 
+export interface SourceTextSearchResult {
+  sourceId: string;
+  sourceLabel: string;
+  artifactId: string;
+  path: string;
+  textFormat: "plain_text" | "markdown" | "ocr_text";
+  lineNumber: number;
+  line: string;
+}
+
 export interface RecordSourceArtifactInput {
   sourceId: string;
   artifactKind: SourceArtifactKind;
@@ -89,4 +99,9 @@ export interface SourceMetadataStore {
     brainId: string,
     category?: string
   ): Promise<SourceManifestRecord[]>;
+  searchArtifactText(
+    brainId: string,
+    query: string,
+    maxResults: number
+  ): Promise<SourceTextSearchResult[]>;
 }

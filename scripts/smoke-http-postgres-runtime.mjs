@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { Readable, Writable } from "node:stream";
+import pg from "pg";
 import { handleHttpRequest } from "../dist/http/server.js";
 import { issueAccessToken } from "../dist/oauth/jwt.js";
 import { assertHttpRuntimeConfig } from "../dist/services/runtime-config.js";
@@ -206,6 +207,7 @@ assert.notEqual(search, "No matches found.");
 
 const sources = await callTool("brain_list_sources", { brain_id: brainId });
 let sourceManifestChecked = false;
+let sourceTextSearchChecked = false;
 if (process.env.BRAIN_HTTP_SMOKE_EXPECT_SOURCES !== "0") {
   assert.match(sources, /All sources:/);
   const sourcePath = sources
@@ -222,6 +224,38 @@ if (process.env.BRAIN_HTTP_SMOKE_EXPECT_SOURCES !== "0") {
   assert.match(manifest, /# Source Manifest:/);
   assert.match(manifest, /metadata only/);
   sourceManifestChecked = true;
+
+  const pool = new pg.Pool({
+    connectionString: process.env.BRAIN_REVISION_DATABASE_URL,
+  });
+  try {
+    const textResult = await pool.query(
+      `
+        select t.content
+        from brain.source_artifact_text t
+        join brain.source_artifacts a on a.id = t.artifact_id
+        join brain.sources s on s.id = a.source_id
+        where s.brain_id = $1
+          and length(t.content) > 20
+        order by t.created_at desc
+        limit 1
+      `,
+      [brainId]
+    );
+    if (textResult.rows[0]) {
+      const sourceQuery = firstSearchableToken(textResult.rows[0].content);
+      const sourceSearch = await callTool("brain_search", {
+        brain_id: brainId,
+        query: sourceQuery,
+        scope: "sources",
+        max_results: 5,
+      });
+      assert.match(sourceSearch, /^sources:/m);
+      sourceTextSearchChecked = true;
+    }
+  } finally {
+    await pool.end();
+  }
 }
 
 let writeStatus = "skipped";
@@ -255,6 +289,7 @@ console.log(
       searchQuery: query,
       sourcesListed: !sources.includes("No source files found."),
       sourceManifestChecked,
+      sourceTextSearchChecked,
       write: writeStatus,
     },
     null,

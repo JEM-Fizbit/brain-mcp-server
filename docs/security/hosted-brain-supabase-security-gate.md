@@ -32,7 +32,8 @@ This gate does not approve broad client-side access, public API access, or produ
 - The real `ai-brain-jem` full Markdown seed completed for 49 Markdown files on 2026-06-14. A fresh hosted-to-local mirror verification matched all 49 files byte-for-byte and recorded zero conflicts.
 - Source/original artifact inventory completed for 70 local files on 2026-06-14. Postgres now records pointer-only artifact manifests with checksums, sizes, MIME guesses, local provenance paths, and `storage_upload_status=pending`; no binary bytes were uploaded in that step.
 - Source/original artifact upload completed for 70 local files on 2026-06-14. Supabase Storage now contains 70 private objects in `brain-artifacts`; Postgres manifests are `active`, have distinct Storage paths, and have no missing hashes.
-- Hosted source discovery is available through Postgres-backed source manifest listing and filename/path metadata search. Extracted-text/OCR source search has not yet been enabled.
+- Hosted source discovery is available through Postgres-backed source manifest listing, filename/path metadata search, and extracted-text search when `brain.source_artifact_text` rows exist. OCR/text extraction population remains an ingestion concern; original binary bytes are still not exposed through hosted source reads.
+- Source text extraction populated 49 `brain.source_artifact_text` rows on 2026-06-14 from supported local Markdown/plain/text-like and PDF artifacts. The extractor skipped 21 unsupported binaries, with zero missing files, empty extractions, or failures. Hosted MCP smoke verification confirmed `brain_search` can find extracted source text through the private Postgres-backed runtime without exposing Storage object bytes.
 
 ## Expected Supabase Surface
 

@@ -81,3 +81,49 @@ test("PostgresSourceMetadataStore lists source paths relative to sources root", 
   ]);
   assert.deepEqual(queries[0].values, ["ai-brain-jem", "photos"]);
 });
+
+test("PostgresSourceMetadataStore searches extracted source text with literal query matching", async () => {
+  const queries = [];
+  const store = new PostgresSourceMetadataStore({
+    async query(sql, values) {
+      queries.push({ sql, values });
+      return {
+        rows: [
+          {
+            source_id: "source-1",
+            source_label: "profile.pdf",
+            artifact_id: "artifact-1",
+            display_path: "sources/assessments/profile.pdf",
+            text_format: "plain_text",
+            content: [
+              "Opening paragraph",
+              "Risk score is 50%_complete for this profile.",
+              "Another risk line appears later.",
+            ].join("\n"),
+          },
+        ],
+      };
+    },
+  });
+
+  assert.deepEqual(
+    await store.searchArtifactText("ai-brain-jem", "50%_complete", 5),
+    [
+      {
+        sourceId: "source-1",
+        sourceLabel: "profile.pdf",
+        artifactId: "artifact-1",
+        path: "assessments/profile.pdf",
+        textFormat: "plain_text",
+        lineNumber: 2,
+        line: "Risk score is 50%_complete for this profile.",
+      },
+    ]
+  );
+  assert.ok(queries[0].sql.includes("and t.content ilike $2 escape '\\'"));
+  assert.deepEqual(queries[0].values, [
+    "ai-brain-jem",
+    "%50\\%\\_complete%",
+    20,
+  ]);
+});

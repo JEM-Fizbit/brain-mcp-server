@@ -172,6 +172,27 @@ export class RevisionBrainStore implements BrainStore {
       this.sourceStore &&
       (scope === "sources" || scope === "all")
     ) {
+      const textMatches = await this.sourceStore.searchArtifactText(
+        brainId,
+        query,
+        cap - lines.length
+      );
+      lines.push(
+        ...textMatches.map((result) => {
+          const rawLine =
+            result.line.length > SEARCH_LINE_CHAR_LIMIT
+              ? `${result.line.slice(0, SEARCH_LINE_CHAR_LIMIT)}...`
+              : result.line;
+          return `sources:${result.path}:${result.lineNumber}: ${rawLine}`;
+        })
+      );
+    }
+
+    if (
+      lines.length < cap &&
+      this.sourceStore &&
+      (scope === "sources" || scope === "all")
+    ) {
       const lowerQuery = query.toLowerCase();
       const paths = await this.sourceStore.listSourcePaths(brainId);
       for (const sourcePath of paths) {

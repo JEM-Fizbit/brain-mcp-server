@@ -8,6 +8,7 @@ import type {
   SourceManifestRecord,
   SourceMetadataStore,
   SourceRecord,
+  SourceTextSearchResult,
 } from "./types.js";
 import type {
   StoredArtifactRef,
@@ -68,6 +69,15 @@ interface SourceManifestRow extends SourceRow {
   artifact_created_at: Date | null;
 }
 
+interface SourceTextSearchRow {
+  source_id: string;
+  source_label: string;
+  artifact_id: string;
+  display_path: string | null;
+  text_format: SourceTextSearchResult["textFormat"];
+  content: string;
+}
+
 function sourceFromRow(row: SourceRow): SourceRecord {
   return {
     id: row.id,
@@ -107,6 +117,26 @@ function normalizeSourcePath(sourcePath: string): string {
   return sourcePath
     .replace(/^sources\//, "")
     .replace(/^brain\/working\//, "working/");
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function matchingLines(
+  content: string,
+  query: string,
+  maxResults: number
+): Array<{ lineNumber: number; line: string }> {
+  const lowerQuery = query.toLowerCase();
+  const results: Array<{ lineNumber: number; line: string }> = [];
+  const lines = content.split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (!line.toLowerCase().includes(lowerQuery)) continue;
+    results.push({ lineNumber: index + 1, line });
+    if (results.length >= maxResults) break;
+  }
+  return results;
 }
 
 export class PostgresSourceMetadataStore implements SourceMetadataStore {
@@ -356,5 +386,59 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
       manifest.paths = Array.from(new Set(manifest.paths)).sort();
     }
     return Array.from(manifests.values());
+  }
+
+  async searchArtifactText(
+    brainId: string,
+    query: string,
+    maxResults: number
+  ): Promise<SourceTextSearchResult[]> {
+    const trimmed = query.trim();
+    if (!trimmed || maxResults <= 0) return [];
+
+    const result = await this.pool.query<SourceTextSearchRow>(
+      `
+        select
+          s.id as source_id,
+          s.label as source_label,
+          a.id as artifact_id,
+          coalesce(
+            a.metadata->>'local_path',
+            a.external_id,
+            a.storage_path,
+            s.metadata->>'local_path',
+            s.label
+          ) as display_path,
+          t.text_format,
+          t.content
+        from brain.source_artifact_text t
+        join brain.source_artifacts a on a.id = t.artifact_id
+        join brain.sources s on s.id = a.source_id
+        where s.brain_id = $1
+          and t.content ilike $2 escape '\\'
+        order by s.category, s.label, t.created_at desc
+        limit $3
+      `,
+      [brainId, `%${escapeLikePattern(trimmed)}%`, Math.max(maxResults * 4, 8)]
+    );
+
+    const matches: SourceTextSearchResult[] = [];
+    for (const row of result.rows) {
+      const path = normalizeSourcePath(row.display_path || row.source_label);
+      const remaining = maxResults - matches.length;
+      for (const line of matchingLines(row.content, trimmed, remaining)) {
+        matches.push({
+          sourceId: row.source_id,
+          sourceLabel: row.source_label,
+          artifactId: row.artifact_id,
+          path,
+          textFormat: row.text_format,
+          lineNumber: line.lineNumber,
+          line: line.line,
+        });
+      }
+      if (matches.length >= maxResults) break;
+    }
+    return matches;
   }
 }

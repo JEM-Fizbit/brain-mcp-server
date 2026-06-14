@@ -20,6 +20,7 @@
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
     "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",
     "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
+    "sources:extract-text:postgres": "npm run build && node scripts/extract-source-text-postgres.mjs",
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "test": "npm run build && node --test"
