@@ -21,6 +21,8 @@ The hosted MCP server needs a public HTTPS endpoint, a Node runtime, and OAuth c
 
 Fly should not provide the live Brain working copy. The previous deployment used a persistent volume and git checkout as the hosted write path. That path is retired because it allowed hosted state and local Markdown state to drift. Git may return later only as async export/history after sync succeeds.
 
+The committed `fly.toml`, `Dockerfile`, and Fly entrypoint intentionally enforce this: no deploy key mount, no `BRAIN_AUTO_SYNC`, no `BRAIN_AUTO_PUSH`, and no SSH setup in the runtime image. Keep Supabase database URLs, OAuth secrets, and any service-role keys in Fly secrets, not in `fly.toml`.
+
 ## One-Time Setup
 
 Apply the Supabase migrations and security gate before deploying the hosted MCP runtime:
