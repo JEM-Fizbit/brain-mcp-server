@@ -15,7 +15,12 @@ import type {
   WriteMode,
 } from "./brain-store.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
-import type { ConflictRecord, FileHead, RevisionStore } from "../sync/types.js";
+import type {
+  ConflictRecord,
+  FileHead,
+  RevisionActor,
+  RevisionStore,
+} from "../sync/types.js";
 import type {
   SourceArtifactRecord,
   SourceManifestRecord,
@@ -227,7 +232,8 @@ export class RevisionBrainStore implements BrainStore {
     filename: string,
     content: string,
     mode: WriteMode,
-    oldContent?: string
+    oldContent?: string,
+    actor?: RevisionActor
   ): Promise<string> {
     validateFilename(filename);
     const current = await this.revisionStore.getHead(brainId, filename);
@@ -262,6 +268,7 @@ export class RevisionBrainStore implements BrainStore {
       baseRevisionId: current?.revisionId || null,
       content: nextContent,
       origin: "hosted_mcp",
+      actor,
     });
 
     if (!result.ok) {
@@ -277,10 +284,11 @@ export class RevisionBrainStore implements BrainStore {
     brainId: string,
     opType: LogOpType,
     filesTouched: string[],
-    summary: string
+    summary: string,
+    actor?: RevisionActor
   ): Promise<string> {
     const line = `${new Date().toISOString().slice(0, 10)} — ${opType} — ${filesTouched.join(", ")} — ${summary}`;
-    return this.writeFile(brainId, "LOG.md", `${line}\n`, "append");
+    return this.writeFile(brainId, "LOG.md", `${line}\n`, "append", undefined, actor);
   }
 
   async readLog(brainId: string, limit = 20): Promise<string> {

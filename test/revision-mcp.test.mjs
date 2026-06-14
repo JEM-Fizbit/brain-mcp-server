@@ -265,11 +265,36 @@ test("HTTP MCP update writes to revision store harness", async () => {
   const store = new FileRevisionStore(harness.storeFile);
   const hosted = await store.readFile("ai-brain-jem", "NOW.md");
   assert.equal(hosted.content, "Hosted update through MCP\n");
+  assert.deepEqual(hosted.actor, {
+    provider: "github",
+    id: "123",
+    name: "johnemilad",
+  });
 
   const readBack = await callTool(harness, "brain_read_file", {
     filename: "NOW.md",
   });
   assert.equal(readBack, "Hosted update through MCP\n");
+});
+
+test("HTTP MCP log writes through revision store with actor metadata", async () => {
+  const harness = await setupHarness("log-write");
+  const result = await callTool(harness, "brain_log", {
+    opType: "UPDATE",
+    filesTouched: ["NOW.md"],
+    summary: "Hosted log entry",
+  });
+  assert.match(result, /Updated LOG\.md:/);
+
+  const store = new FileRevisionStore(harness.storeFile);
+  const hosted = await store.readFile("ai-brain-jem", "LOG.md");
+  assert.match(hosted.content, /Hosted log entry/);
+  assert.equal(hosted.origin, "hosted_mcp");
+  assert.deepEqual(hosted.actor, {
+    provider: "github",
+    id: "123",
+    name: "johnemilad",
+  });
 });
 
 test("HTTP MCP list and search use revision store harness", async () => {

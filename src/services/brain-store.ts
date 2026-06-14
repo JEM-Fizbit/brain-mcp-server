@@ -1,5 +1,5 @@
 import type { SourceCategory, LogOpType } from "../constants.js";
-import type { ConflictRecord } from "../sync/types.js";
+import type { ConflictRecord, RevisionActor } from "../sync/types.js";
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
@@ -47,13 +47,15 @@ export interface BrainStore {
     filename: string,
     content: string,
     mode: WriteMode,
-    oldContent?: string
+    oldContent?: string,
+    actor?: RevisionActor
   ): Promise<string>;
   appendLog(
     brainId: string,
     opType: LogOpType,
     filesTouched: string[],
-    summary: string
+    summary: string,
+    actor?: RevisionActor
   ): Promise<string>;
   readLog(brainId: string, limit?: number, offset?: number): Promise<string>;
   commit(
@@ -109,7 +111,8 @@ export class FilesystemBrainStore implements BrainStore {
     filename: string,
     content: string,
     mode: WriteMode,
-    oldContent?: string
+    oldContent?: string,
+    _actor?: RevisionActor
   ): Promise<string> {
     return brain.updateFile(filename, content, mode, oldContent, brainId);
   }
@@ -118,7 +121,8 @@ export class FilesystemBrainStore implements BrainStore {
     brainId: string,
     opType: LogOpType,
     filesTouched: string[],
-    summary: string
+    summary: string,
+    _actor?: RevisionActor
   ): Promise<string> {
     return log.appendLog(opType, filesTouched, summary, brainId);
   }

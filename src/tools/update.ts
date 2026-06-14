@@ -12,6 +12,7 @@ import {
 import {
   assertWriteRole,
   authorIdentity,
+  revisionActor,
   resolveToolBrain,
 } from "../services/request-context.js";
 
@@ -29,7 +30,8 @@ export function registerUpdateTools(server: McpServer): void {
           filename,
           content,
           mode,
-          old_content
+          old_content,
+          revisionActor(ctx)
         );
         const sync = revisionStoreModeEnabled()
           ? ""
