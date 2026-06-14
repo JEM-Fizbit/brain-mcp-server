@@ -19,6 +19,13 @@ const hardeningPath = path.join(
   "migrations",
   "2026-06-14_002_harden_hosted_brain_advisors.sql"
 );
+const runtimeRolePath = path.join(
+  __dirname,
+  "..",
+  "db",
+  "migrations",
+  "2026-06-14_003_brain_runtime_role.sql"
+);
 const pilotSeedPath = path.join(
   __dirname,
   "..",
@@ -111,4 +118,53 @@ test("pilot seed bootstraps Brain registry without public grants", async () => {
   assert.doesNotMatch(executableSql, /\bgrant\b/i);
   assert.doesNotMatch(executableSql, /create policy/i);
   assert.doesNotMatch(executableSql, /alter table .* disable row level security/i);
+});
+
+test("runtime role migration grants server access without public client access", async () => {
+  const sql = await fs.readFile(runtimeRolePath, "utf-8");
+  const executableSql = sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+  const tables = [
+    "brains",
+    "principals",
+    "brain_roles",
+    "brain_files",
+    "brain_file_revisions",
+    "sync_clients",
+    "sync_file_states",
+    "sync_conflicts",
+    "sources",
+    "source_artifacts",
+    "source_artifact_text",
+    "source_chunks",
+    "ingest_jobs",
+    "sync_events",
+  ];
+
+  assert.match(sql, /create role brain_runtime nologin/i);
+  assert.match(sql, /grant usage on schema brain to brain_runtime/i);
+  assert.match(
+    sql,
+    /grant select, insert, update, delete on all tables in schema brain to brain_runtime/i
+  );
+  assert.match(sql, /alter default privileges in schema brain/i);
+  assert.doesNotMatch(executableSql, /create role brain_runtime\b[^;]*\blogin\b/i);
+  assert.doesNotMatch(executableSql, /\bbypassrls\b/i);
+  assert.doesNotMatch(executableSql, /grant .* on schema brain to public/i);
+  assert.doesNotMatch(executableSql, /grant .* on schema brain to anon/i);
+  assert.doesNotMatch(executableSql, /grant .* on schema brain to authenticated/i);
+  assert.match(executableSql, /revoke all on schema brain from public/i);
+  assert.match(executableSql, /revoke all on schema brain from anon/i);
+  assert.match(executableSql, /revoke all on schema brain from authenticated/i);
+  assert.match(sql, /policy_name := format\('brain_runtime_all_%s', brain_table_name\)/i);
+  assert.match(
+    sql,
+    /create policy .* on brain\.%I for all to brain_runtime using \(true\) with check \(true\)/i
+  );
+
+  for (const table of tables) {
+    assert.match(sql, new RegExp(`'${table}'`, "i"));
+  }
 });

@@ -17,7 +17,8 @@ This gate does not approve broad client-side access, public API access, or produ
 
 - The `brain` schema has no grants to `anon`, `authenticated`, or `public`.
 - All `brain.*` tables have Row Level Security enabled.
-- The `brain.*` tables intentionally have no RLS policies at this stage, so web/client roles have no row access.
+- The `brain.*` tables have server-side RLS policies only for the no-login `brain_runtime` database role; web/client roles still have no row access.
+- The `brain_runtime` role is a no-login group role for private MCP runtime database connections. Dedicated login roles may inherit it, but `anon`, `authenticated`, and `public` must not.
 - The `brain-artifacts` Storage bucket exists and is private.
 - Storage has no public policies granting object access.
 - The `public.rls_auto_enable()` helper no longer grants execute privileges to `public`, `anon`, or `authenticated`.
@@ -39,7 +40,7 @@ This gate does not approve broad client-side access, public API access, or produ
 
 Supabase Storage tables may show grants for Supabase's standard `anon` and `authenticated` roles. That does not make Brain artifacts public by itself. Storage object access is still gated by Storage RLS policies and bucket privacy. For this pilot, no policies grant anonymous or authenticated users access to `brain-artifacts` objects.
 
-The service role, database owner, Supabase project owners, and privileged database connection strings can still access all data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk.
+The service role, database owner, Supabase project owners, dedicated `brain_runtime` database logins, and privileged database connection strings can still access Brain data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk. Prefer a dedicated `brain_runtime` login for `BRAIN_REVISION_DATABASE_URL`; the Supabase service-role API key remains needed for private Storage artifact operations until a narrower artifact access model is designed.
 
 ## Required Handling Rules
 
@@ -48,6 +49,7 @@ The service role, database owner, Supabase project owners, and privileged databa
 - Do not use `NEXT_PUBLIC_` or any other browser-exposed environment variable for service role keys or privileged database URLs.
 - Do not add `brain` to exposed API schemas unless a separate API/RLS design has been approved.
 - Do not grant `anon` or `authenticated` access to `brain` tables during ingestion or sync implementation.
+- Do not use the database owner or Supabase service-role database connection for routine hosted Brain revision traffic after a dedicated `brain_runtime` login is available.
 - Run Supabase security advisors after each migration that touches schemas, functions, RLS, Storage, or user data.
 - Source artifact byte uploads require `BRAIN_SUPABASE_SERVICE_ROLE_KEY` in a local/deployment secret. Do not paste it into chat or commit it to the repository.
 
@@ -55,8 +57,9 @@ The service role, database owner, Supabase project owners, and privileged databa
 
 - Move from the private pilot organization to an ERS-owned Supabase account/project.
 - Re-run this gate against the ERS project and record the project ref.
-- Decide whether hosted Brain runtime should use the service role key or a narrower database role.
+- Create an ERS-owned dedicated database login that inherits `brain_runtime`, and use it for `BRAIN_REVISION_DATABASE_URL`.
 - Define the end-user access model before adding RLS policies.
+- Decide the narrower artifact access model that can replace broad server-side service-role Storage access.
 - Confirm backup, retention, audit, and artifact deletion requirements for ERS-owned data.
 
 ## Verification Queries
@@ -89,6 +92,18 @@ select schemaname, tablename, policyname, roles, cmd
 from pg_policies
 where schemaname in ('brain', 'storage')
 order by schemaname, tablename, policyname;
+```
+
+```sql
+select rolname, rolcanlogin, rolbypassrls
+from pg_roles
+where rolname = 'brain_runtime';
+```
+
+After applying the runtime role migration, this smoke creates a temporary login role, grants it `brain_runtime`, verifies it can read Brain metadata through RLS, verifies public/client grants remain zero, and drops the temporary role:
+
+```bash
+npm run smoke:brain-runtime-role
 ```
 
 ```sql

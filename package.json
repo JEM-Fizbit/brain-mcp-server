@@ -24,6 +24,7 @@
     "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
     "sources:extract-text:postgres": "npm run build && node scripts/extract-source-text-postgres.mjs",
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
+    "smoke:brain-runtime-role": "node scripts/smoke-brain-runtime-role.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "test": "npm run build && node --test"
   },
