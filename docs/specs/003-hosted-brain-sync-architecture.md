@@ -399,6 +399,8 @@ Every hosted MCP request and sync cycle should record separate timings:
 
 Acceptance should be based on measured end-to-end user-visible loops, not only server internals.
 
+The hosted HTTP runtime can emit coarse MCP request timings with `BRAIN_HTTP_TIMING_LOGS=1`. These logs include method, path, status, and duration only; they intentionally omit request bodies, authorization headers, database URLs, and Supabase keys.
+
 ## Acceptance Tests
 
 Before hosted becomes recommended/default again:

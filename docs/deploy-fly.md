@@ -62,6 +62,7 @@ fly secrets set \
   BRAIN_SUPABASE_URL="https://<project-ref>.supabase.co" \
   BRAIN_SUPABASE_SERVICE_ROLE_KEY="<server-side-secret-key>" \
   BRAIN_SUPABASE_STORAGE_BUCKET="brain-artifacts" \
+  BRAIN_HTTP_TIMING_LOGS="1" \
   --app jem-brain-mcp
 ```
 
@@ -123,3 +124,4 @@ After any deployment that changes schema, RLS, functions, Storage, or user-data 
 - Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted.
 - Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.
 - Store Supabase database URLs and service keys only in deployment secrets or a password manager. They must not appear in docs, commits, logs, screenshots, or client-side environment variables.
+- `BRAIN_HTTP_TIMING_LOGS=1` enables coarse MCP request timing logs with method, path, status, and duration only; request bodies and authorization headers are not logged.

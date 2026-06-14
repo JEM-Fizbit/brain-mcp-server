@@ -200,3 +200,33 @@ test("unauthenticated mcp request returns bearer challenge", async () => {
     /resource_metadata="http:\/\/127\.0\.0\.1\/\.well-known\/oauth-protected-resource\/mcp"/
   );
 });
+
+test("mcp timing logs omit request payloads when enabled", async () => {
+  const messages = [];
+  const oldLog = console.log;
+  console.log = (...args) => {
+    messages.push(args.join(" "));
+  };
+  try {
+    await withEnv({ BRAIN_HTTP_TIMING_LOGS: "1" }, async () => {
+      const res = new FakeResponse();
+      await handleHttpRequest(
+        {
+          method: "POST",
+          url: "/mcp",
+          headers: {},
+        },
+        res,
+        ctx
+      );
+
+      assert.equal(res.status, 401);
+      assert.equal(messages.length, 1);
+      assert.match(messages[0], /mcp request completed/);
+      assert.match(messages[0], /duration_ms/);
+      assert.doesNotMatch(messages[0], /authorization|Bearer|jsonrpc|params/);
+    });
+  } finally {
+    console.log = oldLog;
+  }
+});
