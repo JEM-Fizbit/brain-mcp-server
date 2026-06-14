@@ -70,6 +70,8 @@ Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for t
 
 The current pilot Supabase project is John's private-org project `brain-platform-pilot` (`omnwbcdtmtvxasgdmvwr`). ERS production must use an ERS-owned Supabase project with the same migrations and environment contract.
 
+For local operator scripts, copy `.env.local.example` to `.env.local` and fill the secret values once. The Postgres/Supabase smoke, seed, verify, inventory, and upload scripts load `.env.local` automatically; deployment still uses the hosting secret manager.
+
 ## Deploy
 
 ```bash

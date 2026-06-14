@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import pg from "pg";
 import { RevisionBrainStore } from "../dist/services/revision-brain-store.js";
 import { PostgresRevisionStore } from "../dist/sync/index.js";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 

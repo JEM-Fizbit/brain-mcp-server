@@ -3,6 +3,9 @@ import { Readable, Writable } from "node:stream";
 import { handleHttpRequest } from "../dist/http/server.js";
 import { issueAccessToken } from "../dist/oauth/jwt.js";
 import { assertHttpRuntimeConfig } from "../dist/services/runtime-config.js";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+loadLocalEnv();
 
 process.env.TRANSPORT = "http";
 process.env.BRAIN_REVISION_STORE = "postgres";

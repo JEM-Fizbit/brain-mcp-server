@@ -4,6 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import pg from "pg";
 import { LocalSyncAgent, PostgresRevisionStore } from "../dist/sync/index.js";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 

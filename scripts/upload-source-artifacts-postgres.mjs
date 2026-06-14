@@ -2,6 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
 import { SupabaseArtifactStore } from "../dist/artifacts/index.js";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const supabaseUrl = process.env.BRAIN_SUPABASE_URL || "https://omnwbcdtmtvxasgdmvwr.supabase.co";
