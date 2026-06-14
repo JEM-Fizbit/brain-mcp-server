@@ -25,6 +25,7 @@ function dirs(name) {
   return {
     brainDir: path.join(root, "brain"),
     stateFile: path.join(root, ".brain-sync", "state.json"),
+    lockFile: path.join(root, ".brain-sync", "state.json.lock"),
     storeFile: path.join(root, "hosted", "revision-store.json"),
   };
 }
@@ -46,6 +47,7 @@ async function runCli(command, config) {
       BRAIN_ID: "ai-brain-jem",
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_LOCK_FILE: config.lockFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -61,6 +63,7 @@ async function runCliWithEnv(command, config, env) {
       BRAIN_ID: "ai-brain-jem",
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_LOCK_FILE: config.lockFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -68,6 +71,22 @@ async function runCliWithEnv(command, config, env) {
     },
   });
   return JSON.parse(stdout);
+}
+
+function envWithoutSyncConfig() {
+  const env = { ...process.env };
+  for (const key of [
+    "BRAIN_ID",
+    "BRAIN_DIR",
+    "BRAIN_SYNC_STATE_FILE",
+    "BRAIN_SYNC_LOCK_FILE",
+    "BRAIN_SYNC_STORE_FILE",
+    "BRAIN_REVISION_STORE",
+    "BRAIN_REVISION_DATABASE_URL",
+  ]) {
+    delete env[key];
+  }
+  return env;
 }
 
 async function accept(result) {
@@ -138,6 +157,36 @@ test("sync CLI status reports state, hosted files, and open conflicts", async ()
   assert.equal(output.openConflicts[0].filename, "NOW.md");
 });
 
+test("sync CLI loads local env files before reading config", async () => {
+  const config = dirs("local-env");
+  const cwd = path.dirname(config.brainDir);
+  await fs.mkdir(cwd, { recursive: true });
+  await fs.writeFile(
+    path.join(cwd, ".env.local"),
+    [
+      "BRAIN_ID=ai-brain-jem",
+      `BRAIN_DIR=${config.brainDir}`,
+      `BRAIN_SYNC_STATE_FILE=${config.stateFile}`,
+      `BRAIN_SYNC_LOCK_FILE=${config.lockFile}`,
+      `BRAIN_SYNC_STORE_FILE=${config.storeFile}`,
+      "BRAIN_REVISION_STORE=file",
+      "",
+    ].join("\n"),
+    "utf-8"
+  );
+
+  const { stdout } = await exec(process.execPath, [cliPath, "status"], {
+    cwd,
+    env: envWithoutSyncConfig(),
+  });
+  const output = JSON.parse(stdout);
+
+  assert.equal(output.command, "status");
+  assert.equal(output.config.brainDir, config.brainDir);
+  assert.equal(output.config.lockFile, config.lockFile);
+  assert.equal(output.config.revisionStore, "file");
+});
+
 test("sync CLI reports missing Postgres database URL when provider is postgres", async () => {
   const config = dirs("postgres-missing-url");
 
@@ -148,6 +197,7 @@ test("sync CLI reports missing Postgres database URL when provider is postgres",
         BRAIN_ID: "ai-brain-jem",
         BRAIN_DIR: config.brainDir,
         BRAIN_SYNC_STATE_FILE: config.stateFile,
+        BRAIN_SYNC_LOCK_FILE: config.lockFile,
         BRAIN_SYNC_STORE_FILE: config.storeFile,
         BRAIN_REVISION_STORE: "postgres",
         BRAIN_REVISION_DATABASE_URL: "",
@@ -186,6 +236,7 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
       BRAIN_ID: "ai-brain-jem",
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_LOCK_FILE: config.lockFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -206,4 +257,28 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
   assert.deepEqual(outputs[0].report.pushed, ["NOW.md"]);
   assert.equal(outputs[1].cycle, 2);
   assert.equal(outputs[1].report.conflicts.length, 0);
+});
+
+test("sync CLI fails fast when another sync lock exists", async () => {
+  const config = dirs("lock-exists");
+  await writeBrainFile(config.brainDir, "NOW.md", "Locked run\n");
+  await fs.mkdir(path.dirname(config.lockFile), { recursive: true });
+  await fs.writeFile(config.lockFile, "existing lock\n", "utf-8");
+
+  await assert.rejects(
+    exec(process.execPath, [cliPath, "push"], {
+      env: {
+        ...process.env,
+        BRAIN_ID: "ai-brain-jem",
+        BRAIN_DIR: config.brainDir,
+        BRAIN_SYNC_STATE_FILE: config.stateFile,
+        BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_STORE_FILE: config.storeFile,
+        BRAIN_REVISION_STORE: "file",
+        BRAIN_REVISION_DATABASE_URL: "",
+      },
+    }),
+    /Brain sync is already running/
+  );
+  assert.equal(await fs.readFile(config.lockFile, "utf-8"), "existing lock\n");
 });

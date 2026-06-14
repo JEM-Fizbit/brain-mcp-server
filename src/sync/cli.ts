@@ -1,4 +1,6 @@
 import path from "node:path";
+import fsSync from "node:fs";
+import fs from "node:fs/promises";
 import { BRAIN_DIR } from "../constants.js";
 import { FileRevisionStore } from "./file-revision-store.js";
 import { LocalSyncAgent } from "./local-sync-agent.js";
@@ -12,6 +14,7 @@ interface SyncCliConfig {
   brainId: string;
   brainDir: string;
   stateFile: string;
+  lockFile: string;
   storeFile: string;
   revisionStore: RevisionStoreProvider;
   databaseUrl?: string;
@@ -25,6 +28,37 @@ interface StoreHandle {
   close(): Promise<void>;
 }
 
+function parseEnvLine(line: string): [string, string] | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) return null;
+  const equals = trimmed.indexOf("=");
+  if (equals === -1) return null;
+  const key = trimmed.slice(0, equals).trim();
+  let value = trimmed.slice(equals + 1).trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return null;
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+  return [key, value];
+}
+
+function loadLocalEnv(rootDir = process.cwd()): void {
+  for (const filename of [".env.local", ".env"]) {
+    const envPath = path.join(rootDir, filename);
+    if (!fsSync.existsSync(envPath)) continue;
+    const raw = fsSync.readFileSync(envPath, "utf-8");
+    for (const line of raw.split(/\r?\n/)) {
+      const parsed = parseEnvLine(line);
+      if (!parsed) continue;
+      const [key, value] = parsed;
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+  }
+}
+
 function usage(): string {
   return [
     "Usage: node dist/sync/cli.js <push|pull|once|status|watch>",
@@ -33,6 +67,7 @@ function usage(): string {
     "  BRAIN_ID                  Brain id (default: ai-brain-jem)",
     "  BRAIN_DIR                 Local Markdown Brain directory",
     "  BRAIN_SYNC_STATE_FILE     Local sync metadata JSON path",
+    "  BRAIN_SYNC_LOCK_FILE      Local sync lock path",
     "  BRAIN_SYNC_STORE_FILE     File-backed hosted revision store path",
     "  BRAIN_SYNC_INCLUDE_FILES  Optional comma-separated .md file list",
     "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
@@ -51,6 +86,10 @@ function defaultStoreFile(brainDir: string): string {
   return path.resolve(brainDir, "..", ".brain-sync", "hosted-revisions.json");
 }
 
+function defaultLockFile(stateFile: string): string {
+  return `${stateFile}.lock`;
+}
+
 function readConfig(): SyncCliConfig {
   const revisionStore =
     process.env.BRAIN_REVISION_STORE === "postgres" ? "postgres" : "file";
@@ -64,6 +103,12 @@ function readConfig(): SyncCliConfig {
     stateFile:
       process.env.BRAIN_SYNC_STATE_FILE ||
       defaultStateFile(process.env.BRAIN_DIR || BRAIN_DIR),
+    lockFile:
+      process.env.BRAIN_SYNC_LOCK_FILE ||
+      defaultLockFile(
+        process.env.BRAIN_SYNC_STATE_FILE ||
+          defaultStateFile(process.env.BRAIN_DIR || BRAIN_DIR)
+      ),
     storeFile:
       process.env.BRAIN_SYNC_STORE_FILE ||
       defaultStoreFile(process.env.BRAIN_DIR || BRAIN_DIR),
@@ -121,8 +166,50 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withLock<T>(
+  lockFile: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  await fs.mkdir(path.dirname(lockFile), { recursive: true });
+  try {
+    const handle = await fs.open(lockFile, "wx");
+    await handle.writeFile(
+      JSON.stringify(
+        {
+          pid: process.pid,
+          startedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      ) + "\n",
+      "utf-8"
+    );
+    await handle.close();
+  } catch (error: any) {
+    if (error?.code === "EEXIST") {
+      throw new Error(
+        `Brain sync is already running or a stale lock exists: ${lockFile}`
+      );
+    }
+    throw error;
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await fs.rm(lockFile, { force: true }).catch(() => undefined);
+  }
+}
+
 async function run(command: SyncCommand): Promise<void> {
   const config = readConfig();
+  await withLock(config.lockFile, () => runWithConfig(command, config));
+}
+
+async function runWithConfig(
+  command: SyncCommand,
+  config: SyncCliConfig
+): Promise<void> {
   const storeHandle = createStore(config);
   const store = storeHandle.store;
   const agent = new LocalSyncAgent({
@@ -211,6 +298,7 @@ async function run(command: SyncCommand): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  loadLocalEnv();
   const command = process.argv[2] as SyncCommand | undefined;
   if (!command || !["push", "pull", "once", "status", "watch"].includes(command)) {
     process.stderr.write(`${usage()}\n`);
