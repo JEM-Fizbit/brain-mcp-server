@@ -416,6 +416,21 @@ Before hosted becomes recommended/default again:
 9. **Surface parity plan:** Claude, ChatGPT/OpenAI, Codex, desktop, web, mobile, local-filesystem, and remote-only clients are covered in the test matrix.
 10. **ERS path accounted for:** SharePoint/OneDrive behavior is either tested or explicitly deferred behind a named adapter with risks.
 
+Current coverage in this branch:
+
+| Acceptance item | Status | Evidence |
+| --- | --- | --- |
+| Local baseline still works | Covered by existing filesystem tests | Existing Brain filesystem, lint, log, ingest-planning, and git tests continue to pass. |
+| Hosted to local | Covered in harness | `LocalSyncAgent` and HTTP MCP tests pull hosted revisions into a fresh Markdown tree. |
+| Local to hosted | Covered in harness and pilot | Sync agent pushes local Markdown to file/Postgres revision stores; pilot seeded 49 Markdown files into Supabase Postgres. |
+| Dirty local block | Covered in harness | Dirty local Markdown creates an explicit conflict instead of being overwritten. |
+| Dirty hosted block | Covered in harness | Stale local writes create conflict records instead of overwriting newer hosted heads. |
+| No git hot path | Covered in harness | Revision-store read/write/sync tests pass without git; hosted runtime disables git hot path in health/status. |
+| Git export recovery | Deferred | Git export is intentionally not in the hot path yet. |
+| Latency budget | Partial | Sync phase timings are recorded; optional hosted HTTP MCP timing logs are available with `BRAIN_HTTP_TIMING_LOGS=1`. |
+| Surface parity plan | Partial | HTTP MCP smoke covers authenticated remote tool calls; Claude/Codex connector re-enablement remains controlled follow-up. |
+| ERS path accounted for | Partial | Supabase project portability and SharePoint/OneDrive risks are documented; direct ERS adapter is not implemented. |
+
 ## Implementation Sequence
 
 1. Add pure sync-domain types and tests: revisions, heads, hashes, conflicts, cursors.
