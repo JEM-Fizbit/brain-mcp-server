@@ -136,7 +136,7 @@ export async function saveSource(
 }
 
 /**
- * Record a completed ingest: append to LOG.md and SOURCES.md index.
+ * Record a completed ingest: update LOG.md and SOURCES.md index.
  * Supports dual-format storage (original + markdown).
  */
 export async function recordIngest(
@@ -147,7 +147,7 @@ export async function recordIngest(
   originalFile?: string,
   brainId?: string
 ): Promise<string> {
-  // Append to LOG.md
+  // Record in LOG.md
   await log.appendLog(
     "INGEST",
     filesTouched,
