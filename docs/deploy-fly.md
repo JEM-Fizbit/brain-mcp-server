@@ -1,5 +1,7 @@
 # Fly Deployment
 
+> Pilot status: this deployment is experimental while the hosted sync architecture is under review. Do not treat it as the primary Brain connector or the recommended write path. The local stdio `brain` MCP remains the baseline/default until hosted passes the local-first parity contract in `docs/specs/002-local-first-hosted-sync-contract.md`.
+
 This is the Phase 2 hosted target for a single `ai-brain-jem` Brain. It gives remote MCP clients a public HTTPS URL while keeping the Brain repo, OAuth state, and semantic indexes on a persistent Fly volume.
 
 ## Shape
