@@ -291,6 +291,47 @@ test("HTTP MCP source list stays empty for file revision harness without source 
   assert.equal(sources, "No source files found.");
 });
 
+test("HTTP MCP exposes hosted sync status and conflict listing", async () => {
+  const harness = await setupHarness("sync-status");
+
+  const status = await callTool(harness, "brain_sync_status");
+  assert.match(status, /Brain: ai-brain-jem/);
+  assert.match(status, /Provider: revision/);
+  assert.match(status, /Hosted files: 2/);
+  assert.match(status, /Open conflicts: 0/);
+
+  const emptyConflicts = await callTool(harness, "brain_list_conflicts");
+  assert.equal(emptyConflicts, "No open sync conflicts for ai-brain-jem.");
+
+  const store = new FileRevisionStore(harness.storeFile);
+  const staleHead = await store.getHead("ai-brain-jem", "NOW.md");
+  assert.ok(staleHead);
+  await store.proposeRevision({
+    brainId: "ai-brain-jem",
+    filename: "NOW.md",
+    baseRevisionId: staleHead.revisionId,
+    content: "Remote advance\n",
+    origin: "hosted_mcp",
+  });
+  const staleResult = await store.proposeRevision({
+    brainId: "ai-brain-jem",
+    filename: "NOW.md",
+    baseRevisionId: staleHead.revisionId,
+    content: "Stale local edit\n",
+    origin: "local_agent",
+  });
+  assert.equal(staleResult.ok, false);
+
+  const conflictStatus = await callTool(harness, "brain_sync_status");
+  assert.match(conflictStatus, /Open conflicts: 1/);
+
+  const conflicts = await callTool(harness, "brain_list_conflicts");
+  assert.match(conflicts, /Sync conflicts for ai-brain-jem \(open\):/);
+  assert.match(conflicts, /NOW\.md/);
+  assert.match(conflicts, /local: local_agent/);
+  assert.match(conflicts, /remote: hosted_mcp/);
+});
+
 test("HTTP MCP and local sync agent complete hosted-local-hosted loop", async () => {
   const harness = await setupHarness("full-loop");
   const agent = new LocalSyncAgent({

@@ -97,6 +97,8 @@ Expected first authenticated tool checks:
 - `brain_describe` with `brain_id=ai-brain-jem`
 - `brain_load_context`
 - `brain_list_files` should show hosted Markdown files from Postgres.
+- `brain_sync_status` should report `Provider: revision` and the current open conflict count.
+- `brain_list_conflicts` should show open sync conflicts or report none.
 - `brain_search` should search hosted Markdown revisions from Postgres.
 - `brain_list_sources` should show source manifests from Postgres.
 - A small hosted write should create a Postgres revision without invoking git.

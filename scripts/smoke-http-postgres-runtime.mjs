@@ -181,6 +181,14 @@ const files = await callTool("brain_list_files", { brain_id: brainId });
 assert.match(files, /Revision store: Postgres/);
 assert.match(files, /00_loader\.md/);
 
+const syncStatus = await callTool("brain_sync_status", { brain_id: brainId });
+assert.match(syncStatus, /Provider: revision/);
+assert.match(syncStatus, /Hosted files: \d+/);
+assert.match(syncStatus, /Open conflicts: \d+/);
+
+const conflicts = await callTool("brain_list_conflicts", { brain_id: brainId });
+assert.match(conflicts, /sync conflicts/i);
+
 const loader = await callTool("brain_read_file", {
   brain_id: brainId,
   filename: "00_loader.md",
@@ -225,6 +233,7 @@ console.log(
       brainId,
       runtime: healthBody.runtime,
       filesListed: true,
+      syncStatusChecked: true,
       searchQuery: query,
       sourcesListed: !sources.includes("No source files found."),
       write: writeStatus,

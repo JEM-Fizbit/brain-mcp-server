@@ -204,7 +204,7 @@ Likely new tools for hosted/control surfaces:
 - `brain_list_conflicts`
 - `brain_resolve_conflict`
 
-These should not be added until the underlying sync state exists. The local stdio path does not need to expose hosted sync tools as its primary workflow.
+`brain_sync_status` and `brain_list_conflicts` are implemented once revision-store sync state exists. `brain_resolve_conflict` remains deferred until the resolution flow can write or acknowledge a reviewed merged Markdown revision without hiding unresolved content. The local stdio path does not need hosted sync tools as its primary workflow, but the tools may report that filesystem-only mode has no hosted sync state.
 
 ## Storage Provider Decision
 

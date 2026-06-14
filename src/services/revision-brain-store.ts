@@ -11,10 +11,11 @@ import type {
   FileMetadata,
   ReadScope,
   SearchScope,
+  SyncStatus,
   WriteMode,
 } from "./brain-store.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
-import type { RevisionStore } from "../sync/types.js";
+import type { ConflictRecord, RevisionStore } from "../sync/types.js";
 import type { SourceMetadataStore } from "../sources/types.js";
 
 function validateFilename(filename: string): void {
@@ -215,6 +216,32 @@ export class RevisionBrainStore implements BrainStore {
       message:
         "Revision store harness does not commit to git; git export is intentionally out of the hot path.",
     };
+  }
+
+  async syncStatus(brainId: string): Promise<SyncStatus> {
+    const [files, openConflicts] = await Promise.all([
+      this.revisionStore.listFiles(brainId),
+      this.revisionStore.listConflicts(brainId, "open"),
+    ]);
+    const latestCursor =
+      files
+        .map((file) => file.cursor)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || null;
+    return {
+      provider: "revision",
+      hostedFiles: files.length,
+      openConflicts: openConflicts.length,
+      latestCursor,
+    };
+  }
+
+  listConflicts(
+    brainId: string,
+    status?: "open" | "resolved" | "superseded"
+  ): Promise<ConflictRecord[]> {
+    return this.revisionStore.listConflicts(brainId, status);
   }
 }
 

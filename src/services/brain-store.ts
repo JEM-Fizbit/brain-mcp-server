@@ -1,4 +1,5 @@
 import type { SourceCategory, LogOpType } from "../constants.js";
+import type { ConflictRecord } from "../sync/types.js";
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
@@ -21,6 +22,13 @@ export interface SearchResult {
 
 export interface CommitResult {
   message: string;
+}
+
+export interface SyncStatus {
+  provider: "filesystem" | "revision";
+  hostedFiles: number;
+  openConflicts: number;
+  latestCursor: string | null;
 }
 
 export interface BrainStore {
@@ -54,6 +62,11 @@ export interface BrainStore {
     authorIdentity?: string,
     push?: boolean
   ): Promise<CommitResult>;
+  syncStatus(brainId: string): Promise<SyncStatus>;
+  listConflicts(
+    brainId: string,
+    status?: "open" | "resolved" | "superseded"
+  ): Promise<ConflictRecord[]>;
 }
 
 export class FilesystemBrainStore implements BrainStore {
@@ -123,6 +136,19 @@ export class FilesystemBrainStore implements BrainStore {
     return {
       message: await git.commit(message, push, brainId, authorIdentity),
     };
+  }
+
+  async syncStatus(_brainId: string): Promise<SyncStatus> {
+    return {
+      provider: "filesystem",
+      hostedFiles: 0,
+      openConflicts: 0,
+      latestCursor: null,
+    };
+  }
+
+  async listConflicts(): Promise<ConflictRecord[]> {
+    return [];
   }
 }
 
