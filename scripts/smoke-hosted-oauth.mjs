@@ -28,11 +28,16 @@ const shouldVerifyHosted =
   args.has("--verify-hosted") || process.env.BRAIN_HOSTED_OAUTH_VERIFY_HOSTED === "1";
 const shouldConflict =
   args.has("--conflict") || process.env.BRAIN_HOSTED_OAUTH_CONFLICT === "1";
+const shouldReauth =
+  args.has("--reauth") || process.env.BRAIN_HOSTED_OAUTH_REAUTH === "1";
 const smokeFilename = process.env.BRAIN_HOSTED_OAUTH_WRITE_FILE || "HOSTED_OAUTH_WRITE_SMOKE.md";
 const localBrainDir =
   process.env.BRAIN_DIR || path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
 const localSyncWaitMs = Number(process.env.BRAIN_HOSTED_OAUTH_LOCAL_WAIT_MS || 30000);
 const hostedSyncWaitMs = Number(process.env.BRAIN_HOSTED_OAUTH_HOSTED_WAIT_MS || 30000);
+const tokenCacheFile =
+  process.env.BRAIN_HOSTED_OAUTH_TOKEN_CACHE ||
+  path.resolve(localBrainDir, "..", ".brain-sync", "hosted-oauth-token.json");
 const latencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(localBrainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
@@ -138,6 +143,130 @@ function openBrowser(url) {
   });
   child.on("error", () => undefined);
   child.unref();
+}
+
+async function readTokenCache() {
+  if (shouldReauth) return null;
+  try {
+    const cache = JSON.parse(await fs.readFile(tokenCacheFile, "utf-8"));
+    if (
+      cache?.version === 1 &&
+      cache.baseUrl === baseUrl &&
+      cache.resource === resource &&
+      cache.clientId &&
+      cache.refreshToken
+    ) {
+      return cache;
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.warn(`[hosted-oauth] Ignoring unreadable OAuth token cache: ${error.message}`);
+    }
+  }
+  return null;
+}
+
+async function writeTokenCache(clientId, token) {
+  if (!token?.refresh_token) return;
+  await fs.mkdir(path.dirname(tokenCacheFile), { recursive: true });
+  const payload = {
+    version: 1,
+    baseUrl,
+    resource,
+    clientId,
+    scope: token.scope || "mcp:tools",
+    refreshToken: token.refresh_token,
+    updatedAt: new Date().toISOString(),
+  };
+  await fs.writeFile(tokenCacheFile, `${JSON.stringify(payload, null, 2)}\n`, {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
+  await fs.chmod(tokenCacheFile, 0o600).catch(() => undefined);
+  console.log(`[hosted-oauth] OAuth refresh token cache updated: ${tokenCacheFile}`);
+}
+
+async function refreshFromTokenCache() {
+  const cache = await readTokenCache();
+  if (!cache) return null;
+
+  try {
+    const token = await jsonFetch(`${baseUrl}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: cache.clientId,
+        refresh_token: cache.refreshToken,
+        resource,
+      }).toString(),
+    });
+    assert.equal(token.token_type, "Bearer");
+    assert.ok(token.access_token);
+    await writeTokenCache(cache.clientId, token);
+    console.log("[hosted-oauth] Reused cached OAuth grant; browser approval not required.");
+    return token;
+  } catch (error) {
+    console.warn(`[hosted-oauth] Cached OAuth grant could not be reused: ${error.message}`);
+    console.warn("[hosted-oauth] Falling back to browser login.");
+    return null;
+  }
+}
+
+async function authorizeWithBrowser() {
+  const state = randomToken();
+  const verifier = randomToken(48);
+  const challenge = sha256Base64url(verifier);
+  const callbackServer = listenForCallback(state);
+  const redirectUri = await callbackServer.start();
+
+  const client = await jsonFetch(`${baseUrl}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      redirect_uris: [redirectUri],
+      token_endpoint_auth_method: "none",
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      client_name: "brain-hosted-oauth-smoke",
+    }),
+  });
+
+  const authorizeUrl = new URL(`${baseUrl}/authorize`);
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("client_id", client.client_id);
+  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+  authorizeUrl.searchParams.set("scope", "mcp:tools");
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("code_challenge", challenge);
+  authorizeUrl.searchParams.set("code_challenge_method", "S256");
+  authorizeUrl.searchParams.set("resource", resource);
+
+  console.log("[hosted-oauth] Complete the browser login to continue.");
+  console.log(`[hosted-oauth] ${authorizeUrl.toString()}`);
+  if (shouldOpenBrowser) openBrowser(authorizeUrl.toString());
+
+  const { code } = await callbackServer.wait();
+  const token = await jsonFetch(`${baseUrl}/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: client.client_id,
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: verifier,
+      resource,
+    }).toString(),
+  });
+  assert.equal(token.token_type, "Bearer");
+  assert.ok(token.access_token);
+  await writeTokenCache(client.client_id, token);
+  return token;
+}
+
+async function getToken() {
+  return (await refreshFromTokenCache()) || authorizeWithBrowser();
 }
 
 async function callTool(accessToken, name, args = {}) {
@@ -445,53 +574,7 @@ async function main() {
   assert.equal(health.runtime.gitHotPath, "disabled");
   assert.equal(health.runtime.autoSyncEnabled, false);
 
-  const state = randomToken();
-  const verifier = randomToken(48);
-  const challenge = sha256Base64url(verifier);
-  const callbackServer = listenForCallback(state);
-  const redirectUri = await callbackServer.start();
-
-  const client = await jsonFetch(`${baseUrl}/register`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      redirect_uris: [redirectUri],
-      token_endpoint_auth_method: "none",
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-      client_name: "brain-hosted-oauth-smoke",
-    }),
-  });
-
-  const authorizeUrl = new URL(`${baseUrl}/authorize`);
-  authorizeUrl.searchParams.set("response_type", "code");
-  authorizeUrl.searchParams.set("client_id", client.client_id);
-  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-  authorizeUrl.searchParams.set("scope", "mcp:tools");
-  authorizeUrl.searchParams.set("state", state);
-  authorizeUrl.searchParams.set("code_challenge", challenge);
-  authorizeUrl.searchParams.set("code_challenge_method", "S256");
-  authorizeUrl.searchParams.set("resource", resource);
-
-  console.log("[hosted-oauth] Complete the browser login to continue.");
-  console.log(`[hosted-oauth] ${authorizeUrl.toString()}`);
-  if (shouldOpenBrowser) openBrowser(authorizeUrl.toString());
-
-  const { code } = await callbackServer.wait();
-  const token = await jsonFetch(`${baseUrl}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: client.client_id,
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier,
-      resource,
-    }).toString(),
-  });
-  assert.equal(token.token_type, "Bearer");
-  assert.ok(token.access_token);
+  const token = await getToken();
 
   try {
     const files = await timedTool(token.access_token, "brain_list_files", { brain_id: brainId });
