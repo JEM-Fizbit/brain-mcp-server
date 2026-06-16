@@ -117,6 +117,14 @@ npm run smoke:hosted:oauth -- --write --verify-local
 
 This writes only `HOSTED_OAUTH_WRITE_SMOKE.md`, reads it back from hosted Postgres, and waits for the local Markdown mirror to match. If the launchd sync loop has not pulled it yet, the script runs one bounded sync cycle for that file.
 
+To include the reverse local-to-hosted parity gate:
+
+```bash
+npm run smoke:hosted:oauth -- --local-write --verify-hosted
+```
+
+This writes only `HOSTED_OAUTH_WRITE_SMOKE.md` in the local Markdown Brain, waits for the local sync agent to push it to hosted Postgres, then verifies the hosted MCP read matches.
+
 Expected first authenticated tool checks:
 
 - `brain_list_brains`
