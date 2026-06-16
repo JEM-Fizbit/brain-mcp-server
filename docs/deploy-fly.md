@@ -125,6 +125,14 @@ npm run smoke:hosted:oauth -- --local-write --verify-hosted
 
 This writes only `HOSTED_OAUTH_WRITE_SMOKE.md` in the local Markdown Brain, waits for the local sync agent to push it to hosted Postgres, then verifies the hosted MCP read matches.
 
+To include the hosted conflict lifecycle gate:
+
+```bash
+npm run smoke:hosted:oauth -- --conflict
+```
+
+This writes the dedicated smoke file through hosted MCP, creates a dirty local edit in a temporary local mirror, runs one bounded sync cycle to create a conflict, verifies the conflict is visible through hosted MCP, resolves it with reviewed replacement smoke content through `brain_resolve_conflict`, and removes the temporary mirror.
+
 Expected first authenticated tool checks:
 
 - `brain_list_brains`
