@@ -228,6 +228,13 @@ const page = String.raw`<!doctype html>
         gap: 14px;
       }
 
+      .activity-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
       section {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -312,15 +319,34 @@ const page = String.raw`<!doctype html>
         gap: 8px;
       }
 
-      .action {
+      .activity-list {
+        display: grid;
+        gap: 0;
+      }
+
+      .event {
         border-top: 1px solid var(--line);
-        padding-top: 9px;
+        padding: 9px 0;
         overflow-wrap: anywhere;
       }
 
-      .action:first-child {
+      .event:first-child {
         border-top: 0;
         padding-top: 0;
+      }
+
+      .event-title {
+        font-weight: 650;
+      }
+
+      .event-meta {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
 
       pre {
@@ -342,6 +368,7 @@ const page = String.raw`<!doctype html>
 
         header,
         .status-band,
+        .activity-grid,
         .grid,
         .metrics {
           grid-template-columns: 1fr;
@@ -395,6 +422,18 @@ const page = String.raw`<!doctype html>
         </div>
       </div>
 
+      <div class="activity-grid">
+        <section>
+          <h2>Recent Brain Activity</h2>
+          <div class="activity-list" id="activity"></div>
+        </section>
+
+        <section>
+          <h2>Watch Log</h2>
+          <div class="activity-list" id="operation-log"></div>
+        </section>
+      </div>
+
       <div class="grid">
         <section>
           <h2>Checks</h2>
@@ -425,6 +464,9 @@ const page = String.raw`<!doctype html>
     </main>
 
     <script>
+      const operationLog = [];
+      let previousSnapshot = null;
+
       const statusCopy = {
         pass: ["Safe to use hosted", "Hosted health, local sync, conflict count, daemon, and Fly checks are currently passing."],
         warn: ["Needs attention", "Nothing is hard-failing, but one or more checks needs review before this is boring."],
@@ -459,6 +501,14 @@ const page = String.raw`<!doctype html>
         return payload.checks?.find((check) => check.name === name);
       }
 
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
       function ageLabel(iso) {
         if (!iso) return "-";
         const ms = Date.now() - Date.parse(iso);
@@ -471,10 +521,58 @@ const page = String.raw`<!doctype html>
         return hours + "h ago";
       }
 
+      function localTime(iso) {
+        if (!iso) return "-";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "-";
+        return new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          timeZoneName: "short",
+        }).format(date);
+      }
+
+      function localDateTime(iso) {
+        if (!iso) return "-";
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "-";
+        return new Intl.DateTimeFormat(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          timeZoneName: "short",
+        }).format(date);
+      }
+
+      function compactHash(value) {
+        return value ? String(value).slice(0, 10) : "-";
+      }
+
+      function eventLabel(eventType) {
+        if (eventType === "file_revision") return "File revision";
+        if (eventType === "conflict_opened") return "Conflict opened";
+        if (eventType === "conflict_resolved") return "Conflict resolved";
+        return eventType || "Activity";
+      }
+
+      function readableOrigin(origin) {
+        if (origin === "hosted_mcp") return "hosted MCP";
+        if (origin === "local_agent") return "local sync";
+        return origin || "unknown";
+      }
+
       function detailSummary(details = {}) {
         return usefulDetailKeys
           .filter((key) => details[key] !== undefined && details[key] !== null && details[key] !== "")
-          .map((key) => "<code>" + key + "</code>: " + String(Array.isArray(details[key]) ? details[key].join(" | ") : details[key]))
+          .map((key) => {
+            const value = Array.isArray(details[key]) ? details[key].join(" | ") : details[key];
+            const display = /At$|checkedAt|latestHostedUpdate/.test(key) ? localDateTime(value) : value;
+            return "<code>" + escapeHtml(key) + "</code>: " + escapeHtml(display);
+          })
           .join("<br>");
       }
 
@@ -514,13 +612,92 @@ const page = String.raw`<!doctype html>
         return [...new Set(items)];
       }
 
+      function currentSnapshot(payload) {
+        const postgres = byName(payload, "postgres_summary")?.details || {};
+        const sync = byName(payload, "sync_health")?.details || {};
+        return {
+          status: payload.status || "unknown",
+          latestHostedUpdate: postgres.latestHostedUpdate || null,
+          openConflicts: postgres.openConflicts ?? null,
+          syncCycle: sync.cycle ?? null,
+          pushed: sync.pushed ?? null,
+          pulled: sync.pulled ?? null,
+          conflicts: sync.conflicts ?? null,
+        };
+      }
+
+      function appendOperation(message, kind = "info") {
+        operationLog.unshift({
+          at: new Date().toISOString(),
+          kind,
+          message,
+        });
+        operationLog.splice(8);
+      }
+
+      function detectChanges(payload) {
+        const next = currentSnapshot(payload);
+        if (!previousSnapshot) {
+          appendOperation("Cockpit connected; watching hosted Brain state.");
+          previousSnapshot = next;
+          return;
+        }
+
+        if (next.latestHostedUpdate && next.latestHostedUpdate !== previousSnapshot.latestHostedUpdate) {
+          appendOperation("Hosted Brain updated at " + localTime(next.latestHostedUpdate) + ".");
+        }
+
+        if (next.openConflicts !== previousSnapshot.openConflicts) {
+          appendOperation("Open conflicts changed from " + previousSnapshot.openConflicts + " to " + next.openConflicts + ".", next.openConflicts ? "warn" : "pass");
+        }
+
+        if (
+          next.syncCycle !== previousSnapshot.syncCycle &&
+          ((next.pushed || 0) > 0 || (next.pulled || 0) > 0 || (next.conflicts || 0) > 0)
+        ) {
+          appendOperation("Sync cycle " + next.syncCycle + ": pushed " + next.pushed + ", pulled " + next.pulled + ", conflicts " + next.conflicts + ".");
+        }
+
+        if (next.status !== previousSnapshot.status) {
+          appendOperation("Overall status changed from " + previousSnapshot.status + " to " + next.status + ".", next.status);
+        }
+
+        previousSnapshot = next;
+      }
+
+      function renderActivity(payload) {
+        const events = byName(payload, "recent_activity")?.details?.events || [];
+        document.getElementById("activity").innerHTML = events.length
+          ? events.map((event) => {
+              const actor = event.actorName || event.actorEmail || readableOrigin(event.origin);
+              return "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(eventLabel(event.eventType)) + ": " + escapeHtml(event.filename) + "</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(localDateTime(event.occurredAt)) + " · " + escapeHtml(readableOrigin(event.origin)) + " · " + escapeHtml(actor) + " · " +
+                  "<span class=\"mono\">" + escapeHtml(compactHash(event.contentSha256 || event.referenceId)) + "</span></div>" +
+              "</div>";
+            }).join("")
+          : "<div class=\"event muted\">No recent Brain activity reported.</div>";
+      }
+
+      function renderOperationLog() {
+        document.getElementById("operation-log").innerHTML = operationLog.length
+          ? operationLog.map((event) =>
+              "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(event.message) + "</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(localDateTime(event.at)) + "</div>" +
+              "</div>"
+            ).join("")
+          : "<div class=\"event muted\">Waiting for first refresh.</div>";
+      }
+
       function render(payload) {
+        detectChanges(payload);
         const state = payload.status || "fail";
         const [title, copy] = statusCopy[state] || statusCopy.fail;
         document.getElementById("state-dot").className = "dot " + state;
         document.getElementById("state-text").textContent = title;
         document.getElementById("state-copy").textContent = copy;
-        document.getElementById("last-updated").textContent = payload.checkedAt ? "Checked " + ageLabel(payload.checkedAt) : "Checked just now";
+        document.getElementById("last-updated").textContent = payload.checkedAt ? "Checked " + ageLabel(payload.checkedAt) + " (" + localTime(payload.checkedAt) + ")" : "Checked just now";
 
         const postgres = byName(payload, "postgres_summary")?.details || {};
         const local = byName(payload, "local_sync_state")?.details || {};
@@ -532,13 +709,16 @@ const page = String.raw`<!doctype html>
         document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
 
         document.getElementById("checks").innerHTML = (payload.checks || [])
-          .map((check) => "<tr><td>" + check.name + "</td><td><span class=\"pill " + check.status + "\">" + check.status + "</span></td><td class=\"details\">" + (detailSummary(check.details) || "-") + "</td></tr>")
+          .filter((check) => check.name !== "recent_activity")
+          .map((check) => "<tr><td>" + escapeHtml(check.name) + "</td><td><span class=\"pill " + escapeHtml(check.status) + "\">" + escapeHtml(check.status) + "</span></td><td class=\"details\">" + (detailSummary(check.details) || "-") + "</td></tr>")
           .join("");
 
         document.getElementById("actions").innerHTML = actionItems(payload)
-          .map((item) => "<div class=\"action\">" + item + "</div>")
+          .map((item) => "<div class=\"event\">" + escapeHtml(item) + "</div>")
           .join("");
 
+        renderActivity(payload);
+        renderOperationLog();
         document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
       }
 

@@ -72,6 +72,8 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.equal(packageJson.scripts["hosted:doctor"], "node scripts/hosted-doctor.mjs");
   assert.match(script, /hosted_health/);
   assert.match(script, /postgres_summary/);
+  assert.match(script, /recent_activity/);
+  assert.match(script, /brain_file_revisions/);
   assert.match(script, /local_sync_state/);
   assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
@@ -96,5 +98,9 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /BRAIN_COCKPIT_PORT \|\| 8787/);
   assert.match(script, /hosted-doctor\.mjs/);
   assert.match(script, /\/api\/doctor/);
+  assert.match(script, /Recent Brain Activity/);
+  assert.match(script, /Watch Log/);
+  assert.match(script, /localDateTime/);
+  assert.match(script, /operationLog/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
