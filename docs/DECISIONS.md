@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-16 — Automate Brain maintenance and proactively surface required user action
+
+**Decision:** Brain MCP maintenance must be automation-first: routine linting, sync health, hosted health, conflict detection, and stale-state checks should run through tools or scheduled/operator commands, and any issue needing human judgement must be clearly and proactively surfaced to the user with the next required action.
+
+**Why:** The Brain is meant to reduce cognitive and operational load, not create a second system the user must manually babysit. Sync conflicts, lint drift, stale daemon health, and source-ingestion issues are real, but they should be detected automatically and presented as actionable exceptions. Manual work is acceptable only where semantic judgement is required, such as choosing the correct merged Markdown content for a conflict.
+
+**Alternatives rejected:** Requiring users to remember maintenance commands; burying sync/lint failures in logs; silently resolving semantic conflicts; treating hosted Brain operation as an expert-only database/admin workflow; making every routine check a manual user ritual.
+
+**Related:** `docs/ROADMAP.md`; `docs/conflict-resolution.md`; `docs/deploy-fly.md`; `brain_load_context` lint/inbox nudges; `npm run hosted:doctor`.
+
+---
+
 ## 2026-06-16 — Stage hosted Brain cutover before ERS multi-tenant buildout
 
 **Decision:** Treat the JEM hosted Brain as a local-first pilot that must become operationally boring before normal remote-client cutover, then build multi-Brain support, ERS-owned Supabase migration, ERS multi-user access, and true multi-tenant product shape in that order.
