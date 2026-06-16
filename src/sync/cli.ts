@@ -15,6 +15,7 @@ interface SyncCliConfig {
   brainDir: string;
   stateFile: string;
   lockFile: string;
+  healthFile: string;
   storeFile: string;
   revisionStore: RevisionStoreProvider;
   databaseUrl?: string;
@@ -74,6 +75,7 @@ function usage(): string {
     "  BRAIN_DIR                 Local Markdown Brain directory",
     "  BRAIN_SYNC_STATE_FILE     Local sync metadata JSON path",
     "  BRAIN_SYNC_LOCK_FILE      Local sync lock path",
+    "  BRAIN_SYNC_HEALTH_FILE    Local sync daemon health JSON path",
     "  BRAIN_SYNC_STORE_FILE     File-backed hosted revision store path",
     "  BRAIN_SYNC_INCLUDE_FILES  Optional comma-separated .md file list",
     "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
@@ -97,6 +99,10 @@ function defaultLockFile(stateFile: string): string {
   return `${stateFile}.lock`;
 }
 
+function defaultHealthFile(stateFile: string): string {
+  return `${stateFile}.health.json`;
+}
+
 function readConfig(): SyncCliConfig {
   const revisionStore =
     process.env.BRAIN_REVISION_STORE === "postgres" ? "postgres" : "file";
@@ -104,18 +110,16 @@ function readConfig(): SyncCliConfig {
     ?.split(",")
     .map((file) => file.trim())
     .filter(Boolean);
+  const stateFile =
+    process.env.BRAIN_SYNC_STATE_FILE ||
+    defaultStateFile(process.env.BRAIN_DIR || BRAIN_DIR);
   return {
     brainId: process.env.BRAIN_ID || "ai-brain-jem",
     brainDir: process.env.BRAIN_DIR || BRAIN_DIR,
-    stateFile:
-      process.env.BRAIN_SYNC_STATE_FILE ||
-      defaultStateFile(process.env.BRAIN_DIR || BRAIN_DIR),
-    lockFile:
-      process.env.BRAIN_SYNC_LOCK_FILE ||
-      defaultLockFile(
-        process.env.BRAIN_SYNC_STATE_FILE ||
-          defaultStateFile(process.env.BRAIN_DIR || BRAIN_DIR)
-      ),
+    stateFile,
+    lockFile: process.env.BRAIN_SYNC_LOCK_FILE || defaultLockFile(stateFile),
+    healthFile:
+      process.env.BRAIN_SYNC_HEALTH_FILE || defaultHealthFile(stateFile),
     storeFile:
       process.env.BRAIN_SYNC_STORE_FILE ||
       defaultStoreFile(process.env.BRAIN_DIR || BRAIN_DIR),
@@ -163,6 +167,28 @@ function summarizeReport(report: LocalSyncReport) {
     conflictFiles: report.conflicts.map((conflict) => conflict.filename),
     totalMs: totalTiming?.ms ?? null,
   };
+}
+
+async function writeSyncHealth(
+  config: SyncCliConfig,
+  health: Record<string, unknown>
+): Promise<void> {
+  await fs.mkdir(path.dirname(config.healthFile), { recursive: true });
+  await fs.writeFile(
+    config.healthFile,
+    `${JSON.stringify(
+      {
+        version: 1,
+        brainId: config.brainId,
+        brainDir: config.brainDir,
+        stateFile: config.stateFile,
+        ...health,
+      },
+      null,
+      2
+    )}\n`,
+    "utf-8"
+  );
 }
 
 function createStore(config: SyncCliConfig): StoreHandle {
@@ -350,14 +376,32 @@ async function runWithConfig(
         let cycle = 0;
         while (!stopped) {
           cycle += 1;
-          const report = await agent.syncOnce();
-          writeJsonLine({
-            command,
-            cycle,
-            config: outputConfig(config),
-            report:
-              config.watchOutput === "full" ? report : summarizeReport(report),
-          });
+          try {
+            const report = await agent.syncOnce();
+            const summary = summarizeReport(report);
+            await writeSyncHealth(config, {
+              command,
+              status: "ok",
+              cycle,
+              checkedAt: new Date().toISOString(),
+              report: summary,
+            });
+            writeJsonLine({
+              command,
+              cycle,
+              config: outputConfig(config),
+              report: config.watchOutput === "full" ? report : summary,
+            });
+          } catch (error: any) {
+            await writeSyncHealth(config, {
+              command,
+              status: "error",
+              cycle,
+              checkedAt: new Date().toISOString(),
+              error: error?.message || String(error),
+            });
+            throw error;
+          }
           if (config.watchCycles && cycle >= config.watchCycles) break;
           await sleep(config.watchIntervalMs);
         }

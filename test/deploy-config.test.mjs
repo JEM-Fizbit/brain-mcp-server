@@ -73,6 +73,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /hosted_health/);
   assert.match(script, /postgres_summary/);
   assert.match(script, /local_sync_state/);
+  assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
   assert.match(script, /launchd/);
   assert.match(script, /fly_status/);

@@ -115,7 +115,7 @@ For a non-destructive hosted operator check, run:
 npm run hosted:doctor
 ```
 
-The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health or Postgres summary exits non-zero; local launchd/Fly warnings are reported without blocking the command.
+The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold.
 
 To include the hosted write/local mirror parity gate:
 
@@ -170,7 +170,7 @@ npm run bench:http:postgres
 
 HTTP startup warms the hosted Brain store by default before accepting traffic. Set `BRAIN_HTTP_WARMUP=0` only for deliberate cold-start debugging. The benchmark also warms each measured scenario by default; set `BRAIN_HTTP_BENCH_WARMUP=0` to include cold path timings.
 
-For the local Markdown mirror, `npm run sync -- watch` runs the interim polling sync loop. Set `BRAIN_SYNC_INTERVAL_MS` for cadence and `BRAIN_SYNC_WATCH_CYCLES` only for bounded smoke tests or scheduled jobs. Watch mode emits compact per-cycle summaries by default; set `BRAIN_SYNC_WATCH_OUTPUT=full` when debugging a specific sync report.
+For the local Markdown mirror, `npm run sync -- watch` runs the interim polling sync loop. Set `BRAIN_SYNC_INTERVAL_MS` for cadence and `BRAIN_SYNC_WATCH_CYCLES` only for bounded smoke tests or scheduled jobs. Watch mode emits compact per-cycle summaries by default; set `BRAIN_SYNC_WATCH_OUTPUT=full` when debugging a specific sync report. Each successful watch cycle writes `${BRAIN_SYNC_STATE_FILE}.health.json` by default, or `BRAIN_SYNC_HEALTH_FILE` when set, with last-success counts for `hosted:doctor`.
 
 The sync CLI uses an atomic lock file to prevent overlapping local mirror runs. By default the lock is `${BRAIN_SYNC_STATE_FILE}.lock`; set `BRAIN_SYNC_LOCK_FILE` only when the state path is shared in a non-standard layout. Locks include the owning PID and start time. A live owner still blocks overlapping runs, while malformed or dead-owner locks are replaced automatically on the next run.
 
