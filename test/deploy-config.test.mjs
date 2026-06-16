@@ -74,6 +74,8 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /postgres_summary/);
   assert.match(script, /recent_activity/);
   assert.match(script, /brain_file_revisions/);
+  assert.match(script, /timedCheck/);
+  assert.match(script, /latencyMs/);
   assert.match(script, /local_sync_state/);
   assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
@@ -101,9 +103,14 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /role="tablist"/);
   assert.match(script, /panel-overview/);
   assert.match(script, /panel-activity/);
+  assert.match(script, /panel-latency/);
   assert.match(script, /panel-checks/);
   assert.match(script, /panel-raw/);
   assert.match(script, /activateTab/);
+  assert.match(script, /Latency Measures/);
+  assert.match(script, /hosted-latency/);
+  assert.match(script, /doctor-latency/);
+  assert.match(script, /formatDuration/);
   assert.match(script, /Recent Brain Activity/);
   assert.match(script, /Watch Log/);
   assert.match(script, /localDateTime/);
