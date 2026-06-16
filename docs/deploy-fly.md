@@ -156,7 +156,7 @@ HTTP startup warms the hosted Brain store by default before accepting traffic. S
 
 For the local Markdown mirror, `npm run sync -- watch` runs the interim polling sync loop. Set `BRAIN_SYNC_INTERVAL_MS` for cadence and `BRAIN_SYNC_WATCH_CYCLES` only for bounded smoke tests or scheduled jobs. Watch mode emits compact per-cycle summaries by default; set `BRAIN_SYNC_WATCH_OUTPUT=full` when debugging a specific sync report.
 
-The sync CLI uses an atomic lock file to prevent overlapping local mirror runs. By default the lock is `${BRAIN_SYNC_STATE_FILE}.lock`; set `BRAIN_SYNC_LOCK_FILE` only when the state path is shared in a non-standard layout. If a process exits uncleanly, inspect the lock before deleting it.
+The sync CLI uses an atomic lock file to prevent overlapping local mirror runs. By default the lock is `${BRAIN_SYNC_STATE_FILE}.lock`; set `BRAIN_SYNC_LOCK_FILE` only when the state path is shared in a non-standard layout. Locks include the owning PID and start time. A live owner still blocks overlapping runs, while malformed or dead-owner locks are replaced automatically on the next run.
 
 Use `npm run sync -- summary` for routine operator checks. It reports compact counts and cursor status. Use `npm run sync -- status` only when the full tracked-file and hosted-head payload is needed for debugging.
 
