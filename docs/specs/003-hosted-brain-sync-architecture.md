@@ -340,7 +340,7 @@ npm run sync -- watch
 
 `BRAIN_SYNC_INTERVAL_MS` controls the interval. `BRAIN_SYNC_WATCH_CYCLES` can bound the loop for smoke tests or scheduled jobs. This is not yet a product decision that the permanent local sync surface must be a daemon, launchd service, or MCP-adjacent subprocess; it is the minimal loop needed to exercise the local-first sync contract without manual push/pull rituals.
 
-The sync CLI takes an atomic local lock for every run so two local mirror processes do not race the same `.brain-sync/state.json` file. The default lock path is `${BRAIN_SYNC_STATE_FILE}.lock`; `BRAIN_SYNC_LOCK_FILE` can override it for unusual operator layouts.
+The sync CLI takes an atomic local lock for every run so two local mirror processes do not race the same `.brain-sync/state.json` file. The default lock path is `${BRAIN_SYNC_STATE_FILE}.lock`; `BRAIN_SYNC_LOCK_FILE` can override it for unusual operator layouts. Locks record the owning PID and start time; active locks block concurrent runs, while malformed or dead-owner locks are recovered automatically.
 
 Pilot verification on 2026-06-14:
 

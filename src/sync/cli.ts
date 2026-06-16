@@ -29,6 +29,11 @@ interface StoreHandle {
   close(): Promise<void>;
 }
 
+interface SyncLockPayload {
+  pid: number;
+  startedAt: string;
+}
+
 function parseEnvLine(line: string): [string, string] | null {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) return null;
@@ -184,38 +189,101 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function createLockPayload(): SyncLockPayload {
+  return {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+  };
+}
+
+function parseLockPayload(raw: string): SyncLockPayload | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<SyncLockPayload>;
+    if (
+      typeof parsed.pid !== "number" ||
+      !Number.isInteger(parsed.pid) ||
+      parsed.pid <= 0 ||
+      typeof parsed.startedAt !== "string" ||
+      Number.isNaN(Date.parse(parsed.startedAt))
+    ) {
+      return null;
+    }
+    return { pid: parsed.pid, startedAt: parsed.startedAt };
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error: any) {
+    if (error?.code === "ESRCH") return false;
+    return true;
+  }
+}
+
+async function readLockPayload(lockFile: string): Promise<SyncLockPayload | null> {
+  try {
+    return parseLockPayload(await fs.readFile(lockFile, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+async function writeLock(lockFile: string): Promise<SyncLockPayload> {
+  const payload = createLockPayload();
+  const handle = await fs.open(lockFile, "wx");
+  try {
+    await handle.writeFile(`${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  } finally {
+    await handle.close();
+  }
+  return payload;
+}
+
 async function withLock<T>(
   lockFile: string,
   fn: () => Promise<T>
 ): Promise<T> {
   await fs.mkdir(path.dirname(lockFile), { recursive: true });
+  let lockPayload: SyncLockPayload;
   try {
-    const handle = await fs.open(lockFile, "wx");
-    await handle.writeFile(
-      JSON.stringify(
-        {
-          pid: process.pid,
-          startedAt: new Date().toISOString(),
-        },
-        null,
-        2
-      ) + "\n",
-      "utf-8"
-    );
-    await handle.close();
+    lockPayload = await writeLock(lockFile);
   } catch (error: any) {
     if (error?.code === "EEXIST") {
-      throw new Error(
-        `Brain sync is already running or a stale lock exists: ${lockFile}`
-      );
+      const existing = await readLockPayload(lockFile);
+      if (existing && isProcessAlive(existing.pid)) {
+        throw new Error(
+          `Brain sync is already running: ${lockFile} (pid ${existing.pid}, started ${existing.startedAt})`
+        );
+      }
+      await fs.rm(lockFile, { force: true });
+      try {
+        lockPayload = await writeLock(lockFile);
+      } catch (retryError: any) {
+        if (retryError?.code === "EEXIST") {
+          throw new Error(`Brain sync is already running: ${lockFile}`);
+        }
+        throw retryError;
+      }
+    } else {
+      throw error;
     }
-    throw error;
   }
 
   try {
     return await fn();
   } finally {
-    await fs.rm(lockFile, { force: true }).catch(() => undefined);
+    const current = await readLockPayload(lockFile);
+    if (
+      current &&
+      current.pid === lockPayload.pid &&
+      current.startedAt === lockPayload.startedAt
+    ) {
+      await fs.rm(lockFile, { force: true }).catch(() => undefined);
+    }
   }
 }
 

@@ -308,11 +308,19 @@ test("sync CLI watch can emit full reports for debugging", async () => {
   assert.ok(output.report.timings.some((timing) => timing.phase === "total"));
 });
 
-test("sync CLI fails fast when another sync lock exists", async () => {
+test("sync CLI fails fast when another active sync lock exists", async () => {
   const config = dirs("lock-exists");
   await writeBrainFile(config.brainDir, "NOW.md", "Locked run\n");
   await fs.mkdir(path.dirname(config.lockFile), { recursive: true });
-  await fs.writeFile(config.lockFile, "existing lock\n", "utf-8");
+  const activeLock = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+  };
+  await fs.writeFile(
+    config.lockFile,
+    `${JSON.stringify(activeLock, null, 2)}\n`,
+    "utf-8"
+  );
 
   await assert.rejects(
     exec(process.execPath, [cliPath, "push"], {
@@ -329,5 +337,21 @@ test("sync CLI fails fast when another sync lock exists", async () => {
     }),
     /Brain sync is already running/
   );
-  assert.equal(await fs.readFile(config.lockFile, "utf-8"), "existing lock\n");
+  assert.deepEqual(
+    JSON.parse(await fs.readFile(config.lockFile, "utf-8")),
+    activeLock
+  );
+});
+
+test("sync CLI replaces stale sync locks before running", async () => {
+  const config = dirs("stale-lock");
+  await writeBrainFile(config.brainDir, "NOW.md", "Recovered lock run\n");
+  await fs.mkdir(path.dirname(config.lockFile), { recursive: true });
+  await fs.writeFile(config.lockFile, "existing lock\n", "utf-8");
+
+  const output = await runCli("push", config);
+
+  assert.equal(output.command, "push");
+  assert.deepEqual(output.report.pushed, ["NOW.md"]);
+  await assert.rejects(fs.readFile(config.lockFile, "utf-8"), /ENOENT/);
 });
