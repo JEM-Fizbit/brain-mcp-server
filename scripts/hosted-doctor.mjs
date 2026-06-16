@@ -20,8 +20,13 @@ const stateFile =
   process.env.BRAIN_SYNC_STATE_FILE ||
   path.resolve(brainDir, "..", ".brain-sync", "state.json");
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE || `${stateFile}.lock`;
+const healthFile =
+  process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
+const maxSyncHealthAgeMs = Number(
+  process.env.BRAIN_SYNC_HEALTH_MAX_AGE_MS || 2 * 60 * 1000
+);
 
 const checks = [];
 
@@ -171,6 +176,42 @@ async function checkSyncLock() {
   }
 }
 
+async function checkSyncHealth() {
+  try {
+    const health = await readJson(healthFile);
+    const checkedAt = health.checkedAt ? Date.parse(health.checkedAt) : NaN;
+    const ageMs = Number.isNaN(checkedAt) ? null : Date.now() - checkedAt;
+    const stale = ageMs === null || ageMs > maxSyncHealthAgeMs;
+    const status =
+      health.status === "ok" && !stale
+        ? "pass"
+        : health.status === "error"
+          ? "fail"
+          : "warn";
+
+    addCheck("sync_health", status, {
+      healthFile,
+      state: stale ? "stale" : health.status || "unknown",
+      checkedAt: health.checkedAt || null,
+      ageMs,
+      maxAgeMs: maxSyncHealthAgeMs,
+      cycle: health.cycle ?? null,
+      pushed: health.report?.pushed ?? null,
+      pulled: health.report?.pulled ?? null,
+      unchanged: health.report?.unchanged ?? null,
+      conflicts: health.report?.conflicts ?? null,
+      conflictFiles: health.report?.conflictFiles ?? [],
+      totalMs: health.report?.totalMs ?? null,
+      error: health.error || null,
+    });
+  } catch (error) {
+    addCheck("sync_health", "warn", {
+      healthFile,
+      error: error.message,
+    });
+  }
+}
+
 function parseLaunchdOutput(stdout) {
   const state = stdout.match(/state = ([^\n]+)/)?.[1]?.trim() || null;
   const activeCount = stdout.match(/active count = ([^\n]+)/)?.[1]?.trim() || null;
@@ -241,6 +282,7 @@ await Promise.all([
   checkPostgresSummary(),
   checkLocalState(),
   checkSyncLock(),
+  checkSyncHealth(),
   checkLaunchd(),
   checkFlyStatus(),
 ]);

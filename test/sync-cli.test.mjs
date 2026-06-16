@@ -26,6 +26,7 @@ function dirs(name) {
     brainDir: path.join(root, "brain"),
     stateFile: path.join(root, ".brain-sync", "state.json"),
     lockFile: path.join(root, ".brain-sync", "state.json.lock"),
+    healthFile: path.join(root, ".brain-sync", "state.json.health.json"),
     storeFile: path.join(root, "hosted", "revision-store.json"),
   };
 }
@@ -48,6 +49,7 @@ async function runCli(command, config) {
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
       BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -64,6 +66,7 @@ async function runCliWithEnv(command, config, env) {
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
       BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -80,6 +83,7 @@ function envWithoutSyncConfig() {
     "BRAIN_DIR",
     "BRAIN_SYNC_STATE_FILE",
     "BRAIN_SYNC_LOCK_FILE",
+    "BRAIN_SYNC_HEALTH_FILE",
     "BRAIN_SYNC_STORE_FILE",
     "BRAIN_REVISION_STORE",
     "BRAIN_REVISION_DATABASE_URL",
@@ -184,6 +188,7 @@ test("sync CLI loads local env files before reading config", async () => {
       `BRAIN_DIR=${config.brainDir}`,
       `BRAIN_SYNC_STATE_FILE=${config.stateFile}`,
       `BRAIN_SYNC_LOCK_FILE=${config.lockFile}`,
+      `BRAIN_SYNC_HEALTH_FILE=${config.healthFile}`,
       `BRAIN_SYNC_STORE_FILE=${config.storeFile}`,
       "BRAIN_REVISION_STORE=file",
       "",
@@ -200,6 +205,7 @@ test("sync CLI loads local env files before reading config", async () => {
   assert.equal(output.command, "status");
   assert.equal(output.config.brainDir, config.brainDir);
   assert.equal(output.config.lockFile, config.lockFile);
+  assert.equal(output.config.healthFile, config.healthFile);
   assert.equal(output.config.revisionStore, "file");
 });
 
@@ -214,6 +220,7 @@ test("sync CLI reports missing Postgres database URL when provider is postgres",
         BRAIN_DIR: config.brainDir,
         BRAIN_SYNC_STATE_FILE: config.stateFile,
         BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_HEALTH_FILE: config.healthFile,
         BRAIN_SYNC_STORE_FILE: config.storeFile,
         BRAIN_REVISION_STORE: "postgres",
         BRAIN_REVISION_DATABASE_URL: "",
@@ -253,6 +260,7 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
       BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -278,6 +286,22 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
   assert.equal(typeof outputs[0].report.totalMs, "number");
   assert.equal(outputs[1].cycle, 2);
   assert.equal(outputs[1].report.conflicts, 0);
+
+  const health = JSON.parse(await fs.readFile(config.healthFile, "utf-8"));
+  assert.equal(health.version, 1);
+  assert.equal(health.brainId, "ai-brain-jem");
+  assert.equal(health.brainDir, config.brainDir);
+  assert.equal(health.stateFile, config.stateFile);
+  assert.equal(health.command, "watch");
+  assert.equal(health.status, "ok");
+  assert.equal(health.cycle, 2);
+  assert.equal(health.report.pushed, 0);
+  assert.equal(health.report.pulled, 0);
+  assert.equal(health.report.conflicts, 0);
+  assert.deepEqual(health.report.conflictFiles, []);
+  assert.equal(typeof health.report.totalMs, "number");
+  assert.equal(typeof health.checkedAt, "string");
+  assert.equal("files" in health, false);
 });
 
 test("sync CLI watch can emit full reports for debugging", async () => {
@@ -291,6 +315,7 @@ test("sync CLI watch can emit full reports for debugging", async () => {
       BRAIN_DIR: config.brainDir,
       BRAIN_SYNC_STATE_FILE: config.stateFile,
       BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile,
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
@@ -330,6 +355,7 @@ test("sync CLI fails fast when another active sync lock exists", async () => {
         BRAIN_DIR: config.brainDir,
         BRAIN_SYNC_STATE_FILE: config.stateFile,
         BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_HEALTH_FILE: config.healthFile,
         BRAIN_SYNC_STORE_FILE: config.storeFile,
         BRAIN_REVISION_STORE: "file",
         BRAIN_REVISION_DATABASE_URL: "",
