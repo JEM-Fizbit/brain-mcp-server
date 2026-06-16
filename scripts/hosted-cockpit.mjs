@@ -228,11 +228,16 @@ const page = String.raw`<!doctype html>
         gap: 14px;
       }
 
+      .overview-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+      }
+
       .activity-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 14px;
-        margin-bottom: 14px;
       }
 
       section {
@@ -240,6 +245,47 @@ const page = String.raw`<!doctype html>
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 16px;
+        min-width: 0;
+      }
+
+      .tabs {
+        display: grid;
+        gap: 14px;
+      }
+
+      .tab-list {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tab-button {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 10px 12px 9px;
+        white-space: nowrap;
+      }
+
+      .tab-button[aria-selected="true"] {
+        color: var(--ink);
+        border-bottom-color: var(--pass);
+        font-weight: 650;
+      }
+
+      .tab-button:focus-visible {
+        outline: 2px solid var(--pass);
+        outline-offset: -2px;
+      }
+
+      .tab-panel[hidden] {
+        display: none;
+      }
+
+      .tab-panel {
         min-width: 0;
       }
 
@@ -351,6 +397,8 @@ const page = String.raw`<!doctype html>
 
       pre {
         margin: 0;
+        width: 100%;
+        max-width: 100%;
         max-height: 280px;
         overflow: auto;
         background: #202124;
@@ -368,6 +416,7 @@ const page = String.raw`<!doctype html>
 
         header,
         .status-band,
+        .overview-grid,
         .activity-grid,
         .grid,
         .metrics {
@@ -422,39 +471,59 @@ const page = String.raw`<!doctype html>
         </div>
       </div>
 
-      <div class="activity-grid">
-        <section>
-          <h2>Recent Brain Activity</h2>
-          <div class="activity-list" id="activity"></div>
-        </section>
+      <div class="tabs">
+        <div class="tab-list" role="tablist" aria-label="Cockpit sections">
+          <button class="tab-button" id="tab-overview" type="button" role="tab" aria-controls="panel-overview" aria-selected="true">Overview</button>
+          <button class="tab-button" id="tab-activity" type="button" role="tab" aria-controls="panel-activity" aria-selected="false">Activity</button>
+          <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
+          <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
+        </div>
 
-        <section>
-          <h2>Watch Log</h2>
-          <div class="activity-list" id="operation-log"></div>
-        </section>
-      </div>
+        <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+          <div class="overview-grid">
+            <section>
+              <h2>Next Actions</h2>
+              <div class="next-actions" id="actions"></div>
+            </section>
 
-      <div class="grid">
-        <section>
-          <h2>Checks</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Check</th>
-                <th>Status</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody id="checks"></tbody>
-          </table>
-        </section>
+            <section>
+              <h2>Watch Log</h2>
+              <div class="activity-list" id="operation-log"></div>
+            </section>
+          </div>
+        </div>
 
-        <div class="stack">
+        <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
+          <div class="activity-grid">
+            <section>
+              <h2>Recent Brain Activity</h2>
+              <div class="activity-list" id="activity"></div>
+            </section>
+
+            <section>
+              <h2>Watch Log</h2>
+              <div class="activity-list" id="operation-log-activity"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="panel-checks" role="tabpanel" aria-labelledby="tab-checks" hidden>
           <section>
-            <h2>Next Actions</h2>
-            <div class="next-actions" id="actions"></div>
+            <h2>Checks</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Check</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="checks"></tbody>
+            </table>
           </section>
+        </div>
 
+        <div class="tab-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" hidden>
           <section>
             <h2>Raw Doctor Output</h2>
             <pre id="raw">{}</pre>
@@ -680,7 +749,7 @@ const page = String.raw`<!doctype html>
       }
 
       function renderOperationLog() {
-        document.getElementById("operation-log").innerHTML = operationLog.length
+        const markup = operationLog.length
           ? operationLog.map((event) =>
               "<div class=\"event\">" +
                 "<div class=\"event-title\">" + escapeHtml(event.message) + "</div>" +
@@ -688,6 +757,8 @@ const page = String.raw`<!doctype html>
               "</div>"
             ).join("")
           : "<div class=\"event muted\">Waiting for first refresh.</div>";
+        document.getElementById("operation-log").innerHTML = markup;
+        document.getElementById("operation-log-activity").innerHTML = markup;
       }
 
       function render(payload) {
@@ -742,7 +813,35 @@ const page = String.raw`<!doctype html>
         }
       }
 
+      function activateTab(tabId) {
+        for (const button of document.querySelectorAll("[role='tab']")) {
+          const selected = button.id === tabId;
+          button.setAttribute("aria-selected", String(selected));
+          document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
+        }
+      }
+
+      function setupTabs() {
+        for (const button of document.querySelectorAll("[role='tab']")) {
+          button.addEventListener("click", () => activateTab(button.id));
+          button.addEventListener("keydown", (event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const buttons = Array.from(document.querySelectorAll("[role='tab']"));
+            const currentIndex = buttons.indexOf(button);
+            let nextIndex = currentIndex;
+            if (event.key === "ArrowLeft") nextIndex = (currentIndex + buttons.length - 1) % buttons.length;
+            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = buttons.length - 1;
+            buttons[nextIndex].focus();
+            activateTab(buttons[nextIndex].id);
+          });
+        }
+      }
+
       document.getElementById("refresh").addEventListener("click", refresh);
+      setupTabs();
       refresh();
       setInterval(refresh, 60000);
     </script>

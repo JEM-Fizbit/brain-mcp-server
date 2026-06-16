@@ -98,6 +98,12 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /BRAIN_COCKPIT_PORT \|\| 8787/);
   assert.match(script, /hosted-doctor\.mjs/);
   assert.match(script, /\/api\/doctor/);
+  assert.match(script, /role="tablist"/);
+  assert.match(script, /panel-overview/);
+  assert.match(script, /panel-activity/);
+  assert.match(script, /panel-checks/);
+  assert.match(script, /panel-raw/);
+  assert.match(script, /activateTab/);
   assert.match(script, /Recent Brain Activity/);
   assert.match(script, /Watch Log/);
   assert.match(script, /localDateTime/);
