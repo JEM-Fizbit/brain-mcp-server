@@ -117,6 +117,8 @@ npm run hosted:doctor
 
 The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold.
 
+If doctor reports open conflicts, follow [`docs/conflict-resolution.md`](./conflict-resolution.md). Conflicts should be surfaced proactively and resolved with reviewed Markdown content, not hidden by manual database edits or duplicate filenames.
+
 To include the hosted write/local mirror parity gate:
 
 ```bash

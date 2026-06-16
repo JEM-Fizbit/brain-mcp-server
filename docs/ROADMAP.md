@@ -12,6 +12,7 @@ The core product direction is local-first hosted Brain:
 - Supabase Postgres stores Markdown revisions, sync cursors, conflicts, metadata, extracted source text, and future semantic chunks;
 - Supabase Storage stores original binary/source artifacts in private immutable paths;
 - git remains backup/export/history, not the live hosted sync hot path.
+- maintenance is automation-first: routine linting, sync health, hosted health, and conflict detection should be checked by tools and surfaced proactively, leaving users to make judgement calls rather than babysit infrastructure.
 
 ## Current Position
 
@@ -59,6 +60,7 @@ Move hosted MCP from pilot/shadow path to normal remote path for JEM Brain only 
 - daily hosted doctor/status checks pass without manual fiddling;
 - local sync daemon exposes a clear last-success signal and does not wedge on stale locks;
 - open conflicts are visible, understandable, and resolvable without database spelunking;
+- sync, lint, and hosted-health issues are proactively flagged with the next required action;
 - there is a short recovery playbook for reseeding hosted from local Markdown;
 - source artifact metadata and private retention behavior are verified;
 - OAuth client setup works smoothly enough for Claude and Codex;
@@ -72,7 +74,8 @@ Planned work:
 
 - add `hosted:doctor` or equivalent operator command for health, sync summary, open conflicts, and daemon status;
 - harden local sync daemon observability, including last successful sync time and clearer launchd logs;
-- write a conflict resolution operator guide;
+- write a conflict resolution operator guide that distinguishes automated checks from human judgement points;
+- define the proactive nudge path for lint, sync health, open conflicts, and source-ingestion issues;
 - run a real-world rehearsal on `ai-brain-jem`, including conflict inspection/resolution and local mirror catch-up;
 - verify source artifact privacy and metadata access from the hosted runtime;
 - keep local stdio Brain MCP as the default fallback.
@@ -82,6 +85,7 @@ Exit criteria:
 - hosted doctor passes repeatedly;
 - no unresolved smoke/test conflicts remain in the real Brain;
 - hosted MCP can be used by a real client without manual database intervention;
+- users are alerted when action is required rather than expected to poll raw logs;
 - recovery path is documented and rehearsed.
 
 ## Milestone 2: Multi-Brain For One Owner
@@ -177,9 +181,10 @@ Recommended order:
 1. Build `hosted:doctor`.
 2. Add sync daemon health and last-success reporting.
 3. Write the conflict resolution operator guide.
-4. Run the JEM Brain real-world rehearsal.
-5. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
-6. Start the multi-Brain design after the pilot path is boring.
+4. Define proactive user nudges for sync/lint/conflict issues.
+5. Run the JEM Brain real-world rehearsal.
+6. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
+7. Start the multi-Brain design after the pilot path is boring.
 
 ## Non-Goals For Now
 
