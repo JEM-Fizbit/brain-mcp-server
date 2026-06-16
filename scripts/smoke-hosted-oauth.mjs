@@ -33,6 +33,10 @@ const localBrainDir =
   process.env.BRAIN_DIR || path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
 const localSyncWaitMs = Number(process.env.BRAIN_HOSTED_OAUTH_LOCAL_WAIT_MS || 30000);
 const hostedSyncWaitMs = Number(process.env.BRAIN_HOSTED_OAUTH_HOSTED_WAIT_MS || 30000);
+const latencyFile =
+  process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
+  path.resolve(localBrainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
+const operationLatencies = [];
 
 function base64url(buffer) {
   return buffer
@@ -163,6 +167,83 @@ async function callTool(accessToken, name, args = {}) {
   return resultText;
 }
 
+function classifyTool(name) {
+  if (/update|resolve/.test(name)) return "write";
+  if (/read|load|list|search|status/.test(name)) return "read";
+  return "operation";
+}
+
+function targetFor(name, args = {}) {
+  if (args.filename) return args.filename;
+  if (args.conflict_id) return args.conflict_id;
+  if (args.query) return args.query;
+  if (args.brain_id) return args.brain_id;
+  return name;
+}
+
+async function timedOperation(name, kind, target, fn) {
+  const startedAt = Date.now();
+  try {
+    const result = await fn();
+    operationLatencies.push({
+      name,
+      kind,
+      target,
+      ok: true,
+      latencyMs: Date.now() - startedAt,
+      at: new Date().toISOString(),
+    });
+    return result;
+  } catch (error) {
+    operationLatencies.push({
+      name,
+      kind,
+      target,
+      ok: false,
+      latencyMs: Date.now() - startedAt,
+      at: new Date().toISOString(),
+      error: error.message,
+    });
+    throw error;
+  }
+}
+
+function latestOperation(kind) {
+  return operationLatencies
+    .slice()
+    .reverse()
+    .find((operation) => operation.kind === kind && operation.ok);
+}
+
+async function timedTool(accessToken, name, args = {}) {
+  return timedOperation(name, classifyTool(name), targetFor(name, args), () =>
+    callTool(accessToken, name, args)
+  );
+}
+
+async function writeLatencySnapshot() {
+  if (operationLatencies.length === 0) return;
+  await fs.mkdir(path.dirname(latencyFile), { recursive: true });
+  const latestRead = latestOperation("read");
+  const latestWrite = latestOperation("write");
+  const latestSyncWait = latestOperation("sync_wait");
+  const snapshot = {
+    version: 1,
+    checkedAt: new Date().toISOString(),
+    baseUrl,
+    brainId,
+    smokeFilename,
+    operationCount: operationLatencies.length,
+    latestReadLatencyMs: latestRead?.latencyMs ?? null,
+    latestWriteLatencyMs: latestWrite?.latencyMs ?? null,
+    latestSyncWaitLatencyMs: latestSyncWait?.latencyMs ?? null,
+    latestOperationAt: operationLatencies.at(-1)?.at ?? null,
+    operations: operationLatencies.slice(-40),
+  };
+  await fs.writeFile(latencyFile, `${JSON.stringify(snapshot, null, 2)}\n`, "utf-8");
+  console.log(`[hosted-oauth] User-facing latency snapshot written: ${latencyFile}`);
+}
+
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -245,7 +326,7 @@ function extractConflictId(conflicts) {
   return match?.[1];
 }
 
-async function runHostedConflictSmoke(accessToken) {
+async function runHostedConflictSmoke(accessToken, tool = timedTool) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "brain-hosted-oauth-conflict-"));
   const tempBrainDir = path.join(root, "brain");
   const tempStateFile = path.join(root, ".brain-sync", "state.json");
@@ -271,7 +352,7 @@ async function runHostedConflictSmoke(accessToken) {
       "Baseline content for hosted OAuth conflict smoke.",
       "",
     ].join("\n");
-    const baselineUpdate = await callTool(accessToken, "brain_update_file", {
+    const baselineUpdate = await tool(accessToken, "brain_update_file", {
       brain_id: brainId,
       filename: smokeFilename,
       content: baselineContent,
@@ -295,7 +376,7 @@ async function runHostedConflictSmoke(accessToken) {
       "Hosted update while the temporary local mirror is dirty.",
       "",
     ].join("\n");
-    const hostedUpdate = await callTool(accessToken, "brain_update_file", {
+    const hostedUpdate = await tool(accessToken, "brain_update_file", {
       brain_id: brainId,
       filename: smokeFilename,
       content: hostedConflictContent,
@@ -309,7 +390,7 @@ async function runHostedConflictSmoke(accessToken) {
       dirtyLocalContent
     );
 
-    const conflicts = await callTool(accessToken, "brain_list_conflicts", {
+    const conflicts = await tool(accessToken, "brain_list_conflicts", {
       brain_id: brainId,
     });
     assert.match(conflicts, new RegExp(`${smokeFilename}`));
@@ -326,24 +407,24 @@ async function runHostedConflictSmoke(accessToken) {
       "Reviewed resolution content for hosted OAuth conflict smoke.",
       "",
     ].join("\n");
-    const resolution = await callTool(accessToken, "brain_resolve_conflict", {
+    const resolution = await tool(accessToken, "brain_resolve_conflict", {
       brain_id: brainId,
       conflict_id: conflictId,
       content: resolvedContent,
     });
     assert.match(resolution, new RegExp(`Resolved conflict ${conflictId}`));
 
-    const openConflicts = await callTool(accessToken, "brain_list_conflicts", {
+    const openConflicts = await tool(accessToken, "brain_list_conflicts", {
       brain_id: brainId,
     });
     assert.doesNotMatch(openConflicts, new RegExp(`${conflictId}\\s+${smokeFilename}`));
-    const resolvedConflicts = await callTool(accessToken, "brain_list_conflicts", {
+    const resolvedConflicts = await tool(accessToken, "brain_list_conflicts", {
       brain_id: brainId,
       status: "resolved",
     });
     assert.match(resolvedConflicts, new RegExp(`${conflictId}\\s+${smokeFilename}`));
     assert.equal(
-      await callTool(accessToken, "brain_read_file", {
+      await tool(accessToken, "brain_read_file", {
         brain_id: brainId,
         filename: smokeFilename,
       }),
@@ -412,88 +493,97 @@ async function main() {
   assert.equal(token.token_type, "Bearer");
   assert.ok(token.access_token);
 
-  const files = await callTool(token.access_token, "brain_list_files", { brain_id: brainId });
-  assert.match(files, /00_loader\.md/);
-  const syncStatus = await callTool(token.access_token, "brain_sync_status", {
-    brain_id: brainId,
-  });
-  assert.match(syncStatus, /Provider: revision/);
-  const context = await callTool(token.access_token, "brain_load_context", {
-    brain_id: brainId,
-  });
-  assert.match(context, /00_loader|NOW\.md|Brain/i);
-
-  if (shouldWrite) {
-    const stamp = new Date().toISOString();
-    const expectedContent = [
-      "# Hosted OAuth Write Smoke",
-      "",
-      `- brain_id: ${brainId}`,
-      `- base_url: ${baseUrl}`,
-      `- timestamp: ${stamp}`,
-      "",
-      "This file is generated by scripts/smoke-hosted-oauth.mjs to verify hosted write parity.",
-      "",
-    ].join("\n");
-    const update = await callTool(token.access_token, "brain_update_file", {
+  try {
+    const files = await timedTool(token.access_token, "brain_list_files", { brain_id: brainId });
+    assert.match(files, /00_loader\.md/);
+    const syncStatus = await timedTool(token.access_token, "brain_sync_status", {
       brain_id: brainId,
-      filename: smokeFilename,
-      content: expectedContent,
-      mode: "replace",
     });
-    assert.match(update, new RegExp(`Updated ${smokeFilename}`));
-    const hosted = await callTool(token.access_token, "brain_read_file", {
+    assert.match(syncStatus, /Provider: revision/);
+    const context = await timedTool(token.access_token, "brain_load_context", {
       brain_id: brainId,
-      filename: smokeFilename,
     });
-    assert.equal(hosted, expectedContent);
-    console.log(`[hosted-oauth] Hosted write verified: ${smokeFilename}`);
+    assert.match(context, /00_loader|NOW\.md|Brain/i);
 
-    if (shouldVerifyLocal) {
-      try {
-        await waitForLocalFile(expectedContent);
-      } catch {
-        await runLocalSyncOnce();
-        await waitForLocalFile(expectedContent);
+    if (shouldWrite) {
+      const stamp = new Date().toISOString();
+      const expectedContent = [
+        "# Hosted OAuth Write Smoke",
+        "",
+        `- brain_id: ${brainId}`,
+        `- base_url: ${baseUrl}`,
+        `- timestamp: ${stamp}`,
+        "",
+        "This file is generated by scripts/smoke-hosted-oauth.mjs to verify hosted write parity.",
+        "",
+      ].join("\n");
+      const update = await timedTool(token.access_token, "brain_update_file", {
+        brain_id: brainId,
+        filename: smokeFilename,
+        content: expectedContent,
+        mode: "replace",
+      });
+      assert.match(update, new RegExp(`Updated ${smokeFilename}`));
+      const hosted = await timedTool(token.access_token, "brain_read_file", {
+        brain_id: brainId,
+        filename: smokeFilename,
+      });
+      assert.equal(hosted, expectedContent);
+      console.log(`[hosted-oauth] Hosted write verified: ${smokeFilename}`);
+
+      if (shouldVerifyLocal) {
+        await timedOperation("hosted_to_local_sync", "sync_wait", smokeFilename, async () => {
+          try {
+            await waitForLocalFile(expectedContent);
+          } catch {
+            await runLocalSyncOnce();
+            await waitForLocalFile(expectedContent);
+          }
+        });
+        console.log(`[hosted-oauth] Local sync verified: ${path.join(localBrainDir, smokeFilename)}`);
       }
-      console.log(`[hosted-oauth] Local sync verified: ${path.join(localBrainDir, smokeFilename)}`);
     }
-  }
 
-  if (shouldLocalWrite) {
-    const stamp = new Date().toISOString();
-    const expectedContent = [
-      "# Local OAuth Write Smoke",
-      "",
-      `- brain_id: ${brainId}`,
-      `- base_url: ${baseUrl}`,
-      `- timestamp: ${stamp}`,
-      "",
-      "This file is generated by scripts/smoke-hosted-oauth.mjs to verify local-to-hosted sync parity.",
-      "",
-    ].join("\n");
-    const localPath = await writeLocalSmokeFile(expectedContent);
-    console.log(`[hosted-oauth] Local write created: ${localPath}`);
+    if (shouldLocalWrite) {
+      const stamp = new Date().toISOString();
+      const expectedContent = [
+        "# Local OAuth Write Smoke",
+        "",
+        `- brain_id: ${brainId}`,
+        `- base_url: ${baseUrl}`,
+        `- timestamp: ${stamp}`,
+        "",
+        "This file is generated by scripts/smoke-hosted-oauth.mjs to verify local-to-hosted sync parity.",
+        "",
+      ].join("\n");
+      const localPath = await writeLocalSmokeFile(expectedContent);
+      console.log(`[hosted-oauth] Local write created: ${localPath}`);
 
-    if (shouldVerifyHosted) {
-      try {
-        await waitForHostedFile(token.access_token, expectedContent);
-      } catch {
-        await runLocalSyncOnce();
-        await waitForHostedFile(token.access_token, expectedContent);
+      if (shouldVerifyHosted) {
+        await timedOperation("local_to_hosted_sync", "sync_wait", smokeFilename, async () => {
+          try {
+            await waitForHostedFile(token.access_token, expectedContent);
+          } catch {
+            await runLocalSyncOnce();
+            await waitForHostedFile(token.access_token, expectedContent);
+          }
+        });
+        console.log(`[hosted-oauth] Hosted sync verified: ${smokeFilename}`);
       }
-      console.log(`[hosted-oauth] Hosted sync verified: ${smokeFilename}`);
     }
-  }
 
-  if (shouldConflict) {
-    await runHostedConflictSmoke(token.access_token);
+    if (shouldConflict) {
+      await runHostedConflictSmoke(token.access_token);
+    }
+  } finally {
+    await writeLatencySnapshot();
   }
 
   console.log("[hosted-oauth] PASS: OAuth enrollment and authenticated hosted MCP reads verified");
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  await writeLatencySnapshot().catch(() => undefined);
   console.error(`[hosted-oauth] FAIL: ${error.message}`);
   process.exitCode = 1;
 });

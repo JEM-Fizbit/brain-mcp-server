@@ -469,6 +469,18 @@ const page = String.raw`<!doctype html>
             <div class="metric-value" id="last-sync">-</div>
           </div>
           <div class="metric">
+            <div class="metric-label">Read op</div>
+            <div class="metric-value" id="read-op-latency">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Write op</div>
+            <div class="metric-value" id="write-op-latency">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Sync wait</div>
+            <div class="metric-value" id="sync-wait-latency">-</div>
+          </div>
+          <div class="metric">
             <div class="metric-label">Hosted HTTP</div>
             <div class="metric-value" id="hosted-latency">-</div>
           </div>
@@ -525,10 +537,17 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
-          <section>
-            <h2>Latency Measures</h2>
-            <div class="activity-list" id="latencies"></div>
-          </section>
+          <div class="activity-grid">
+            <section>
+              <h2>User-Facing Operations</h2>
+              <div class="activity-list" id="user-operation-latencies"></div>
+            </section>
+
+            <section>
+              <h2>Infrastructure Checks</h2>
+              <div class="activity-list" id="latencies"></div>
+            </section>
+          </div>
         </div>
 
         <div class="tab-panel" id="panel-checks" role="tabpanel" aria-labelledby="tab-checks" hidden>
@@ -573,6 +592,11 @@ const page = String.raw`<!doctype html>
         "trackedFiles",
         "openConflicts",
         "latestHostedUpdate",
+        "latestOperationAt",
+        "latestReadLatencyMs",
+        "latestWriteLatencyMs",
+        "latestSyncWaitLatencyMs",
+        "operationCount",
         "checkedAt",
         "state",
         "cycle",
@@ -828,6 +852,52 @@ const page = String.raw`<!doctype html>
           : "<div class=\"event muted\">No latency measures reported yet.</div>";
       }
 
+      function operationKindLabel(kind) {
+        if (kind === "read") return "read";
+        if (kind === "write") return "write";
+        if (kind === "sync_wait") return "sync wait";
+        return kind || "operation";
+      }
+
+      function renderUserOperationLatencies(payload) {
+        const details = byName(payload, "user_operation_latency")?.details || {};
+        const operations = details.operations || [];
+        const recordedAt = details.latestOperationAt || details.checkedAt;
+        const intro = details.state === "recorded"
+          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt)
+          : "No hosted MCP operation timing has been recorded yet. Run the hosted OAuth smoke or a measured client operation.";
+
+        const summaryRows = [
+          ["Latest read", details.latestReadLatencyMs],
+          ["Latest write", details.latestWriteLatencyMs],
+          ["Latest sync wait", details.latestSyncWaitLatencyMs],
+        ].filter((row) => row[1] !== undefined && row[1] !== null);
+
+        const summary = summaryRows.length
+          ? "<div class=\"event\">" +
+              "<div class=\"event-title\">" + escapeHtml(intro) + "</div>" +
+              "<div class=\"event-meta\">" + summaryRows.map((row) => escapeHtml(row[0] + ": " + formatDuration(row[1]))).join(" · ") + "</div>" +
+            "</div>"
+          : "<div class=\"event muted\">" + escapeHtml(intro) + "</div>";
+
+        const rows = operations.length
+          ? operations.map((operation) =>
+              "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(operation.name) + ": " + escapeHtml(formatDuration(operation.latencyMs)) + "</div>" +
+                "<div class=\"event-meta\">" +
+                  escapeHtml(operationKindLabel(operation.kind)) + " · " +
+                  escapeHtml(operation.target || "-") + " · " +
+                  escapeHtml(operation.ok ? "ok" : "failed") + " · " +
+                  escapeHtml(localDateTime(operation.at)) +
+                  (operation.error ? " · " + escapeHtml(operation.error) : "") +
+                "</div>" +
+              "</div>"
+            ).join("")
+          : "";
+
+        document.getElementById("user-operation-latencies").innerHTML = summary + rows;
+      }
+
       function render(payload) {
         detectChanges(payload);
         const state = payload.status || "fail";
@@ -840,11 +910,15 @@ const page = String.raw`<!doctype html>
         const postgres = byName(payload, "postgres_summary")?.details || {};
         const local = byName(payload, "local_sync_state")?.details || {};
         const sync = byName(payload, "sync_health")?.details || {};
+        const userOps = byName(payload, "user_operation_latency")?.details || {};
 
         document.getElementById("hosted-files").textContent = postgres.hostedFiles ?? "-";
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
         document.getElementById("open-conflicts").textContent = postgres.openConflicts ?? "-";
         document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
+        document.getElementById("read-op-latency").textContent = formatDuration(userOps.latestReadLatencyMs);
+        document.getElementById("write-op-latency").textContent = formatDuration(userOps.latestWriteLatencyMs);
+        document.getElementById("sync-wait-latency").textContent = formatDuration(userOps.latestSyncWaitLatencyMs);
         document.getElementById("hosted-latency").textContent = formatDuration(byName(payload, "hosted_health")?.details?.latencyMs);
         document.getElementById("postgres-latency").textContent = formatDuration(postgres.latencyMs);
         document.getElementById("sync-latency").textContent = formatDuration(sync.totalMs);
@@ -861,6 +935,7 @@ const page = String.raw`<!doctype html>
 
         renderActivity(payload);
         renderOperationLog();
+        renderUserOperationLatencies(payload);
         renderLatencies(payload);
         document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
       }

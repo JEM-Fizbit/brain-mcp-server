@@ -22,6 +22,9 @@ const stateFile =
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE || `${stateFile}.lock`;
 const healthFile =
   process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
+const userOperationLatencyFile =
+  process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
+  path.resolve(brainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
@@ -322,6 +325,42 @@ async function checkSyncHealth() {
   }
 }
 
+async function checkUserOperationLatency() {
+  try {
+    const snapshot = await readJson(userOperationLatencyFile);
+    const operations = Array.isArray(snapshot.operations)
+      ? snapshot.operations.slice(-12).reverse()
+      : [];
+
+    addCheck("user_operation_latency", "pass", {
+      latencyFile: userOperationLatencyFile,
+      state: "recorded",
+      checkedAt: snapshot.checkedAt || null,
+      latestOperationAt: snapshot.latestOperationAt || null,
+      latestReadLatencyMs: snapshot.latestReadLatencyMs ?? null,
+      latestWriteLatencyMs: snapshot.latestWriteLatencyMs ?? null,
+      latestSyncWaitLatencyMs: snapshot.latestSyncWaitLatencyMs ?? null,
+      operationCount: snapshot.operationCount ?? operations.length,
+      operations,
+    });
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      addCheck("user_operation_latency", "pass", {
+        latencyFile: userOperationLatencyFile,
+        state: "not_recorded",
+        operations: [],
+      });
+      return;
+    }
+    addCheck("user_operation_latency", "warn", {
+      latencyFile: userOperationLatencyFile,
+      state: "unreadable",
+      error: error.message,
+      operations: [],
+    });
+  }
+}
+
 function parseLaunchdOutput(stdout) {
   const state = stdout.match(/state = ([^\n]+)/)?.[1]?.trim() || null;
   const activeCount = stdout.match(/active count = ([^\n]+)/)?.[1]?.trim() || null;
@@ -396,6 +435,7 @@ await Promise.all([
   timedCheck("local_sync_state", checkLocalState),
   timedCheck("sync_lock", checkSyncLock),
   timedCheck("sync_health", checkSyncHealth),
+  timedCheck("user_operation_latency", checkUserOperationLatency),
   timedCheck("launchd", checkLaunchd),
   timedCheck("fly_status", checkFlyStatus),
 ]);
