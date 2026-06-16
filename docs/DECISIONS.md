@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-16 — Stage hosted Brain cutover before ERS multi-tenant buildout
+
+**Decision:** Treat the JEM hosted Brain as a local-first pilot that must become operationally boring before normal remote-client cutover, then build multi-Brain support, ERS-owned Supabase migration, ERS multi-user access, and true multi-tenant product shape in that order.
+
+**Why:** The rebuild has proven the core Supabase-backed sync, conflict, and OAuth paths, but production trust depends on repeatable operator checks, daemon health, conflict resolution guidance, and recovery rehearsal. ERS multi-user and multi-tenant work should build on a proven single-user/multi-Brain contract rather than mixing product tenancy concerns into the remaining JEM pilot hardening.
+
+**Alternatives rejected:** Cutting over hosted MCP immediately because tests pass once; treating hosted cutover as abandoning local Markdown; building ERS multi-tenant machinery before multi-Brain routing and operational recovery are proven; treating John's private Supabase pilot as final ERS production infrastructure.
+
+**Related:** `docs/ROADMAP.md`; `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/specs/003-hosted-brain-sync-architecture.md`.
+
+---
+
 ## 2026-06-14 — Remove git hot path from Fly hosted runtime config
 
 **Decision:** The committed Fly runtime config, Docker image, and entrypoint must represent the Supabase-backed hosted Brain runtime, not the retired git working-copy pilot. Fly must not mount a deploy key, install SSH/git only for hosted writes, or enable `BRAIN_AUTO_SYNC`/`BRAIN_AUTO_PUSH` for the Supabase-backed server.
