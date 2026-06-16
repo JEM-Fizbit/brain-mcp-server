@@ -19,6 +19,7 @@
     "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",
+    "hosted:doctor": "node scripts/hosted-doctor.mjs",
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
     "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",

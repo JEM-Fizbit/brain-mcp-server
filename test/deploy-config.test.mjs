@@ -59,3 +59,24 @@ test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
     assert.doesNotMatch(line, /console\.log.*access_token|access_token.*console\.log/);
   }
 });
+
+test("hosted doctor is non-destructive and redacts database credentials", async () => {
+  const packageJson = JSON.parse(
+    await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
+  );
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+
+  assert.equal(packageJson.scripts["hosted:doctor"], "node scripts/hosted-doctor.mjs");
+  assert.match(script, /hosted_health/);
+  assert.match(script, /postgres_summary/);
+  assert.match(script, /local_sync_state/);
+  assert.match(script, /sync_lock/);
+  assert.match(script, /launchd/);
+  assert.match(script, /fly_status/);
+  assert.match(script, /databaseUrl: "set"/);
+  assert.doesNotMatch(script, /databaseUrl[,}]/);
+  assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
+});
