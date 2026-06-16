@@ -83,14 +83,19 @@ function listenForCallback(expectedState) {
       return `http://127.0.0.1:${address.port}/callback`;
     },
     async wait() {
+      let timeout;
       try {
         return await Promise.race([
           callback,
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timed out waiting for OAuth callback")), timeoutMs)
+            timeout = setTimeout(
+              () => reject(new Error("Timed out waiting for OAuth callback")),
+              timeoutMs
+            )
           ),
         ]);
       } finally {
+        if (timeout) clearTimeout(timeout);
         server.close();
       }
     },
