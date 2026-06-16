@@ -27,6 +27,8 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - conflicts can be explicitly resolved through `brain_resolve_conflict`;
 - live OAuth smoke verifies hosted conflict listing, resolution, and final hosted content;
 - `hosted:cockpit` provides a local read-only operator dashboard over the hosted doctor checks;
+- `hosted:test-drive` provides a single readable operator rehearsal for hosted health, MCP read/write parity, conflict lifecycle, and latency;
+- cached hosted OAuth smoke avoids repeated GitHub approval during routine checks;
 - local Brain MCP remains the trusted default while hosted becomes operationally boring.
 
 ## Cutover Principle
@@ -180,14 +182,12 @@ Exit criteria:
 
 Recommended order:
 
-1. Build `hosted:doctor`.
-2. Add sync daemon health and last-success reporting.
-3. Build a local read-only cockpit over hosted doctor output.
-4. Write the conflict resolution operator guide.
-5. Define proactive user nudges for sync/lint/conflict issues.
-6. Run the JEM Brain real-world rehearsal.
-7. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
-8. Start the multi-Brain design after the pilot path is boring.
+1. Run the JEM Brain real-world hosted-client rehearsal using `npm run hosted:test-drive` as the readiness gate.
+2. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
+3. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI.
+4. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
+5. Document and rehearse hosted recovery/reseed from local Markdown.
+6. Start the multi-Brain design after the JEM pilot path is boring.
 
 ## Non-Goals For Now
 
