@@ -51,6 +51,12 @@ test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
   assert.match(script, /Bearer \$\{accessToken\}/);
   assert.match(script, /HOSTED_OAUTH_WRITE_SMOKE\.md/);
   assert.match(script, /BRAIN_SYNC_INCLUDE_FILES: smokeFilename/);
+  assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
+  assert.match(script, /hosted-mcp-latency\.json/);
+  assert.match(script, /operationLatencies/);
+  assert.match(script, /writeLatencySnapshot/);
+  assert.match(script, /latestReadLatencyMs/);
+  assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /brain-hosted-oauth-conflict-/);
   assert.match(script, /brain_resolve_conflict/);
   assert.match(script, /fs\.writeFile\(localPath, expectedContent, "utf-8"\)/);
@@ -76,6 +82,10 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /brain_file_revisions/);
   assert.match(script, /timedCheck/);
   assert.match(script, /latencyMs/);
+  assert.match(script, /user_operation_latency/);
+  assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
+  assert.match(script, /latestReadLatencyMs/);
+  assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /local_sync_state/);
   assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
@@ -107,7 +117,12 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /panel-checks/);
   assert.match(script, /panel-raw/);
   assert.match(script, /activateTab/);
-  assert.match(script, /Latency Measures/);
+  assert.match(script, /User-Facing Operations/);
+  assert.match(script, /Infrastructure Checks/);
+  assert.match(script, /read-op-latency/);
+  assert.match(script, /write-op-latency/);
+  assert.match(script, /sync-wait-latency/);
+  assert.match(script, /renderUserOperationLatencies/);
   assert.match(script, /hosted-latency/);
   assert.match(script, /doctor-latency/);
   assert.match(script, /formatDuration/);
