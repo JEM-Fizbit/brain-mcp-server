@@ -35,3 +35,22 @@ test("Fly image does not install or configure deploy-key SSH access", async () =
   assert.doesNotMatch(entrypoint, /brain_deploy_key/);
   assert.match(entrypoint, /exec "\$@"/);
 });
+
+test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
+  const packageJson = JSON.parse(
+    await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
+  );
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "smoke-hosted-oauth.mjs"),
+    "utf-8"
+  );
+
+  assert.equal(packageJson.scripts["smoke:hosted:oauth"], "node scripts/smoke-hosted-oauth.mjs");
+  assert.match(script, /token_endpoint_auth_method: "none"/);
+  assert.match(script, /code_challenge_method", "S256"/);
+  assert.match(script, /Bearer \$\{accessToken\}/);
+  assert.doesNotMatch(script, /writeFile|appendFile|localStorage/);
+  for (const line of script.split("\n")) {
+    assert.doesNotMatch(line, /console\.log.*access_token|access_token.*console\.log/);
+  }
+});

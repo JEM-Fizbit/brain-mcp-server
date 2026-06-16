@@ -101,6 +101,14 @@ Then enroll a remote MCP client against:
 https://jem-brain-mcp.fly.dev/mcp
 ```
 
+For an operator-controlled OAuth enrollment smoke, run:
+
+```bash
+npm run smoke:hosted:oauth
+```
+
+The script registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and performs read-only hosted MCP checks. It keeps tokens in memory only and exits after verification. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser.
+
 Expected first authenticated tool checks:
 
 - `brain_list_brains`
