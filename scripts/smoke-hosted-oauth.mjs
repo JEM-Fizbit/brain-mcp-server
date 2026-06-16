@@ -6,7 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
 
+loadLocalEnv();
 const exec = promisify(execFile);
 
 const baseUrl = (process.env.BRAIN_HOSTED_BASE_URL || "https://jem-brain-mcp.fly.dev")
@@ -24,6 +26,8 @@ const shouldLocalWrite =
   args.has("--local-write") || process.env.BRAIN_HOSTED_OAUTH_LOCAL_WRITE === "1";
 const shouldVerifyHosted =
   args.has("--verify-hosted") || process.env.BRAIN_HOSTED_OAUTH_VERIFY_HOSTED === "1";
+const shouldConflict =
+  args.has("--conflict") || process.env.BRAIN_HOSTED_OAUTH_CONFLICT === "1";
 const smokeFilename = process.env.BRAIN_HOSTED_OAUTH_WRITE_FILE || "HOSTED_OAUTH_WRITE_SMOKE.md";
 const localBrainDir =
   process.env.BRAIN_DIR || path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
@@ -163,8 +167,8 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForLocalFile(expectedContent) {
-  const localPath = path.join(localBrainDir, smokeFilename);
+async function waitForLocalFile(expectedContent, brainDir = localBrainDir) {
+  const localPath = path.join(brainDir, smokeFilename);
   const deadline = Date.now() + localSyncWaitMs;
   let lastContent = "";
   while (Date.now() < deadline) {
@@ -177,7 +181,7 @@ async function waitForLocalFile(expectedContent) {
     await sleep(1000);
   }
   throw new Error(
-    `Timed out waiting for local sync of ${smokeFilename} under ${localBrainDir}` +
+    `Timed out waiting for local sync of ${smokeFilename} under ${brainDir}` +
       (lastContent ? "; file exists but content did not match" : "")
   );
 }
@@ -203,19 +207,20 @@ async function waitForHostedFile(accessToken, expectedContent) {
   );
 }
 
-async function runLocalSyncOnce() {
+async function runLocalSync(command = "once", env = {}) {
   try {
-    await exec("npm", ["run", "sync", "--", "once"], {
+    await exec("npm", ["run", "sync", "--", command], {
       env: {
         ...process.env,
         BRAIN_SYNC_INCLUDE_FILES: smokeFilename,
+        ...env,
       },
       timeout: 30000,
       maxBuffer: 1024 * 1024,
     });
   } catch (error) {
     const output = `${error.stdout || ""}\n${error.stderr || ""}`;
-    if (/Brain sync is already running or a stale lock exists/.test(output)) {
+    if (/Brain sync is already running/.test(output)) {
       return false;
     }
     throw error;
@@ -223,11 +228,132 @@ async function runLocalSyncOnce() {
   return true;
 }
 
+async function runLocalSyncOnce(env = {}) {
+  return runLocalSync("once", env);
+}
+
 async function writeLocalSmokeFile(expectedContent) {
   const localPath = path.join(localBrainDir, smokeFilename);
   await fs.mkdir(path.dirname(localPath), { recursive: true });
   await fs.writeFile(localPath, expectedContent, "utf-8");
   return localPath;
+}
+
+function extractConflictId(conflicts) {
+  const escaped = smokeFilename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = conflicts.match(new RegExp(`- ([^\\s]+) ${escaped}`));
+  return match?.[1];
+}
+
+async function runHostedConflictSmoke(accessToken) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "brain-hosted-oauth-conflict-"));
+  const tempBrainDir = path.join(root, "brain");
+  const tempStateFile = path.join(root, ".brain-sync", "state.json");
+  const tempLockFile = `${tempStateFile}.lock`;
+  const syncEnv = {
+    BRAIN_ID: brainId,
+    BRAIN_DIR: tempBrainDir,
+    BRAIN_SYNC_STATE_FILE: tempStateFile,
+    BRAIN_SYNC_LOCK_FILE: tempLockFile,
+    BRAIN_SYNC_INCLUDE_FILES: smokeFilename,
+    BRAIN_REVISION_STORE: "postgres",
+  };
+
+  try {
+    const stamp = new Date().toISOString();
+    const baselineContent = [
+      "# Hosted OAuth Conflict Smoke",
+      "",
+      `- brain_id: ${brainId}`,
+      `- base_url: ${baseUrl}`,
+      `- baseline_timestamp: ${stamp}`,
+      "",
+      "Baseline content for hosted OAuth conflict smoke.",
+      "",
+    ].join("\n");
+    const baselineUpdate = await callTool(accessToken, "brain_update_file", {
+      brain_id: brainId,
+      filename: smokeFilename,
+      content: baselineContent,
+      mode: "replace",
+    });
+    assert.match(baselineUpdate, new RegExp(`Updated ${smokeFilename}`));
+
+    await runLocalSync("pull", syncEnv);
+    await waitForLocalFile(baselineContent, tempBrainDir);
+
+    const dirtyLocalContent = `${baselineContent}Local dirty edit before hosted update.\n`;
+    await fs.writeFile(path.join(tempBrainDir, smokeFilename), dirtyLocalContent, "utf-8");
+
+    const hostedConflictContent = [
+      "# Hosted OAuth Conflict Smoke",
+      "",
+      `- brain_id: ${brainId}`,
+      `- base_url: ${baseUrl}`,
+      `- hosted_conflict_timestamp: ${new Date().toISOString()}`,
+      "",
+      "Hosted update while the temporary local mirror is dirty.",
+      "",
+    ].join("\n");
+    const hostedUpdate = await callTool(accessToken, "brain_update_file", {
+      brain_id: brainId,
+      filename: smokeFilename,
+      content: hostedConflictContent,
+      mode: "replace",
+    });
+    assert.match(hostedUpdate, new RegExp(`Updated ${smokeFilename}`));
+
+    await runLocalSync("pull", syncEnv);
+    assert.equal(
+      await fs.readFile(path.join(tempBrainDir, smokeFilename), "utf-8"),
+      dirtyLocalContent
+    );
+
+    const conflicts = await callTool(accessToken, "brain_list_conflicts", {
+      brain_id: brainId,
+    });
+    assert.match(conflicts, new RegExp(`${smokeFilename}`));
+    const conflictId = extractConflictId(conflicts);
+    assert.ok(conflictId, `Could not find conflict id for ${smokeFilename}`);
+
+    const resolvedContent = [
+      "# Hosted OAuth Conflict Smoke",
+      "",
+      `- brain_id: ${brainId}`,
+      `- base_url: ${baseUrl}`,
+      `- resolved_timestamp: ${new Date().toISOString()}`,
+      "",
+      "Reviewed resolution content for hosted OAuth conflict smoke.",
+      "",
+    ].join("\n");
+    const resolution = await callTool(accessToken, "brain_resolve_conflict", {
+      brain_id: brainId,
+      conflict_id: conflictId,
+      content: resolvedContent,
+    });
+    assert.match(resolution, new RegExp(`Resolved conflict ${conflictId}`));
+
+    const openConflicts = await callTool(accessToken, "brain_list_conflicts", {
+      brain_id: brainId,
+    });
+    assert.doesNotMatch(openConflicts, new RegExp(`${conflictId}\\s+${smokeFilename}`));
+    const resolvedConflicts = await callTool(accessToken, "brain_list_conflicts", {
+      brain_id: brainId,
+      status: "resolved",
+    });
+    assert.match(resolvedConflicts, new RegExp(`${conflictId}\\s+${smokeFilename}`));
+    assert.equal(
+      await callTool(accessToken, "brain_read_file", {
+        brain_id: brainId,
+        filename: smokeFilename,
+      }),
+      resolvedContent
+    );
+
+    console.log(`[hosted-oauth] Conflict lifecycle verified: ${conflictId}`);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 async function main() {
@@ -358,6 +484,10 @@ async function main() {
       }
       console.log(`[hosted-oauth] Hosted sync verified: ${smokeFilename}`);
     }
+  }
+
+  if (shouldConflict) {
+    await runHostedConflictSmoke(token.access_token);
   }
 
   console.log("[hosted-oauth] PASS: OAuth enrollment and authenticated hosted MCP reads verified");

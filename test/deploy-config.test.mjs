@@ -51,6 +51,8 @@ test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
   assert.match(script, /Bearer \$\{accessToken\}/);
   assert.match(script, /HOSTED_OAUTH_WRITE_SMOKE\.md/);
   assert.match(script, /BRAIN_SYNC_INCLUDE_FILES: smokeFilename/);
+  assert.match(script, /brain-hosted-oauth-conflict-/);
+  assert.match(script, /brain_resolve_conflict/);
   assert.match(script, /fs\.writeFile\(localPath, expectedContent, "utf-8"\)/);
   assert.doesNotMatch(script, /appendFile|localStorage/);
   for (const line of script.split("\n")) {
