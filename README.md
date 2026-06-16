@@ -78,6 +78,7 @@ This repo includes:
 - `Dockerfile` for the hosted Node runtime
 - `fly.toml` for the first Supabase-backed Fly.io target, `jem-brain-mcp`
 - [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
+- [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the staged JEM cutover, ERS migration, and multi-tenant roadmap
 
 Hosted endpoint shape:
 
