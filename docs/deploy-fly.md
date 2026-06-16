@@ -107,7 +107,7 @@ For an operator-controlled OAuth enrollment smoke, run:
 npm run smoke:hosted:oauth
 ```
 
-The script registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and performs read-only hosted MCP checks. It keeps tokens in memory only and exits after verification. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser.
+The script reuses a local refresh-token cache when available, then performs read-only hosted MCP checks. On first run, or when the cached grant has expired or been revoked, it registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and updates the cache. Access tokens stay in memory; only the rotating refresh token is written locally with `0600` permissions. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser, `BRAIN_HOSTED_OAUTH_TOKEN_CACHE` to override the cache path, or pass `--reauth` to force a new browser approval.
 
 For a non-destructive hosted operator check, run:
 

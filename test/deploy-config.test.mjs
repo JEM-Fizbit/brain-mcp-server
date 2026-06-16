@@ -36,7 +36,7 @@ test("Fly image does not install or configure deploy-key SSH access", async () =
   assert.match(entrypoint, /exec "\$@"/);
 });
 
-test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
+test("hosted OAuth smoke caches refresh grants without logging access tokens", async () => {
   const packageJson = JSON.parse(
     await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
   );
@@ -51,6 +51,12 @@ test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
   assert.match(script, /Bearer \$\{accessToken\}/);
   assert.match(script, /HOSTED_OAUTH_WRITE_SMOKE\.md/);
   assert.match(script, /BRAIN_SYNC_INCLUDE_FILES: smokeFilename/);
+  assert.match(script, /BRAIN_HOSTED_OAUTH_TOKEN_CACHE/);
+  assert.match(script, /hosted-oauth-token\.json/);
+  assert.match(script, /refresh_token/);
+  assert.match(script, /grant_type: "refresh_token"/);
+  assert.match(script, /shouldReauth/);
+  assert.match(script, /chmod\(tokenCacheFile, 0o600\)/);
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
   assert.match(script, /hosted-mcp-latency\.json/);
   assert.match(script, /operationLatencies/);
@@ -60,6 +66,7 @@ test("hosted OAuth smoke keeps temporary access tokens in memory", async () => {
   assert.match(script, /brain-hosted-oauth-conflict-/);
   assert.match(script, /brain_resolve_conflict/);
   assert.match(script, /fs\.writeFile\(localPath, expectedContent, "utf-8"\)/);
+  assert.doesNotMatch(script, /accessToken.*fs\.writeFile|fs\.writeFile.*accessToken/);
   assert.doesNotMatch(script, /appendFile|localStorage/);
   for (const line of script.split("\n")) {
     assert.doesNotMatch(line, /console\.log.*access_token|access_token.*console\.log/);
