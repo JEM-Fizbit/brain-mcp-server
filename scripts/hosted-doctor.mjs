@@ -118,6 +118,97 @@ async function checkPostgresSummary() {
   }
 }
 
+async function checkRecentActivity() {
+  if (!databaseUrl) {
+    addCheck("recent_activity", "warn", {
+      brainId,
+      databaseUrl: "missing",
+      events: [],
+    });
+    return;
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    const result = await pool.query(
+      `
+        with revision_events as (
+          select
+            created_at as occurred_at,
+            'file_revision' as event_type,
+            filename,
+            origin,
+            actor_name,
+            actor_email,
+            content_sha256,
+            id::text as reference_id
+          from brain.brain_file_revisions
+          where brain_id = $1
+        ),
+        conflict_events as (
+          select
+            created_at as occurred_at,
+            'conflict_opened' as event_type,
+            filename,
+            local_origin as origin,
+            null::text as actor_name,
+            null::text as actor_email,
+            local_content_sha256 as content_sha256,
+            id::text as reference_id
+          from brain.sync_conflicts
+          where brain_id = $1
+
+          union all
+
+          select
+            resolved_at as occurred_at,
+            'conflict_resolved' as event_type,
+            filename,
+            remote_origin as origin,
+            null::text as actor_name,
+            null::text as actor_email,
+            remote_content_sha256 as content_sha256,
+            id::text as reference_id
+          from brain.sync_conflicts
+          where brain_id = $1 and resolved_at is not null
+        )
+        select *
+        from (
+          select * from revision_events
+          union all
+          select * from conflict_events
+        ) events
+        where occurred_at is not null
+        order by occurred_at desc
+        limit 12
+      `,
+      [brainId]
+    );
+    addCheck("recent_activity", "pass", {
+      brainId,
+      events: result.rows.map((row) => ({
+        occurredAt: row.occurred_at.toISOString(),
+        eventType: row.event_type,
+        filename: row.filename,
+        origin: row.origin,
+        actorName: row.actor_name,
+        actorEmail: row.actor_email,
+        contentSha256: row.content_sha256,
+        referenceId: row.reference_id,
+      })),
+    });
+  } catch (error) {
+    addCheck("recent_activity", "warn", {
+      brainId,
+      databaseUrl: "set",
+      error: error.message,
+      events: [],
+    });
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
 async function checkLocalState() {
   try {
     const state = await readJson(stateFile);
@@ -280,6 +371,7 @@ async function checkFlyStatus() {
 await Promise.all([
   checkHostedHealth(),
   checkPostgresSummary(),
+  checkRecentActivity(),
   checkLocalState(),
   checkSyncLock(),
   checkSyncHealth(),

@@ -125,6 +125,8 @@ npm run hosted:cockpit
 
 The cockpit binds to `127.0.0.1:8787` by default, calls `hosted:doctor` behind `GET /api/doctor`, and auto-refreshes once per minute. It is intended for local visibility during the JEM hosted Brain pilot; it should not be exposed publicly or used as an admin mutation surface. Set `BRAIN_COCKPIT_PORT` or `BRAIN_COCKPIT_HOST` only for deliberate local operator needs.
 
+File counts are inventory counts, not an activity log. Updating an existing smoke file should leave the hosted/local file counts unchanged. Use the cockpit's Recent Brain Activity panel and Watch Log to see revision writes, conflict open/resolution events, sync pulls/pushes, and local-time timestamps while exercising hosted MCP operations.
+
 If doctor reports open conflicts, follow [`docs/conflict-resolution.md`](./conflict-resolution.md). Conflicts should be surfaced proactively and resolved with reviewed Markdown content, not hidden by manual database edits or duplicate filenames.
 
 To include the hosted write/local mirror parity gate:
