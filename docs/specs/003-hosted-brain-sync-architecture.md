@@ -344,7 +344,7 @@ The sync CLI takes an atomic local lock for every run so two local mirror proces
 
 Pilot verification on 2026-06-14:
 
-- temporary smoke Brain push/status/pull round trip passed against Supabase Postgres;
+- temporary smoke Brain push/pull round trip and conflict-blocking flows passed against Supabase Postgres;
 - real `ai-brain-jem` canary push of `00_loader.md` passed;
 - real `ai-brain-jem` canary pull of `00_loader.md` into a fresh mirror passed;
 - staged core seed of 14 root Brain files passed and a fresh mirror matched all files byte-for-byte;
