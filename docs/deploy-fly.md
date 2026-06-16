@@ -127,6 +127,8 @@ The cockpit binds to `127.0.0.1:8787` by default, calls `hosted:doctor` behind `
 
 File counts are inventory counts, not an activity log. Updating an existing smoke file should leave the hosted/local file counts unchanged. Use the cockpit's Recent Brain Activity panel and Watch Log to see revision writes, conflict open/resolution events, sync pulls/pushes, and local-time timestamps while exercising hosted MCP operations.
 
+The cockpit also reports latency for the hosted health request, Postgres summary query, most recent local sync cycle, total doctor run, and each underlying doctor check. These are operator diagnostics, not strict SLOs yet; use them to notice drift before a sync or hosted MCP path becomes painful.
+
 If doctor reports open conflicts, follow [`docs/conflict-resolution.md`](./conflict-resolution.md). Conflicts should be surfaced proactively and resolved with reviewed Markdown content, not hidden by manual database edits or duplicate filenames.
 
 To include the hosted write/local mirror parity gate:
