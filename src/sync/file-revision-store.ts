@@ -8,6 +8,8 @@ import type {
   ChangePage,
   ConflictInput,
   ConflictRecord,
+  ConflictResolutionInput,
+  ConflictResolutionResult,
   FileHead,
   RevisionContent,
   RevisionProposal,
@@ -65,6 +67,12 @@ export class FileRevisionStore implements RevisionStore {
     status?: "open" | "resolved" | "superseded"
   ): Promise<ConflictRecord[]> {
     return this.withStore(false, (store) => store.listConflicts(brainId, status));
+  }
+
+  resolveConflict(
+    input: ConflictResolutionInput
+  ): Promise<ConflictResolutionResult> {
+    return this.withStore(true, (store) => store.resolveConflict(input));
   }
 
   private async withStore<T>(

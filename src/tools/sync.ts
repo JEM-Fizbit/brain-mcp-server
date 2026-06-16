@@ -1,7 +1,15 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ListConflictsSchema, SyncStatusSchema } from "../schemas/tools.js";
+import {
+  ListConflictsSchema,
+  ResolveConflictSchema,
+  SyncStatusSchema,
+} from "../schemas/tools.js";
 import { activeBrainStore } from "../services/active-brain-store.js";
-import { resolveToolBrain } from "../services/request-context.js";
+import {
+  assertWriteRole,
+  resolveToolBrain,
+  revisionActor,
+} from "../services/request-context.js";
 import type { ConflictRecord } from "../sync/types.js";
 
 function shortHash(value?: string | null): string {
@@ -63,6 +71,34 @@ export function registerSyncTools(server: McpServer): void {
             : `Sync conflicts for ${ctx.brainId} (${status}):\n${conflicts
                 .map(formatConflict)
                 .join("\n")}`;
+        return { content: [{ type: "text", text }] };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: String(error) }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "brain_resolve_conflict",
+    "Resolve an open sync conflict by writing reviewed replacement Markdown content as the new hosted head, then marking the conflict resolved. Use brain_list_conflicts first and do not use this to hide unreviewed divergence.",
+    ResolveConflictSchema.shape,
+    async ({ brain_id, conflict_id, content }, extra) => {
+      try {
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
+        const result = await activeBrainStore().resolveConflict(
+          ctx.brainId,
+          conflict_id,
+          content,
+          revisionActor(ctx)
+        );
+        const text = [
+          `Resolved conflict ${result.conflict.conflictId} for ${result.conflict.filename}.`,
+          `Resolution revision: ${result.revision.revisionId}`,
+        ].join("\n");
         return { content: [{ type: "text", text }] };
       } catch (error) {
         return {
