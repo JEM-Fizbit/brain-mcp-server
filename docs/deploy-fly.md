@@ -109,6 +109,14 @@ npm run smoke:hosted:oauth
 
 The script reuses a local refresh-token cache when available, then performs read-only hosted MCP checks. On first run, or when the cached grant has expired or been revoked, it registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and updates the cache. Access tokens stay in memory; only the rotating refresh token is written locally with `0600` permissions. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser, `BRAIN_HOSTED_OAUTH_TOKEN_CACHE` to override the cache path, or pass `--reauth` to force a new browser approval.
 
+For a single operator rehearsal that runs the hosted doctor, OAuth MCP read/write parity, local-to-hosted parity, conflict lifecycle, latency snapshot, and final doctor summary, run:
+
+```bash
+npm run hosted:test-drive
+```
+
+The final output is intended to be readable without inspecting raw JSON: it reports pass/warn/fail status, hosted/local inventory, open conflicts, sync cycle activity, user-facing read/write/sync latency, and the next operator action. Use `--read-only` for a non-mutating check or `--skip-conflict` when the write parity checks are desired but the conflict lifecycle is not.
+
 For a non-destructive hosted operator check, run:
 
 ```bash
