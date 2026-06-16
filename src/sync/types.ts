@@ -51,6 +51,8 @@ export interface ConflictRecord extends ConflictInput {
   conflictId: string;
   createdAt: string;
   status: "open" | "resolved" | "superseded";
+  resolutionRevisionId?: string;
+  resolvedAt?: string;
 }
 
 export interface RevisionAccepted {
@@ -68,6 +70,18 @@ export interface RevisionConflict {
 }
 
 export type RevisionProposalResult = RevisionAccepted | RevisionConflict;
+
+export interface ConflictResolutionInput {
+  brainId: string;
+  conflictId: string;
+  content: string;
+  actor?: RevisionActor;
+}
+
+export interface ConflictResolutionResult {
+  conflict: ConflictRecord;
+  revision: RevisionContent;
+}
 
 export interface SearchOptions {
   maxResults?: number;
@@ -111,6 +125,7 @@ export interface RevisionStore {
     brainId: string,
     status?: "open" | "resolved" | "superseded"
   ): Promise<ConflictRecord[]>;
+  resolveConflict(input: ConflictResolutionInput): Promise<ConflictResolutionResult>;
 }
 
 export interface LocalFileSyncState {

@@ -173,7 +173,8 @@ interface RevisionStore {
   proposeRevision(input: RevisionProposal): Promise<RevisionAccepted | RevisionConflict>;
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage>;
   recordConflict(input: ConflictInput): Promise<ConflictRecord>;
-  listConflicts(brainId: string, status?: "open" | "resolved"): Promise<ConflictRecord[]>;
+  listConflicts(brainId: string, status?: "open" | "resolved" | "superseded"): Promise<ConflictRecord[]>;
+  resolveConflict(input: ConflictResolutionInput): Promise<ConflictResolutionResult>;
 }
 ```
 
@@ -204,7 +205,7 @@ Likely new tools for hosted/control surfaces:
 - `brain_list_conflicts`
 - `brain_resolve_conflict`
 
-`brain_sync_status` and `brain_list_conflicts` are implemented once revision-store sync state exists. `brain_resolve_conflict` remains deferred until the resolution flow can write or acknowledge a reviewed merged Markdown revision without hiding unresolved content. The local stdio path does not need hosted sync tools as its primary workflow, but the tools may report that filesystem-only mode has no hosted sync state.
+`brain_sync_status`, `brain_list_conflicts`, and `brain_resolve_conflict` are implemented once revision-store sync state exists. Conflict resolution is explicit: the tool requires reviewed replacement Markdown content, writes that content as the new hosted head, and marks the chosen conflict resolved with the resolution revision id. The local stdio path does not need hosted sync tools as its primary workflow, but the tools may report that filesystem-only mode has no hosted sync state.
 
 ## Storage Provider Decision
 

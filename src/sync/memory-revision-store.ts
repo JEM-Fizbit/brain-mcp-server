@@ -4,6 +4,8 @@ import type {
   ChangeRecord,
   ConflictInput,
   ConflictRecord,
+  ConflictResolutionInput,
+  ConflictResolutionResult,
   FileHead,
   RevisionContent,
   RevisionProposal,
@@ -230,5 +232,41 @@ export class MemoryRevisionStore implements RevisionStore {
       (conflict) =>
         conflict.brainId === brainId && (!status || conflict.status === status)
     );
+  }
+
+  async resolveConflict(
+    input: ConflictResolutionInput
+  ): Promise<ConflictResolutionResult> {
+    const conflict = this.conflicts.find(
+      (candidate) =>
+        candidate.brainId === input.brainId &&
+        candidate.conflictId === input.conflictId
+    );
+    if (!conflict) {
+      throw new Error(`Conflict not found: ${input.conflictId}`);
+    }
+    if (conflict.status !== "open") {
+      throw new Error(`Conflict is not open: ${input.conflictId}`);
+    }
+
+    const current = await this.getHead(input.brainId, conflict.filename);
+    const resolution = await this.proposeRevision({
+      brainId: input.brainId,
+      filename: conflict.filename,
+      baseRevisionId: current?.revisionId || null,
+      content: input.content,
+      origin: "hosted_mcp",
+      actor: input.actor,
+    });
+    if (!resolution.ok) {
+      throw new Error(
+        `Could not resolve conflict ${input.conflictId}: current head changed`
+      );
+    }
+
+    conflict.status = "resolved";
+    conflict.resolutionRevisionId = resolution.revision.revisionId;
+    conflict.resolvedAt = new Date().toISOString();
+    return { conflict, revision: resolution.revision };
   }
 }
