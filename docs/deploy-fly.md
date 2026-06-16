@@ -109,6 +109,14 @@ npm run smoke:hosted:oauth
 
 The script registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and performs read-only hosted MCP checks. It keeps tokens in memory only and exits after verification. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser.
 
+For a non-destructive hosted operator check, run:
+
+```bash
+npm run hosted:doctor
+```
+
+The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health or Postgres summary exits non-zero; local launchd/Fly warnings are reported without blocking the command.
+
 To include the hosted write/local mirror parity gate:
 
 ```bash
