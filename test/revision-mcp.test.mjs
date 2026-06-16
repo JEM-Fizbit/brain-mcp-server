@@ -364,6 +364,26 @@ test("HTTP MCP exposes hosted sync status and conflict listing", async () => {
   assert.match(conflicts, /NOW\.md/);
   assert.match(conflicts, /local: local_agent/);
   assert.match(conflicts, /remote: hosted_mcp/);
+
+  const conflictId = conflicts.match(/- (conflict_[^\s]+) NOW\.md/)?.[1];
+  assert.ok(conflictId);
+  const resolution = await callTool(harness, "brain_resolve_conflict", {
+    conflict_id: conflictId,
+    content: "Reviewed merged resolution\n",
+  });
+  assert.match(resolution, new RegExp(`Resolved conflict ${conflictId}`));
+  assert.match(resolution, /Resolution revision: rev_/);
+
+  const resolvedStatus = await callTool(harness, "brain_sync_status");
+  assert.match(resolvedStatus, /Open conflicts: 0/);
+  assert.equal(
+    await callTool(harness, "brain_read_file", { filename: "NOW.md" }),
+    "Reviewed merged resolution\n"
+  );
+  assert.match(
+    await callTool(harness, "brain_list_conflicts", { status: "resolved" }),
+    new RegExp(`${conflictId} NOW\\.md`)
+  );
 });
 
 test("HTTP MCP and local sync agent complete hosted-local-hosted loop", async () => {

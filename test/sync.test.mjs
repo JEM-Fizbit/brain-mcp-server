@@ -200,6 +200,27 @@ test("file revision store persists heads and conflicts across instances", async 
   assert.equal(hosted.content, "Persistent base\n");
   assert.equal(conflicts.length, 1);
   assert.equal(conflicts[0].filename, "NOW.md");
+
+  const resolution = await restarted.resolveConflict({
+    brainId: "ai-brain-jem",
+    conflictId: conflicts[0].conflictId,
+    content: "Persistent resolution\n",
+    actor: { provider: "test", id: "resolver" },
+  });
+  assert.equal(resolution.conflict.status, "resolved");
+  assert.equal(resolution.conflict.resolutionRevisionId, resolution.revision.revisionId);
+  assert.equal(resolution.revision.content, "Persistent resolution\n");
+
+  const resolvedStore = new FileRevisionStore(storeFile);
+  assert.equal(
+    (await resolvedStore.readFile("ai-brain-jem", "NOW.md")).content,
+    "Persistent resolution\n"
+  );
+  assert.equal((await resolvedStore.listConflicts("ai-brain-jem", "open")).length, 0);
+  assert.equal(
+    (await resolvedStore.listConflicts("ai-brain-jem", "resolved")).length,
+    1
+  );
 });
 
 test("local sync agent can use file revision store after restart", async () => {

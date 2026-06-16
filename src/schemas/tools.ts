@@ -127,6 +127,19 @@ export const ListConflictsSchema = BrainIdSchema.extend({
     .describe("Conflict status to list. Defaults to open."),
 });
 
+export const ResolveConflictSchema = BrainIdSchema.extend({
+  conflict_id: z
+    .string()
+    .min(1)
+    .describe("The sync conflict id returned by brain_list_conflicts."),
+  content: z
+    .string()
+    .min(1)
+    .describe(
+      "The reviewed replacement Markdown content to write as the conflict resolution."
+    ),
+});
+
 export const LogSchema = BrainIdSchema.extend({
   opType: z
     .enum(["INGEST", "UPDATE", "LINT", "CREATE", "SPLIT", "PRUNE"])

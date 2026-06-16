@@ -17,6 +17,7 @@ import type {
 import { FileRevisionStore } from "../sync/file-revision-store.js";
 import type {
   ConflictRecord,
+  ConflictResolutionResult,
   FileHead,
   RevisionActor,
   RevisionStore,
@@ -337,6 +338,20 @@ export class RevisionBrainStore implements BrainStore {
     status?: "open" | "resolved" | "superseded"
   ): Promise<ConflictRecord[]> {
     return this.revisionStore.listConflicts(brainId, status);
+  }
+
+  resolveConflict(
+    brainId: string,
+    conflictId: string,
+    content: string,
+    actor?: RevisionActor
+  ): Promise<ConflictResolutionResult> {
+    return this.revisionStore.resolveConflict({
+      brainId,
+      conflictId,
+      content,
+      actor,
+    });
   }
 }
 

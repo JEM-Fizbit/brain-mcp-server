@@ -5,6 +5,8 @@ import type {
   ChangeRecord,
   ConflictInput,
   ConflictRecord,
+  ConflictResolutionInput,
+  ConflictResolutionResult,
   FileHead,
   RevisionActor,
   RevisionContent,
@@ -54,7 +56,9 @@ interface ConflictRow {
   remote_actor_provider: string | null;
   remote_actor_id: string | null;
   status: "open" | "resolved" | "superseded";
+  resolution_revision_id: string | null;
   created_at: Date;
+  resolved_at: Date | null;
 }
 
 function actorFromRow(row: RevisionRow): RevisionActor | undefined {
@@ -128,6 +132,8 @@ function conflictFromRow(row: ConflictRow): ConflictRecord {
         : undefined,
     status: row.status,
     createdAt: row.created_at.toISOString(),
+    resolutionRevisionId: row.resolution_revision_id || undefined,
+    resolvedAt: row.resolved_at?.toISOString(),
   };
 }
 
@@ -396,6 +402,112 @@ export class PostgresRevisionStore implements RevisionStore {
       [brainId, status || null]
     );
     return result.rows.map(conflictFromRow);
+  }
+
+  async resolveConflict(
+    input: ConflictResolutionInput
+  ): Promise<ConflictResolutionResult> {
+    return transaction(this.pool, async (client) => {
+      const conflictResult = await client.query<ConflictRow>(
+        `
+          select *
+          from brain.sync_conflicts
+          where brain_id = $1 and id = $2
+          for update
+        `,
+        [input.brainId, input.conflictId]
+      );
+      const conflict = conflictResult.rows[0];
+      if (!conflict) {
+        throw new Error(`Conflict not found: ${input.conflictId}`);
+      }
+      if (conflict.status !== "open") {
+        throw new Error(`Conflict is not open: ${input.conflictId}`);
+      }
+
+      const currentResult = await client.query<HeadRow>(
+        `
+          select r.*, f.updated_at
+          from brain.brain_files f
+          left join brain.brain_file_revisions r on r.id = f.current_revision_id
+          where f.brain_id = $1 and f.filename = $2
+          for update of f
+        `,
+        [input.brainId, conflict.filename]
+      );
+      const current = currentResult.rows[0] || null;
+      const nextHash = contentHash(input.content);
+
+      if (!current) {
+        await client.query(
+          `
+            insert into brain.brain_files (brain_id, filename)
+            values ($1, $2)
+            on conflict (brain_id, filename) do nothing
+          `,
+          [input.brainId, conflict.filename]
+        );
+      }
+
+      const revisionResult = await client.query<RevisionRow>(
+        `
+          insert into brain.brain_file_revisions (
+            brain_id,
+            filename,
+            parent_revision_id,
+            content,
+            content_sha256,
+            origin,
+            actor_provider,
+            actor_id,
+            actor_name,
+            actor_email
+          )
+          values ($1, $2, $3, $4, $5, 'hosted_mcp', $6, $7, $8, $9)
+          returning *
+        `,
+        [
+          input.brainId,
+          conflict.filename,
+          current?.id || null,
+          input.content,
+          nextHash,
+          input.actor?.provider || null,
+          input.actor?.id || null,
+          input.actor?.name || null,
+          input.actor?.email || null,
+        ]
+      );
+      const revision = revisionResult.rows[0];
+
+      await client.query(
+        `
+          update brain.brain_files
+          set current_revision_id = $3,
+              current_content_sha256 = $4,
+              updated_at = now()
+          where brain_id = $1 and filename = $2
+        `,
+        [input.brainId, conflict.filename, revision.id, revision.content_sha256]
+      );
+
+      const resolvedResult = await client.query<ConflictRow>(
+        `
+          update brain.sync_conflicts
+          set status = 'resolved',
+              resolution_revision_id = $3,
+              resolved_at = now()
+          where brain_id = $1 and id = $2
+          returning *
+        `,
+        [input.brainId, input.conflictId, revision.id]
+      );
+
+      return {
+        conflict: conflictFromRow(resolvedResult.rows[0]),
+        revision: revisionFromRow(revision),
+      };
+    });
   }
 
   private async insertConflict(

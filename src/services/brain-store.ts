@@ -1,5 +1,9 @@
 import type { SourceCategory, LogOpType } from "../constants.js";
-import type { ConflictRecord, RevisionActor } from "../sync/types.js";
+import type {
+  ConflictRecord,
+  ConflictResolutionResult,
+  RevisionActor,
+} from "../sync/types.js";
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
@@ -69,6 +73,12 @@ export interface BrainStore {
     brainId: string,
     status?: "open" | "resolved" | "superseded"
   ): Promise<ConflictRecord[]>;
+  resolveConflict(
+    brainId: string,
+    conflictId: string,
+    content: string,
+    actor?: RevisionActor
+  ): Promise<ConflictResolutionResult>;
 }
 
 export class FilesystemBrainStore implements BrainStore {
@@ -153,6 +163,10 @@ export class FilesystemBrainStore implements BrainStore {
 
   async listConflicts(): Promise<ConflictRecord[]> {
     return [];
+  }
+
+  async resolveConflict(): Promise<ConflictResolutionResult> {
+    throw new Error("Filesystem Brain store has no hosted sync conflicts to resolve.");
   }
 }
 

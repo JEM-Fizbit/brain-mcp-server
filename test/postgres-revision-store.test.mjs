@@ -5,7 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { loadLocalEnv } = await import(
+  path.join(__dirname, "..", "scripts", "lib", "load-local-env.mjs")
+);
 
+loadLocalEnv(path.join(__dirname, ".."));
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 
 test("PostgresRevisionStore compare-and-swap flow", async (t) => {
@@ -76,6 +80,22 @@ test("PostgresRevisionStore compare-and-swap flow", async (t) => {
     const conflicts = await store.listConflicts(brainId, "open");
     assert.equal(conflicts.length, 1);
     assert.equal(conflicts[0].filename, "NOW.md");
+
+    const resolved = await store.resolveConflict({
+      brainId,
+      conflictId: conflicts[0].conflictId,
+      content: "postgres resolved\n",
+      actor: { provider: "test", id: "resolver" },
+    });
+    assert.equal(resolved.conflict.status, "resolved");
+    assert.equal(
+      resolved.conflict.resolutionRevisionId,
+      resolved.revision.revisionId
+    );
+    assert.equal(resolved.revision.content, "postgres resolved\n");
+    assert.equal((await store.listConflicts(brainId, "open")).length, 0);
+    assert.equal((await store.listConflicts(brainId, "resolved")).length, 1);
+    assert.equal((await store.readFile(brainId, "NOW.md")).content, "postgres resolved\n");
   } finally {
     await store.pool.query("delete from brain.brains where id = $1", [brainId]).catch(
       () => undefined
