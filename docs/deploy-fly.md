@@ -109,6 +109,14 @@ npm run smoke:hosted:oauth
 
 The script registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and performs read-only hosted MCP checks. It keeps tokens in memory only and exits after verification. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser.
 
+To include the hosted write/local mirror parity gate:
+
+```bash
+npm run smoke:hosted:oauth -- --write --verify-local
+```
+
+This writes only `HOSTED_OAUTH_WRITE_SMOKE.md`, reads it back from hosted Postgres, and waits for the local Markdown mirror to match. If the launchd sync loop has not pulled it yet, the script runs one bounded sync cycle for that file.
+
 Expected first authenticated tool checks:
 
 - `brain_list_brains`
