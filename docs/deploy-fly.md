@@ -117,6 +117,14 @@ npm run hosted:doctor
 
 The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold.
 
+For a browser-visible local operator view over the same read-only checks, run:
+
+```bash
+npm run hosted:cockpit
+```
+
+The cockpit binds to `127.0.0.1:8787` by default, calls `hosted:doctor` behind `GET /api/doctor`, and auto-refreshes once per minute. It is intended for local visibility during the JEM hosted Brain pilot; it should not be exposed publicly or used as an admin mutation surface. Set `BRAIN_COCKPIT_PORT` or `BRAIN_COCKPIT_HOST` only for deliberate local operator needs.
+
 If doctor reports open conflicts, follow [`docs/conflict-resolution.md`](./conflict-resolution.md). Conflicts should be surfaced proactively and resolved with reviewed Markdown content, not hidden by manual database edits or duplicate filenames.
 
 To include the hosted write/local mirror parity gate:

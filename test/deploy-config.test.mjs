@@ -81,3 +81,20 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.doesNotMatch(script, /databaseUrl[,}]/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
+
+test("hosted cockpit is local-only and read-only", async () => {
+  const packageJson = JSON.parse(
+    await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
+  );
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-cockpit.mjs"),
+    "utf-8"
+  );
+
+  assert.equal(packageJson.scripts["hosted:cockpit"], "node scripts/hosted-cockpit.mjs");
+  assert.match(script, /BRAIN_COCKPIT_HOST \|\| "127\.0\.0\.1"/);
+  assert.match(script, /BRAIN_COCKPIT_PORT \|\| 8787/);
+  assert.match(script, /hosted-doctor\.mjs/);
+  assert.match(script, /\/api\/doctor/);
+  assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
+});
