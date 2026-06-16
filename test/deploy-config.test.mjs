@@ -139,3 +139,30 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /operationLog/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
+
+test("hosted test drive runs the operator rehearsal with a readable verdict", async () => {
+  const packageJson = JSON.parse(
+    await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
+  );
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-test-drive.mjs"),
+    "utf-8"
+  );
+
+  assert.equal(packageJson.scripts["hosted:test-drive"], "node scripts/hosted-test-drive.mjs");
+  assert.match(script, /Hosted Brain Test Drive/);
+  assert.match(script, /Preflight hosted doctor/);
+  assert.match(script, /Hosted MCP client smoke/);
+  assert.match(script, /Final hosted doctor/);
+  assert.match(script, /smoke-hosted-oauth\.mjs/);
+  assert.match(script, /--write/);
+  assert.match(script, /--verify-local/);
+  assert.match(script, /--local-write/);
+  assert.match(script, /--verify-hosted/);
+  assert.match(script, /--conflict/);
+  assert.match(script, /--read-only/);
+  assert.match(script, /--skip-conflict/);
+  assert.match(script, /User-facing latency/);
+  assert.match(script, /Next Action/);
+  assert.match(script, /brain_resolve_conflict/);
+});

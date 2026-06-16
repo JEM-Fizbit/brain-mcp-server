@@ -20,6 +20,7 @@
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",
     "hosted:doctor": "node scripts/hosted-doctor.mjs",
+    "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
