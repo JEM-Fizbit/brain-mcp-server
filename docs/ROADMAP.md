@@ -26,6 +26,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - stale local edits block hosted overwrite and create visible conflicts;
 - conflicts can be explicitly resolved through `brain_resolve_conflict`;
 - live OAuth smoke verifies hosted conflict listing, resolution, and final hosted content;
+- `hosted:cockpit` provides a local read-only operator dashboard over the hosted doctor checks;
 - local Brain MCP remains the trusted default while hosted becomes operationally boring.
 
 ## Cutover Principle
@@ -73,6 +74,7 @@ Goal: make the single-user hosted path operationally boring.
 Planned work:
 
 - add `hosted:doctor` or equivalent operator command for health, sync summary, open conflicts, and daemon status;
+- add a local read-only cockpit/dashboard over the doctor output so the operator can see hosted readiness without reading raw JSON;
 - harden local sync daemon observability, including last successful sync time and clearer launchd logs;
 - write a conflict resolution operator guide that distinguishes automated checks from human judgement points;
 - define the proactive nudge path for lint, sync health, open conflicts, and source-ingestion issues;
@@ -180,11 +182,12 @@ Recommended order:
 
 1. Build `hosted:doctor`.
 2. Add sync daemon health and last-success reporting.
-3. Write the conflict resolution operator guide.
-4. Define proactive user nudges for sync/lint/conflict issues.
-5. Run the JEM Brain real-world rehearsal.
-6. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
-7. Start the multi-Brain design after the pilot path is boring.
+3. Build a local read-only cockpit over hosted doctor output.
+4. Write the conflict resolution operator guide.
+5. Define proactive user nudges for sync/lint/conflict issues.
+6. Run the JEM Brain real-world rehearsal.
+7. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
+8. Start the multi-Brain design after the pilot path is boring.
 
 ## Non-Goals For Now
 
