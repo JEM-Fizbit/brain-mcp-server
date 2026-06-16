@@ -34,6 +34,25 @@ function addCheck(name, status, details = {}) {
   checks.push({ name, status, details });
 }
 
+function lastCheckByName(name) {
+  for (let index = checks.length - 1; index >= 0; index -= 1) {
+    if (checks[index]?.name === name) return checks[index];
+  }
+  return null;
+}
+
+async function timedCheck(name, fn) {
+  const startedAt = Date.now();
+  try {
+    await fn();
+  } finally {
+    const check = lastCheckByName(name);
+    if (check) {
+      check.details.latencyMs = Date.now() - startedAt;
+    }
+  }
+}
+
 function isProcessAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -368,15 +387,17 @@ async function checkFlyStatus() {
   }
 }
 
+const doctorStartedAt = Date.now();
+
 await Promise.all([
-  checkHostedHealth(),
-  checkPostgresSummary(),
-  checkRecentActivity(),
-  checkLocalState(),
-  checkSyncLock(),
-  checkSyncHealth(),
-  checkLaunchd(),
-  checkFlyStatus(),
+  timedCheck("hosted_health", checkHostedHealth),
+  timedCheck("postgres_summary", checkPostgresSummary),
+  timedCheck("recent_activity", checkRecentActivity),
+  timedCheck("local_sync_state", checkLocalState),
+  timedCheck("sync_lock", checkSyncLock),
+  timedCheck("sync_health", checkSyncHealth),
+  timedCheck("launchd", checkLaunchd),
+  timedCheck("fly_status", checkFlyStatus),
 ]);
 
 const failed = checks.filter((check) => check.status === "fail");
@@ -385,6 +406,7 @@ const summary = {
   ok: failed.length === 0,
   status: failed.length ? "fail" : warnings.length ? "warn" : "pass",
   checkedAt: new Date().toISOString(),
+  latencyMs: Date.now() - doctorStartedAt,
   checks,
 };
 

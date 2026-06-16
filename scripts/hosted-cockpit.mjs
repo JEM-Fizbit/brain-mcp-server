@@ -196,7 +196,7 @@ const page = String.raw`<!doctype html>
 
       .metrics {
         display: grid;
-        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
         gap: 10px;
       }
 
@@ -468,6 +468,22 @@ const page = String.raw`<!doctype html>
             <div class="metric-label">Last sync</div>
             <div class="metric-value" id="last-sync">-</div>
           </div>
+          <div class="metric">
+            <div class="metric-label">Hosted HTTP</div>
+            <div class="metric-value" id="hosted-latency">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Postgres</div>
+            <div class="metric-value" id="postgres-latency">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Sync cycle</div>
+            <div class="metric-value" id="sync-latency">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Doctor run</div>
+            <div class="metric-value" id="doctor-latency">-</div>
+          </div>
         </div>
       </div>
 
@@ -475,6 +491,7 @@ const page = String.raw`<!doctype html>
         <div class="tab-list" role="tablist" aria-label="Cockpit sections">
           <button class="tab-button" id="tab-overview" type="button" role="tab" aria-controls="panel-overview" aria-selected="true">Overview</button>
           <button class="tab-button" id="tab-activity" type="button" role="tab" aria-controls="panel-activity" aria-selected="false">Activity</button>
+          <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
           <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
         </div>
@@ -505,6 +522,13 @@ const page = String.raw`<!doctype html>
               <div class="activity-list" id="operation-log-activity"></div>
             </section>
           </div>
+        </div>
+
+        <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
+          <section>
+            <h2>Latency Measures</h2>
+            <div class="activity-list" id="latencies"></div>
+          </section>
         </div>
 
         <div class="tab-panel" id="panel-checks" role="tabpanel" aria-labelledby="tab-checks" hidden>
@@ -557,6 +581,7 @@ const page = String.raw`<!doctype html>
         "unchanged",
         "conflicts",
         "totalMs",
+        "latencyMs",
         "pid",
         "startedAt",
         "label",
@@ -621,6 +646,13 @@ const page = String.raw`<!doctype html>
         return value ? String(value).slice(0, 10) : "-";
       }
 
+      function formatDuration(ms) {
+        const value = Number(ms);
+        if (!Number.isFinite(value)) return "-";
+        if (value < 1000) return Math.round(value) + "ms";
+        return (value / 1000).toFixed(value < 10000 ? 1 : 0) + "s";
+      }
+
       function eventLabel(eventType) {
         if (eventType === "file_revision") return "File revision";
         if (eventType === "conflict_opened") return "Conflict opened";
@@ -639,7 +671,11 @@ const page = String.raw`<!doctype html>
           .filter((key) => details[key] !== undefined && details[key] !== null && details[key] !== "")
           .map((key) => {
             const value = Array.isArray(details[key]) ? details[key].join(" | ") : details[key];
-            const display = /At$|checkedAt|latestHostedUpdate/.test(key) ? localDateTime(value) : value;
+            const display = /At$|checkedAt|latestHostedUpdate/.test(key)
+              ? localDateTime(value)
+              : /Ms$/.test(key)
+                ? formatDuration(value)
+                : value;
             return "<code>" + escapeHtml(key) + "</code>: " + escapeHtml(display);
           })
           .join("<br>");
@@ -761,6 +797,37 @@ const page = String.raw`<!doctype html>
         document.getElementById("operation-log-activity").innerHTML = markup;
       }
 
+      function renderLatencies(payload) {
+        const checks = payload.checks || [];
+        const rows = [
+          {
+            label: "Doctor run",
+            value: payload.latencyMs,
+            note: "Total time for the cockpit API refresh to collect all checks.",
+          },
+          ...checks
+            .map((check) => ({
+              label: check.name,
+              value: check.details?.latencyMs,
+              note: check.status + " check runtime",
+            })),
+          {
+            label: "Sync cycle",
+            value: byName(payload, "sync_health")?.details?.totalMs,
+            note: "Most recent local sync loop duration reported by the sync agent.",
+          },
+        ].filter((row) => row.value !== undefined && row.value !== null);
+
+        document.getElementById("latencies").innerHTML = rows.length
+          ? rows.map((row) =>
+              "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(row.label) + ": " + escapeHtml(formatDuration(row.value)) + "</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(row.note) + "</div>" +
+              "</div>"
+            ).join("")
+          : "<div class=\"event muted\">No latency measures reported yet.</div>";
+      }
+
       function render(payload) {
         detectChanges(payload);
         const state = payload.status || "fail";
@@ -778,6 +845,10 @@ const page = String.raw`<!doctype html>
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
         document.getElementById("open-conflicts").textContent = postgres.openConflicts ?? "-";
         document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
+        document.getElementById("hosted-latency").textContent = formatDuration(byName(payload, "hosted_health")?.details?.latencyMs);
+        document.getElementById("postgres-latency").textContent = formatDuration(postgres.latencyMs);
+        document.getElementById("sync-latency").textContent = formatDuration(sync.totalMs);
+        document.getElementById("doctor-latency").textContent = formatDuration(payload.latencyMs);
 
         document.getElementById("checks").innerHTML = (payload.checks || [])
           .filter((check) => check.name !== "recent_activity")
@@ -790,6 +861,7 @@ const page = String.raw`<!doctype html>
 
         renderActivity(payload);
         renderOperationLog();
+        renderLatencies(payload);
         document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
       }
 
