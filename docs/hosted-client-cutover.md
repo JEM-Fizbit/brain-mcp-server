@@ -99,6 +99,8 @@ Claude account cutover is partly complete: the personal Max account has been act
 
 Claude has been cut over so the default `brain` MCP connector points at hosted across local Claude Code surfaces, and the Claude personal Max custom connector has been activated and verified. The naming convention matches Codex: hosted is the default `brain`, local stdio is retained as `brain-local`.
 
+> **Tenancy — single-user / single-Brain (important).** The hosted runtime is still **single-tenant**: it serves exactly one Brain (`ai-brain-jem`), and access is gated by GitHub OAuth to John's identity plus the hosted allowlist. Adding the connector in the **ERS Teams** account is John reaching his *own* JEM Brain from that account — it is **not** a team rollout. **John remains the sole user on every account and surface** until the multi-tenant Brain Platform (one `mcp__brain__*` namespace + `brain_id` + per-Brain substrate + per-user attribution) is built and rolled out (roadmap: `~/Projects/ai-brain-jem/docs/PLAN_brain_roadmap.md`; architecture: `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`). When adding the ERS connector, add it at **user/personal scope, not org/workspace-wide**, so it is not surfaced to other ERS users — the server-side OAuth + allowlist already enforces John-only regardless, but user-scope keeps it clean.
+
 ### Claude Code (`~/.claude.json`, top-level `mcpServers`)
 
 ```json
