@@ -125,7 +125,7 @@ For a non-destructive hosted operator check, run:
 npm run hosted:doctor
 ```
 
-The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold.
+The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, lint freshness, pending inbox files, launchd status on macOS, and Fly app status when `flyctl` is available. It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly/lint/inbox warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold or `BRAIN_LINT_NUDGE_DAYS` to change the lint freshness threshold.
 
 For a browser-visible local operator view over the same read-only checks, run:
 

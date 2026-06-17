@@ -12,7 +12,7 @@ The core product direction is local-first hosted Brain:
 - Supabase Postgres stores Markdown revisions, sync cursors, conflicts, metadata, extracted source text, and future semantic chunks;
 - Supabase Storage stores original binary/source artifacts in private immutable paths;
 - git remains backup/export/history, not the live hosted sync hot path.
-- maintenance is automation-first: routine linting, sync health, hosted health, and conflict detection should be checked by tools and surfaced proactively, leaving users to make judgement calls rather than babysit infrastructure.
+- maintenance is automation-first: routine linting, sync health, hosted health, inbox/source-ingestion state, and conflict detection should be checked by tools and surfaced proactively, leaving users to make judgement calls rather than babysit infrastructure.
 
 ## Current Position
 

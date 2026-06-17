@@ -605,6 +605,10 @@ const page = String.raw`<!doctype html>
         "latestWriteLatencyMs",
         "latestSyncWaitLatencyMs",
         "operationCount",
+        "lastLintAt",
+        "ageDays",
+        "maxAgeDays",
+        "pendingFiles",
         "checkedAt",
         "state",
         "cycle",
@@ -714,6 +718,12 @@ const page = String.raw`<!doctype html>
       }
 
       function actionItems(payload) {
+        if (Array.isArray(payload.actions) && payload.actions.length > 0) {
+          return payload.actions.map((action) =>
+            action.title + (action.detail ? " " + action.detail : "")
+          );
+        }
+
         const items = [];
         const checks = payload.checks || [];
         const openConflicts = byName(payload, "postgres_summary")?.details?.openConflicts || 0;

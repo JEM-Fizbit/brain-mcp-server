@@ -12,7 +12,7 @@ Use a local browser surface backed by a macOS LaunchAgent:
 - cockpit stays bound to `127.0.0.1`;
 - the stable local URL is `http://127.0.0.1:8787/`;
 - checks continue to come from `npm run hosted:doctor`;
-- local sync health, launchd state, local mirror state, and local latency snapshots remain visible;
+- local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
@@ -59,7 +59,7 @@ launchctl bootout "gui/$(id -u)/com.jem.brain-cockpit"
 
 Green means hosted Brain is ready for normal use.
 
-Warn means use judgement. Typical examples are stale sync health, missing optional Fly status, or no recent measured hosted MCP latency.
+Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, pending inbox files, missing optional Fly status, or no recent measured hosted MCP latency.
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
@@ -68,6 +68,5 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 ## Next Hardening
 
 - Add a one-click local launcher or browser bookmark artifact after the LaunchAgent path is stable.
-- Surface lint and inbox/source-ingestion nudges in the same operator view.
-- Add clearer copy for each warning/failure so the cockpit always shows the next concrete action.
+- Expand source-ingestion nudges beyond pending inbox count.
 - Add a recovery/reseed guide from local Markdown to hosted Postgres.

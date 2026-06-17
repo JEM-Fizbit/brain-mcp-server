@@ -132,6 +132,16 @@ function summariseDoctor(label, doctor) {
 }
 
 function nextActions(finalDoctor, failedSteps) {
+  if (Array.isArray(finalDoctor?.actions) && finalDoctor.actions.length > 0) {
+    const actions = finalDoctor.actions.map((action) =>
+      action.title + (action.detail ? ` ${action.detail}` : "")
+    );
+    if (failedSteps.length > 0) {
+      actions.unshift("Inspect the failed step output above before using hosted Brain as the normal path.");
+    }
+    return [...new Set(actions)];
+  }
+
   const actions = [];
   const postgres = checkByName(finalDoctor, "postgres_summary")?.details || {};
   const sync = checkByName(finalDoctor, "sync_health");
