@@ -78,11 +78,13 @@ test("cockpit launchd plist runs local cockpit with a stable loopback URL", asyn
   assert.equal(result.url, "http://127.0.0.1:8799/");
   assert.equal(result.nodePath, nodePath);
   assert.equal(result.cockpitScriptPath, hostedCockpitPath);
+  assert.match(result.path, /\/opt\/homebrew\/bin/);
   assert.match(plist, new RegExp(`<string>${nodePath}</string>`));
   assert.match(plist, new RegExp(`<string>${hostedCockpitPath}</string>`));
   assert.match(plist, /<key>BRAIN_COCKPIT_HOST<\/key>\s*<string>127\.0\.0\.1<\/string>/);
   assert.match(plist, /<key>BRAIN_COCKPIT_PORT<\/key>\s*<string>8799<\/string>/);
   assert.match(plist, /<key>BRAIN_COCKPIT_PORT_FALLBACK<\/key>\s*<string>0<\/string>/);
+  assert.match(plist, /<key>PATH<\/key>\s*<string>\/opt\/homebrew\/bin:/);
   assert.match(plist, /cockpit\.out\.log/);
   assert.match(plist, /cockpit\.err\.log/);
   assert.doesNotMatch(plist, /<string>\/usr\/bin\/env<\/string>/);
