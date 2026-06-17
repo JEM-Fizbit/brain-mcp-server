@@ -17,6 +17,9 @@ const cockpitScriptPath =
   path.join(repoRoot, "scripts", "hosted-cockpit.mjs");
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
 const port = Number(process.env.BRAIN_COCKPIT_PORT || 8787);
+const runtimePath =
+  process.env.BRAIN_COCKPIT_LAUNCHD_PATH ||
+  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 const outputPath =
   process.env.BRAIN_COCKPIT_LAUNCHD_PLIST ||
   path.join(repoRoot, "tmp", `${label}.plist`);
@@ -69,6 +72,8 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
     <string>${xmlEscape(String(port))}</string>
     <key>BRAIN_COCKPIT_PORT_FALLBACK</key>
     <string>0</string>
+    <key>PATH</key>
+    <string>${xmlEscape(runtimePath)}</string>
   </dict>
 
   <key>RunAtLoad</key>
@@ -98,6 +103,7 @@ console.log(
       cockpitScriptPath,
       host,
       port,
+      path: runtimePath,
       note: "Review before copying to ~/Library/LaunchAgents and loading with launchctl.",
     },
     null,
