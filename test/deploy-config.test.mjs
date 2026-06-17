@@ -113,6 +113,10 @@ test("hosted cockpit is local-only and read-only", async () => {
   );
 
   assert.equal(packageJson.scripts["hosted:cockpit"], "node scripts/hosted-cockpit.mjs");
+  assert.equal(
+    packageJson.scripts["hosted:cockpit:launchd:plist"],
+    "node scripts/write-cockpit-launchd-plist.mjs"
+  );
   assert.match(script, /BRAIN_COCKPIT_HOST \|\| "127\.0\.0\.1"/);
   assert.match(script, /requestedPort \|\| 8787/);
   assert.match(script, /BRAIN_COCKPIT_PORT_FALLBACK/);
