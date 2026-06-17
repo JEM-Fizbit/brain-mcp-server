@@ -10,9 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Context
 
-brain-mcp-server is a generic, open-source MCP server (TypeScript, stdio transport) that serves Markdown-based AI Brain files to any MCP-compatible Claude client.
+brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves Markdown-based AI Brain files to any MCP-compatible client over stdio (local subprocess) or HTTP (hosted, multi-tenant).
 
-**Live URL:** Local development only (stdio transport)
+**Hosted (default Claude/Codex connector):** `brain` → `https://jem-brain-mcp.fly.dev/mcp` (Fly.io + Supabase Postgres revision store + Supabase Storage). Promoted to the default `brain` connector across Claude and Codex surfaces on 2026-06-16; local stdio is retained as the `brain-local` fallback. Operator guide: `docs/hosted-client-cutover.md`.
+**Local:** stdio only (`node dist/index.js`, `BRAIN_DIR` env) — fast path for local filesystem work and recovery.
 **Status:** Production
 
 > **Active major initiative — Brain Platform (cloud, multi-tenant).** This server is evolving from single-user stdio into a multi-tenant "Brain Platform that serves any Brain" (one `mcp__brain__*` namespace + `brain_id` param + per-Brain substrate). It is an **evolution of this codebase, not a rewrite or new project.** Cloud transport + OAuth 2.1 + per-user attribution are already proven in a separate reference repo (`~/Projects/slack-mcp-server/` v0.3.0) — lift, don't re-derive. Next build window = JEM Phase 1+2 (HTTP transport + `BrainStore`/`BrainSemanticSearch` abstractions + `brain_id` + OAuth/GitHub-IdP + Tier 1 vector). **Kickoff plan:** `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md`. **Canonical roadmap:** `~/Projects/ai-brain-jem/docs/PLAN_brain_roadmap.md`. **Target architecture:** `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`. The implementation SPEC for this window goes at `docs/specs/001-brain-platform-phase-1-2.md` — draft and get sign-off before writing code.
