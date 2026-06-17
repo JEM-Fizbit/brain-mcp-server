@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-17 — Verify hosted Brain on Claude personal and ERS accounts
+
+**Decision:** Treat hosted Brain as activated and verified for both the Claude personal Max account and the Claude ERS account, strictly for John's personal use of `ai-brain-jem`.
+
+**Why:** The personal Max and ERS verifications prove the hosted `/mcp` endpoint, GitHub OAuth flow, and revision-backed Brain tools work from Claude's cloud-synced custom connector path across John's account surfaces. The ERS connector is a user-scope path for John to reach his own JEM Brain from that account; it is not an ERS team rollout or a multi-user tenancy milestone.
+
+**Alternatives rejected:** Keeping Claude ERS grouped with unverified Claude accounts; treating ERS account verification as an org-wide/team deployment; reopening the OpenAI/Codex/ChatGPT cutover decisions.
+
+**Related:** `docs/hosted-client-cutover.md`; `docs/ROADMAP.md`; `https://jem-brain-mcp.fly.dev/mcp`.
+
+---
+
 ## 2026-06-16 — Verify hosted Brain across OpenAI accounts before Claude rollout
 
 **Decision:** Treat hosted Brain as deployed and verified for OpenAI surfaces after successful Codex verification plus ChatGPT verification in both ERS and personal OpenAI accounts. The next client rollout target is Claude surfaces for both personal and ERS accounts.
