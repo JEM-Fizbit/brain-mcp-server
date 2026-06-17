@@ -93,6 +93,13 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
   assert.match(script, /latestReadLatencyMs/);
   assert.match(script, /latestWriteLatencyMs/);
+  assert.match(script, /lint_nudge/);
+  assert.match(script, /BRAIN_LINT_NUDGE_DAYS/);
+  assert.match(script, /lastLintAt/);
+  assert.match(script, /inbox/);
+  assert.match(script, /pendingFiles/);
+  assert.match(script, /buildOperatorActions/);
+  assert.match(script, /actions: buildOperatorActions/);
   assert.match(script, /local_sync_state/);
   assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
@@ -140,6 +147,7 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /renderUserOperationLatencies/);
   assert.match(script, /hosted-latency/);
   assert.match(script, /doctor-latency/);
+  assert.match(script, /payload\.actions/);
   assert.match(script, /formatDuration/);
   assert.match(script, /Recent Brain Activity/);
   assert.match(script, /Watch Log/);
@@ -172,5 +180,6 @@ test("hosted test drive runs the operator rehearsal with a readable verdict", as
   assert.match(script, /--skip-conflict/);
   assert.match(script, /User-facing latency/);
   assert.match(script, /Next Action/);
+  assert.match(script, /finalDoctor\.actions/);
   assert.match(script, /brain_resolve_conflict/);
 });

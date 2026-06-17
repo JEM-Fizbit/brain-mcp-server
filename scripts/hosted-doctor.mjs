@@ -16,6 +16,8 @@ const baseUrl = (process.env.BRAIN_HOSTED_BASE_URL || "https://jem-brain-mcp.fly
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
 const brainDir =
   process.env.BRAIN_DIR || path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
+const inboxDir =
+  process.env.BRAIN_INBOX_DIR || path.resolve(brainDir, "..", "inbox");
 const stateFile =
   process.env.BRAIN_SYNC_STATE_FILE ||
   path.resolve(brainDir, "..", ".brain-sync", "state.json");
@@ -30,6 +32,7 @@ const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
   process.env.BRAIN_SYNC_HEALTH_MAX_AGE_MS || 2 * 60 * 1000
 );
+const lintNudgeDays = Number(process.env.BRAIN_LINT_NUDGE_DAYS || 30);
 
 const checks = [];
 
@@ -361,6 +364,77 @@ async function checkUserOperationLatency() {
   }
 }
 
+async function checkLintNudge() {
+  const logFile = path.join(brainDir, "LOG.md");
+  try {
+    const content = await fs.readFile(logFile, "utf-8");
+    const match = content.match(/^## \[(\d{4}-\d{2}-\d{2})\] LINT/m);
+    if (!match) {
+      addCheck("lint_nudge", "warn", {
+        logFile,
+        state: "never_run",
+        lastLintAt: null,
+        maxAgeDays: lintNudgeDays,
+      });
+      return;
+    }
+
+    const lastLintAt = new Date(`${match[1]}T00:00:00.000Z`);
+    const ageDays = Math.floor((Date.now() - lastLintAt.getTime()) / 86400000);
+    addCheck("lint_nudge", ageDays > lintNudgeDays ? "warn" : "pass", {
+      logFile,
+      state: ageDays > lintNudgeDays ? "stale" : "fresh",
+      lastLintAt: match[1],
+      ageDays,
+      maxAgeDays: lintNudgeDays,
+    });
+  } catch (error) {
+    addCheck("lint_nudge", "warn", {
+      logFile,
+      state: "unreadable",
+      error: error.message,
+      maxAgeDays: lintNudgeDays,
+    });
+  }
+}
+
+async function checkInbox() {
+  try {
+    const entries = await fs.readdir(inboxDir, { withFileTypes: true });
+    const files = [];
+    for (const entry of entries) {
+      if (entry.isDirectory()) continue;
+      if (entry.name.startsWith(".") || entry.name === ".gitkeep") continue;
+      const stat = await fs.stat(path.join(inboxDir, entry.name));
+      files.push({
+        name: entry.name,
+        size: stat.size,
+        modifiedAt: stat.mtime.toISOString(),
+      });
+    }
+    files.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+    addCheck("inbox", files.length > 0 ? "warn" : "pass", {
+      inboxDir,
+      pendingFiles: files.length,
+      files: files.slice(0, 8),
+    });
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      addCheck("inbox", "pass", {
+        inboxDir,
+        pendingFiles: 0,
+        state: "missing_empty",
+      });
+      return;
+    }
+    addCheck("inbox", "warn", {
+      inboxDir,
+      state: "unreadable",
+      error: error.message,
+    });
+  }
+}
+
 function parseLaunchdOutput(stdout) {
   const state = stdout.match(/state = ([^\n]+)/)?.[1]?.trim() || null;
   const activeCount = stdout.match(/active count = ([^\n]+)/)?.[1]?.trim() || null;
@@ -426,6 +500,100 @@ async function checkFlyStatus() {
   }
 }
 
+function checkByName(name) {
+  return checks.find((check) => check.name === name);
+}
+
+function buildOperatorActions(status) {
+  const actions = [];
+  const postgres = checkByName("postgres_summary");
+  const sync = checkByName("sync_health");
+  const launchd = checkByName("launchd");
+  const lint = checkByName("lint_nudge");
+  const inbox = checkByName("inbox");
+
+  const openConflicts = postgres?.details?.openConflicts || 0;
+  if (openConflicts > 0) {
+    actions.push({
+      level: "fail",
+      title: "Resolve open sync conflicts before hosted writes.",
+      detail: "Follow docs/conflict-resolution.md and resolve with reviewed Markdown content.",
+    });
+  }
+
+  if (sync?.status === "fail") {
+    actions.push({
+      level: "fail",
+      title: "Fix failing local sync health.",
+      detail: "Run npm run sync -- summary, inspect the reported error, then rerun hosted:doctor.",
+    });
+  } else if (sync?.status === "warn") {
+    actions.push({
+      level: "warn",
+      title: "Refresh stale or incomplete sync health.",
+      detail: "Check the local launchd loop and recent sync logs before relying on hosted state.",
+    });
+  }
+
+  if (launchd?.status === "warn") {
+    actions.push({
+      level: "warn",
+      title: "Confirm the local sync LaunchAgent is running.",
+      detail: "Restart the local sync agent if the state is stale, missing, or not confidently active.",
+    });
+  }
+
+  if (lint?.status === "warn") {
+    actions.push({
+      level: "warn",
+      title: "Run brain_lint before accuracy-sensitive Brain work.",
+      detail: "The last lint pass is missing, stale, or unreadable from the local Brain log.",
+    });
+  }
+
+  if ((inbox?.details?.pendingFiles || 0) > 0) {
+    actions.push({
+      level: "warn",
+      title: "Review pending Brain inbox files.",
+      detail: "Run brain_scan_inbox and process or intentionally defer the pending source files.",
+    });
+  }
+
+  const handledWarnings = new Set([
+    "sync_health",
+    "launchd",
+    "lint_nudge",
+    "inbox",
+  ]);
+  for (const check of checks.filter((check) => check.status === "warn")) {
+    if (handledWarnings.has(check.name)) continue;
+    actions.push({
+      level: "warn",
+      title: `${check.name} needs review.`,
+      detail: "Inspect hosted:doctor details; this warning does not block hosted use unless it affects the current operation.",
+    });
+  }
+
+  for (const check of checks.filter((check) => check.status === "fail")) {
+    if (check.name === "sync_health") continue;
+    actions.push({
+      level: "fail",
+      title: `${check.name} failed.`,
+      detail: "Inspect hosted:doctor details and fix this before relying on hosted Brain.",
+    });
+  }
+
+  if (actions.length === 0 && status === "pass") {
+    actions.push({
+      level: "pass",
+      title: "No operator action required.",
+      detail: "Hosted health, local sync, conflicts, lint freshness, inbox, daemon, and Fly checks are currently acceptable.",
+    });
+  }
+
+  return actions;
+}
+
 const doctorStartedAt = Date.now();
 
 await Promise.all([
@@ -436,18 +604,22 @@ await Promise.all([
   timedCheck("sync_lock", checkSyncLock),
   timedCheck("sync_health", checkSyncHealth),
   timedCheck("user_operation_latency", checkUserOperationLatency),
+  timedCheck("lint_nudge", checkLintNudge),
+  timedCheck("inbox", checkInbox),
   timedCheck("launchd", checkLaunchd),
   timedCheck("fly_status", checkFlyStatus),
 ]);
 
 const failed = checks.filter((check) => check.status === "fail");
 const warnings = checks.filter((check) => check.status === "warn");
+const status = failed.length ? "fail" : warnings.length ? "warn" : "pass";
 const summary = {
   ok: failed.length === 0,
-  status: failed.length ? "fail" : warnings.length ? "warn" : "pass",
+  status,
   checkedAt: new Date().toISOString(),
   latencyMs: Date.now() - doctorStartedAt,
   checks,
+  actions: buildOperatorActions(status),
 };
 
 console.log(JSON.stringify(summary, null, 2));
