@@ -120,7 +120,23 @@ Allow-list in `~/.claude/settings.json` so `mcp__brain` tools never re-prompt: `
 
 ### Claude Desktop / Cowork (`~/Library/Application Support/Claude/claude_desktop_config.json`)
 
-Same rename — hosted as `brain` (`"type": "http"`), local stdio retained as `brain-local`. Restart the Desktop app to reload. Cowork connectors managed in the cloud are configured through **Settings -> Connectors** in the app, not this file; add the hosted Brain there as a custom connector using the web/custom connector URL below.
+**Important — Desktop does NOT accept the `{ "type": "http", "url": ... }` shape that Claude Code uses.** `claude_desktop_config.json` only loads local stdio (`command`) servers; a bare `type: http` entry is rejected with "Some MCP servers could not be loaded ... were skipped: brain". Bridge the hosted server through `mcp-remote` so it loads as a stdio command, keeping the `brain` name:
+
+```json
+{
+  "brain": {
+    "command": "npx",
+    "args": ["-y", "mcp-remote", "https://jem-brain-mcp.fly.dev/mcp"]
+  },
+  "brain-local": {
+    "command": "node",
+    "args": ["/Users/johnemilad/Projects/brain-mcp-server/dist/index.js"],
+    "env": { "BRAIN_DIR": "/Users/johnemilad/Projects/ai-brain-jem/brain" }
+  }
+}
+```
+
+Quit and reopen the Desktop app to reload. First hosted use opens a browser for GitHub OAuth once; `mcp-remote` caches the token afterward. (`npx` must resolve on the Desktop app's PATH — it does if bare `node` already works for `brain-local`, since both live in the same bin dir.) Alternatively, omit `brain` from this file and add the hosted Brain through the app's **Settings -> Connectors -> Add custom connector** UI (cloud-synced, also covers web + mobile for that account) using the URL below. Cowork connectors are managed the same way through **Settings -> Connectors**, not this file.
 
 ### Claude web + mobile (custom connector, personal and ERS accounts)
 
@@ -162,14 +178,14 @@ url = "https://jem-brain-mcp.fly.dev/mcp"
 oauth_resource = "https://jem-brain-mcp.fly.dev/mcp"
 ```
 
-Claude Desktop `claude_desktop_config.json`:
+Claude Desktop `claude_desktop_config.json` (bridge remote servers through `mcp-remote` — Desktop rejects the bare `type: http` shape; see the Claude Client Cutover section above):
 
 ```json
 {
   "mcpServers": {
     "brain-hosted": {
-      "type": "http",
-      "url": "https://jem-brain-mcp.fly.dev/mcp"
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://jem-brain-mcp.fly.dev/mcp"]
     }
   }
 }
