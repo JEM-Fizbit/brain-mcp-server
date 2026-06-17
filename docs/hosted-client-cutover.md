@@ -93,11 +93,11 @@ OpenAI account cutover verification passed on 2026-06-16 for both ERS and person
 - open conflicts: 0;
 - latest cursor: `2026-06-16T11:05:57.337Z`.
 
-Claude account cutover is partly complete: the personal Max account has been activated and verified against hosted Brain as of 2026-06-17. The ERS account remains to be verified. Use the same sync verification payload for the remaining ERS smoke and require hosted/revision provider, hosted file count `52` or higher, open conflicts `0`, and no Brain file contents printed during the smoke.
+Claude account cutover verification passed on 2026-06-17 for both the personal Max account and the ERS account. This is John-only, user-scope access to `ai-brain-jem`; it is not an ERS team rollout. Both verifications used the hosted/revision provider, hosted file count `52` or higher, open conflicts `0`, and no Brain file contents printed during the smoke.
 
 ## Claude Client Cutover
 
-Claude has been cut over so the default `brain` MCP connector points at hosted across local Claude Code surfaces, and the Claude personal Max custom connector has been activated and verified. The naming convention matches Codex: hosted is the default `brain`, local stdio is retained as `brain-local`.
+Claude has been cut over so the default `brain` MCP connector points at hosted across local Claude Code surfaces, and the Claude personal Max and ERS custom connectors have been activated and verified for John's personal use. The naming convention matches Codex: hosted is the default `brain`, local stdio is retained as `brain-local`.
 
 > **Tenancy — single-user / single-Brain (important).** The hosted runtime is still **single-tenant**: it serves exactly one Brain (`ai-brain-jem`), and access is gated by GitHub OAuth to John's identity plus the hosted allowlist. Adding the connector in the **ERS Teams** account is John reaching his *own* JEM Brain from that account — it is **not** a team rollout. **John remains the sole user on every account and surface** until the multi-tenant Brain Platform (one `mcp__brain__*` namespace + `brain_id` + per-Brain substrate + per-user attribution) is built and rolled out (roadmap: `~/Projects/ai-brain-jem/docs/PLAN_brain_roadmap.md`; architecture: `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`). When adding the ERS connector, add it at **user/personal scope, not org/workspace-wide**, so it is not surfaced to other ERS users — the server-side OAuth + allowlist already enforces John-only regardless, but user-scope keeps it clean.
 
@@ -124,7 +124,7 @@ Allow-list in `~/.claude/settings.json` so `mcp__brain` tools never re-prompt: `
 
 **Important — Desktop does NOT accept the `{ "type": "http", "url": ... }` shape that Claude Code uses.** `claude_desktop_config.json` only loads local stdio (`command`) servers; a bare `type: http` entry is rejected with "Some MCP servers could not be loaded ... were skipped: brain". So the hosted Brain does **not** go in this file.
 
-**Recommended (robust) — add hosted `brain` as a custom connector.** Use the app's **Settings -> Connectors -> Add custom connector** (Name `brain`, URL `https://jem-brain-mcp.fly.dev/mcp`, then GitHub OAuth). This is first-party (no `npx`/`mcp-remote` bridge, no PATH or package-drift risk), uses native in-app auth, and is **cloud-synced — one addition per account covers Desktop + web + mobile**. Do it once per account: personal Max is done; ERS Teams remains. Keep only `brain-local` (local stdio) in `claude_desktop_config.json` as the recovery fallback:
+**Recommended (robust) — add hosted `brain` as a custom connector.** Use the app's **Settings -> Connectors -> Add custom connector** (Name `brain`, URL `https://jem-brain-mcp.fly.dev/mcp`, then GitHub OAuth). This is first-party (no `npx`/`mcp-remote` bridge, no PATH or package-drift risk), uses native in-app auth, and is **cloud-synced — one addition per account covers Desktop + web + mobile**. This is done for personal Max and ERS Teams at John/user scope only. Keep only `brain-local` (local stdio) in `claude_desktop_config.json` as the recovery fallback:
 
 ```json
 {
@@ -151,7 +151,7 @@ Quit and reopen the Desktop app after editing the file. Cowork connectors are ma
 
 ### Claude web + mobile (custom connector, personal and ERS accounts)
 
-Claude web and mobile share cloud-synced connectors per account. On current claude.ai builds, custom connectors live under **Customize -> Connectors** (`https://claude.ai/customize/connectors`), reached via the in-app "Connectors have moved to Customize" link in Settings — a direct deep-link can render a blank shell, so navigate from Settings. Add the hosted Brain once per account via **Customize -> Connectors -> Add custom connector**. Personal Max is already activated and verified; ERS Teams remains to be done:
+Claude web and mobile share cloud-synced connectors per account. On current claude.ai builds, custom connectors live under **Customize -> Connectors** (`https://claude.ai/customize/connectors`), reached via the in-app "Connectors have moved to Customize" link in Settings — a direct deep-link can render a blank shell, so navigate from Settings. Add the hosted Brain once per account via **Customize -> Connectors -> Add custom connector**. Personal Max and ERS Teams are already activated and verified for John-only use:
 
 ```text
 Name: brain

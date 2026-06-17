@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-06-16
+**Last updated:** 2026-06-17
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
@@ -32,7 +32,8 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - `docs/hosted-client-cutover.md` defines the real-client connector rehearsal, promotion gate, and account-specific verification status;
 - the real hosted client shadow rehearsal passed for `ai-brain-jem`, so hosted MCP is now the normal remote JEM path;
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
-- the next surface target is hosted Brain deployment and verification for Claude personal and ERS accounts;
+- Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
+- the hosted runtime remains single-tenant and single-Brain: John is still the only user, and `ai-brain-jem` is the only served Brain;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
 
 ## Cutover Principle
