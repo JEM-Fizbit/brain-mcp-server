@@ -8,6 +8,54 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-16 — Verify hosted Brain across OpenAI accounts before Claude rollout
+
+**Decision:** Treat hosted Brain as deployed and verified for OpenAI surfaces after successful Codex verification plus ChatGPT verification in both ERS and personal OpenAI accounts. The next client rollout target is Claude surfaces for both personal and ERS accounts.
+
+**Why:** Cross-account OpenAI verification proves the hosted `/mcp` endpoint, OAuth registration, and revision-backed `brain_sync_status` path work outside the local Codex-only configuration. Recording this as the handoff point keeps the next phase focused on Claude enrollment and verification rather than re-litigating OpenAI readiness.
+
+**Alternatives rejected:** Waiting for Claude before recording OpenAI cutover success; treating one ChatGPT account as enough account-surface proof; moving immediately to cockpit productization without marking Claude as the next client deployment target.
+
+**Related:** `docs/hosted-client-cutover.md`; `docs/ROADMAP.md`; `https://jem-brain-mcp.fly.dev/mcp`.
+
+---
+
+## 2026-06-16 — Make hosted Brain the default Codex connector
+
+**Decision:** Codex now uses hosted Brain MCP as the default `brain` connector, and the previous local stdio connector is retained as `brain-local` for fallback and local filesystem-heavy work. ChatGPT uses the same hosted `/mcp` endpoint through its server-side connector settings.
+
+**Why:** The hosted MCP path passed scripted and real-client rehearsal, and the user explicitly requested full cutover for OpenAI clients. Keeping the local connector under a fallback name preserves the local-first recovery path without leaving Codex's default Brain tool on filesystem mode.
+
+**Alternatives rejected:** Leaving Codex default on local stdio after promotion; removing the local fallback entirely; trying to edit ChatGPT Electron caches instead of using ChatGPT's connector settings; using separate Brain endpoints for Codex and ChatGPT.
+
+**Related:** `~/.codex/config.toml`; `docs/hosted-client-cutover.md`; `https://jem-brain-mcp.fly.dev/mcp`.
+
+---
+
+## 2026-06-16 — Promote hosted Brain MCP as the normal remote JEM path
+
+**Decision:** Hosted `brain-hosted` is promoted as the normal remote MCP path for `ai-brain-jem`, while local stdio `brain` remains configured for fast local work, source-file handling, and recovery.
+
+**Why:** The hosted test drive passed with hosted/local sync parity, OAuth reuse, conflict lifecycle, latency reporting, zero open conflicts, and a fresh local sync loop. A real hosted client shadow rehearsal then passed, and the post-rehearsal cockpit doctor reported hosted health green, 50 hosted files, 0 open conflicts, and fresh sync health. This satisfies the JEM remote-client promotion gate without weakening the local-first contract.
+
+**Alternatives rejected:** Keeping hosted as a smoke-script-only pilot after a successful real-client rehearsal; removing the local stdio connector; making hosted mandatory for local filesystem-heavy work; waiting for multi-Brain or ERS tenancy before using the JEM remote path.
+
+**Related:** `docs/hosted-client-cutover.md`; `docs/ROADMAP.md`; `npm run hosted:test-drive`; `npm run hosted:cockpit`.
+
+---
+
+## 2026-06-16 — Rehearse hosted MCP as a shadow client connector before promotion
+
+**Decision:** Add hosted Brain MCP to Claude/Codex as a separate `brain-hosted` connector for real-client rehearsal before making it the normal remote JEM path, while preserving the local stdio `brain` connector as the default local fallback.
+
+**Why:** The hosted test drive now verifies the server, OAuth smoke, sync parity, conflict lifecycle, and latency, but the final cutover risk is client enrollment and day-to-day ergonomics. A shadow connector lets a real client prove OAuth, reads, writes, cockpit visibility, and local mirror catch-up without removing the trusted local path.
+
+**Alternatives rejected:** Replacing the local `brain` connector immediately after a passing scripted rehearsal; requiring every local Claude/Codex session to use hosted MCP before a real shadow session; leaving hosted usable only through bespoke smoke scripts; removing the local fallback during the JEM pilot.
+
+**Related:** `docs/hosted-client-cutover.md`; `docs/ROADMAP.md`; `docs/deploy-fly.md`; `npm run hosted:test-drive`; `npm run hosted:doctor`.
+
+---
+
 ## 2026-06-16 — Automate Brain maintenance and proactively surface required user action
 
 **Decision:** Brain MCP maintenance must be automation-first: routine linting, sync health, hosted health, conflict detection, and stale-state checks should run through tools or scheduled/operator commands, and any issue needing human judgement must be clearly and proactively surfaced to the user with the next required action.

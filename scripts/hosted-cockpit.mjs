@@ -7,8 +7,16 @@ import { fileURLToPath } from "node:url";
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
-const port = Number(process.env.BRAIN_COCKPIT_PORT || 8787);
+const requestedPort = process.env.BRAIN_COCKPIT_PORT;
+const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
+const allowPortFallback =
+  process.env.BRAIN_COCKPIT_PORT_FALLBACK === "1" ||
+  (!requestedPort && process.env.BRAIN_COCKPIT_PORT_FALLBACK !== "0");
+const maxPortAttempts = Math.max(
+  1,
+  Number(process.env.BRAIN_COCKPIT_PORT_ATTEMPTS || 10)
+);
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -995,19 +1003,46 @@ const page = String.raw`<!doctype html>
   </body>
 </html>`;
 
-const server = http.createServer(async (request, response) => {
-  const url = new URL(request.url || "/", `http://${request.headers.host}`);
-  if (request.method === "GET" && url.pathname === "/") {
-    sendHtml(response, page);
-    return;
-  }
-  if (request.method === "GET" && url.pathname === "/api/doctor") {
-    sendJson(response, 200, await runDoctor());
-    return;
-  }
-  sendJson(response, 404, { ok: false, error: "not_found" });
-});
+function createCockpitServer() {
+  return http.createServer(async (request, response) => {
+    const url = new URL(request.url || "/", `http://${request.headers.host}`);
+    if (request.method === "GET" && url.pathname === "/") {
+      sendHtml(response, page);
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/doctor") {
+      sendJson(response, 200, await runDoctor());
+      return;
+    }
+    sendJson(response, 404, { ok: false, error: "not_found" });
+  });
+}
 
-server.listen(port, host, () => {
-  console.log(`Brain cockpit listening on http://${host}:${port}`);
-});
+function listen(portToTry, attempt = 1) {
+  const server = createCockpitServer();
+  const onError = (error) => {
+    if (
+      error.code === "EADDRINUSE" &&
+      allowPortFallback &&
+      attempt < maxPortAttempts
+    ) {
+      console.warn(
+        `Brain cockpit port ${portToTry} is in use; trying ${portToTry + 1}.`
+      );
+      listen(portToTry + 1, attempt + 1);
+      return;
+    }
+
+    console.error(
+      `Brain cockpit failed to listen on http://${host}:${portToTry}: ${error.message}`
+    );
+    process.exit(1);
+  };
+
+  server.once("error", onError);
+  server.listen(portToTry, host, () => {
+    console.log(`Brain cockpit listening on http://${host}:${portToTry}`);
+  });
+}
+
+listen(port);
