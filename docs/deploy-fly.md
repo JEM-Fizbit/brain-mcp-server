@@ -141,6 +141,14 @@ The cockpit also reports latency in two groups. User-facing operation latency co
 
 If doctor reports open conflicts, follow [`docs/conflict-resolution.md`](./conflict-resolution.md). Conflicts should be surfaced proactively and resolved with reviewed Markdown content, not hidden by manual database edits or duplicate filenames.
 
+For a user-launchable local cockpit that does not require a Codex session or terminal to keep running, generate a reviewable macOS LaunchAgent:
+
+```bash
+npm run hosted:cockpit:launchd:plist
+```
+
+The generated plist binds cockpit to `127.0.0.1:8787`, disables port fallback so the URL stays stable, and writes logs beside the Brain sync health files. Review and install it per [`docs/hosted-cockpit.md`](./hosted-cockpit.md). This local LaunchAgent path is the current operator recommendation; a hosted persistent admin website is deferred until multi-user auth and local-first sync visibility are redesigned.
+
 To include the hosted write/local mirror parity gate:
 
 ```bash

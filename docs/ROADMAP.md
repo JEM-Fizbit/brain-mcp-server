@@ -26,7 +26,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - stale local edits block hosted overwrite and create visible conflicts;
 - conflicts can be explicitly resolved through `brain_resolve_conflict`;
 - live OAuth smoke verifies hosted conflict listing, resolution, and final hosted content;
-- `hosted:cockpit` provides a local read-only operator dashboard over the hosted doctor checks;
+- `hosted:cockpit` provides a local read-only operator dashboard over the hosted doctor checks, with a reviewable macOS LaunchAgent generator for a stable user-launchable local surface;
 - `hosted:test-drive` provides a single readable operator rehearsal for hosted health, MCP read/write parity, conflict lifecycle, and latency;
 - cached hosted OAuth smoke avoids repeated GitHub approval during routine checks;
 - `docs/hosted-client-cutover.md` defines the real-client connector rehearsal, promotion gate, and account-specific verification status;
@@ -187,7 +187,7 @@ Exit criteria:
 
 Recommended order:
 
-1. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI.
+1. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI. First slice: local LaunchAgent + stable loopback URL; hosted persistent admin website deferred until multi-user auth and local-first sync visibility are redesigned.
 2. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
 3. Document and rehearse hosted recovery/reseed from local Markdown.
 4. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.

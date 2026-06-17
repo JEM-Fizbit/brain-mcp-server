@@ -22,6 +22,7 @@
     "hosted:doctor": "node scripts/hosted-doctor.mjs",
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",
+    "hosted:cockpit:launchd:plist": "node scripts/write-cockpit-launchd-plist.mjs",
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
     "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",

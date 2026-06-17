@@ -91,7 +91,7 @@ For hosted client cutover, add the HTTP endpoint as a separate `brain-hosted` co
 
 After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint through Settings -> Connectors -> Create.
 
-For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied.
+For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied. For a user-launchable local operator surface, generate the reviewable macOS LaunchAgent with `npm run hosted:cockpit:launchd:plist`; see [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md).
 
 ## Client Setup
 
