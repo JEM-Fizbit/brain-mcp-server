@@ -180,7 +180,7 @@ Require: `brain_id` `ai-brain-jem`, provider `revision`, hosted file count `52` 
 Status as of 2026-06-17:
 
 - Claude personal Max: activated and verified.
-- Claude ERS account: pending.
+- Claude ERS account: activated and verified, 2026-06-17 (provider `revision`, hosted files 52, open conflicts 0; PP slim v2026.06.17-1 deployed same day).
 
 ## Shadow Connector
 
