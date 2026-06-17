@@ -117,6 +117,8 @@ npm run hosted:test-drive
 
 The final output is intended to be readable without inspecting raw JSON: it reports pass/warn/fail status, hosted/local inventory, open conflicts, sync cycle activity, user-facing read/write/sync latency, and the next operator action. Use `--read-only` for a non-mutating check or `--skip-conflict` when the write parity checks are desired but the conflict lifecycle is not.
 
+After `hosted:test-drive` passes, follow [`docs/hosted-client-cutover.md`](./hosted-client-cutover.md) to add hosted MCP as a shadow `brain-hosted` connector in Claude or Codex, exercise real-client reads and one narrow write, and decide when to promote hosted as the normal remote JEM path.
+
 For a non-destructive hosted operator check, run:
 
 ```bash
@@ -131,7 +133,7 @@ For a browser-visible local operator view over the same read-only checks, run:
 npm run hosted:cockpit
 ```
 
-The cockpit binds to `127.0.0.1:8787` by default, calls `hosted:doctor` behind `GET /api/doctor`, and auto-refreshes once per minute. It is intended for local visibility during the JEM hosted Brain pilot; it should not be exposed publicly or used as an admin mutation surface. Set `BRAIN_COCKPIT_PORT` or `BRAIN_COCKPIT_HOST` only for deliberate local operator needs.
+The cockpit binds to `127.0.0.1:8787` by default, falls forward to the next available local port when the default is already occupied, calls `hosted:doctor` behind `GET /api/doctor`, and auto-refreshes once per minute. It is intended for local visibility during the JEM hosted Brain pilot; it should not be exposed publicly or used as an admin mutation surface. Set `BRAIN_COCKPIT_PORT` or `BRAIN_COCKPIT_HOST` only for deliberate local operator needs. Set `BRAIN_COCKPIT_PORT_FALLBACK=0` to make occupied-port startup fail instead of trying the next port.
 
 File counts are inventory counts, not an activity log. Updating an existing smoke file should leave the hosted/local file counts unchanged. Use the cockpit's Recent Brain Activity panel and Watch Log to see revision writes, conflict open/resolution events, sync pulls/pushes, and local-time timestamps while exercising hosted MCP operations.
 
@@ -225,7 +227,7 @@ After any deployment that changes schema, RLS, functions, Storage, or user-data 
 
 - Keep `auto_stop_machines = "off"` while OAuth state handling is file/local-process based.
 - If the app name changes, update `app`, `MCP_OAUTH_PUBLIC_BASE`, and GitHub OAuth callback URL together.
-- Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted.
+- Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted. ChatGPT connector creation can generate a callback under `https://chatgpt.com/connector/oauth/<id>`; allowlist the exact callback from the `invalid_redirect_uri` error and retry creation.
 - Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.
 - Store Supabase database URLs and service keys only in deployment secrets or a password manager. They must not appear in docs, commits, logs, screenshots, or client-side environment variables.
 - `BRAIN_HTTP_TIMING_LOGS=1` enables coarse MCP request timing logs with method, path, status, and duration only; request bodies and authorization headers are not logged.

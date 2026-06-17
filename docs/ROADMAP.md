@@ -29,7 +29,11 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - `hosted:cockpit` provides a local read-only operator dashboard over the hosted doctor checks;
 - `hosted:test-drive` provides a single readable operator rehearsal for hosted health, MCP read/write parity, conflict lifecycle, and latency;
 - cached hosted OAuth smoke avoids repeated GitHub approval during routine checks;
-- local Brain MCP remains the trusted default while hosted becomes operationally boring.
+- `docs/hosted-client-cutover.md` defines the real-client connector rehearsal, promotion gate, and account-specific verification status;
+- the real hosted client shadow rehearsal passed for `ai-brain-jem`, so hosted MCP is now the normal remote JEM path;
+- OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
+- the next surface target is hosted Brain deployment and verification for Claude personal and ERS accounts;
+- local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
 
 ## Cutover Principle
 
@@ -58,7 +62,7 @@ If hosted breaks, local Brain still works and can reseed hosted state.
 
 ## JEM Brain Cutover Criteria
 
-Move hosted MCP from pilot/shadow path to normal remote path for JEM Brain only after the following are true:
+Hosted MCP has moved from pilot/shadow path to normal remote path for JEM Brain. Keep the promotion valid only while the following stay true:
 
 - daily hosted doctor/status checks pass without manual fiddling;
 - local sync daemon exposes a clear last-success signal and does not wedge on stale locks;
@@ -66,7 +70,7 @@ Move hosted MCP from pilot/shadow path to normal remote path for JEM Brain only 
 - sync, lint, and hosted-health issues are proactively flagged with the next required action;
 - there is a short recovery playbook for reseeding hosted from local Markdown;
 - source artifact metadata and private retention behavior are verified;
-- OAuth client setup works smoothly enough for Claude and Codex;
+- OAuth client setup works smoothly enough for Codex, ChatGPT, and Claude;
 - local Brain MCP remains available as fallback.
 
 ## Milestone 1: JEM Hosted Brain Pilot Ready
@@ -182,12 +186,11 @@ Exit criteria:
 
 Recommended order:
 
-1. Run the JEM Brain real-world hosted-client rehearsal using `npm run hosted:test-drive` as the readiness gate.
-2. Decide when Claude/Codex should use hosted MCP as the normal remote JEM path.
-3. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI.
-4. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
-5. Document and rehearse hosted recovery/reseed from local Markdown.
-6. Start the multi-Brain design after the JEM pilot path is boring.
+1. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI.
+2. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
+3. Document and rehearse hosted recovery/reseed from local Markdown.
+4. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.
+5. Start the multi-Brain design after the JEM pilot path is boring.
 
 ## Non-Goals For Now
 

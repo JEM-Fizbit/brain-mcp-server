@@ -78,6 +78,7 @@ This repo includes:
 - `Dockerfile` for the hosted Node runtime
 - `fly.toml` for the first Supabase-backed Fly.io target, `jem-brain-mcp`
 - [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
+- [`docs/hosted-client-cutover.md`](./docs/hosted-client-cutover.md) for the JEM hosted client shadow rehearsal and promotion gate
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the staged JEM cutover, ERS migration, and multi-tenant roadmap
 
 Hosted endpoint shape:
@@ -85,6 +86,12 @@ Hosted endpoint shape:
 ```text
 https://jem-brain-mcp.fly.dev/mcp
 ```
+
+For hosted client cutover, add the HTTP endpoint as a separate `brain-hosted` connector first and keep the local stdio `brain` connector available as fallback.
+
+After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint through Settings -> Connectors -> Create.
+
+For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied.
 
 ## Client Setup
 
