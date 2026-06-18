@@ -16,6 +16,12 @@ const cockpitScriptPath = path.join(
   "scripts",
   "write-cockpit-launchd-plist.mjs"
 );
+const launcherScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "install-cockpit-launcher.mjs"
+);
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-launchd-test-"));
 
 after(async () => {
@@ -90,4 +96,35 @@ test("cockpit launchd plist runs local cockpit with a stable loopback URL", asyn
   assert.doesNotMatch(plist, /<string>\/usr\/bin\/env<\/string>/);
   assert.doesNotMatch(plist, /<string>npm<\/string>/);
   assert.doesNotMatch(plist, /<string>run<\/string>/);
+});
+
+test("desktop launcher app opens cockpit and kickstarts launchd service", async () => {
+  const appPath = path.join(tmpRoot, "Brain Cockpit.app");
+
+  const { stdout } = await exec(process.execPath, [launcherScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_COCKPIT_LAUNCHER_APP: appPath,
+      BRAIN_COCKPIT_LAUNCHD_LABEL: "com.example.brain-cockpit",
+      BRAIN_COCKPIT_URL: "http://127.0.0.1:8799/",
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const infoPlist = await fs.readFile(path.join(appPath, "Contents", "Info.plist"), "utf-8");
+  const executablePath = path.join(appPath, "Contents", "MacOS", "Brain Cockpit");
+  const executable = await fs.readFile(executablePath, "utf-8");
+  const stat = await fs.stat(executablePath);
+
+  assert.equal(result.appPath, appPath);
+  assert.equal(result.url, "http://127.0.0.1:8799/");
+  assert.match(infoPlist, /<key>CFBundlePackageType<\/key>\s*<string>APPL<\/string>/);
+  assert.match(infoPlist, /<key>LSUIElement<\/key>\s*<true\/>/);
+  assert.match(executable, /launchctl print/);
+  assert.match(executable, /launchctl bootstrap/);
+  assert.match(executable, /launchctl kickstart -k/);
+  assert.match(executable, /\/usr\/bin\/open "\$\{URL\}"/);
+  assert.match(executable, /com\.example\.brain-cockpit/);
+  assert.match(executable, /http:\/\/127\.0\.0\.1:8799\//);
+  assert.notEqual(stat.mode & 0o111, 0);
 });
