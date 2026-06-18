@@ -29,6 +29,8 @@ The cockpit is local-only and read-only. It must not expose Brain writes, confli
 Use Supabase Postgres for hosted operational telemetry.
 
 - User-facing hosted MCP latency samples belong in `brain.sync_events` with `event_type = 'hosted_mcp_latency'`.
+- Real hosted MCP server tool calls are the normal telemetry source and should use metadata `source = 'hosted_mcp_server'`.
+- Telemetry must not record file content, patch text, source content, or search query text.
 - The cockpit should read Postgres telemetry first.
 - `.brain-sync/hosted-mcp-latency.json` is a fallback cache only, used when Postgres is unavailable or explicitly enabled.
 - Do not introduce a new metrics database, daemon, or analytics service unless a backlog/spec promotion justifies it.

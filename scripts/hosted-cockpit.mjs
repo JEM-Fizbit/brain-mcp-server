@@ -671,6 +671,7 @@ const page = String.raw`<!doctype html>
         "baseUrl",
         "brainId",
         "source",
+        "telemetrySource",
         "postgresState",
         "hostedFiles",
         "trackedFiles",
@@ -1044,7 +1045,9 @@ const page = String.raw`<!doctype html>
         const summaries = details.operationSummaries || [];
         const recordedAt = details.latestOperationAt || details.checkedAt;
         const historySource = details.source === "postgres"
-          ? "Postgres telemetry history"
+          ? (details.telemetrySource === "hosted_mcp_server"
+              ? "hosted MCP server telemetry history"
+              : "Postgres telemetry history")
           : "fallback latency cache";
         const intro = details.state === "recorded"
           ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Averages use the bounded " + historySource + "."
