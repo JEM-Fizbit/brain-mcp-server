@@ -1045,8 +1045,8 @@ const page = String.raw`<!doctype html>
         const summaries = details.operationSummaries || [];
         const recordedAt = details.latestOperationAt || details.checkedAt;
         const historySource = details.source === "postgres"
-          ? (details.telemetrySource === "hosted_mcp_server"
-              ? "hosted MCP server telemetry history"
+          ? (details.telemetrySource === "hosted_mcp_server_plus_sync_wait"
+              ? "hosted MCP telemetry history"
               : "Postgres telemetry history")
           : "fallback latency cache";
         const intro = details.state === "recorded"

@@ -67,6 +67,8 @@ test("hosted OAuth smoke caches refresh grants without logging access tokens", a
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT/);
   assert.match(script, /BRAIN_REVISION_DATABASE_URL/);
   assert.match(script, /BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE/);
+  assert.match(script, /BRAIN_HOSTED_MCP_SYNC_WAIT_DB_WRITE/);
+  assert.match(script, /hosted_mcp_sync_wait/);
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
   assert.match(script, /operationLatencies/);
@@ -106,6 +108,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
   assert.match(script, /hosted_mcp_server/);
+  assert.match(script, /sync_wait/);
   assert.match(script, /latestReadLatencyMs/);
   assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /operationSummaries/);

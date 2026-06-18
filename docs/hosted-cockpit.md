@@ -118,7 +118,7 @@ The cockpit does not run hidden writes just to refresh charts. User-facing laten
 
 Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency` and metadata source `hosted_mcp_server`. The telemetry row records tool name, operation kind, safe target metadata such as filename or category, latency, and success/failure state; it does not record file content, patch text, source content, or search query text. The cockpit reads server-emitted Postgres rows first when `BRAIN_REVISION_DATABASE_URL` is configured.
 
-For end-to-end client timing diagnostics, `npm run smoke:hosted:oauth` can also write client-observed latency rows when `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=1` is set. Those rows are a compatibility/diagnostic fallback, not the normal cockpit source.
+Sync-wait latency is measured by `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`, because it measures local-hosted propagation rather than one server tool handler. Those flows write `sync_wait` rows by default. For end-to-end client timing diagnostics of all tool calls, set `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=1`; those rows are a compatibility/diagnostic fallback, not the normal read/write source.
 
 If Postgres is unavailable, or if `BRAIN_HOSTED_MCP_LATENCY_CACHE=1` is set, the smoke flow writes a bounded fallback cache to:
 
