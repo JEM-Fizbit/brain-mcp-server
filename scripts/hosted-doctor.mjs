@@ -346,14 +346,16 @@ async function checkUserOperationLatency() {
       const pool = new Pool({ connectionString: databaseUrl });
       try {
         const serverResult = await pool.query(
-          latencyRowsQuery("and metadata->>'source' = 'hosted_mcp_server'"),
+          latencyRowsQuery(
+            "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')"
+          ),
           [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
         );
         const history = latencyHistoryFromSyncEventRows(serverResult.rows);
         if (history.length > 0) {
           addUserOperationLatencyCheck({
             source: "postgres",
-            telemetrySource: "hosted_mcp_server",
+            telemetrySource: "hosted_mcp_server_plus_sync_wait",
             checkedAt: history.at(-1)?.at || null,
             history,
             operationCount: history.length,

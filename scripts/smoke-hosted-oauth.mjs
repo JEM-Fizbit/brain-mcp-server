@@ -51,8 +51,10 @@ const latencyFile =
   path.resolve(localBrainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
 const latencyHistoryLimit = Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240);
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
-const shouldWriteLatencyToPostgres =
+const shouldWriteClientLatencyToPostgres =
   process.env.BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE === "1";
+const shouldWriteSyncWaitLatencyToPostgres =
+  process.env.BRAIN_HOSTED_MCP_SYNC_WAIT_DB_WRITE !== "0";
 const shouldWriteLatencyCache =
   process.env.BRAIN_HOSTED_MCP_LATENCY_CACHE === "1" || !databaseUrl;
 const operationLatencies = [];
@@ -383,12 +385,21 @@ async function writeLatencySnapshot() {
 }
 
 async function writeLatencyTelemetryToPostgres() {
-  if (!databaseUrl || !shouldWriteLatencyToPostgres) return false;
+  if (!databaseUrl) return false;
+  const telemetryOperations = operationLatencies.filter(
+    (operation) =>
+      shouldWriteClientLatencyToPostgres ||
+      (shouldWriteSyncWaitLatencyToPostgres && operation.kind === "sync_wait")
+  );
+  if (telemetryOperations.length === 0) return false;
   const pool = new Pool({ connectionString: databaseUrl });
   try {
-    for (const operation of operationLatencies) {
+    for (const operation of telemetryOperations) {
       const metadata = metadataForLatencyOperation(operation, {
-        source: "smoke-hosted-oauth",
+        source:
+          operation.kind === "sync_wait"
+            ? "hosted_mcp_sync_wait"
+            : "smoke-hosted-oauth",
         baseUrl,
         smokeFilename,
       });
