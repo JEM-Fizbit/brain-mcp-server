@@ -13,6 +13,7 @@ Use a local browser surface backed by a macOS LaunchAgent:
 - the stable local URL is `http://127.0.0.1:8787/`;
 - checks continue to come from `npm run hosted:doctor`;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
+- user-facing hosted MCP latency shows latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
@@ -110,6 +111,24 @@ Warn means use judgement. Typical examples are stale sync health, stale or missi
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
 Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not manually delete database rows to make the cockpit green.
+
+## Latency Trend Semantics
+
+The cockpit does not run hidden writes just to refresh charts. User-facing latency comes from measured hosted MCP flows such as `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`.
+
+Those flows write a bounded rolling history to:
+
+```text
+<brain-repo>/.brain-sync/hosted-mcp-latency.json
+```
+
+The Latency tab groups successful samples into three operator-level buckets:
+
+- read operations;
+- write operations;
+- sync wait operations.
+
+For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
 
 ## Next Hardening
 

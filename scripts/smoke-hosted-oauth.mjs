@@ -7,6 +7,7 @@ import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
+import { buildLatencySnapshot } from "./lib/latency-summary.mjs";
 
 loadLocalEnv();
 const exec = promisify(execFile);
@@ -41,6 +42,7 @@ const tokenCacheFile =
 const latencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(localBrainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
+const latencyHistoryLimit = Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240);
 const operationLatencies = [];
 
 function base64url(buffer) {
@@ -337,13 +339,6 @@ async function timedOperation(name, kind, target, fn) {
   }
 }
 
-function latestOperation(kind) {
-  return operationLatencies
-    .slice()
-    .reverse()
-    .find((operation) => operation.kind === kind && operation.ok);
-}
-
 async function timedTool(accessToken, name, args = {}) {
   return timedOperation(name, classifyTool(name), targetFor(name, args), () =>
     callTool(accessToken, name, args)
@@ -353,22 +348,22 @@ async function timedTool(accessToken, name, args = {}) {
 async function writeLatencySnapshot() {
   if (operationLatencies.length === 0) return;
   await fs.mkdir(path.dirname(latencyFile), { recursive: true });
-  const latestRead = latestOperation("read");
-  const latestWrite = latestOperation("write");
-  const latestSyncWait = latestOperation("sync_wait");
-  const snapshot = {
-    version: 1,
-    checkedAt: new Date().toISOString(),
+  let previousSnapshot = null;
+  try {
+    previousSnapshot = JSON.parse(await fs.readFile(latencyFile, "utf-8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.warn(`[hosted-oauth] Replacing unreadable latency history: ${error.message}`);
+    }
+  }
+  const snapshot = buildLatencySnapshot({
+    previousSnapshot,
+    operationLatencies,
     baseUrl,
     brainId,
     smokeFilename,
-    operationCount: operationLatencies.length,
-    latestReadLatencyMs: latestRead?.latencyMs ?? null,
-    latestWriteLatencyMs: latestWrite?.latencyMs ?? null,
-    latestSyncWaitLatencyMs: latestSyncWait?.latencyMs ?? null,
-    latestOperationAt: operationLatencies.at(-1)?.at ?? null,
-    operations: operationLatencies.slice(-40),
-  };
+    historyLimit: latencyHistoryLimit,
+  });
   await fs.writeFile(latencyFile, `${JSON.stringify(snapshot, null, 2)}\n`, "utf-8");
   console.log(`[hosted-oauth] User-facing latency snapshot written: ${latencyFile}`);
 }

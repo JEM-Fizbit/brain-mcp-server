@@ -5,6 +5,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
+import {
+  latencyHistoryFromSnapshot,
+  latestSuccessfulLatency,
+  summarizeLatencyHistory,
+} from "./lib/latency-summary.mjs";
 
 loadLocalEnv();
 
@@ -331,19 +336,24 @@ async function checkSyncHealth() {
 async function checkUserOperationLatency() {
   try {
     const snapshot = await readJson(userOperationLatencyFile);
-    const operations = Array.isArray(snapshot.operations)
-      ? snapshot.operations.slice(-12).reverse()
-      : [];
+    const history = latencyHistoryFromSnapshot(snapshot);
+    const operationSummaries = summarizeLatencyHistory(history);
+    const operations = history.slice(-12).reverse();
 
     addCheck("user_operation_latency", "pass", {
       latencyFile: userOperationLatencyFile,
       state: "recorded",
       checkedAt: snapshot.checkedAt || null,
-      latestOperationAt: snapshot.latestOperationAt || null,
-      latestReadLatencyMs: snapshot.latestReadLatencyMs ?? null,
-      latestWriteLatencyMs: snapshot.latestWriteLatencyMs ?? null,
-      latestSyncWaitLatencyMs: snapshot.latestSyncWaitLatencyMs ?? null,
+      latestOperationAt: snapshot.latestOperationAt || history.at(-1)?.at || null,
+      latestReadLatencyMs:
+        snapshot.latestReadLatencyMs ?? latestSuccessfulLatency(history, "read"),
+      latestWriteLatencyMs:
+        snapshot.latestWriteLatencyMs ?? latestSuccessfulLatency(history, "write"),
+      latestSyncWaitLatencyMs:
+        snapshot.latestSyncWaitLatencyMs ?? latestSuccessfulLatency(history, "sync_wait"),
       operationCount: snapshot.operationCount ?? operations.length,
+      historyCount: snapshot.historyCount ?? history.length,
+      operationSummaries,
       operations,
     });
   } catch (error) {

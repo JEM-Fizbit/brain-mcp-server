@@ -399,6 +399,80 @@ const page = String.raw`<!doctype html>
         margin-top: 2px;
       }
 
+      .latency-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .latency-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfbf8;
+        padding: 12px;
+        min-width: 0;
+      }
+
+      .latency-card-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .latency-latest {
+        font-size: 20px;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .sparkline {
+        display: block;
+        width: 100%;
+        height: 38px;
+        margin: 10px 0 8px;
+      }
+
+      .sparkline polyline {
+        fill: none;
+        stroke: var(--pass);
+        stroke-width: 2.25;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .sparkline .sparkline-area {
+        fill: #eef4f0;
+      }
+
+      .latency-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .latency-stat-label {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .latency-stat-value {
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+
+      .recent-heading {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        margin: 4px 0 2px;
+      }
+
       .mono {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
@@ -605,6 +679,7 @@ const page = String.raw`<!doctype html>
         "latestWriteLatencyMs",
         "latestSyncWaitLatencyMs",
         "operationCount",
+        "historyCount",
         "lastLintAt",
         "ageDays",
         "maxAgeDays",
@@ -877,12 +952,96 @@ const page = String.raw`<!doctype html>
         return kind || "operation";
       }
 
+      function formatDelta(ms) {
+        const value = Number(ms);
+        if (!Number.isFinite(value)) return "-";
+        if (value === 0) return "flat";
+        return (value > 0 ? "+" : "-") + formatDuration(Math.abs(value));
+      }
+
+      function trendDelta(summary) {
+        const points = Array.isArray(summary?.trend) ? summary.trend : [];
+        if (points.length < 2) return null;
+        const first = Number(points[0]?.latencyMs);
+        const last = Number(points[points.length - 1]?.latencyMs);
+        if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
+        return last - first;
+      }
+
+      function renderSparkline(points) {
+        const values = (Array.isArray(points) ? points : [])
+          .map((point) => Number(point.latencyMs))
+          .filter(Number.isFinite);
+        if (values.length < 2) {
+          return "<div class=\"sparkline event-meta\">Need at least two samples for trend.</div>";
+        }
+
+        const width = 180;
+        const height = 38;
+        const pad = 3;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const range = max - min || 1;
+        const step = (width - pad * 2) / Math.max(1, values.length - 1);
+        const coords = values.map((value, index) => {
+          const x = pad + index * step;
+          const y = height - pad - ((value - min) / range) * (height - pad * 2);
+          return x.toFixed(1) + "," + y.toFixed(1);
+        }).join(" ");
+
+        return "<svg class=\"sparkline\" viewBox=\"0 0 " + width + " " + height + "\" preserveAspectRatio=\"none\" aria-hidden=\"true\">" +
+          "<rect class=\"sparkline-area\" x=\"0\" y=\"0\" width=\"" + width + "\" height=\"" + height + "\" rx=\"6\"></rect>" +
+          "<polyline points=\"" + escapeHtml(coords) + "\"></polyline>" +
+        "</svg>";
+      }
+
+      function renderLatencySummaryCards(summaries) {
+        if (!Array.isArray(summaries) || summaries.length === 0) return "";
+        return "<div class=\"latency-summary-grid\">" + summaries.map((summary) => {
+          const failed = Number(summary.failedCount || 0);
+          const delta = trendDelta(summary);
+          const trendCopy = delta === null ? "trend pending" : "recent trend " + formatDelta(delta);
+          const meta = [
+            "n=" + (summary.sampleCount ?? 0),
+            trendCopy,
+            summary.latestAt ? "latest " + ageLabel(summary.latestAt) : null,
+            failed ? failed + " failed" : null,
+          ].filter(Boolean).join(" · ");
+
+          return "<div class=\"latency-card\">" +
+            "<div class=\"latency-card-header\">" +
+              "<div>" +
+                "<div class=\"event-title\">" + escapeHtml(summary.label || operationKindLabel(summary.kind)) + "</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+              "</div>" +
+              "<div class=\"latency-latest\">" + escapeHtml(formatDuration(summary.latestLatencyMs)) + "</div>" +
+            "</div>" +
+            renderSparkline(summary.trend) +
+            "<div class=\"latency-stats\">" +
+              "<div><div class=\"latency-stat-label\">Avg</div><div class=\"latency-stat-value\">" + escapeHtml(formatDuration(summary.averageLatencyMs)) + "</div></div>" +
+              "<div><div class=\"latency-stat-label\">P50</div><div class=\"latency-stat-value\">" + escapeHtml(formatDuration(summary.p50LatencyMs)) + "</div></div>" +
+              "<div><div class=\"latency-stat-label\">P95</div><div class=\"latency-stat-value\">" + escapeHtml(formatDuration(summary.p95LatencyMs)) + "</div></div>" +
+              "<div><div class=\"latency-stat-label\">Range</div><div class=\"latency-stat-value\">" + escapeHtml(formatDuration(summary.minLatencyMs) + "-" + formatDuration(summary.maxLatencyMs)) + "</div></div>" +
+            "</div>" +
+          "</div>";
+        }).join("") + "</div>";
+      }
+
+      function latencySummaryByKind(details, kind) {
+        return (details.operationSummaries || []).find((summary) => summary.kind === kind) || null;
+      }
+
+      function latestLatencyByKind(details, kind, fallback) {
+        return latencySummaryByKind(details, kind)?.latestLatencyMs ?? fallback;
+      }
+
       function renderUserOperationLatencies(payload) {
         const details = byName(payload, "user_operation_latency")?.details || {};
         const operations = details.operations || [];
+        const summaries = details.operationSummaries || [];
         const recordedAt = details.latestOperationAt || details.checkedAt;
         const intro = details.state === "recorded"
-          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt)
+          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Averages use the bounded local latency history."
           : "No hosted MCP operation timing has been recorded yet. Run the hosted OAuth smoke or a measured client operation.";
 
         const summaryRows = [
@@ -898,8 +1057,9 @@ const page = String.raw`<!doctype html>
             "</div>"
           : "<div class=\"event muted\">" + escapeHtml(intro) + "</div>";
 
+        const cards = renderLatencySummaryCards(summaries);
         const rows = operations.length
-          ? operations.map((operation) =>
+          ? "<div class=\"recent-heading\">Recent Samples</div>" + operations.map((operation) =>
               "<div class=\"event\">" +
                 "<div class=\"event-title\">" + escapeHtml(operation.name) + ": " + escapeHtml(formatDuration(operation.latencyMs)) + "</div>" +
                 "<div class=\"event-meta\">" +
@@ -913,7 +1073,7 @@ const page = String.raw`<!doctype html>
             ).join("")
           : "";
 
-        document.getElementById("user-operation-latencies").innerHTML = summary + rows;
+        document.getElementById("user-operation-latencies").innerHTML = summary + cards + rows;
       }
 
       function render(payload) {
@@ -934,9 +1094,15 @@ const page = String.raw`<!doctype html>
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
         document.getElementById("open-conflicts").textContent = postgres.openConflicts ?? "-";
         document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
-        document.getElementById("read-op-latency").textContent = formatDuration(userOps.latestReadLatencyMs);
-        document.getElementById("write-op-latency").textContent = formatDuration(userOps.latestWriteLatencyMs);
-        document.getElementById("sync-wait-latency").textContent = formatDuration(userOps.latestSyncWaitLatencyMs);
+        document.getElementById("read-op-latency").textContent = formatDuration(
+          latestLatencyByKind(userOps, "read", userOps.latestReadLatencyMs)
+        );
+        document.getElementById("write-op-latency").textContent = formatDuration(
+          latestLatencyByKind(userOps, "write", userOps.latestWriteLatencyMs)
+        );
+        document.getElementById("sync-wait-latency").textContent = formatDuration(
+          latestLatencyByKind(userOps, "sync_wait", userOps.latestSyncWaitLatencyMs)
+        );
         document.getElementById("hosted-latency").textContent = formatDuration(byName(payload, "hosted_health")?.details?.latencyMs);
         document.getElementById("postgres-latency").textContent = formatDuration(postgres.latencyMs);
         document.getElementById("sync-latency").textContent = formatDuration(sync.totalMs);
