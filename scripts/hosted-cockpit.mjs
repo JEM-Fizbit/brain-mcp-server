@@ -670,6 +670,8 @@ const page = String.raw`<!doctype html>
       const usefulDetailKeys = [
         "baseUrl",
         "brainId",
+        "source",
+        "postgresState",
         "hostedFiles",
         "trackedFiles",
         "openConflicts",
@@ -700,6 +702,7 @@ const page = String.raw`<!doctype html>
         "lastExitCode",
         "app",
         "error",
+        "postgresError",
       ];
 
       function byName(payload, name) {
@@ -1040,8 +1043,11 @@ const page = String.raw`<!doctype html>
         const operations = details.operations || [];
         const summaries = details.operationSummaries || [];
         const recordedAt = details.latestOperationAt || details.checkedAt;
+        const historySource = details.source === "postgres"
+          ? "Postgres telemetry history"
+          : "fallback latency cache";
         const intro = details.state === "recorded"
-          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Averages use the bounded local latency history."
+          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Averages use the bounded " + historySource + "."
           : "No hosted MCP operation timing has been recorded yet. Run the hosted OAuth smoke or a measured client operation.";
 
         const summaryRows = [

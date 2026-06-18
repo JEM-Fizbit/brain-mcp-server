@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-<!-- Last reviewed: 2026-03-25 -->
+<!-- Last reviewed: 2026-06-18 -->
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Keep it aligned with `AGENTS.md`, which carries the Codex/Agents-facing version of the same project-specific guidance.
 
 <!-- LAYERING: This file is injected alongside ~/.claude/CLAUDE.md (global).
      Do NOT repeat global rules here (git config, security, commit protocol, MCP globals).
@@ -36,6 +36,21 @@ Minimum-stack adoption: no strategic roadmap or audit-doc layers configured. Add
 
 - `npm run build` — TypeScript compile (use for type-only changes)
 - `npm test` — build + Node test runner (use for any logic change)
+
+---
+
+## Hosted Cockpit And Telemetry
+
+The hosted cockpit is a local-only, read-only operator surface at `http://127.0.0.1:8787/`. It must not expose Brain writes, conflict resolution, admin mutations, or public network binding.
+
+Use Supabase Postgres for hosted operational telemetry:
+
+- user-facing hosted MCP latency samples belong in `brain.sync_events` with `event_type = 'hosted_mcp_latency'`;
+- the cockpit should read Postgres telemetry first;
+- `.brain-sync/hosted-mcp-latency.json` is a fallback cache only, used when Postgres is unavailable or explicitly enabled;
+- do not introduce a new metrics database, daemon, or analytics service unless a backlog/spec promotion justifies it.
+
+When changing launcher, LaunchAgent, cockpit, or telemetry behaviour, update `docs/hosted-cockpit.md` and relevant tests in the same change.
 
 ---
 

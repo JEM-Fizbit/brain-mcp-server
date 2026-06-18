@@ -6,7 +6,9 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
+  HOSTED_MCP_LATENCY_EVENT_TYPE,
   latencyHistoryFromSnapshot,
+  latencyHistoryFromSyncEventRows,
   latestSuccessfulLatency,
   summarizeLatencyHistory,
 } from "./lib/latency-summary.mjs";
@@ -32,6 +34,10 @@ const healthFile =
 const userOperationLatencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(brainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
+const userOperationLatencyHistoryLimit = Math.max(
+  1,
+  Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240)
+);
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
@@ -334,35 +340,78 @@ async function checkSyncHealth() {
 }
 
 async function checkUserOperationLatency() {
+  let postgresFallback = null;
+  if (databaseUrl) {
+    try {
+      const pool = new Pool({ connectionString: databaseUrl });
+      try {
+        const result = await pool.query(
+          `
+            select event_type, filename, duration_ms, metadata, created_at
+            from brain.sync_events
+            where brain_id = $1
+              and event_type = $2
+            order by created_at desc
+            limit $3
+          `,
+          [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
+        );
+        const history = latencyHistoryFromSyncEventRows(result.rows);
+        if (history.length > 0) {
+          addUserOperationLatencyCheck({
+            source: "postgres",
+            checkedAt: history.at(-1)?.at || null,
+            history,
+            operationCount: history.length,
+          });
+          return;
+        }
+        postgresFallback = { postgresState: "empty" };
+      } finally {
+        await pool.end().catch(() => undefined);
+      }
+    } catch (error) {
+      postgresFallback = {
+        postgresState: "unreadable",
+        postgresError: error.message,
+      };
+    }
+  }
+
   try {
     const snapshot = await readJson(userOperationLatencyFile);
     const history = latencyHistoryFromSnapshot(snapshot);
-    const operationSummaries = summarizeLatencyHistory(history);
-    const operations = history.slice(-12).reverse();
-
-    addCheck("user_operation_latency", "pass", {
+    addUserOperationLatencyCheck({
+      status: postgresFallback?.postgresState === "unreadable" ? "warn" : "pass",
+      source: "local_json_cache",
       latencyFile: userOperationLatencyFile,
-      state: "recorded",
       checkedAt: snapshot.checkedAt || null,
-      latestOperationAt: snapshot.latestOperationAt || history.at(-1)?.at || null,
-      latestReadLatencyMs:
-        snapshot.latestReadLatencyMs ?? latestSuccessfulLatency(history, "read"),
-      latestWriteLatencyMs:
-        snapshot.latestWriteLatencyMs ?? latestSuccessfulLatency(history, "write"),
-      latestSyncWaitLatencyMs:
-        snapshot.latestSyncWaitLatencyMs ?? latestSuccessfulLatency(history, "sync_wait"),
-      operationCount: snapshot.operationCount ?? operations.length,
-      historyCount: snapshot.historyCount ?? history.length,
-      operationSummaries,
-      operations,
+      latestOperationAt: snapshot.latestOperationAt || null,
+      latestReadLatencyMs: snapshot.latestReadLatencyMs ?? null,
+      latestWriteLatencyMs: snapshot.latestWriteLatencyMs ?? null,
+      latestSyncWaitLatencyMs: snapshot.latestSyncWaitLatencyMs ?? null,
+      operationCount: snapshot.operationCount ?? history.length,
+      history,
+      ...postgresFallback,
     });
   } catch (error) {
     if (error?.code === "ENOENT") {
-      addCheck("user_operation_latency", "pass", {
-        latencyFile: userOperationLatencyFile,
-        state: "not_recorded",
-        operations: [],
-      });
+      if (postgresFallback?.postgresState === "unreadable") {
+        addCheck("user_operation_latency", "warn", {
+          source: "postgres",
+          latencyFile: userOperationLatencyFile,
+          state: "unreadable",
+          operations: [],
+          ...postgresFallback,
+        });
+      } else {
+        addCheck("user_operation_latency", "pass", {
+          latencyFile: userOperationLatencyFile,
+          state: "not_recorded",
+          operations: [],
+          ...postgresFallback,
+        });
+      }
       return;
     }
     addCheck("user_operation_latency", "warn", {
@@ -370,8 +419,45 @@ async function checkUserOperationLatency() {
       state: "unreadable",
       error: error.message,
       operations: [],
+      ...postgresFallback,
     });
   }
+}
+
+function addUserOperationLatencyCheck({
+  status = "pass",
+  source,
+  latencyFile,
+  checkedAt,
+  latestOperationAt,
+  latestReadLatencyMs,
+  latestWriteLatencyMs,
+  latestSyncWaitLatencyMs,
+  operationCount,
+  history,
+  postgresState,
+  postgresError,
+}) {
+  const operationSummaries = summarizeLatencyHistory(history);
+  const operations = history.slice(-12).reverse();
+
+  addCheck("user_operation_latency", status, {
+    source,
+    latencyFile,
+    state: "recorded",
+    postgresState,
+    postgresError,
+    checkedAt,
+    latestOperationAt: latestOperationAt || history.at(-1)?.at || null,
+    latestReadLatencyMs: latestReadLatencyMs ?? latestSuccessfulLatency(history, "read"),
+    latestWriteLatencyMs: latestWriteLatencyMs ?? latestSuccessfulLatency(history, "write"),
+    latestSyncWaitLatencyMs:
+      latestSyncWaitLatencyMs ?? latestSuccessfulLatency(history, "sync_wait"),
+    operationCount: operationCount ?? operations.length,
+    historyCount: history.length,
+    operationSummaries,
+    operations,
+  });
 }
 
 async function checkLintNudge() {
