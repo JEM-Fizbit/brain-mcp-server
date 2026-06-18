@@ -1,5 +1,6 @@
 const DEFAULT_HISTORY_LIMIT = 240;
 const DEFAULT_TREND_LIMIT = 24;
+export const HOSTED_MCP_LATENCY_EVENT_TYPE = "hosted_mcp_latency";
 const KIND_LABELS = {
   read: "Read operations",
   write: "Write operations",
@@ -51,6 +52,47 @@ export function latencyHistoryFromSnapshot(snapshot) {
     .map(normalizeLatencyOperation)
     .filter(Boolean)
     .sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+}
+
+export function latencyOperationFromSyncEventRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  return normalizeLatencyOperation({
+    name: metadata.name || row.event_type || "operation",
+    kind: metadata.kind || "operation",
+    target: metadata.target || row.filename || null,
+    ok: metadata.ok !== false,
+    latencyMs: row.duration_ms,
+    at: row.created_at,
+    error: metadata.error,
+  });
+}
+
+export function latencyHistoryFromSyncEventRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(latencyOperationFromSyncEventRow)
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+}
+
+export function filenameForLatencyOperation(operation) {
+  const target = operation?.target ? String(operation.target) : "";
+  return target.endsWith(".md") && !target.startsWith("/") && !target.includes("..")
+    ? target
+    : null;
+}
+
+export function metadataForLatencyOperation(operation, extra = {}) {
+  const normalized = normalizeLatencyOperation(operation);
+  if (!normalized) return null;
+  return {
+    ...extra,
+    name: normalized.name,
+    kind: normalized.kind,
+    target: normalized.target,
+    ok: normalized.ok,
+    error: normalized.error || null,
+  };
 }
 
 export function appendLatencyHistory(previousSnapshot, operations, limit = DEFAULT_HISTORY_LIMIT) {

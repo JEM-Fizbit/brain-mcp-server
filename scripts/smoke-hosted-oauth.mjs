@@ -6,11 +6,18 @@ import os from "node:os";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
-import { buildLatencySnapshot } from "./lib/latency-summary.mjs";
+import {
+  buildLatencySnapshot,
+  filenameForLatencyOperation,
+  HOSTED_MCP_LATENCY_EVENT_TYPE,
+  metadataForLatencyOperation,
+} from "./lib/latency-summary.mjs";
 
 loadLocalEnv();
 const exec = promisify(execFile);
+const { Pool } = pg;
 
 const baseUrl = (process.env.BRAIN_HOSTED_BASE_URL || "https://jem-brain-mcp.fly.dev")
   .replace(/\/$/, "");
@@ -43,6 +50,11 @@ const latencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(localBrainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
 const latencyHistoryLimit = Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240);
+const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
+const shouldWriteLatencyToPostgres =
+  process.env.BRAIN_HOSTED_MCP_LATENCY_DB_WRITE !== "0";
+const shouldWriteLatencyCache =
+  process.env.BRAIN_HOSTED_MCP_LATENCY_CACHE === "1" || !databaseUrl;
 const operationLatencies = [];
 
 function base64url(buffer) {
@@ -347,6 +359,8 @@ async function timedTool(accessToken, name, args = {}) {
 
 async function writeLatencySnapshot() {
   if (operationLatencies.length === 0) return;
+  const wrotePostgres = await writeLatencyTelemetryToPostgres();
+  if (wrotePostgres && !shouldWriteLatencyCache) return;
   await fs.mkdir(path.dirname(latencyFile), { recursive: true });
   let previousSnapshot = null;
   try {
@@ -365,7 +379,50 @@ async function writeLatencySnapshot() {
     historyLimit: latencyHistoryLimit,
   });
   await fs.writeFile(latencyFile, `${JSON.stringify(snapshot, null, 2)}\n`, "utf-8");
-  console.log(`[hosted-oauth] User-facing latency snapshot written: ${latencyFile}`);
+  console.log(`[hosted-oauth] User-facing latency fallback cache written: ${latencyFile}`);
+}
+
+async function writeLatencyTelemetryToPostgres() {
+  if (!databaseUrl || !shouldWriteLatencyToPostgres) return false;
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    for (const operation of operationLatencies) {
+      const metadata = metadataForLatencyOperation(operation, {
+        source: "smoke-hosted-oauth",
+        baseUrl,
+        smokeFilename,
+      });
+      if (!metadata) continue;
+      await pool.query(
+        `
+          insert into brain.sync_events (
+            brain_id,
+            event_type,
+            filename,
+            duration_ms,
+            metadata,
+            created_at
+          )
+          values ($1, $2, $3, $4, $5::jsonb, $6::timestamptz)
+        `,
+        [
+          brainId,
+          HOSTED_MCP_LATENCY_EVENT_TYPE,
+          filenameForLatencyOperation(operation),
+          operation.latencyMs,
+          JSON.stringify(metadata),
+          operation.at,
+        ]
+      );
+    }
+    console.log("[hosted-oauth] User-facing latency telemetry written to Postgres sync_events.");
+    return true;
+  } catch (error) {
+    console.warn(`[hosted-oauth] Could not write latency telemetry to Postgres: ${error.message}`);
+    return false;
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
 }
 
 async function sleep(ms) {

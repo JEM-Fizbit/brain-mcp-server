@@ -4,6 +4,7 @@ import {
   appendLatencyHistory,
   buildLatencySnapshot,
   latencyHistoryFromSnapshot,
+  latencyHistoryFromSyncEventRows,
   summarizeLatencyHistory,
 } from "../scripts/lib/latency-summary.mjs";
 
@@ -148,4 +149,40 @@ test("latency snapshot preserves legacy fields while adding history summaries", 
   assert.equal(snapshot.historyCount, 4);
   assert.equal(snapshot.operations.length, 2);
   assert.ok(snapshot.operationSummaries.some((summary) => summary.kind === "sync_wait"));
+});
+
+test("latency history can be built from Postgres sync_events rows", () => {
+  const history = latencyHistoryFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "510",
+      created_at: new Date("2026-06-18T10:03:00.000Z"),
+      metadata: {
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+      },
+    },
+    {
+      event_type: "hosted_mcp_latency",
+      filename: null,
+      duration_ms: "1500",
+      created_at: "2026-06-18T10:03:05.000Z",
+      metadata: {
+        name: "brain_update_file",
+        kind: "write",
+        target: "HOSTED_OAUTH_WRITE_SMOKE.md",
+        ok: false,
+        error: "conflict",
+      },
+    },
+  ]);
+
+  assert.equal(history.length, 2);
+  assert.equal(history[0].latencyMs, 510);
+  assert.equal(history[0].target, "NOW.md");
+  assert.equal(history[1].ok, false);
+  assert.equal(history[1].error, "conflict");
 });

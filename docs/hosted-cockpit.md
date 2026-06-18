@@ -116,11 +116,15 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 
 The cockpit does not run hidden writes just to refresh charts. User-facing latency comes from measured hosted MCP flows such as `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`.
 
-Those flows write a bounded rolling history to:
+Those flows write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency`. The cockpit reads that table first when `BRAIN_REVISION_DATABASE_URL` is configured.
+
+If Postgres is unavailable, or if `BRAIN_HOSTED_MCP_LATENCY_CACHE=1` is set, the smoke flow writes a bounded fallback cache to:
 
 ```text
 <brain-repo>/.brain-sync/hosted-mcp-latency.json
 ```
+
+Treat Postgres as the source of record and the JSON file as a fallback/cache, not the primary metrics store.
 
 The Latency tab groups successful samples into three operator-level buckets:
 
