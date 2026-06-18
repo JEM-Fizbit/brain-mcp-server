@@ -14,6 +14,6 @@
 
 <!-- backlog items below; newest first -->
 
-- Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI: evaluate a hosted persistent website versus a local desktop app/launcher, including auth, secure secret handling, local sync visibility, and install/update ergonomics.
+- Convert the Brain Cockpit desktop launcher into a distributable macOS app package: signed/notarized bundle, installer or DMG packaging, versioned update path, reusable branding/icon assets, and documented install/uninstall flow for non-terminal users.
 - Reduce hosted Brain MCP latency: instrument request/tool timings end-to-end, measure Codex client overhead vs server work, and optimize common read/write flows so hosted does not feel worse than local files.
 - **Brain Platform Phase 1+2** (cloud, multi-tenant): HTTP transport + `BrainStore`/`BrainSemanticSearch` + `brain_id` + OAuth (GitHub IdP) + Tier 1 vector. Lift substrate from `~/Projects/slack-mcp-server/`. Kickoff: `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md` → spec `docs/specs/001-*`.
