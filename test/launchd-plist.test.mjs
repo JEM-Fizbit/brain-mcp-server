@@ -128,3 +128,17 @@ test("desktop launcher app opens cockpit and kickstarts launchd service", async 
   assert.match(executable, /http:\/\/127\.0\.0\.1:8799\//);
   assert.notEqual(stat.mode & 0o111, 0);
 });
+
+test("launchd and launcher generators avoid user-specific absolute defaults", async () => {
+  const syncGenerator = await fs.readFile(scriptPath, "utf-8");
+  const cockpitGenerator = await fs.readFile(cockpitScriptPath, "utf-8");
+  const launcherGenerator = await fs.readFile(launcherScriptPath, "utf-8");
+
+  for (const generator of [syncGenerator, cockpitGenerator, launcherGenerator]) {
+    assert.doesNotMatch(generator, /\/Users\/johnemilad/);
+  }
+
+  assert.match(syncGenerator, /os\.homedir\(\)/);
+  assert.match(cockpitGenerator, /os\.homedir\(\)/);
+  assert.match(launcherGenerator, /os\.homedir\(\)/);
+});
