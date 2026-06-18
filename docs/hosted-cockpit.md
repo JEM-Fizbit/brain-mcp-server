@@ -114,9 +114,11 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 
 ## Latency Trend Semantics
 
-The cockpit does not run hidden writes just to refresh charts. User-facing latency comes from measured hosted MCP flows such as `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`.
+The cockpit does not run hidden writes just to refresh charts. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls.
 
-Those flows write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency`. The cockpit reads that table first when `BRAIN_REVISION_DATABASE_URL` is configured.
+Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency` and metadata source `hosted_mcp_server`. The telemetry row records tool name, operation kind, safe target metadata such as filename or category, latency, and success/failure state; it does not record file content, patch text, source content, or search query text. The cockpit reads server-emitted Postgres rows first when `BRAIN_REVISION_DATABASE_URL` is configured.
+
+For end-to-end client timing diagnostics, `npm run smoke:hosted:oauth` can also write client-observed latency rows when `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=1` is set. Those rows are a compatibility/diagnostic fallback, not the normal cockpit source.
 
 If Postgres is unavailable, or if `BRAIN_HOSTED_MCP_LATENCY_CACHE=1` is set, the smoke flow writes a bounded fallback cache to:
 

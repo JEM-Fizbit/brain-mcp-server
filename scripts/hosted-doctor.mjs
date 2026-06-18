@@ -345,27 +345,39 @@ async function checkUserOperationLatency() {
     try {
       const pool = new Pool({ connectionString: databaseUrl });
       try {
-        const result = await pool.query(
-          `
-            select event_type, filename, duration_ms, metadata, created_at
-            from brain.sync_events
-            where brain_id = $1
-              and event_type = $2
-            order by created_at desc
-            limit $3
-          `,
+        const serverResult = await pool.query(
+          latencyRowsQuery("and metadata->>'source' = 'hosted_mcp_server'"),
           [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
         );
-        const history = latencyHistoryFromSyncEventRows(result.rows);
+        const history = latencyHistoryFromSyncEventRows(serverResult.rows);
         if (history.length > 0) {
           addUserOperationLatencyCheck({
             source: "postgres",
+            telemetrySource: "hosted_mcp_server",
             checkedAt: history.at(-1)?.at || null,
             history,
             operationCount: history.length,
           });
           return;
         }
+
+        const legacyResult = await pool.query(
+          latencyRowsQuery(""),
+          [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
+        );
+        const legacyHistory = latencyHistoryFromSyncEventRows(legacyResult.rows);
+        if (legacyHistory.length > 0) {
+          addUserOperationLatencyCheck({
+            source: "postgres",
+            telemetrySource: "legacy_client_or_unspecified",
+            postgresState: "server_empty",
+            checkedAt: legacyHistory.at(-1)?.at || null,
+            history: legacyHistory,
+            operationCount: legacyHistory.length,
+          });
+          return;
+        }
+
         postgresFallback = { postgresState: "empty" };
       } finally {
         await pool.end().catch(() => undefined);
@@ -424,9 +436,22 @@ async function checkUserOperationLatency() {
   }
 }
 
+function latencyRowsQuery(sourceFilter) {
+  return `
+    select event_type, filename, duration_ms, metadata, created_at
+    from brain.sync_events
+    where brain_id = $1
+      and event_type = $2
+      ${sourceFilter}
+    order by created_at desc
+    limit $3
+  `;
+}
+
 function addUserOperationLatencyCheck({
   status = "pass",
   source,
+  telemetrySource,
   latencyFile,
   checkedAt,
   latestOperationAt,
@@ -443,6 +468,7 @@ function addUserOperationLatencyCheck({
 
   addCheck("user_operation_latency", status, {
     source,
+    telemetrySource,
     latencyFile,
     state: "recorded",
     postgresState,

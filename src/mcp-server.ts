@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAllTools } from "./tools/index.js";
+import { instrumentToolLatency } from "./services/tool-telemetry.js";
 
 const SERVER_INSTRUCTIONS = `This server exposes a personal AI Brain: Markdown files (identity, voice, \
 career, projects, and operational state such as TASKS/JOURNAL/NOW) plus an ingested source archive.
@@ -25,6 +26,7 @@ export function createBrainMcpServer(): McpServer {
     { instructions: SERVER_INSTRUCTIONS },
   );
 
+  instrumentToolLatency(server);
   registerAllTools(server);
   return server;
 }

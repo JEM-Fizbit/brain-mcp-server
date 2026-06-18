@@ -52,7 +52,7 @@ const latencyFile =
 const latencyHistoryLimit = Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240);
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const shouldWriteLatencyToPostgres =
-  process.env.BRAIN_HOSTED_MCP_LATENCY_DB_WRITE !== "0";
+  process.env.BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE === "1";
 const shouldWriteLatencyCache =
   process.env.BRAIN_HOSTED_MCP_LATENCY_CACHE === "1" || !databaseUrl;
 const operationLatencies = [];

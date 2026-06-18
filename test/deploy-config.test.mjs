@@ -66,6 +66,7 @@ test("hosted OAuth smoke caches refresh grants without logging access tokens", a
   assert.match(script, /buildLatencySnapshot/);
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT/);
   assert.match(script, /BRAIN_REVISION_DATABASE_URL/);
+  assert.match(script, /BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE/);
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
   assert.match(script, /operationLatencies/);
@@ -104,6 +105,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
+  assert.match(script, /hosted_mcp_server/);
   assert.match(script, /latestReadLatencyMs/);
   assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /operationSummaries/);
@@ -123,6 +125,24 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /databaseUrl: "set"/);
   assert.doesNotMatch(script, /databaseUrl[,}]/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
+});
+
+test("hosted MCP server records tool latency without payload content", async () => {
+  const server = await fs.readFile(path.join(repoRoot, "src", "mcp-server.ts"), "utf-8");
+  const telemetry = await fs.readFile(
+    path.join(repoRoot, "src", "services", "tool-telemetry.ts"),
+    "utf-8"
+  );
+
+  assert.match(server, /instrumentToolLatency\(server\)/);
+  assert.match(telemetry, /hosted_mcp_latency/);
+  assert.match(telemetry, /hosted_mcp_server/);
+  assert.match(telemetry, /BRAIN_HOSTED_MCP_LATENCY_DB_WRITE/);
+  assert.match(telemetry, /brain\.sync_events/);
+  assert.match(telemetry, /brain_update_file/);
+  assert.match(telemetry, /brain_resolve_conflict/);
+  assert.match(telemetry, /tool_returned_error/);
+  assert.doesNotMatch(telemetry, /content:\s*input|input\.content|old_content|source_content/);
 });
 
 test("hosted cockpit is local-only and read-only", async () => {
