@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const brainRoot =
-  process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
+  process.env.BRAIN_REPO_ROOT || path.join(os.homedir(), "Projects", "ai-brain-jem");
 const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
 const syncDir = path.resolve(brainDir, "..", ".brain-sync");
 const label = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";

@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-06-17
+**Last updated:** 2026-06-18
 
 Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
 
@@ -22,6 +22,22 @@ Do not build a hosted persistent admin website yet. A hosted website would be us
 From the repo:
 
 ```bash
+npm run hosted:cockpit:launchd:plist
+```
+
+Default assumptions:
+
+- Brain checkout: `~/Projects/ai-brain-jem`;
+- cockpit launchd label: `com.jem.brain-cockpit`;
+- cockpit URL: `http://127.0.0.1:8787/`;
+- Node runtime: the `node` executable running the generator.
+
+For another local Brain checkout or label, set environment variables before generating:
+
+```bash
+BRAIN_REPO_ROOT="$HOME/Projects/<brain-repo>" \
+BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.brain-cockpit" \
+BRAIN_COCKPIT_PORT=8787 \
 npm run hosted:cockpit:launchd:plist
 ```
 
@@ -66,6 +82,18 @@ This writes:
 ```
 
 The app is a small local wrapper. It does not host anything itself and does not expose any write/admin surface. On launch, it asks launchd to start or kick `com.jem.brain-cockpit` if needed, then opens `http://127.0.0.1:8787/` in the default browser.
+
+For a different user, app name, label, or local URL, use the same launcher script with overrides:
+
+```bash
+BRAIN_COCKPIT_LAUNCHER_APP="$HOME/Desktop/Brain Cockpit.app" \
+BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.brain-cockpit" \
+BRAIN_COCKPIT_URL="http://127.0.0.1:8787/" \
+BRAIN_COCKPIT_LAUNCHER_BUNDLE_ID="com.example.brain-cockpit.launcher" \
+npm run hosted:cockpit:launcher:install
+```
+
+The launcher and LaunchAgent labels must match. If the LaunchAgent was generated with `BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.brain-cockpit"`, use the same value when installing the Desktop launcher.
 
 To stop it:
 
