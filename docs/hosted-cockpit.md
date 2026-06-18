@@ -51,6 +51,22 @@ Then open:
 http://127.0.0.1:8787/
 ```
 
+## Install The Desktop Launcher
+
+To create a double-clickable launcher app:
+
+```bash
+npm run hosted:cockpit:launcher:install
+```
+
+This writes:
+
+```text
+~/Desktop/Brain Cockpit.app
+```
+
+The app is a small local wrapper. It does not host anything itself and does not expose any write/admin surface. On launch, it asks launchd to start or kick `com.jem.brain-cockpit` if needed, then opens `http://127.0.0.1:8787/` in the default browser.
+
 To stop it:
 
 ```bash
@@ -69,6 +85,5 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 
 ## Next Hardening
 
-- Add a one-click local launcher or browser bookmark artifact after the LaunchAgent path is stable.
 - Expand source-ingestion nudges beyond pending inbox count.
 - Add a recovery/reseed guide from local Markdown to hosted Postgres.
