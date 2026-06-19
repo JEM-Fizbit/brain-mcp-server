@@ -170,9 +170,13 @@ export function instrumentPostgresPool(pool: pg.Pool, label = "postgres"): pg.Po
   instrumentable.query = ((...args: unknown[]) =>
     timedQuery(label, args[0], () => originalQuery(...args))) as ConnectablePool["query"];
 
-  instrumentable.connect = (async (...args: unknown[]) => {
-    const client = await originalConnect(...args);
-    return instrumentClient(client, label);
+  instrumentable.connect = ((...args: unknown[]) => {
+    if (typeof args[0] === "function") {
+      return originalConnect(...args);
+    }
+    return originalConnect(...args).then((client: pg.PoolClient) =>
+      instrumentClient(client, label)
+    );
   }) as ConnectablePool["connect"];
 
   instrumentable.__brainTelemetryInstrumented = true;
