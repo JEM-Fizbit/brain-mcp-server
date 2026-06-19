@@ -224,6 +224,11 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /Timing Layers/);
   assert.match(script, /Slowest Operations/);
   assert.match(script, /dbSummaryLabel/);
+  assert.match(script, /renderOperationEventDetail/);
+  assert.match(script, /operation-detail-table/);
+  assert.match(script, /db-span-table/);
+  assert.match(script, /grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(script, /data-label=\\"Operation\\"/);
   assert.match(script, /Local cockpit observations/);
   assert.match(script, /Cockpit Watch/);
   assert.match(script, /localDateTime/);

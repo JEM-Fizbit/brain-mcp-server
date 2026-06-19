@@ -244,7 +244,7 @@ const page = String.raw`<!doctype html>
 
       .activity-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: 14px;
       }
 
@@ -399,6 +399,105 @@ const page = String.raw`<!doctype html>
         margin-top: 2px;
       }
 
+      .operation-detail {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      .operation-detail-table,
+      .db-span-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        background: #fbfbf8;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .operation-detail-table th,
+      .operation-detail-table td,
+      .db-span-table th,
+      .db-span-table td {
+        border-top: 1px solid var(--line);
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.35;
+        vertical-align: top;
+      }
+
+      .operation-detail-table tr:first-child th,
+      .operation-detail-table tr:first-child td,
+      .db-span-table thead tr:first-child th {
+        border-top: 0;
+      }
+
+      .operation-detail-table th {
+        width: 116px;
+        color: var(--muted);
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .operation-detail-table th:nth-child(1) {
+        width: 116px;
+      }
+
+      .operation-detail-table td:nth-child(2) {
+        width: auto;
+      }
+
+      .operation-detail-table td,
+      .db-span-table td {
+        color: var(--ink);
+        overflow-wrap: anywhere;
+      }
+
+      .db-span-heading {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .db-span-table th {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .db-span-table th:nth-child(1),
+      .db-span-table td:nth-child(1) {
+        width: 16%;
+      }
+
+      .db-span-table th:nth-child(2),
+      .db-span-table td:nth-child(2) {
+        width: 38%;
+      }
+
+      .db-span-table th:nth-child(3),
+      .db-span-table td:nth-child(3) {
+        width: 16%;
+      }
+
+      .db-span-table th:nth-child(4),
+      .db-span-table td:nth-child(4) {
+        width: 12%;
+      }
+
+      .db-span-table th:nth-child(5),
+      .db-span-table td:nth-child(5) {
+        width: 18%;
+      }
+
       .latency-summary-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -518,6 +617,55 @@ const page = String.raw`<!doctype html>
         .toolbar {
           justify-content: flex-start;
         }
+
+        .db-span-table {
+          table-layout: auto;
+        }
+
+        .db-span-table thead {
+          display: none;
+        }
+
+        .db-span-table tbody,
+        .db-span-table tr,
+        .db-span-table td {
+          display: block;
+          width: 100%;
+        }
+
+        .db-span-table tr {
+          border-top: 1px solid var(--line);
+          padding: 5px 0;
+        }
+
+        .db-span-table tr:first-child {
+          border-top: 0;
+        }
+
+        .db-span-table td,
+        .db-span-table td:nth-child(1),
+        .db-span-table td:nth-child(2),
+        .db-span-table td:nth-child(3),
+        .db-span-table td:nth-child(4),
+        .db-span-table td:nth-child(5) {
+          border-top: 0;
+          min-height: 22px;
+          padding: 3px 8px 3px 92px;
+          position: relative;
+          width: 100%;
+        }
+
+        .db-span-table td::before {
+          content: attr(data-label);
+          position: absolute;
+          left: 8px;
+          width: 74px;
+          color: var(--muted);
+          font-size: 11px;
+          font-weight: 650;
+          text-transform: uppercase;
+          letter-spacing: 0;
+        }
       }
     </style>
   </head>
@@ -625,15 +773,15 @@ const page = String.raw`<!doctype html>
         <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
           <div class="activity-grid">
             <section>
-              <h2>Recent Brain Activity</h2>
-              <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
-              <div class="activity-list" id="activity"></div>
-            </section>
-
-            <section>
               <h2>Operation Log</h2>
               <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
               <div class="activity-list" id="operation-events"></div>
+            </section>
+
+            <section>
+              <h2>Recent Brain Activity</h2>
+              <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
+              <div class="activity-list" id="activity"></div>
             </section>
 
             <section>
@@ -979,24 +1127,60 @@ const page = String.raw`<!doctype html>
         const windowDays = details.eventLogWindowDays || 30;
         document.getElementById("operation-events").innerHTML = events.length
           ? events.map((event) => {
-              const status = event.ok ? "ok" : "failed";
-              const dbMeta = dbSummaryLabel(event.db);
-              const meta = [
-                operationKindLabel(event.kind),
-                timingLayerLabel(event.timingLayer),
-                event.target || event.filename || "-",
-                status,
-                event.source || details.telemetrySource || details.source || "-",
-                dbMeta,
-                localDateTime(event.at),
-                event.error || null,
-              ].filter(Boolean).join(" · ");
               return "<div class=\"event\">" +
                 "<div class=\"event-title\">" + escapeHtml(event.name || event.eventType || "operation") + ": " + escapeHtml(formatDuration(event.latencyMs)) + "</div>" +
-                "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+                renderOperationEventDetail(event, details) +
               "</div>";
             }).join("")
           : "<div class=\"event muted\">No operation metadata recorded in the last " + escapeHtml(windowDays) + " days.</div>";
+      }
+
+      function renderOperationEventDetail(event, details) {
+        const rows = [
+          ["Type", operationKindLabel(event.kind)],
+          ["Timing", timingLayerLabel(event.timingLayer)],
+          ["Target", event.target || event.filename || "-"],
+          ["Status", event.ok ? "ok" : "failed"],
+          ["Source", event.source || details.telemetrySource || details.source || "-"],
+          ["Latency", formatDuration(event.latencyMs)],
+          ["DB", dbSummaryLabel(event.db) || "-"],
+          ["When", localDateTime(event.at)],
+          event.error ? ["Error", event.error] : null,
+        ].filter(Boolean);
+
+        return "<div class=\"operation-detail\">" +
+          "<table class=\"operation-detail-table\"><tbody>" +
+            rows.map(([label, value]) =>
+              "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td>" + escapeHtml(value) + "</td></tr>"
+            ).join("") +
+          "</tbody></table>" +
+          renderDbSpanTable(event.db) +
+        "</div>";
+      }
+
+      function renderDbSpanTable(db) {
+        const allSpans = Array.isArray(db?.spans) ? db.spans : [];
+        const spans = allSpans.slice(0, 4);
+        if (spans.length === 0) return "";
+        const hidden = Math.max(0, allSpans.length - spans.length);
+        const truncated = Math.max(0, Number(db.truncatedCount || 0)) + hidden;
+        return "<div>" +
+          "<div class=\"db-span-heading\">DB spans" + (truncated ? " (" + escapeHtml(formatCount(truncated)) + " more truncated)" : "") + "</div>" +
+          "<table class=\"db-span-table\">" +
+            "<thead><tr><th>Operation</th><th>Target</th><th>Duration</th><th>Rows</th><th>Status</th></tr></thead>" +
+            "<tbody>" +
+              spans.map((span) =>
+                "<tr>" +
+                  "<td data-label=\"Operation\">" + escapeHtml(span.operation || "query") + "</td>" +
+                  "<td data-label=\"Target\">" + escapeHtml(span.target || span.name || "-") + "</td>" +
+                  "<td data-label=\"Duration\">" + escapeHtml(formatDuration(span.durationMs)) + "</td>" +
+                  "<td data-label=\"Rows\">" + escapeHtml(formatCount(span.rowCount)) + "</td>" +
+                  "<td data-label=\"Status\">" + escapeHtml(span.ok ? "ok" : (span.error || "failed")) + "</td>" +
+                "</tr>"
+              ).join("") +
+            "</tbody>" +
+          "</table>" +
+        "</div>";
       }
 
       function renderOperationLog() {
