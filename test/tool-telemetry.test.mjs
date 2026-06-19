@@ -77,3 +77,39 @@ test("postgres operation telemetry records sanitized DB spans", async () => {
   assert.equal(summary.db.spans[0].target, "brain.brain_file_revisions");
   assert.doesNotMatch(JSON.stringify(summary), /private search term|select content/);
 });
+
+test("postgres pool instrumentation preserves callback-style connect", async () => {
+  const client = {
+    async query(_sql) {
+      return { rowCount: 1, rows: [{ id: 1 }] };
+    },
+  };
+  const pool = instrumentPostgresPool(
+    {
+      connect(callback) {
+        callback(null, client, () => undefined);
+      },
+      query(sql) {
+        return new Promise((resolve, reject) => {
+          this.connect((error, connectedClient) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+            connectedClient.query(sql).then(resolve, reject);
+          });
+        });
+      },
+    },
+    "brain_runtime"
+  );
+  const context = createOperationTelemetryContext();
+
+  await runWithOperationTelemetry(context, async () => {
+    await pool.query("select * from brain.brain_files");
+  });
+
+  const summary = summarizeOperationTelemetry(context);
+  assert.equal(summary.db.queryCount, 1);
+  assert.equal(summary.db.spans[0].target, "brain.brain_files");
+});
