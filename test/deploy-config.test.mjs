@@ -112,6 +112,12 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /latestReadLatencyMs/);
   assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /operationSummaries/);
+  assert.match(script, /operationUsageRowsQuery/);
+  assert.match(script, /eventLogWindowDays/);
+  assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT/);
+  assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_DAYS/);
+  assert.match(script, /count_24h/);
+  assert.match(script, /count_7d/);
   assert.match(script, /summarizeLatencyHistory/);
   assert.match(script, /lint_nudge/);
   assert.match(script, /BRAIN_LINT_NUDGE_DAYS/);
@@ -182,6 +188,13 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /panel-raw/);
   assert.match(script, /activateTab/);
   assert.match(script, /User-Facing Operations/);
+  assert.match(script, /Operation Log/);
+  assert.match(script, /Usage/);
+  assert.match(script, /ops-24h/);
+  assert.match(script, /ops-7d/);
+  assert.match(script, /ops-total/);
+  assert.match(script, /renderOperationUsage/);
+  assert.match(script, /renderOperationEvents/);
   assert.match(script, /Infrastructure Checks/);
   assert.match(script, /read-op-latency/);
   assert.match(script, /write-op-latency/);
@@ -194,7 +207,7 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /payload\.actions/);
   assert.match(script, /formatDuration/);
   assert.match(script, /Recent Brain Activity/);
-  assert.match(script, /Watch Log/);
+  assert.match(script, /Cockpit Watch/);
   assert.match(script, /localDateTime/);
   assert.match(script, /operationLog/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);

@@ -8,6 +8,10 @@ const KIND_LABELS = {
   operation: "Other operations",
 };
 const KIND_ORDER = ["read", "write", "sync_wait", "operation"];
+const DEFAULT_USAGE_WINDOWS = [
+  { key: "24h", label: "24H", durationMs: 24 * 60 * 60 * 1000 },
+  { key: "7d", label: "7D", durationMs: 7 * 24 * 60 * 60 * 1000 },
+];
 
 function asFiniteLatency(value) {
   const number = Number(value);
@@ -68,11 +72,35 @@ export function latencyOperationFromSyncEventRow(row) {
   });
 }
 
+export function operationKindLabel(kind) {
+  return KIND_LABELS[kind] || kind || "operation";
+}
+
 export function latencyHistoryFromSyncEventRows(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map(latencyOperationFromSyncEventRow)
     .filter(Boolean)
     .sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+}
+
+export function operationEventFromSyncEventRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  const operation = latencyOperationFromSyncEventRow(row);
+  if (!operation) return null;
+  return {
+    eventType: String(row.event_type || HOSTED_MCP_LATENCY_EVENT_TYPE),
+    source: metadata.source ? String(metadata.source) : null,
+    filename: row.filename ? String(row.filename) : null,
+    ...operation,
+  };
+}
+
+export function operationEventLogFromSyncEventRows(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(operationEventFromSyncEventRow)
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(right.at) - Date.parse(left.at));
 }
 
 export function filenameForLatencyOperation(operation) {
@@ -132,6 +160,79 @@ function percentile(sortedValues, percentileValue) {
 
 function rounded(value) {
   return value === null ? null : Math.round(value);
+}
+
+function normalizedKind(kind) {
+  return KIND_ORDER.includes(kind) ? kind : kind || "operation";
+}
+
+function kindSort(left, right) {
+  const leftIndex = KIND_ORDER.indexOf(left);
+  const rightIndex = KIND_ORDER.indexOf(right);
+  if (leftIndex !== -1 || rightIndex !== -1) {
+    return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+      (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
+  }
+  return left.localeCompare(right);
+}
+
+function operationUsageBucket(operations) {
+  const byKindMap = new Map();
+  for (const operation of operations) {
+    const kind = normalizedKind(operation.kind);
+    const current = byKindMap.get(kind) || {
+      kind,
+      label: operationKindLabel(kind),
+      totalCount: 0,
+      failedCount: 0,
+    };
+    current.totalCount += 1;
+    if (operation.ok === false) current.failedCount += 1;
+    byKindMap.set(kind, current);
+  }
+
+  const byKind = [...byKindMap.values()].sort((left, right) =>
+    kindSort(left.kind, right.kind)
+  );
+  return {
+    totalCount: byKind.reduce((total, row) => total + row.totalCount, 0),
+    failedCount: byKind.reduce((total, row) => total + row.failedCount, 0),
+    byKind,
+  };
+}
+
+export function summarizeOperationUsage(history, options = {}) {
+  const now = options.now ? new Date(options.now) : new Date();
+  const nowMs = Number.isNaN(now.getTime()) ? Date.now() : now.getTime();
+  const windowSpecs = Array.isArray(options.windows) && options.windows.length > 0
+    ? options.windows
+    : DEFAULT_USAGE_WINDOWS;
+  const normalized = Array.isArray(history)
+    ? history.map(normalizeLatencyOperation).filter(Boolean)
+    : [];
+
+  return {
+    allTime: {
+      key: "all",
+      label: "All Recorded",
+      ...operationUsageBucket(normalized),
+    },
+    windows: windowSpecs.map((windowSpec) => {
+      const durationMs = Math.max(1, Number(windowSpec.durationMs) || 1);
+      const windowStartedAt = new Date(nowMs - durationMs).toISOString();
+      const operations = normalized.filter(
+        (operation) => Date.parse(operation.at) >= nowMs - durationMs
+      );
+      return {
+        key: String(windowSpec.key || windowSpec.label || "window"),
+        label: String(windowSpec.label || windowSpec.key || "Window"),
+        durationMs,
+        windowStartedAt,
+        windowEndedAt: new Date(nowMs).toISOString(),
+        ...operationUsageBucket(operations),
+      };
+    }),
+  };
 }
 
 export function summarizeLatencyHistory(history, trendLimit = DEFAULT_TREND_LIMIT) {
