@@ -10,6 +10,9 @@ import {
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
   latestSuccessfulLatency,
+  operationEventLogFromSyncEventRows,
+  operationKindLabel,
+  summarizeOperationUsage,
   summarizeLatencyHistory,
 } from "./lib/latency-summary.mjs";
 
@@ -37,6 +40,14 @@ const userOperationLatencyFile =
 const userOperationLatencyHistoryLimit = Math.max(
   1,
   Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240)
+);
+const userOperationEventLogLimit = Math.max(
+  1,
+  Number(process.env.BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT || 60)
+);
+const userOperationEventLogWindowDays = Math.max(
+  1,
+  Number(process.env.BRAIN_HOSTED_MCP_EVENT_LOG_DAYS || 30)
 );
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
@@ -345,13 +356,11 @@ async function checkUserOperationLatency() {
     try {
       const pool = new Pool({ connectionString: databaseUrl });
       try {
-        const serverResult = await pool.query(
-          latencyRowsQuery(
-            "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')"
-          ),
-          [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
+        const serverTelemetry = await readPostgresOperationTelemetry(
+          pool,
+          "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')"
         );
-        const history = latencyHistoryFromSyncEventRows(serverResult.rows);
+        const history = serverTelemetry.history;
         if (history.length > 0) {
           addUserOperationLatencyCheck({
             source: "postgres",
@@ -359,15 +368,14 @@ async function checkUserOperationLatency() {
             checkedAt: history.at(-1)?.at || null,
             history,
             operationCount: history.length,
+            usageStats: serverTelemetry.usageStats,
+            eventLog: serverTelemetry.eventLog,
           });
           return;
         }
 
-        const legacyResult = await pool.query(
-          latencyRowsQuery(""),
-          [brainId, HOSTED_MCP_LATENCY_EVENT_TYPE, userOperationLatencyHistoryLimit]
-        );
-        const legacyHistory = latencyHistoryFromSyncEventRows(legacyResult.rows);
+        const legacyTelemetry = await readPostgresOperationTelemetry(pool, "");
+        const legacyHistory = legacyTelemetry.history;
         if (legacyHistory.length > 0) {
           addUserOperationLatencyCheck({
             source: "postgres",
@@ -376,6 +384,8 @@ async function checkUserOperationLatency() {
             checkedAt: legacyHistory.at(-1)?.at || null,
             history: legacyHistory,
             operationCount: legacyHistory.length,
+            usageStats: legacyTelemetry.usageStats,
+            eventLog: legacyTelemetry.eventLog,
           });
           return;
         }
@@ -406,6 +416,8 @@ async function checkUserOperationLatency() {
       latestSyncWaitLatencyMs: snapshot.latestSyncWaitLatencyMs ?? null,
       operationCount: snapshot.operationCount ?? history.length,
       history,
+      usageStats: summarizeOperationUsage(history),
+      eventLog: eventLogFromHistory(history, "local_json_cache"),
       ...postgresFallback,
     });
   } catch (error) {
@@ -450,6 +462,141 @@ function latencyRowsQuery(sourceFilter) {
   `;
 }
 
+function operationUsageRowsQuery(sourceFilter) {
+  return `
+    select
+      coalesce(nullif(metadata->>'kind', ''), 'operation') as kind,
+      count(*)::int as total_count,
+      count(*) filter (where metadata->>'ok' = 'false')::int as failed_total,
+      count(*) filter (where created_at >= now() - interval '24 hours')::int as count_24h,
+      count(*) filter (
+        where created_at >= now() - interval '24 hours'
+          and metadata->>'ok' = 'false'
+      )::int as failed_24h,
+      count(*) filter (where created_at >= now() - interval '7 days')::int as count_7d,
+      count(*) filter (
+        where created_at >= now() - interval '7 days'
+          and metadata->>'ok' = 'false'
+      )::int as failed_7d
+    from brain.sync_events
+    where brain_id = $1
+      and event_type = $2
+      ${sourceFilter}
+    group by kind
+    order by kind
+  `;
+}
+
+function operationLogRowsQuery(sourceFilter) {
+  return `
+    select event_type, filename, duration_ms, metadata, created_at
+    from brain.sync_events
+    where brain_id = $1
+      and event_type = $2
+      ${sourceFilter}
+      and created_at >= $3::timestamptz
+    order by created_at desc
+    limit $4
+  `;
+}
+
+async function readPostgresOperationTelemetry(pool, sourceFilter) {
+  const eventLogCutoff = new Date(
+    Date.now() - userOperationEventLogWindowDays * 24 * 60 * 60 * 1000
+  ).toISOString();
+  const [latencyResult, usageResult, eventLogResult] = await Promise.all([
+    pool.query(latencyRowsQuery(sourceFilter), [
+      brainId,
+      HOSTED_MCP_LATENCY_EVENT_TYPE,
+      userOperationLatencyHistoryLimit,
+    ]),
+    pool.query(operationUsageRowsQuery(sourceFilter), [
+      brainId,
+      HOSTED_MCP_LATENCY_EVENT_TYPE,
+    ]),
+    pool.query(operationLogRowsQuery(sourceFilter), [
+      brainId,
+      HOSTED_MCP_LATENCY_EVENT_TYPE,
+      eventLogCutoff,
+      userOperationEventLogLimit,
+    ]),
+  ]);
+
+  return {
+    history: latencyHistoryFromSyncEventRows(latencyResult.rows),
+    usageStats: usageStatsFromAggregateRows(usageResult.rows),
+    eventLog: operationEventLogFromSyncEventRows(eventLogResult.rows),
+  };
+}
+
+function usageStatsFromAggregateRows(rows) {
+  const now = Date.now();
+  const kindOrder = new Map([
+    ["read", 0],
+    ["write", 1],
+    ["sync_wait", 2],
+    ["operation", 3],
+  ]);
+  const normalizedRows = (Array.isArray(rows) ? rows : []).map((row) => ({
+    kind: String(row.kind || "operation"),
+    label: operationKindLabel(String(row.kind || "operation")),
+    totalCount: Number(row.total_count || 0),
+    failedTotal: Number(row.failed_total || 0),
+    count24h: Number(row.count_24h || 0),
+    failed24h: Number(row.failed_24h || 0),
+    count7d: Number(row.count_7d || 0),
+    failed7d: Number(row.failed_7d || 0),
+  })).sort((left, right) => {
+    const leftRank = kindOrder.get(left.kind) ?? Number.MAX_SAFE_INTEGER;
+    const rightRank = kindOrder.get(right.kind) ?? Number.MAX_SAFE_INTEGER;
+    return leftRank === rightRank ? left.kind.localeCompare(right.kind) : leftRank - rightRank;
+  });
+
+  function bucket(key, label, countKey, failedKey, durationMs) {
+    const byKind = normalizedRows
+      .map((row) => ({
+        kind: row.kind,
+        label: row.label,
+        totalCount: row[countKey],
+        failedCount: row[failedKey],
+      }))
+      .filter((row) => row.totalCount > 0 || row.failedCount > 0);
+    const bucketDetails = {
+      key,
+      label,
+      totalCount: byKind.reduce((total, row) => total + row.totalCount, 0),
+      failedCount: byKind.reduce((total, row) => total + row.failedCount, 0),
+      byKind,
+    };
+    if (durationMs) {
+      bucketDetails.durationMs = durationMs;
+      bucketDetails.windowStartedAt = new Date(now - durationMs).toISOString();
+      bucketDetails.windowEndedAt = new Date(now).toISOString();
+    }
+    return bucketDetails;
+  }
+
+  return {
+    allTime: bucket("all", "All Recorded", "totalCount", "failedTotal"),
+    windows: [
+      bucket("24h", "24H", "count24h", "failed24h", 24 * 60 * 60 * 1000),
+      bucket("7d", "7D", "count7d", "failed7d", 7 * 24 * 60 * 60 * 1000),
+    ],
+  };
+}
+
+function eventLogFromHistory(history, source) {
+  return [...history]
+    .slice(-userOperationEventLogLimit)
+    .reverse()
+    .map((operation) => ({
+      eventType: HOSTED_MCP_LATENCY_EVENT_TYPE,
+      source,
+      filename: operation.target?.endsWith(".md") ? operation.target : null,
+      ...operation,
+    }));
+}
+
 function addUserOperationLatencyCheck({
   status = "pass",
   source,
@@ -462,6 +609,8 @@ function addUserOperationLatencyCheck({
   latestSyncWaitLatencyMs,
   operationCount,
   history,
+  usageStats,
+  eventLog,
   postgresState,
   postgresError,
 }) {
@@ -483,6 +632,10 @@ function addUserOperationLatencyCheck({
       latestSyncWaitLatencyMs ?? latestSuccessfulLatency(history, "sync_wait"),
     operationCount: operationCount ?? operations.length,
     historyCount: history.length,
+    usageStats: usageStats || summarizeOperationUsage(history),
+    eventLogWindowDays: userOperationEventLogWindowDays,
+    eventLogLimit: userOperationEventLogLimit,
+    eventLog: eventLog || eventLogFromHistory(history, source),
     operationSummaries,
     operations,
   });

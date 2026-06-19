@@ -5,6 +5,8 @@ import {
   buildLatencySnapshot,
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
+  operationEventLogFromSyncEventRows,
+  summarizeOperationUsage,
   summarizeLatencyHistory,
 } from "../scripts/lib/latency-summary.mjs";
 
@@ -185,4 +187,86 @@ test("latency history can be built from Postgres sync_events rows", () => {
   assert.equal(history[0].target, "NOW.md");
   assert.equal(history[1].ok, false);
   assert.equal(history[1].error, "conflict");
+});
+
+test("operation usage summarizes all-time and fixed-window counts", () => {
+  const usage = summarizeOperationUsage(
+    [
+      {
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+        latencyMs: 300,
+        at: "2026-06-18T12:30:00.000Z",
+      },
+      {
+        name: "brain_update_file",
+        kind: "write",
+        target: "TASKS.md",
+        ok: false,
+        latencyMs: 1100,
+        at: "2026-06-18T11:00:00.000Z",
+        error: "conflict",
+      },
+      {
+        name: "brain_search",
+        kind: "read",
+        target: "query",
+        ok: true,
+        latencyMs: 450,
+        at: "2026-06-12T12:00:00.000Z",
+      },
+    ],
+    { now: "2026-06-18T13:00:00.000Z" }
+  );
+
+  assert.equal(usage.allTime.totalCount, 3);
+  assert.equal(usage.allTime.failedCount, 1);
+  assert.equal(usage.windows.find((window) => window.key === "24h").totalCount, 2);
+  assert.equal(usage.windows.find((window) => window.key === "7d").totalCount, 3);
+  assert.equal(
+    usage.windows
+      .find((window) => window.key === "24h")
+      .byKind.find((row) => row.kind === "write").failedCount,
+    1
+  );
+});
+
+test("operation event log preserves safe metadata from sync_events rows", () => {
+  const events = operationEventLogFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "510",
+      created_at: "2026-06-18T10:03:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+      },
+    },
+    {
+      event_type: "hosted_mcp_latency",
+      filename: null,
+      duration_ms: "1500",
+      created_at: "2026-06-18T10:03:05.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        name: "brain_update_file",
+        kind: "write",
+        target: "TASKS.md",
+        ok: false,
+        error: "conflict",
+      },
+    },
+  ]);
+
+  assert.equal(events.length, 2);
+  assert.equal(events[0].name, "brain_update_file");
+  assert.equal(events[0].source, "hosted_mcp_server");
+  assert.equal(events[0].error, "conflict");
+  assert.equal(events[1].filename, "NOW.md");
 });

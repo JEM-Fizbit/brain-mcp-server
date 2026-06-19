@@ -128,6 +128,10 @@ If Postgres is unavailable, or if `BRAIN_HOSTED_MCP_LATENCY_CACHE=1` is set, the
 
 Treat Postgres as the source of record and the JSON file as a fallback/cache, not the primary metrics store.
 
+The cockpit also reports aggregate operation usage from the same Postgres telemetry rows. The top-level cards show total recorded operations, operations in the last 24H, and operations in the last 7D. The Overview tab breaks those counts down by operation kind, including read, write, sync-wait, and other operational calls, with failed operations counted separately.
+
+The Activity tab includes a rolling Operation Log. It is a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Rows include tool name, operation kind, safe target metadata, source, success/failure state, timestamp, and latency.
+
 The Latency tab groups successful samples into three operator-level buckets:
 
 - read operations;
@@ -135,6 +139,8 @@ The Latency tab groups successful samples into three operator-level buckets:
 - sync wait operations.
 
 For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
+
+Refresh remains read-only. The additional usage and operation-log views use bounded server-side Postgres reads over the existing telemetry table. They do not add hidden writes, a metrics daemon, another datastore, or a separate analytics service.
 
 ## Next Hardening
 

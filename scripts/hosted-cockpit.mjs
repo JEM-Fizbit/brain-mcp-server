@@ -551,6 +551,18 @@ const page = String.raw`<!doctype html>
             <div class="metric-value" id="last-sync">-</div>
           </div>
           <div class="metric">
+            <div class="metric-label">Ops 24H</div>
+            <div class="metric-value" id="ops-24h">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Ops 7D</div>
+            <div class="metric-value" id="ops-7d">-</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Ops total</div>
+            <div class="metric-value" id="ops-total">-</div>
+          </div>
+          <div class="metric">
             <div class="metric-label">Read op</div>
             <div class="metric-value" id="read-op-latency">-</div>
           </div>
@@ -598,8 +610,8 @@ const page = String.raw`<!doctype html>
             </section>
 
             <section>
-              <h2>Watch Log</h2>
-              <div class="activity-list" id="operation-log"></div>
+              <h2>Usage</h2>
+              <div class="activity-list" id="operation-usage"></div>
             </section>
           </div>
         </div>
@@ -612,7 +624,12 @@ const page = String.raw`<!doctype html>
             </section>
 
             <section>
-              <h2>Watch Log</h2>
+              <h2>Operation Log</h2>
+              <div class="activity-list" id="operation-events"></div>
+            </section>
+
+            <section>
+              <h2>Cockpit Watch</h2>
               <div class="activity-list" id="operation-log-activity"></div>
             </section>
           </div>
@@ -761,6 +778,12 @@ const page = String.raw`<!doctype html>
         return value ? String(value).slice(0, 10) : "-";
       }
 
+      function formatCount(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "-";
+        return new Intl.NumberFormat().format(number);
+      }
+
       function formatDuration(ms) {
         const value = Number(ms);
         if (!Number.isFinite(value)) return "-";
@@ -905,6 +928,63 @@ const page = String.raw`<!doctype html>
           : "<div class=\"event muted\">No recent Brain activity reported.</div>";
       }
 
+      function usageWindow(details, key) {
+        const windows = details.usageStats?.windows || [];
+        return windows.find((window) => window.key === key) || null;
+      }
+
+      function byKindSummary(byKind) {
+        const rows = Array.isArray(byKind) ? byKind : [];
+        return rows.length
+          ? rows.map((row) => operationKindLabel(row.kind) + " " + formatCount(row.totalCount)).join(" · ")
+          : "no operation types recorded";
+      }
+
+      function renderOperationUsage(payload) {
+        const details = byName(payload, "user_operation_latency")?.details || {};
+        const usage = details.usageStats || {};
+        const rows = [usageWindow(details, "24h"), usageWindow(details, "7d"), usage.allTime]
+          .filter(Boolean);
+
+        document.getElementById("operation-usage").innerHTML = rows.length
+          ? rows.map((row) => {
+              const failed = Number(row.failedCount || 0);
+              const meta = [
+                byKindSummary(row.byKind),
+                failed ? formatCount(failed) + " failed" : null,
+                row.windowStartedAt ? "since " + localDateTime(row.windowStartedAt) : null,
+              ].filter(Boolean).join(" · ");
+              return "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(row.label || row.key) + ": " + escapeHtml(formatCount(row.totalCount)) + " operations</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+              "</div>";
+            }).join("")
+          : "<div class=\"event muted\">No operation usage has been recorded yet.</div>";
+      }
+
+      function renderOperationEvents(payload) {
+        const details = byName(payload, "user_operation_latency")?.details || {};
+        const events = details.eventLog || [];
+        const windowDays = details.eventLogWindowDays || 30;
+        document.getElementById("operation-events").innerHTML = events.length
+          ? events.map((event) => {
+              const status = event.ok ? "ok" : "failed";
+              const meta = [
+                operationKindLabel(event.kind),
+                event.target || event.filename || "-",
+                status,
+                event.source || details.telemetrySource || details.source || "-",
+                localDateTime(event.at),
+                event.error || null,
+              ].filter(Boolean).join(" · ");
+              return "<div class=\"event\">" +
+                "<div class=\"event-title\">" + escapeHtml(event.name || event.eventType || "operation") + ": " + escapeHtml(formatDuration(event.latencyMs)) + "</div>" +
+                "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+              "</div>";
+            }).join("")
+          : "<div class=\"event muted\">No operation metadata recorded in the last " + escapeHtml(windowDays) + " days.</div>";
+      }
+
       function renderOperationLog() {
         const markup = operationLog.length
           ? operationLog.map((event) =>
@@ -914,8 +994,10 @@ const page = String.raw`<!doctype html>
               "</div>"
             ).join("")
           : "<div class=\"event muted\">Waiting for first refresh.</div>";
-        document.getElementById("operation-log").innerHTML = markup;
-        document.getElementById("operation-log-activity").innerHTML = markup;
+        for (const targetId of ["operation-log", "operation-log-activity"]) {
+          const target = document.getElementById(targetId);
+          if (target) target.innerHTML = markup;
+        }
       }
 
       function renderLatencies(payload) {
@@ -1098,11 +1180,16 @@ const page = String.raw`<!doctype html>
         const local = byName(payload, "local_sync_state")?.details || {};
         const sync = byName(payload, "sync_health")?.details || {};
         const userOps = byName(payload, "user_operation_latency")?.details || {};
+        const usage24h = usageWindow(userOps, "24h");
+        const usage7d = usageWindow(userOps, "7d");
 
         document.getElementById("hosted-files").textContent = postgres.hostedFiles ?? "-";
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
         document.getElementById("open-conflicts").textContent = postgres.openConflicts ?? "-";
         document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
+        document.getElementById("ops-24h").textContent = formatCount(usage24h?.totalCount);
+        document.getElementById("ops-7d").textContent = formatCount(usage7d?.totalCount);
+        document.getElementById("ops-total").textContent = formatCount(userOps.usageStats?.allTime?.totalCount);
         document.getElementById("read-op-latency").textContent = formatDuration(
           latestLatencyByKind(userOps, "read", userOps.latestReadLatencyMs)
         );
@@ -1127,6 +1214,8 @@ const page = String.raw`<!doctype html>
           .join("");
 
         renderActivity(payload);
+        renderOperationUsage(payload);
+        renderOperationEvents(payload);
         renderOperationLog();
         renderUserOperationLatencies(payload);
         renderLatencies(payload);
