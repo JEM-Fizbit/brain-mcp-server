@@ -473,6 +473,12 @@ const page = String.raw`<!doctype html>
         margin: 4px 0 2px;
       }
 
+      .section-note {
+        color: var(--muted);
+        font-size: 12px;
+        margin: -5px 0 8px;
+      }
+
       .mono {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
@@ -620,16 +626,19 @@ const page = String.raw`<!doctype html>
           <div class="activity-grid">
             <section>
               <h2>Recent Brain Activity</h2>
+              <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
               <div class="activity-list" id="activity"></div>
             </section>
 
             <section>
               <h2>Operation Log</h2>
+              <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, safe target, status, latency, and timestamp.</div>
               <div class="activity-list" id="operation-events"></div>
             </section>
 
             <section>
               <h2>Cockpit Watch</h2>
+              <div class="section-note">Local cockpit observations from this browser session, such as status, sync, and conflict-count changes.</div>
               <div class="activity-list" id="operation-log-activity"></div>
             </section>
           </div>

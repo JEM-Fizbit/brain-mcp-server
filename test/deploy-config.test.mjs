@@ -207,6 +207,9 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /payload\.actions/);
   assert.match(script, /formatDuration/);
   assert.match(script, /Recent Brain Activity/);
+  assert.match(script, /Brain content state changes/);
+  assert.match(script, /hosted MCP tool-call metadata/);
+  assert.match(script, /Local cockpit observations/);
   assert.match(script, /Cockpit Watch/);
   assert.match(script, /localDateTime/);
   assert.match(script, /operationLog/);
