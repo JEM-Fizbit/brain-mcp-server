@@ -289,7 +289,40 @@ const page = String.raw`<!doctype html>
         outline-offset: -2px;
       }
 
+      .subtab-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .subtab-button {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
+        background: transparent;
+        color: var(--muted);
+        padding: 8px 10px 7px;
+        white-space: nowrap;
+      }
+
+      .subtab-button[aria-selected="true"] {
+        color: var(--ink);
+        border-bottom-color: var(--pass);
+        font-weight: 650;
+      }
+
+      .subtab-button:focus-visible {
+        outline: 2px solid var(--pass);
+        outline-offset: -2px;
+      }
+
       .tab-panel[hidden] {
+        display: none;
+      }
+
+      .activity-view[hidden] {
         display: none;
       }
 
@@ -399,17 +432,90 @@ const page = String.raw`<!doctype html>
         margin-top: 2px;
       }
 
-      .operation-detail {
-        display: grid;
-        gap: 8px;
-        margin-top: 8px;
+      .operation-table-wrap {
         max-width: 100%;
         overflow-x: auto;
       }
 
-      .operation-detail-table,
+      .operation-log-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        min-width: 980px;
+      }
+
+      .operation-log-table th,
+      .operation-log-table td {
+        padding: 6px 8px;
+        font-size: 12px;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+      }
+
+      .operation-log-table thead th {
+        border-top: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .operation-log-table tbody tr:hover {
+        background: #fbfbf8;
+      }
+
+      .operation-log-table .tool-col {
+        font-weight: 650;
+      }
+
+      .operation-log-table .duration-col {
+        font-weight: 650;
+        text-align: right;
+      }
+
+      .operation-log-table .status-pass {
+        color: var(--pass);
+        font-weight: 650;
+      }
+
+      .operation-log-table .status-fail {
+        color: var(--fail);
+        font-weight: 650;
+      }
+
+      .operation-db-detail-row td,
+      .operation-db-detail-row td:nth-child(1),
+      .operation-db-detail-row td:nth-child(2) {
+        width: auto;
+        padding: 0 8px 7px;
+        border-top: 0;
+        white-space: normal;
+        overflow: visible;
+      }
+
+      .operation-db-detail-row details {
+        display: block;
+        max-width: 100%;
+      }
+
+      .operation-db-detail-row summary {
+        cursor: pointer;
+        white-space: nowrap;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        padding: 2px 0 6px;
+      }
+
+      .db-span-panel {
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: normal;
+      }
+
       .db-span-table {
         width: 100%;
+        min-width: 620px;
         border-collapse: collapse;
         table-layout: fixed;
         background: #fbfbf8;
@@ -418,8 +524,6 @@ const page = String.raw`<!doctype html>
         overflow: hidden;
       }
 
-      .operation-detail-table th,
-      .operation-detail-table td,
       .db-span-table th,
       .db-span-table td {
         border-top: 1px solid var(--line);
@@ -427,42 +531,8 @@ const page = String.raw`<!doctype html>
         font-size: 12px;
         line-height: 1.35;
         vertical-align: top;
-      }
-
-      .operation-detail-table tr:first-child th,
-      .operation-detail-table tr:first-child td,
-      .db-span-table thead tr:first-child th {
-        border-top: 0;
-      }
-
-      .operation-detail-table th {
-        width: 116px;
-        color: var(--muted);
-        font-weight: 650;
-        text-transform: uppercase;
-        letter-spacing: 0;
-      }
-
-      .operation-detail-table th:nth-child(1) {
-        width: 116px;
-      }
-
-      .operation-detail-table td:nth-child(2) {
-        width: auto;
-      }
-
-      .operation-detail-table td,
-      .db-span-table td {
-        color: var(--ink);
+        white-space: normal;
         overflow-wrap: anywhere;
-      }
-
-      .db-span-heading {
-        color: var(--muted);
-        font-size: 11px;
-        font-weight: 650;
-        text-transform: uppercase;
-        letter-spacing: 0;
       }
 
       .db-span-table th {
@@ -618,7 +688,12 @@ const page = String.raw`<!doctype html>
           justify-content: flex-start;
         }
 
+        .operation-log-table {
+          min-width: 900px;
+        }
+
         .db-span-table {
+          min-width: 0;
           table-layout: auto;
         }
 
@@ -771,25 +846,29 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
-          <div class="activity-grid">
-            <section>
-              <h2>Operation Log</h2>
-              <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
-              <div class="activity-list" id="operation-events"></div>
-            </section>
-
-            <section>
-              <h2>Recent Brain Activity</h2>
-              <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
-              <div class="activity-list" id="activity"></div>
-            </section>
-
-            <section>
-              <h2>Cockpit Watch</h2>
-              <div class="section-note">Local cockpit observations from this browser session, such as status, sync, and conflict-count changes.</div>
-              <div class="activity-list" id="operation-log-activity"></div>
-            </section>
+          <div class="subtab-list" role="tablist" aria-label="Activity sections">
+            <button class="subtab-button" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
+            <button class="subtab-button" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
+            <button class="subtab-button" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
           </div>
+
+          <section class="activity-view" id="activity-view-operations" role="tabpanel" aria-labelledby="activity-subtab-operations">
+            <h2>Operation Log</h2>
+            <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
+            <div class="activity-list" id="operation-events"></div>
+          </section>
+
+          <section class="activity-view" id="activity-view-brain" role="tabpanel" aria-labelledby="activity-subtab-brain" hidden>
+            <h2>Recent Brain Activity</h2>
+            <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
+            <div class="activity-list" id="activity"></div>
+          </section>
+
+          <section class="activity-view" id="activity-view-watch" role="tabpanel" aria-labelledby="activity-subtab-watch" hidden>
+            <h2>Cockpit Watch</h2>
+            <div class="section-note">Local cockpit observations from this browser session, such as status, sync, and conflict-count changes.</div>
+            <div class="activity-list" id="operation-log-activity"></div>
+          </section>
         </div>
 
         <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
@@ -1126,36 +1205,80 @@ const page = String.raw`<!doctype html>
         const events = details.eventLog || [];
         const windowDays = details.eventLogWindowDays || 30;
         document.getElementById("operation-events").innerHTML = events.length
-          ? events.map((event) => {
-              return "<div class=\"event\">" +
-                "<div class=\"event-title\">" + escapeHtml(event.name || event.eventType || "operation") + ": " + escapeHtml(formatDuration(event.latencyMs)) + "</div>" +
-                renderOperationEventDetail(event, details) +
-              "</div>";
-            }).join("")
+          ? renderOperationEventTable(events, details)
           : "<div class=\"event muted\">No operation metadata recorded in the last " + escapeHtml(windowDays) + " days.</div>";
       }
 
-      function renderOperationEventDetail(event, details) {
-        const rows = [
-          ["Type", operationKindLabel(event.kind)],
-          ["Timing", timingLayerLabel(event.timingLayer)],
-          ["Target", event.target || event.filename || "-"],
-          ["Status", event.ok ? "ok" : "failed"],
-          ["Source", event.source || details.telemetrySource || details.source || "-"],
-          ["Latency", formatDuration(event.latencyMs)],
-          ["DB", dbSummaryLabel(event.db) || "-"],
-          ["When", localDateTime(event.at)],
-          event.error ? ["Error", event.error] : null,
-        ].filter(Boolean);
-
-        return "<div class=\"operation-detail\">" +
-          "<table class=\"operation-detail-table\"><tbody>" +
-            rows.map(([label, value]) =>
-              "<tr><th scope=\"row\">" + escapeHtml(label) + "</th><td>" + escapeHtml(value) + "</td></tr>"
-            ).join("") +
-          "</tbody></table>" +
-          renderDbSpanTable(event.db) +
+      function renderOperationEventTable(events, details) {
+        return "<div class=\"operation-table-wrap\">" +
+          "<table class=\"operation-log-table\">" +
+            "<thead><tr>" +
+              "<th style=\"width: 18%\">Tool</th>" +
+              "<th style=\"width: 8%\">Latency</th>" +
+              "<th style=\"width: 8%\">Type</th>" +
+              "<th style=\"width: 10%\">Timing</th>" +
+              "<th style=\"width: 8%\">Status</th>" +
+              "<th style=\"width: 14%\">Target</th>" +
+              "<th style=\"width: 10%\">Source</th>" +
+              "<th style=\"width: 14%\">DB</th>" +
+              "<th style=\"width: 10%\">When</th>" +
+            "</tr></thead>" +
+            "<tbody>" +
+              events.map((event) => renderOperationEventRows(event, details)).join("") +
+            "</tbody>" +
+          "</table>" +
         "</div>";
+      }
+
+      function renderOperationEventRows(event, details) {
+        const tool = event.name || event.eventType || "operation";
+        const target = event.target || event.filename || "-";
+        const source = event.source || details.telemetrySource || details.source || "-";
+        const status = event.ok ? "ok" : "failed";
+        const statusClass = event.ok ? "status-pass" : "status-fail";
+        const sourceDisplay = sourceLabel(source);
+        const errorTitle = event.error ? " - " + event.error : "";
+
+        return "<tr>" +
+          "<td class=\"tool-col\" title=\"" + escapeHtml(tool) + "\">" + escapeHtml(tool) + "</td>" +
+          "<td class=\"duration-col\" title=\"" + escapeHtml(formatDuration(event.latencyMs)) + "\">" + escapeHtml(formatDuration(event.latencyMs)) + "</td>" +
+          "<td title=\"" + escapeHtml(operationKindLabel(event.kind)) + "\">" + escapeHtml(operationKindLabel(event.kind)) + "</td>" +
+          "<td title=\"" + escapeHtml(timingLayerLabel(event.timingLayer)) + "\">" + escapeHtml(timingLayerLabel(event.timingLayer)) + "</td>" +
+          "<td class=\"" + statusClass + "\" title=\"" + escapeHtml(status + errorTitle) + "\">" + escapeHtml(status) + "</td>" +
+          "<td title=\"" + escapeHtml(target) + "\">" + escapeHtml(target) + "</td>" +
+          "<td title=\"" + escapeHtml(source) + "\">" + escapeHtml(sourceDisplay) + "</td>" +
+          "<td title=\"" + escapeHtml(dbSummaryLabel(event.db) || "-") + "\">" + escapeHtml(dbSummaryCompact(event.db) || "-") + "</td>" +
+          "<td title=\"" + escapeHtml(localDateTime(event.at)) + "\">" + escapeHtml(localTime(event.at)) + "</td>" +
+        "</tr>" +
+        renderOperationDbDetailRow(event.db);
+      }
+
+      function sourceLabel(source) {
+        if (source === "hosted_mcp_server") return "server";
+        if (source === "hosted_mcp_client_e2e" || source === "smoke-hosted-oauth") return "client E2E";
+        if (source === "hosted_mcp_sync_wait") return "sync wait";
+        if (source === "local_json_cache") return "local cache";
+        return source || "-";
+      }
+
+      function renderOperationDbDetailRow(db) {
+        if (!Array.isArray(db?.spans) || db.spans.length === 0) return "";
+        return "<tr class=\"operation-db-detail-row\"><td colspan=\"9\">" +
+          "<details>" +
+            "<summary>DB spans: " + escapeHtml(dbSummaryCompact(db)) + "</summary>" +
+            renderDbSpanTable(db) +
+          "</details>" +
+        "</td></tr>";
+      }
+
+      function dbSummaryCompact(db) {
+        if (!db || !Number(db.queryCount)) return null;
+        return [
+          formatCount(db.queryCount) + "q",
+          formatDuration(db.totalMs),
+          db.maxMs !== undefined && db.maxMs !== null ? "max " + formatDuration(db.maxMs) : null,
+          db.failedCount ? formatCount(db.failedCount) + " fail" : null,
+        ].filter(Boolean).join("/");
       }
 
       function renderDbSpanTable(db) {
@@ -1164,8 +1287,7 @@ const page = String.raw`<!doctype html>
         if (spans.length === 0) return "";
         const hidden = Math.max(0, allSpans.length - spans.length);
         const truncated = Math.max(0, Number(db.truncatedCount || 0)) + hidden;
-        return "<div>" +
-          "<div class=\"db-span-heading\">DB spans" + (truncated ? " (" + escapeHtml(formatCount(truncated)) + " more truncated)" : "") + "</div>" +
+        return "<div class=\"db-span-panel\">" +
           "<table class=\"db-span-table\">" +
             "<thead><tr><th>Operation</th><th>Target</th><th>Duration</th><th>Rows</th><th>Status</th></tr></thead>" +
             "<tbody>" +
@@ -1180,6 +1302,7 @@ const page = String.raw`<!doctype html>
               ).join("") +
             "</tbody>" +
           "</table>" +
+          (truncated ? "<div class=\"event-meta\">" + escapeHtml(formatCount(truncated)) + " more DB spans truncated.</div>" : "") +
         "</div>";
       }
 
@@ -1514,7 +1637,7 @@ const page = String.raw`<!doctype html>
       }
 
       function activateTab(tabId) {
-        for (const button of document.querySelectorAll("[role='tab']")) {
+        for (const button of document.querySelectorAll(".tab-button")) {
           const selected = button.id === tabId;
           button.setAttribute("aria-selected", String(selected));
           document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
@@ -1522,12 +1645,12 @@ const page = String.raw`<!doctype html>
       }
 
       function setupTabs() {
-        for (const button of document.querySelectorAll("[role='tab']")) {
+        for (const button of document.querySelectorAll(".tab-button")) {
           button.addEventListener("click", () => activateTab(button.id));
           button.addEventListener("keydown", (event) => {
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             event.preventDefault();
-            const buttons = Array.from(document.querySelectorAll("[role='tab']"));
+            const buttons = Array.from(document.querySelectorAll(".tab-button"));
             const currentIndex = buttons.indexOf(button);
             let nextIndex = currentIndex;
             if (event.key === "ArrowLeft") nextIndex = (currentIndex + buttons.length - 1) % buttons.length;
@@ -1540,8 +1663,36 @@ const page = String.raw`<!doctype html>
         }
       }
 
+      function activateActivityView(tabId) {
+        for (const button of document.querySelectorAll(".subtab-button")) {
+          const selected = button.id === tabId;
+          button.setAttribute("aria-selected", String(selected));
+          document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
+        }
+      }
+
+      function setupActivityViews() {
+        for (const button of document.querySelectorAll(".subtab-button")) {
+          button.addEventListener("click", () => activateActivityView(button.id));
+          button.addEventListener("keydown", (event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const buttons = Array.from(document.querySelectorAll(".subtab-button"));
+            const currentIndex = buttons.indexOf(button);
+            let nextIndex = currentIndex;
+            if (event.key === "ArrowLeft") nextIndex = (currentIndex + buttons.length - 1) % buttons.length;
+            if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % buttons.length;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = buttons.length - 1;
+            buttons[nextIndex].focus();
+            activateActivityView(buttons[nextIndex].id);
+          });
+        }
+      }
+
       document.getElementById("refresh").addEventListener("click", refresh);
       setupTabs();
+      setupActivityViews();
       refresh();
       setInterval(refresh, 60000);
     </script>
