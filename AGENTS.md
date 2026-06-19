@@ -30,8 +30,11 @@ Use Supabase Postgres for hosted operational telemetry.
 
 - User-facing hosted MCP latency samples belong in `brain.sync_events` with `event_type = 'hosted_mcp_latency'`.
 - Real hosted MCP server tool calls are the normal telemetry source and should use metadata `source = 'hosted_mcp_server'`.
+- Server tool-call telemetry should include `timingLayer = 'server_tool'`, `durationType = 'server_tool_handler'`, and bounded sanitized DB summaries/spans when Postgres work occurs.
+- DB telemetry may record operation/table names, durations, row counts, status, and bounded error text. It must not record SQL text, query parameters, file content, patch text, source content, or search query text.
+- Hosted telemetry writes are best-effort and non-blocking by default so measurement does not add user-facing latency; use `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only for explicit diagnostics.
+- Client-observed end-to-end samples from hosted smoke/test-drive flows should use metadata `source = 'hosted_mcp_client_e2e'` and `timingLayer = 'client_e2e'`.
 - Sync-wait telemetry is measured by hosted smoke/test-drive flows because it measures local-hosted propagation rather than one server tool handler.
-- Telemetry must not record file content, patch text, source content, or search query text.
 - The cockpit should read Postgres telemetry first.
 - `.brain-sync/hosted-mcp-latency.json` is a fallback cache only, used when Postgres is unavailable or explicitly enabled.
 - Do not introduce a new metrics database, daemon, or analytics service unless a backlog/spec promotion justifies it.

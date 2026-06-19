@@ -69,6 +69,8 @@ test("hosted OAuth smoke caches refresh grants without logging access tokens", a
   assert.match(script, /BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE/);
   assert.match(script, /BRAIN_HOSTED_MCP_SYNC_WAIT_DB_WRITE/);
   assert.match(script, /hosted_mcp_sync_wait/);
+  assert.match(script, /hosted_mcp_client_e2e/);
+  assert.match(script, /client_observed_tool_call/);
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
   assert.match(script, /operationLatencies/);
@@ -112,6 +114,10 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /latestReadLatencyMs/);
   assert.match(script, /latestWriteLatencyMs/);
   assert.match(script, /operationSummaries/);
+  assert.match(script, /clientOperationSummaries/);
+  assert.match(script, /timingLayerSummaries/);
+  assert.match(script, /toolSummaries/);
+  assert.match(script, /slowestOperations/);
   assert.match(script, /operationUsageRowsQuery/);
   assert.match(script, /eventLogWindowDays/);
   assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT/);
@@ -146,8 +152,13 @@ test("hosted MCP server records tool latency without payload content", async () 
   assert.match(server, /instrumentToolLatency\(server\)/);
   assert.match(telemetry, /hosted_mcp_latency/);
   assert.match(telemetry, /hosted_mcp_server/);
+  assert.match(telemetry, /server_tool/);
+  assert.match(telemetry, /server_tool_handler/);
+  assert.match(telemetry, /recordToolLatencyBestEffort/);
+  assert.match(telemetry, /BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE/);
   assert.match(telemetry, /BRAIN_HOSTED_MCP_LATENCY_DB_WRITE/);
   assert.match(telemetry, /brain\.sync_events/);
+  assert.match(telemetry, /dbTelemetry/);
   assert.match(telemetry, /brain_update_file/);
   assert.match(telemetry, /brain_resolve_conflict/);
   assert.match(telemetry, /tool_returned_error/);
@@ -209,6 +220,10 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /Recent Brain Activity/);
   assert.match(script, /Brain content state changes/);
   assert.match(script, /hosted MCP tool-call metadata/);
+  assert.match(script, /Client-Observed E2E/);
+  assert.match(script, /Timing Layers/);
+  assert.match(script, /Slowest Operations/);
+  assert.match(script, /dbSummaryLabel/);
   assert.match(script, /Local cockpit observations/);
   assert.match(script, /Cockpit Watch/);
   assert.match(script, /localDateTime/);
