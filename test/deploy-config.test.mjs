@@ -210,6 +210,12 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /read-op-latency/);
   assert.match(script, /write-op-latency/);
   assert.match(script, /sync-wait-latency/);
+  assert.match(script, /latency-subtab-trends/);
+  assert.match(script, /latency-subtab-slowest/);
+  assert.match(script, /latency-subtab-samples/);
+  assert.match(script, /latency-subtab-infra/);
+  assert.match(script, /slowest-operation-latencies/);
+  assert.match(script, /recent-operation-latencies/);
   assert.match(script, /renderUserOperationLatencies/);
   assert.match(script, /renderLatencySummaryCards/);
   assert.match(script, /renderSparkline/);
@@ -224,6 +230,7 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /activity-subtab-brain/);
   assert.match(script, /activity-subtab-watch/);
   assert.match(script, /setupActivityViews/);
+  assert.match(script, /setupSubtabGroup/);
   assert.match(script, /Client-Observed E2E/);
   assert.match(script, /Timing Layers/);
   assert.match(script, /Slowest Operations/);
