@@ -322,6 +322,7 @@ const page = String.raw`<!doctype html>
         display: none;
       }
 
+      .subtab-panel[hidden],
       .activity-view[hidden] {
         display: none;
       }
@@ -847,24 +848,24 @@ const page = String.raw`<!doctype html>
 
         <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
           <div class="subtab-list" role="tablist" aria-label="Activity sections">
-            <button class="subtab-button" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
-            <button class="subtab-button" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
-            <button class="subtab-button" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
+            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
+            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
+            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
           </div>
 
-          <section class="activity-view" id="activity-view-operations" role="tabpanel" aria-labelledby="activity-subtab-operations">
+          <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-operations" role="tabpanel" aria-labelledby="activity-subtab-operations">
             <h2>Operation Log</h2>
             <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
             <div class="activity-list" id="operation-events"></div>
           </section>
 
-          <section class="activity-view" id="activity-view-brain" role="tabpanel" aria-labelledby="activity-subtab-brain" hidden>
+          <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-brain" role="tabpanel" aria-labelledby="activity-subtab-brain" hidden>
             <h2>Recent Brain Activity</h2>
             <div class="section-note">Brain content state changes: file revisions, conflict opens, and conflict resolutions.</div>
             <div class="activity-list" id="activity"></div>
           </section>
 
-          <section class="activity-view" id="activity-view-watch" role="tabpanel" aria-labelledby="activity-subtab-watch" hidden>
+          <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-watch" role="tabpanel" aria-labelledby="activity-subtab-watch" hidden>
             <h2>Cockpit Watch</h2>
             <div class="section-note">Local cockpit observations from this browser session, such as status, sync, and conflict-count changes.</div>
             <div class="activity-list" id="operation-log-activity"></div>
@@ -872,18 +873,35 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
-          <div class="activity-grid">
-            <section>
-              <h2>User-Facing Operations</h2>
-              <div class="section-note">Layered latency view: countable server tool calls, client-observed end-to-end samples, exact tool summaries, and bounded DB spans.</div>
-              <div class="activity-list" id="user-operation-latencies"></div>
-            </section>
-
-            <section>
-              <h2>Infrastructure Checks</h2>
-              <div class="activity-list" id="latencies"></div>
-            </section>
+          <div class="subtab-list" role="tablist" aria-label="Latency sections">
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-trends" type="button" role="tab" aria-controls="latency-view-trends" aria-selected="true">Operation Trends</button>
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slowest" type="button" role="tab" aria-controls="latency-view-slowest" aria-selected="false">Slowest Operations</button>
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-samples" type="button" role="tab" aria-controls="latency-view-samples" aria-selected="false">Recent Samples</button>
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-infra" type="button" role="tab" aria-controls="latency-view-infra" aria-selected="false">Infrastructure Checks</button>
           </div>
+
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-trends" role="tabpanel" aria-labelledby="latency-subtab-trends">
+            <h2>User-Facing Operations</h2>
+            <div class="section-note">Layered latency view: countable server tool calls, client-observed end-to-end samples, exact tool summaries, and bounded DB contribution.</div>
+            <div class="activity-list" id="user-operation-latencies"></div>
+          </section>
+
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-slowest" role="tabpanel" aria-labelledby="latency-subtab-slowest" hidden>
+            <h2>Slowest Operations</h2>
+            <div class="section-note">The slowest individual operations in the current bounded telemetry window.</div>
+            <div class="activity-list" id="slowest-operation-latencies"></div>
+          </section>
+
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-samples" role="tabpanel" aria-labelledby="latency-subtab-samples" hidden>
+            <h2>Recent Samples</h2>
+            <div class="section-note">Recent server-side and client-observed samples, separated so they are not double-counted.</div>
+            <div class="activity-list" id="recent-operation-latencies"></div>
+          </section>
+
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-infra" role="tabpanel" aria-labelledby="latency-subtab-infra" hidden>
+            <h2>Infrastructure Checks</h2>
+            <div class="activity-list" id="latencies"></div>
+          </section>
         </div>
 
         <div class="tab-panel" id="panel-checks" role="tabpanel" aria-labelledby="tab-checks" hidden>
@@ -1458,7 +1476,7 @@ const page = String.raw`<!doctype html>
       function renderSlowestOperations(operations) {
         const rows = Array.isArray(operations) ? operations : [];
         if (rows.length === 0) return "";
-        return "<div class=\"recent-heading\">Slowest Operations</div>" + rows.map((operation) => {
+        return rows.map((operation) => {
           const meta = [
             operationKindLabel(operation.kind),
             timingLayerLabel(operation.timingLayer),
@@ -1556,9 +1574,15 @@ const page = String.raw`<!doctype html>
           layerCards +
           kindCards +
           clientCards +
-          toolCards +
-          renderSlowestOperations(slowestOperations) +
-          rows;
+          toolCards;
+
+        document.getElementById("slowest-operation-latencies").innerHTML =
+          renderSlowestOperations(slowestOperations) ||
+          "<div class=\"event muted\">No slowest-operation samples have been recorded yet.</div>";
+
+        document.getElementById("recent-operation-latencies").innerHTML =
+          rows ||
+          "<div class=\"event muted\">No recent operation samples have been recorded yet.</div>";
       }
 
       function render(payload) {
@@ -1663,21 +1687,23 @@ const page = String.raw`<!doctype html>
         }
       }
 
-      function activateActivityView(tabId) {
-        for (const button of document.querySelectorAll(".subtab-button")) {
+      function activateSubtab(tabId, scope) {
+        for (const button of document.querySelectorAll(".subtab-button[data-subtab-scope='" + scope + "']")) {
           const selected = button.id === tabId;
           button.setAttribute("aria-selected", String(selected));
-          document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
+        }
+        for (const panel of document.querySelectorAll(".subtab-panel[data-subtab-scope='" + scope + "']")) {
+          panel.hidden = panel.id !== document.getElementById(tabId).getAttribute("aria-controls");
         }
       }
 
-      function setupActivityViews() {
-        for (const button of document.querySelectorAll(".subtab-button")) {
-          button.addEventListener("click", () => activateActivityView(button.id));
+      function setupSubtabGroup(scope) {
+        for (const button of document.querySelectorAll(".subtab-button[data-subtab-scope='" + scope + "']")) {
+          button.addEventListener("click", () => activateSubtab(button.id, scope));
           button.addEventListener("keydown", (event) => {
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             event.preventDefault();
-            const buttons = Array.from(document.querySelectorAll(".subtab-button"));
+            const buttons = Array.from(document.querySelectorAll(".subtab-button[data-subtab-scope='" + scope + "']"));
             const currentIndex = buttons.indexOf(button);
             let nextIndex = currentIndex;
             if (event.key === "ArrowLeft") nextIndex = (currentIndex + buttons.length - 1) % buttons.length;
@@ -1685,9 +1711,14 @@ const page = String.raw`<!doctype html>
             if (event.key === "Home") nextIndex = 0;
             if (event.key === "End") nextIndex = buttons.length - 1;
             buttons[nextIndex].focus();
-            activateActivityView(buttons[nextIndex].id);
+            activateSubtab(buttons[nextIndex].id, scope);
           });
         }
+      }
+
+      function setupActivityViews() {
+        setupSubtabGroup("activity");
+        setupSubtabGroup("latency");
       }
 
       document.getElementById("refresh").addEventListener("click", refresh);

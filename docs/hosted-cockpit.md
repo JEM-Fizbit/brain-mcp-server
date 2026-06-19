@@ -132,12 +132,13 @@ The cockpit also reports aggregate operation usage from the same Postgres teleme
 
 The Activity tab separates content-state activity from operation telemetry with an in-tab sub-menu rather than stacked sections. Operation Log, Recent Brain Activity, and Cockpit Watch each get the full content width and are reachable from the top of the tab. Operation Log is the primary troubleshooting feed: a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Operation Log is a compact table with one row per operation: tool name, latency, operation kind, timing layer, status, safe target metadata, telemetry source, DB summary, and timestamp. Rows with DB spans expose a bounded drill-down table with operation, target, duration, row count, and status. Recent Brain Activity shows Brain state changes, such as file revisions and conflict open/resolution events. Cockpit Watch is local to the open browser session and reports refresh-observed status, sync, and conflict-count changes.
 
-The Latency tab groups successful samples into several operator views:
+The Latency tab uses its own in-tab sub-menu so performance views do not stack vertically. Operation Trends shows the high-level latency cards:
 
 - timing layers: server tool handler, client-observed end-to-end, and sync wait;
 - operation kinds: read, write, sync wait, and other operational calls;
-- exact tools, sorted by the slowest p95 values in the bounded history;
-- slowest individual operations in the current bounded sample set.
+- exact tools, sorted by the slowest p95 values in the bounded history.
+
+Slowest Operations is a separate view for the slowest individual operations in the current bounded sample set. Recent Samples is a separate view for recent server-side and client-observed samples. Infrastructure Checks is a separate view for doctor, sync, Postgres, hosted health, Fly, and other check runtimes.
 
 For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, DB contribution when present, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
 
