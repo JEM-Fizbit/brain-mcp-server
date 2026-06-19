@@ -634,6 +634,51 @@ const page = String.raw`<!doctype html>
         overflow-wrap: anywhere;
       }
 
+      .slo-table {
+        margin: 8px 0 12px;
+        min-width: 760px;
+      }
+
+      .slo-table th:nth-child(1),
+      .slo-table td:nth-child(1) {
+        width: 30%;
+      }
+
+      .slo-table th:nth-child(2),
+      .slo-table td:nth-child(2) {
+        width: 12%;
+      }
+
+      .slo-table th:nth-child(3),
+      .slo-table td:nth-child(3),
+      .slo-table th:nth-child(4),
+      .slo-table td:nth-child(4),
+      .slo-table th:nth-child(5),
+      .slo-table td:nth-child(5) {
+        width: 14%;
+      }
+
+      .slo-table th:nth-child(6),
+      .slo-table td:nth-child(6) {
+        width: 16%;
+      }
+
+      .finding {
+        border-top: 1px solid var(--line);
+        padding: 9px 0;
+      }
+
+      .finding:first-child {
+        border-top: 0;
+      }
+
+      .finding-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 650;
+      }
+
       .recent-heading {
         color: var(--muted);
         font-size: 12px;
@@ -874,13 +919,20 @@ const page = String.raw`<!doctype html>
 
         <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
           <div class="subtab-list" role="tablist" aria-label="Latency sections">
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-trends" type="button" role="tab" aria-controls="latency-view-trends" aria-selected="true">Operation Trends</button>
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slo" type="button" role="tab" aria-controls="latency-view-slo" aria-selected="true">SLOs & Findings</button>
+            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-trends" type="button" role="tab" aria-controls="latency-view-trends" aria-selected="false">Operation Trends</button>
             <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slowest" type="button" role="tab" aria-controls="latency-view-slowest" aria-selected="false">Slowest Operations</button>
             <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-samples" type="button" role="tab" aria-controls="latency-view-samples" aria-selected="false">Recent Samples</button>
             <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-infra" type="button" role="tab" aria-controls="latency-view-infra" aria-selected="false">Infrastructure Checks</button>
           </div>
 
-          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-trends" role="tabpanel" aria-labelledby="latency-subtab-trends">
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-slo" role="tabpanel" aria-labelledby="latency-subtab-slo">
+            <h2>SLOs & Findings</h2>
+            <div class="section-note">Operational thresholds over the bounded telemetry window, plus DB-hotspot evidence when a latency breach points at Postgres work.</div>
+            <div class="activity-list" id="latency-slo-findings"></div>
+          </section>
+
+          <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-trends" role="tabpanel" aria-labelledby="latency-subtab-trends" hidden>
             <h2>User-Facing Operations</h2>
             <div class="section-note">Layered latency view: countable server tool calls, client-observed end-to-end samples, exact tool summaries, and bounded DB contribution.</div>
             <div class="activity-list" id="user-operation-latencies"></div>
@@ -956,6 +1008,7 @@ const page = String.raw`<!doctype html>
         "operationCount",
         "historyCount",
         "clientHistoryCount",
+        "performanceStatus",
         "lastLintAt",
         "ageDays",
         "maxAgeDays",
@@ -1473,6 +1526,127 @@ const page = String.raw`<!doctype html>
         }).join("") + "</div>";
       }
 
+      function statusPill(status) {
+        const value = status || "unknown";
+        const css = ["pass", "warn", "fail"].includes(value) ? value : "";
+        return "<span class=\"pill " + escapeHtml(css) + "\">" + escapeHtml(value) + "</span>";
+      }
+
+      function formatSloObserved(evaluation) {
+        if (evaluation?.metric === "count") return formatCount(evaluation.value);
+        return formatDuration(evaluation?.valueMs);
+      }
+
+      function formatSloThreshold(evaluation, threshold) {
+        if (evaluation?.metric === "count") {
+          return threshold === "warn" ? formatCount(evaluation.warnCount) : "-";
+        }
+        return threshold === "warn"
+          ? formatDuration(evaluation?.warnMs)
+          : formatDuration(evaluation?.failMs);
+      }
+
+      function renderSloEvaluations(slo) {
+        const evaluations = Array.isArray(slo?.evaluations) ? slo.evaluations : [];
+        if (evaluations.length === 0) return "";
+        return "<div class=\"operation-table-wrap\">" +
+          "<table class=\"slo-table\">" +
+            "<thead><tr>" +
+              "<th>Measure</th>" +
+              "<th>Status</th>" +
+              "<th>Observed</th>" +
+              "<th>Warn</th>" +
+              "<th>Fail</th>" +
+              "<th>Samples</th>" +
+            "</tr></thead>" +
+            "<tbody>" +
+              evaluations.map((evaluation) =>
+                "<tr>" +
+                  "<td title=\"" + escapeHtml(evaluation.detail || evaluation.label || "") + "\">" + escapeHtml(evaluation.label || evaluation.id) + "</td>" +
+                  "<td>" + statusPill(evaluation.status) + "</td>" +
+                  "<td>" + escapeHtml(formatSloObserved(evaluation)) + "</td>" +
+                  "<td>" + escapeHtml(formatSloThreshold(evaluation, "warn")) + "</td>" +
+                  "<td>" + escapeHtml(formatSloThreshold(evaluation, "fail")) + "</td>" +
+                  "<td>" + escapeHtml(evaluation.sampleCount === null || evaluation.sampleCount === undefined ? "-" : formatCount(evaluation.sampleCount)) + "</td>" +
+                "</tr>"
+              ).join("") +
+            "</tbody>" +
+          "</table>" +
+        "</div>";
+      }
+
+      function renderPerformanceFindings(findings) {
+        const rows = Array.isArray(findings) ? findings : [];
+        if (rows.length === 0) {
+          return "<div class=\"event\">" +
+            "<div class=\"event-title\">No SLO breaches detected in the current bounded telemetry window.</div>" +
+            "<div class=\"event-meta\">Keep an eye on this while the baseline fills out; low sample counts can still hide real-world variance.</div>" +
+          "</div>";
+        }
+        return "<div class=\"recent-heading\">Findings</div>" + rows.map((finding) =>
+          "<div class=\"finding\">" +
+            "<div class=\"finding-title\">" + statusPill(finding.level) + "<span>" + escapeHtml(finding.title || "Finding") + "</span></div>" +
+            "<div class=\"event-meta\">" + escapeHtml(finding.detail || "") + "</div>" +
+          "</div>"
+        ).join("");
+      }
+
+      function renderDbSpanTargets(targets) {
+        const rows = Array.isArray(targets) ? targets.slice(0, 6) : [];
+        if (rows.length === 0) return "";
+        return "<div class=\"recent-heading\">DB Span Hotspots</div>" +
+          "<div class=\"db-span-panel\">" +
+            "<table class=\"db-span-table\">" +
+              "<thead><tr><th>Operation</th><th>Target</th><th>Max</th><th>Avg/Total</th><th>Samples</th></tr></thead>" +
+              "<tbody>" +
+                rows.map((target) => {
+                  const examples = Array.isArray(target.examples)
+                    ? target.examples.map((example) => (example.name || "operation") + " " + formatDuration(example.durationMs)).join(" · ")
+                    : "";
+                  const samples = [
+                    formatCount(target.spanCount) + " spans",
+                    formatCount(target.rowCount) + " rows",
+                    target.failedCount ? formatCount(target.failedCount) + " failed" : null,
+                    examples || null,
+                  ].filter(Boolean).join(" · ");
+                  return "<tr>" +
+                    "<td data-label=\"Operation\">" + escapeHtml(target.operation || "query") + "</td>" +
+                    "<td data-label=\"Target\">" + escapeHtml(target.target || "-") + "</td>" +
+                    "<td data-label=\"Max\">" + escapeHtml(formatDuration(target.maxMs)) + "</td>" +
+                    "<td data-label=\"Avg/Total\">" + escapeHtml(formatDuration(target.averageMs) + " / " + formatDuration(target.totalMs)) + "</td>" +
+                    "<td data-label=\"Samples\">" + escapeHtml(samples) + "</td>" +
+                  "</tr>";
+                }).join("") +
+              "</tbody>" +
+            "</table>" +
+          "</div>";
+      }
+
+      function renderLatencySlo(details) {
+        const slo = details.slo || {};
+        const evaluations = Array.isArray(slo.evaluations) ? slo.evaluations : [];
+        const findings = details.performanceFindings || [];
+        const dbTargets = details.dbSpanTargets || [];
+        if (evaluations.length === 0 && findings.length === 0 && dbTargets.length === 0) {
+          return "<div class=\"event muted\">No latency SLO data has been recorded yet.</div>";
+        }
+
+        const status = details.performanceStatus || slo.status || "pass";
+        const summary = "<div class=\"event\">" +
+          "<div class=\"event-title\">" + statusPill(status) + " Latency SLO status over the current bounded telemetry window.</div>" +
+          "<div class=\"event-meta\">" +
+            escapeHtml(formatCount(evaluations.length) + " measures · " +
+              formatCount(slo.warningCount || 0) + " warnings · " +
+              formatCount(slo.failedCount || 0) + " failures") +
+          "</div>" +
+        "</div>";
+
+        return summary +
+          renderSloEvaluations(slo) +
+          renderPerformanceFindings(findings) +
+          renderDbSpanTargets(dbTargets);
+      }
+
       function renderSlowestOperations(operations) {
         const rows = Array.isArray(operations) ? operations : [];
         if (rows.length === 0) return "";
@@ -1575,6 +1749,9 @@ const page = String.raw`<!doctype html>
           kindCards +
           clientCards +
           toolCards;
+
+        document.getElementById("latency-slo-findings").innerHTML =
+          renderLatencySlo(details);
 
         document.getElementById("slowest-operation-latencies").innerHTML =
           renderSlowestOperations(slowestOperations) ||

@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import {
   appendLatencyHistory,
   buildLatencySnapshot,
+  diagnoseLatencyPerformance,
+  evaluateLatencySlo,
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
+  normalizeLatencySloThresholds,
   operationEventLogFromSyncEventRows,
   slowestLatencyOperations,
   summarizeOperationUsage,
@@ -359,4 +362,158 @@ test("operation event log preserves safe metadata from sync_events rows", () => 
   assert.equal(events[0].source, "hosted_mcp_server");
   assert.equal(events[0].error, "conflict");
   assert.equal(events[1].filename, "NOW.md");
+});
+
+test("latency SLOs warn on slow reads and identify DB hotspots", () => {
+  const history = latencyHistoryFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "800",
+      created_at: "2026-06-18T10:03:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "server_tool",
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+        db: {
+          queryCount: 1,
+          totalMs: 80,
+          averageMs: 80,
+          maxMs: 80,
+          rowCount: 1,
+          failedCount: 0,
+          truncatedCount: 0,
+          spans: [
+            {
+              operation: "select",
+              target: "brain.brain_files+brain.brain_file_revisions",
+              durationMs: 80,
+              ok: true,
+              rowCount: 1,
+            },
+          ],
+        },
+      },
+    },
+    {
+      event_type: "hosted_mcp_latency",
+      filename: null,
+      duration_ms: "1200",
+      created_at: "2026-06-18T10:04:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "server_tool",
+        name: "brain_sync_status",
+        kind: "read",
+        target: "ai-brain-jem",
+        ok: true,
+        db: {
+          queryCount: 2,
+          totalMs: 980,
+          averageMs: 490,
+          maxMs: 900,
+          rowCount: 0,
+          failedCount: 0,
+          truncatedCount: 0,
+          spans: [
+            {
+              operation: "select",
+              target: "brain.sync_conflicts",
+              durationMs: 900,
+              ok: true,
+              rowCount: 0,
+            },
+            {
+              operation: "select",
+              target: "brain.brain_files+brain.brain_file_revisions",
+              durationMs: 80,
+              ok: true,
+              rowCount: 50,
+            },
+          ],
+        },
+      },
+    },
+    {
+      event_type: "hosted_mcp_latency",
+      filename: null,
+      duration_ms: "1800",
+      created_at: "2026-06-18T10:05:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "server_tool",
+        name: "brain_list_files",
+        kind: "read",
+        target: "ai-brain-jem",
+        ok: true,
+        db: {
+          queryCount: 1,
+          totalMs: 700,
+          averageMs: 700,
+          maxMs: 700,
+          rowCount: 50,
+          failedCount: 0,
+          truncatedCount: 0,
+          spans: [
+            {
+              operation: "select",
+              target: "brain.brain_files+brain.brain_file_revisions",
+              durationMs: 700,
+              ok: true,
+              rowCount: 50,
+            },
+          ],
+        },
+      },
+    },
+  ]);
+  const clientHistory = latencyHistoryFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "2600",
+      created_at: "2026-06-18T10:06:00.000Z",
+      metadata: {
+        source: "hosted_mcp_client_e2e",
+        timingLayer: "client_e2e",
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+      },
+    },
+  ]);
+  const thresholds = normalizeLatencySloThresholds({
+    serverReadP95WarnMs: 1000,
+    serverReadP95FailMs: 3000,
+    clientReadP95WarnMs: 2000,
+    clientReadP95FailMs: 5000,
+    dbMaxSpanWarnMs: 500,
+    dbMaxSpanFailMs: 2500,
+  });
+
+  const slo = evaluateLatencySlo({ history, clientHistory, thresholds });
+  assert.equal(slo.status, "warn");
+  assert.equal(
+    slo.evaluations.find((evaluation) => evaluation.id === "server_read_p95").status,
+    "warn"
+  );
+  assert.equal(
+    slo.evaluations.find((evaluation) => evaluation.id === "client_read_p95").status,
+    "warn"
+  );
+  assert.equal(
+    slo.evaluations.find((evaluation) => evaluation.id === "db_max_span").status,
+    "warn"
+  );
+
+  const diagnosis = diagnoseLatencyPerformance({ history, clientHistory, thresholds });
+  assert.equal(diagnosis.status, "warn");
+  assert.equal(diagnosis.dbSpanTargets[0].target, "brain.sync_conflicts");
+  assert.ok(
+    diagnosis.findings.some((finding) => finding.metricId === "server_read_p95")
+  );
 });

@@ -19,6 +19,26 @@ const DEFAULT_USAGE_WINDOWS = [
   { key: "24h", label: "24H", durationMs: 24 * 60 * 60 * 1000 },
   { key: "7d", label: "7D", durationMs: 7 * 24 * 60 * 60 * 1000 },
 ];
+export const DEFAULT_LATENCY_SLO_THRESHOLDS = Object.freeze({
+  serverReadP95WarnMs: 1000,
+  serverReadP95FailMs: 3000,
+  serverWriteP95WarnMs: 2500,
+  serverWriteP95FailMs: 6000,
+  clientReadP95WarnMs: 2000,
+  clientReadP95FailMs: 5000,
+  clientWriteP95WarnMs: 3500,
+  clientWriteP95FailMs: 8000,
+  syncWaitP95WarnMs: 10000,
+  syncWaitP95FailMs: 30000,
+  dbMaxSpanWarnMs: 500,
+  dbMaxSpanFailMs: 2500,
+  dbFailedQueryWarnCount: 1,
+});
+const STATUS_RANK = {
+  pass: 0,
+  warn: 1,
+  fail: 2,
+};
 
 function asFiniteLatency(value) {
   const number = Number(value);
@@ -236,6 +256,83 @@ function percentile(sortedValues, percentileValue) {
 
 function rounded(value) {
   return value === null ? null : Math.round(value);
+}
+
+function statusByRank(left, right) {
+  return (STATUS_RANK[right] ?? 0) > (STATUS_RANK[left] ?? 0) ? right : left;
+}
+
+function worstStatus(...statuses) {
+  return statuses.flat().filter(Boolean).reduce(statusByRank, "pass");
+}
+
+function thresholdStatus(value, warnValue, failValue) {
+  if (!Number.isFinite(Number(value))) return "pass";
+  if (Number.isFinite(Number(failValue)) && value >= failValue) return "fail";
+  if (Number.isFinite(Number(warnValue)) && value >= warnValue) return "warn";
+  return "pass";
+}
+
+function normalizeThreshold(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function durationEvaluation({
+  id,
+  label,
+  valueMs,
+  warnMs,
+  failMs,
+  sampleCount = null,
+  detail = null,
+}) {
+  if (!Number.isFinite(Number(valueMs))) return null;
+  return {
+    id,
+    label,
+    metric: "duration",
+    valueMs: rounded(valueMs),
+    warnMs: rounded(warnMs),
+    failMs: rounded(failMs),
+    sampleCount,
+    status: thresholdStatus(valueMs, warnMs, failMs),
+    detail,
+  };
+}
+
+function countEvaluation({
+  id,
+  label,
+  value,
+  warnCount,
+  sampleCount = null,
+  detail = null,
+}) {
+  if (!Number.isFinite(Number(value))) return null;
+  return {
+    id,
+    label,
+    metric: "count",
+    value: Math.max(0, Math.round(Number(value))),
+    warnCount: Math.max(0, Math.round(Number(warnCount || 0))),
+    sampleCount,
+    status: Number(value) >= Number(warnCount || 0) && Number(warnCount || 0) > 0
+      ? "warn"
+      : "pass",
+    detail,
+  };
+}
+
+function summaryByKind(summaries, kind) {
+  return (Array.isArray(summaries) ? summaries : [])
+    .find((summary) => summary.kind === kind) || null;
+}
+
+function normalizedLatencyHistory(history) {
+  return Array.isArray(history)
+    ? history.map(normalizeLatencyOperation).filter(Boolean)
+    : [];
 }
 
 function normalizedKind(kind) {
@@ -491,6 +588,259 @@ export function slowestLatencyOperations(history, limit = 10) {
       at: operation.at,
       db: operation.db || null,
     }));
+}
+
+export function normalizeLatencySloThresholds(overrides = {}) {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_LATENCY_SLO_THRESHOLDS).map(([key, value]) => [
+      key,
+      normalizeThreshold(overrides[key], value),
+    ])
+  );
+}
+
+export function evaluateLatencySlo({
+  history = [],
+  clientHistory = [],
+  thresholds = {},
+} = {}) {
+  const normalizedThresholds = normalizeLatencySloThresholds(thresholds);
+  const serverHistory = normalizedLatencyHistory(history);
+  const clientObservedHistory = normalizedLatencyHistory(clientHistory);
+  const serverSummaries = summarizeLatencyHistory(serverHistory);
+  const clientSummaries = summarizeLatencyHistory(clientObservedHistory);
+  const serverRead = summaryByKind(serverSummaries, "read");
+  const serverWrite = summaryByKind(serverSummaries, "write");
+  const syncWait = summaryByKind(serverSummaries, "sync_wait");
+  const clientRead = summaryByKind(clientSummaries, "read");
+  const clientWrite = summaryByKind(clientSummaries, "write");
+  const dbMaxValues = serverHistory
+    .map((operation) => operation.db?.maxMs)
+    .filter((value) => Number.isFinite(Number(value)));
+  const dbMaxSpanMs = dbMaxValues.length ? Math.max(...dbMaxValues) : null;
+  const dbFailedQueryCount = serverHistory.reduce(
+    (total, operation) => total + Number(operation.db?.failedCount || 0),
+    0
+  );
+  const dbQueryCount = serverHistory.reduce(
+    (total, operation) => total + Number(operation.db?.queryCount || 0),
+    0
+  );
+
+  const evaluations = [
+    durationEvaluation({
+      id: "server_read_p95",
+      label: "Server read p95",
+      valueMs: serverRead?.p95LatencyMs,
+      warnMs: normalizedThresholds.serverReadP95WarnMs,
+      failMs: normalizedThresholds.serverReadP95FailMs,
+      sampleCount: serverRead?.sampleCount ?? null,
+      detail: "Hosted MCP server handler duration for read tools.",
+    }),
+    durationEvaluation({
+      id: "server_write_p95",
+      label: "Server write p95",
+      valueMs: serverWrite?.p95LatencyMs,
+      warnMs: normalizedThresholds.serverWriteP95WarnMs,
+      failMs: normalizedThresholds.serverWriteP95FailMs,
+      sampleCount: serverWrite?.sampleCount ?? null,
+      detail: "Hosted MCP server handler duration for write tools.",
+    }),
+    durationEvaluation({
+      id: "client_read_p95",
+      label: "Client read p95",
+      valueMs: clientRead?.p95LatencyMs,
+      warnMs: normalizedThresholds.clientReadP95WarnMs,
+      failMs: normalizedThresholds.clientReadP95FailMs,
+      sampleCount: clientRead?.sampleCount ?? null,
+      detail: "Client-observed end-to-end read duration, including network and client parsing overhead.",
+    }),
+    durationEvaluation({
+      id: "client_write_p95",
+      label: "Client write p95",
+      valueMs: clientWrite?.p95LatencyMs,
+      warnMs: normalizedThresholds.clientWriteP95WarnMs,
+      failMs: normalizedThresholds.clientWriteP95FailMs,
+      sampleCount: clientWrite?.sampleCount ?? null,
+      detail: "Client-observed end-to-end write duration, including network and client parsing overhead.",
+    }),
+    durationEvaluation({
+      id: "sync_wait_p95",
+      label: "Sync wait p95",
+      valueMs: syncWait?.p95LatencyMs,
+      warnMs: normalizedThresholds.syncWaitP95WarnMs,
+      failMs: normalizedThresholds.syncWaitP95FailMs,
+      sampleCount: syncWait?.sampleCount ?? null,
+      detail: "Local-hosted propagation wait measured by smoke and test-drive flows.",
+    }),
+    durationEvaluation({
+      id: "db_max_span",
+      label: "Max DB span",
+      valueMs: dbMaxSpanMs,
+      warnMs: normalizedThresholds.dbMaxSpanWarnMs,
+      failMs: normalizedThresholds.dbMaxSpanFailMs,
+      sampleCount: dbQueryCount || null,
+      detail: "Slowest single bounded Postgres span observed inside hosted MCP server handlers.",
+    }),
+    countEvaluation({
+      id: "db_failed_queries",
+      label: "DB failed queries",
+      value: dbFailedQueryCount,
+      warnCount: normalizedThresholds.dbFailedQueryWarnCount,
+      sampleCount: dbQueryCount || null,
+      detail: "Failed Postgres spans observed inside hosted MCP server handlers.",
+    }),
+  ].filter(Boolean);
+
+  const failedCount = evaluations.filter((evaluation) => evaluation.status === "fail").length;
+  const warningCount = evaluations.filter((evaluation) => evaluation.status === "warn").length;
+
+  return {
+    status: worstStatus(evaluations.map((evaluation) => evaluation.status)),
+    thresholds: normalizedThresholds,
+    evaluations,
+    warningCount,
+    failedCount,
+  };
+}
+
+function collectDbSpanTargets(history, limit = 8) {
+  const groups = new Map();
+  const operations = normalizedLatencyHistory(history);
+  for (const operation of operations) {
+    const spans = Array.isArray(operation.db?.spans) ? operation.db.spans : [];
+    for (const span of spans) {
+      const target = span.target || span.name || "db.query";
+      const operationType = span.operation || "query";
+      const key = `${operationType}|${target}`;
+      const current = groups.get(key) || {
+        operation: operationType,
+        target,
+        spanCount: 0,
+        totalMs: 0,
+        maxMs: 0,
+        rowCount: 0,
+        failedCount: 0,
+        latestAt: null,
+        examples: [],
+      };
+
+      current.spanCount += 1;
+      current.totalMs += span.durationMs;
+      current.maxMs = Math.max(current.maxMs, span.durationMs);
+      if (Number.isFinite(Number(span.rowCount))) current.rowCount += Number(span.rowCount);
+      if (span.ok === false) current.failedCount += 1;
+      if (!current.latestAt || Date.parse(operation.at) > Date.parse(current.latestAt)) {
+        current.latestAt = operation.at;
+      }
+      current.examples.push({
+        name: operation.name,
+        kind: operation.kind,
+        target: operation.target,
+        durationMs: rounded(span.durationMs),
+        latencyMs: rounded(operation.latencyMs),
+        at: operation.at,
+        ok: span.ok !== false,
+        error: span.error || null,
+      });
+      current.examples.sort((left, right) => right.durationMs - left.durationMs);
+      current.examples.splice(3);
+      groups.set(key, current);
+    }
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      totalMs: rounded(group.totalMs),
+      averageMs: rounded(group.totalMs / Math.max(1, group.spanCount)),
+      maxMs: rounded(group.maxMs),
+    }))
+    .sort((left, right) => {
+      if (left.maxMs !== right.maxMs) return right.maxMs - left.maxMs;
+      if (left.totalMs !== right.totalMs) return right.totalMs - left.totalMs;
+      return String(left.target).localeCompare(String(right.target));
+    })
+    .slice(0, Math.max(1, Number(limit) || 8));
+}
+
+function sloFindingFromEvaluation(evaluation) {
+  if (!evaluation || evaluation.status === "pass") return null;
+  const observed = evaluation.metric === "count"
+    ? `${evaluation.value} observed`
+    : `${evaluation.valueMs}ms observed`;
+  const warn = evaluation.metric === "count"
+    ? `warn at ${evaluation.warnCount}`
+    : `warn at ${evaluation.warnMs}ms`;
+  const fail = evaluation.metric === "count"
+    ? null
+    : `fail at ${evaluation.failMs}ms`;
+  return {
+    level: evaluation.status,
+    title: `${evaluation.label} breached ${evaluation.status} threshold`,
+    detail: [observed, warn, fail, evaluation.detail].filter(Boolean).join("; "),
+    metricId: evaluation.id,
+  };
+}
+
+export function diagnoseLatencyPerformance({
+  history = [],
+  clientHistory = [],
+  thresholds = {},
+} = {}) {
+  const normalizedThresholds = normalizeLatencySloThresholds(thresholds);
+  const serverHistory = normalizedLatencyHistory(history);
+  const clientObservedHistory = normalizedLatencyHistory(clientHistory);
+  const slo = evaluateLatencySlo({
+    history: serverHistory,
+    clientHistory: clientObservedHistory,
+    thresholds: normalizedThresholds,
+  });
+  const findings = slo.evaluations
+    .map(sloFindingFromEvaluation)
+    .filter(Boolean);
+  const dbSpanTargets = collectDbSpanTargets(serverHistory);
+  const slowestDbTarget = dbSpanTargets[0] || null;
+
+  if (slowestDbTarget?.maxMs >= normalizedThresholds.dbMaxSpanWarnMs) {
+    findings.push({
+      level: slowestDbTarget.maxMs >= normalizedThresholds.dbMaxSpanFailMs
+        ? "fail"
+        : "warn",
+      title: `Slowest DB target: ${slowestDbTarget.target}`,
+      detail: `${slowestDbTarget.operation} max ${slowestDbTarget.maxMs}ms, average ${slowestDbTarget.averageMs}ms across ${slowestDbTarget.spanCount} spans.`,
+      metricId: "slowest_db_target",
+    });
+  }
+
+  const serverRead = summaryByKind(summarizeLatencyHistory(serverHistory), "read");
+  const clientRead = summaryByKind(summarizeLatencyHistory(clientObservedHistory), "read");
+  if (
+    Number.isFinite(Number(serverRead?.p95LatencyMs)) &&
+    Number.isFinite(Number(clientRead?.p95LatencyMs)) &&
+    clientRead.p95LatencyMs - serverRead.p95LatencyMs >= 1000
+  ) {
+    findings.push({
+      level: "warn",
+      title: "Client read latency is materially higher than server handler latency",
+      detail: `Client read p95 ${clientRead.p95LatencyMs}ms vs server read p95 ${serverRead.p95LatencyMs}ms. Check client/network/MCP overhead before optimizing DB paths only.`,
+      metricId: "client_server_read_gap",
+    });
+  }
+
+  return {
+    status: worstStatus([
+      slo.status,
+      findings.map((finding) => finding.level),
+    ]),
+    slo,
+    findings: findings.slice(0, 8),
+    dbSpanTargets,
+    slowestOperations: slowestLatencyOperations([
+      ...serverHistory,
+      ...clientObservedHistory,
+    ], 8),
+  };
 }
 
 export function latestSuccessfulLatency(history, kind) {

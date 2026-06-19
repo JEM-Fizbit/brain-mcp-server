@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-06-18
+**Last updated:** 2026-06-19
 
 Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
 
@@ -13,7 +13,7 @@ Use a local browser surface backed by a macOS LaunchAgent:
 - the stable local URL is `http://127.0.0.1:8787/`;
 - checks continue to come from `npm run hosted:doctor`;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
-- user-facing hosted MCP latency shows latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
+- user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
@@ -106,7 +106,7 @@ launchctl bootout "gui/$(id -u)/com.jem.brain-cockpit"
 
 Green means hosted Brain is ready for normal use.
 
-Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, pending inbox files, missing optional Fly status, or no recent measured hosted MCP latency.
+Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
@@ -130,9 +130,21 @@ Treat Postgres as the source of record and the JSON file as a fallback/cache, no
 
 The cockpit also reports aggregate operation usage from the same Postgres telemetry rows. The top-level cards show total recorded operations, operations in the last 24H, and operations in the last 7D. The Overview tab breaks those counts down by operation kind, including read, write, sync-wait, and other operational calls, with failed operations counted separately.
 
+The cockpit now applies conservative latency SLOs over the bounded telemetry window. Defaults are intentionally operator-facing rather than contractual customer promises:
+
+- server read p95 warns at `1000ms` and fails at `3000ms`;
+- server write p95 warns at `2500ms` and fails at `6000ms`;
+- client-observed read p95 warns at `2000ms` and fails at `5000ms`;
+- client-observed write p95 warns at `3500ms` and fails at `8000ms`;
+- sync-wait p95 warns at `10000ms` and fails at `30000ms`;
+- max DB span warns at `500ms` and fails at `2500ms`;
+- any failed DB span warns.
+
+Override those thresholds with `BRAIN_SLO_SERVER_READ_P95_WARN_MS`, `BRAIN_SLO_SERVER_READ_P95_FAIL_MS`, `BRAIN_SLO_SERVER_WRITE_P95_WARN_MS`, `BRAIN_SLO_SERVER_WRITE_P95_FAIL_MS`, `BRAIN_SLO_CLIENT_READ_P95_WARN_MS`, `BRAIN_SLO_CLIENT_READ_P95_FAIL_MS`, `BRAIN_SLO_CLIENT_WRITE_P95_WARN_MS`, `BRAIN_SLO_CLIENT_WRITE_P95_FAIL_MS`, `BRAIN_SLO_SYNC_WAIT_P95_WARN_MS`, `BRAIN_SLO_SYNC_WAIT_P95_FAIL_MS`, `BRAIN_SLO_DB_MAX_SPAN_WARN_MS`, `BRAIN_SLO_DB_MAX_SPAN_FAIL_MS`, and `BRAIN_SLO_DB_FAILED_QUERY_WARN_COUNT`. The SLO layer does not write telemetry or add a background metrics job. It evaluates the same bounded rows already read by `hosted:doctor`.
+
 The Activity tab separates content-state activity from operation telemetry with an in-tab sub-menu rather than stacked sections. Operation Log, Recent Brain Activity, and Cockpit Watch each get the full content width and are reachable from the top of the tab. Operation Log is the primary troubleshooting feed: a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Operation Log is a compact table with one row per operation: tool name, latency, operation kind, timing layer, status, safe target metadata, telemetry source, DB summary, and timestamp. Rows with DB spans expose a bounded drill-down table with operation, target, duration, row count, and status. Recent Brain Activity shows Brain state changes, such as file revisions and conflict open/resolution events. Cockpit Watch is local to the open browser session and reports refresh-observed status, sync, and conflict-count changes.
 
-The Latency tab uses its own in-tab sub-menu so performance views do not stack vertically. Operation Trends shows the high-level latency cards:
+The Latency tab uses its own in-tab sub-menu so performance views do not stack vertically. SLOs & Findings is the first view: it shows each threshold, pass/warn/fail status, observed value, warning/failure cutoffs, sample count, performance findings, and DB span hotspots when available. Operation Trends shows the high-level latency cards:
 
 - timing layers: server tool handler, client-observed end-to-end, and sync wait;
 - operation kinds: read, write, sync wait, and other operational calls;

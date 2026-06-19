@@ -6,10 +6,12 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
+  diagnoseLatencyPerformance,
   HOSTED_MCP_LATENCY_EVENT_TYPE,
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
   latestSuccessfulLatency,
+  normalizeLatencySloThresholds,
   operationEventLogFromSyncEventRows,
   operationKindLabel,
   slowestLatencyOperations,
@@ -58,11 +60,50 @@ const maxSyncHealthAgeMs = Number(
   process.env.BRAIN_SYNC_HEALTH_MAX_AGE_MS || 2 * 60 * 1000
 );
 const lintNudgeDays = Number(process.env.BRAIN_LINT_NUDGE_DAYS || 30);
+const latencySloThresholds = normalizeLatencySloThresholds({
+  serverReadP95WarnMs: numericEnv("BRAIN_SLO_SERVER_READ_P95_WARN_MS"),
+  serverReadP95FailMs: numericEnv("BRAIN_SLO_SERVER_READ_P95_FAIL_MS"),
+  serverWriteP95WarnMs: numericEnv("BRAIN_SLO_SERVER_WRITE_P95_WARN_MS"),
+  serverWriteP95FailMs: numericEnv("BRAIN_SLO_SERVER_WRITE_P95_FAIL_MS"),
+  clientReadP95WarnMs: numericEnv("BRAIN_SLO_CLIENT_READ_P95_WARN_MS"),
+  clientReadP95FailMs: numericEnv("BRAIN_SLO_CLIENT_READ_P95_FAIL_MS"),
+  clientWriteP95WarnMs: numericEnv("BRAIN_SLO_CLIENT_WRITE_P95_WARN_MS"),
+  clientWriteP95FailMs: numericEnv("BRAIN_SLO_CLIENT_WRITE_P95_FAIL_MS"),
+  syncWaitP95WarnMs: numericEnv("BRAIN_SLO_SYNC_WAIT_P95_WARN_MS"),
+  syncWaitP95FailMs: numericEnv("BRAIN_SLO_SYNC_WAIT_P95_FAIL_MS"),
+  dbMaxSpanWarnMs: numericEnv("BRAIN_SLO_DB_MAX_SPAN_WARN_MS"),
+  dbMaxSpanFailMs: numericEnv("BRAIN_SLO_DB_MAX_SPAN_FAIL_MS"),
+  dbFailedQueryWarnCount: numericEnv("BRAIN_SLO_DB_FAILED_QUERY_WARN_COUNT"),
+});
+const CHECK_STATUS_RANK = {
+  pass: 0,
+  warn: 1,
+  fail: 2,
+};
 
 const checks = [];
 
 function addCheck(name, status, details = {}) {
   checks.push({ name, status, details });
+}
+
+function numericEnv(name) {
+  if (process.env[name] === undefined || process.env[name] === "") return undefined;
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function combineCheckStatuses(...statuses) {
+  return statuses
+    .flat()
+    .filter(Boolean)
+    .reduce(
+      (current, next) =>
+        (CHECK_STATUS_RANK[next] ?? 0) > (CHECK_STATUS_RANK[current] ?? 0)
+          ? next
+          : current,
+      "pass"
+    );
 }
 
 function lastCheckByName(name) {
@@ -652,8 +693,13 @@ function addUserOperationLatencyCheck({
   const slowestOperations = slowestLatencyOperations([...history, ...clientHistory]);
   const operations = history.slice(-12).reverse();
   const clientOperations = clientHistory.slice(-12).reverse();
+  const performance = diagnoseLatencyPerformance({
+    history,
+    clientHistory,
+    thresholds: latencySloThresholds,
+  });
 
-  addCheck("user_operation_latency", status, {
+  addCheck("user_operation_latency", combineCheckStatuses(status, performance.status), {
     source,
     telemetrySource,
     latencyFile,
@@ -678,6 +724,10 @@ function addUserOperationLatencyCheck({
     timingLayerSummaries,
     toolSummaries,
     slowestOperations,
+    performanceStatus: performance.status,
+    slo: performance.slo,
+    performanceFindings: performance.findings,
+    dbSpanTargets: performance.dbSpanTargets,
     operations,
     clientOperations,
   });
@@ -830,6 +880,7 @@ function buildOperatorActions(status) {
   const launchd = checkByName("launchd");
   const lint = checkByName("lint_nudge");
   const inbox = checkByName("inbox");
+  const latency = checkByName("user_operation_latency");
 
   const openConflicts = postgres?.details?.openConflicts || 0;
   if (openConflicts > 0) {
@@ -878,12 +929,25 @@ function buildOperatorActions(status) {
     });
   }
 
+  const latencyFinding = (latency?.details?.performanceFindings || [])
+    .find((finding) => finding.level === "fail") ||
+    (latency?.details?.performanceFindings || [])
+      .find((finding) => finding.level === "warn");
+  if (latencyFinding) {
+    actions.push({
+      level: latencyFinding.level,
+      title: "Investigate hosted Brain latency.",
+      detail: `${latencyFinding.title}. ${latencyFinding.detail}`,
+    });
+  }
+
   const handledWarnings = new Set([
     "sync_health",
     "launchd",
     "lint_nudge",
     "inbox",
   ]);
+  if (latencyFinding) handledWarnings.add("user_operation_latency");
   for (const check of checks.filter((check) => check.status === "warn")) {
     if (handledWarnings.has(check.name)) continue;
     actions.push({
@@ -895,6 +959,7 @@ function buildOperatorActions(status) {
 
   for (const check of checks.filter((check) => check.status === "fail")) {
     if (check.name === "sync_health") continue;
+    if (check.name === "user_operation_latency" && latencyFinding) continue;
     actions.push({
       level: "fail",
       title: `${check.name} failed.`,
