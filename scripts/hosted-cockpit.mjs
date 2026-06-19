@@ -632,7 +632,7 @@ const page = String.raw`<!doctype html>
 
             <section>
               <h2>Operation Log</h2>
-              <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, safe target, status, latency, and timestamp.</div>
+              <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
               <div class="activity-list" id="operation-events"></div>
             </section>
 
@@ -648,6 +648,7 @@ const page = String.raw`<!doctype html>
           <div class="activity-grid">
             <section>
               <h2>User-Facing Operations</h2>
+              <div class="section-note">Layered latency view: countable server tool calls, client-observed end-to-end samples, exact tool summaries, and bounded DB spans.</div>
               <div class="activity-list" id="user-operation-latencies"></div>
             </section>
 
@@ -709,6 +710,7 @@ const page = String.raw`<!doctype html>
         "latestSyncWaitLatencyMs",
         "operationCount",
         "historyCount",
+        "clientHistoryCount",
         "lastLintAt",
         "ageDays",
         "maxAgeDays",
@@ -978,11 +980,14 @@ const page = String.raw`<!doctype html>
         document.getElementById("operation-events").innerHTML = events.length
           ? events.map((event) => {
               const status = event.ok ? "ok" : "failed";
+              const dbMeta = dbSummaryLabel(event.db);
               const meta = [
                 operationKindLabel(event.kind),
+                timingLayerLabel(event.timingLayer),
                 event.target || event.filename || "-",
                 status,
                 event.source || details.telemetrySource || details.source || "-",
+                dbMeta,
                 localDateTime(event.at),
                 event.error || null,
               ].filter(Boolean).join(" · ");
@@ -1047,6 +1052,24 @@ const page = String.raw`<!doctype html>
         return kind || "operation";
       }
 
+      function timingLayerLabel(layer) {
+        if (layer === "server_tool") return "server tool";
+        if (layer === "client_e2e") return "client E2E";
+        if (layer === "sync_wait") return "sync wait";
+        return layer || "unknown layer";
+      }
+
+      function dbSummaryLabel(db) {
+        if (!db || !Number(db.queryCount)) return null;
+        const parts = [
+          "db " + formatCount(db.queryCount) + "q",
+          formatDuration(db.totalMs),
+          db.maxMs !== undefined && db.maxMs !== null ? "max " + formatDuration(db.maxMs) : null,
+          db.failedCount ? formatCount(db.failedCount) + " db failed" : null,
+        ].filter(Boolean);
+        return parts.join("/");
+      }
+
       function formatDelta(ms) {
         const value = Number(ms);
         if (!Number.isFinite(value)) return "-";
@@ -1096,9 +1119,12 @@ const page = String.raw`<!doctype html>
           const failed = Number(summary.failedCount || 0);
           const delta = trendDelta(summary);
           const trendCopy = delta === null ? "trend pending" : "recent trend " + formatDelta(delta);
+          const dbMeta = dbSummaryLabel(summary.db);
           const meta = [
             "n=" + (summary.sampleCount ?? 0),
+            summary.timingLayer ? timingLayerLabel(summary.timingLayer) : null,
             trendCopy,
+            dbMeta,
             summary.latestAt ? "latest " + ageLabel(summary.latestAt) : null,
             failed ? failed + " failed" : null,
           ].filter(Boolean).join(" · ");
@@ -1122,6 +1148,44 @@ const page = String.raw`<!doctype html>
         }).join("") + "</div>";
       }
 
+      function renderSlowestOperations(operations) {
+        const rows = Array.isArray(operations) ? operations : [];
+        if (rows.length === 0) return "";
+        return "<div class=\"recent-heading\">Slowest Operations</div>" + rows.map((operation) => {
+          const meta = [
+            operationKindLabel(operation.kind),
+            timingLayerLabel(operation.timingLayer),
+            operation.target || "-",
+            dbSummaryLabel(operation.db),
+            localDateTime(operation.at),
+          ].filter(Boolean).join(" · ");
+          return "<div class=\"event\">" +
+            "<div class=\"event-title\">" + escapeHtml(operation.name || "operation") + ": " + escapeHtml(formatDuration(operation.latencyMs)) + "</div>" +
+            "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+          "</div>";
+        }).join("");
+      }
+
+      function renderRecentSamples(title, operations) {
+        const rows = Array.isArray(operations) ? operations : [];
+        if (rows.length === 0) return "";
+        return "<div class=\"recent-heading\">" + escapeHtml(title) + "</div>" + rows.map((operation) => {
+          const meta = [
+            operationKindLabel(operation.kind),
+            timingLayerLabel(operation.timingLayer),
+            operation.target || "-",
+            operation.ok ? "ok" : "failed",
+            dbSummaryLabel(operation.db),
+            localDateTime(operation.at),
+            operation.error || null,
+          ].filter(Boolean).join(" · ");
+          return "<div class=\"event\">" +
+            "<div class=\"event-title\">" + escapeHtml(operation.name) + ": " + escapeHtml(formatDuration(operation.latencyMs)) + "</div>" +
+            "<div class=\"event-meta\">" + escapeHtml(meta) + "</div>" +
+          "</div>";
+        }).join("");
+      }
+
       function latencySummaryByKind(details, kind) {
         return (details.operationSummaries || []).find((summary) => summary.kind === kind) || null;
       }
@@ -1133,15 +1197,23 @@ const page = String.raw`<!doctype html>
       function renderUserOperationLatencies(payload) {
         const details = byName(payload, "user_operation_latency")?.details || {};
         const operations = details.operations || [];
+        const clientOperations = details.clientOperations || [];
         const summaries = details.operationSummaries || [];
+        const clientSummaries = details.clientOperationSummaries || [];
+        const layerSummaries = details.timingLayerSummaries || [];
+        const toolSummaries = details.toolSummaries || [];
+        const slowestOperations = details.slowestOperations || [];
         const recordedAt = details.latestOperationAt || details.checkedAt;
         const historySource = details.source === "postgres"
-          ? (details.telemetrySource === "hosted_mcp_server_plus_sync_wait"
-              ? "hosted MCP telemetry history"
+          ? (String(details.telemetrySource || "").includes("hosted_mcp_server")
+              ? "hosted MCP server telemetry"
               : "Postgres telemetry history")
           : "fallback latency cache";
+        const clientCopy = details.clientHistoryCount
+          ? " Client-observed samples are shown separately because they include network and client parsing overhead."
+          : "";
         const intro = details.state === "recorded"
-          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Averages use the bounded " + historySource + "."
+          ? "Latest recorded hosted MCP operation: " + localDateTime(recordedAt) + ". Counted operations use bounded " + historySource + "." + clientCopy
           : "No hosted MCP operation timing has been recorded yet. Run the hosted OAuth smoke or a measured client operation.";
 
         const summaryRows = [
@@ -1157,23 +1229,29 @@ const page = String.raw`<!doctype html>
             "</div>"
           : "<div class=\"event muted\">" + escapeHtml(intro) + "</div>";
 
-        const cards = renderLatencySummaryCards(summaries);
-        const rows = operations.length
-          ? "<div class=\"recent-heading\">Recent Samples</div>" + operations.map((operation) =>
-              "<div class=\"event\">" +
-                "<div class=\"event-title\">" + escapeHtml(operation.name) + ": " + escapeHtml(formatDuration(operation.latencyMs)) + "</div>" +
-                "<div class=\"event-meta\">" +
-                  escapeHtml(operationKindLabel(operation.kind)) + " · " +
-                  escapeHtml(operation.target || "-") + " · " +
-                  escapeHtml(operation.ok ? "ok" : "failed") + " · " +
-                  escapeHtml(localDateTime(operation.at)) +
-                  (operation.error ? " · " + escapeHtml(operation.error) : "") +
-                "</div>" +
-              "</div>"
-            ).join("")
+        const layerCards = layerSummaries.length
+          ? "<div class=\"recent-heading\">Timing Layers</div>" + renderLatencySummaryCards(layerSummaries)
           : "";
+        const kindCards = summaries.length
+          ? "<div class=\"recent-heading\">Operation Kinds</div>" + renderLatencySummaryCards(summaries)
+          : "";
+        const clientCards = clientSummaries.length
+          ? "<div class=\"recent-heading\">Client-Observed E2E</div>" + renderLatencySummaryCards(clientSummaries)
+          : "";
+        const toolCards = toolSummaries.length
+          ? "<div class=\"recent-heading\">By Tool</div>" + renderLatencySummaryCards(toolSummaries)
+          : "";
+        const rows = renderRecentSamples("Recent Server Samples", operations) +
+          renderRecentSamples("Recent Client E2E Samples", clientOperations);
 
-        document.getElementById("user-operation-latencies").innerHTML = summary + cards + rows;
+        document.getElementById("user-operation-latencies").innerHTML =
+          summary +
+          layerCards +
+          kindCards +
+          clientCards +
+          toolCards +
+          renderSlowestOperations(slowestOperations) +
+          rows;
       }
 
       function render(payload) {

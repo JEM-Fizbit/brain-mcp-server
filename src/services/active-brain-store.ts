@@ -5,6 +5,7 @@ import { RevisionBrainStore } from "./revision-brain-store.js";
 import { revisionBrainStoreFromFile } from "./revision-brain-store.js";
 import { PostgresRevisionStore } from "../sync/postgres-revision-store.js";
 import { PostgresSourceMetadataStore } from "../sources/postgres-source-store.js";
+import { instrumentPostgresPool } from "./operation-telemetry.js";
 
 const { Pool } = pg;
 
@@ -52,7 +53,10 @@ export function activeBrainStore(): BrainStore {
         "BRAIN_REVISION_DATABASE_URL is required when BRAIN_REVISION_STORE=postgres"
       );
     }
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = instrumentPostgresPool(
+      new Pool({ connectionString: databaseUrl }),
+      "brain_runtime"
+    );
     store = new RevisionBrainStore(
       new PostgresRevisionStore(pool),
       new PostgresSourceMetadataStore(pool)

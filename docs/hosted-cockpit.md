@@ -114,11 +114,11 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 
 ## Latency Trend Semantics
 
-The cockpit does not run hidden writes just to refresh charts. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls.
+The cockpit does not run hidden writes just to refresh charts. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls. The telemetry write is best-effort and non-blocking by default, so recording a sample should not add response latency. Set `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only when deliberately diagnosing the telemetry write path itself.
 
-Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency` and metadata source `hosted_mcp_server`. The telemetry row records tool name, operation kind, safe target metadata such as filename or category, latency, and success/failure state; it does not record file content, patch text, source content, or search query text. The cockpit reads server-emitted Postgres rows first when `BRAIN_REVISION_DATABASE_URL` is configured.
+Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency` and metadata source `hosted_mcp_server`. Server rows use `timingLayer = "server_tool"` and `durationType = "server_tool_handler"`. The telemetry row records tool name, operation kind, safe target metadata such as filename or category, latency, success/failure state, and a bounded DB summary when Postgres work occurred. DB spans record sanitized operation/table names, duration, row count, status, and bounded error text. They do not record SQL text, SQL parameters, file content, patch text, source content, or search query text. The cockpit reads server-emitted Postgres rows first when `BRAIN_REVISION_DATABASE_URL` is configured.
 
-Sync-wait latency is measured by `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`, because it measures local-hosted propagation rather than one server tool handler. Those flows write `sync_wait` rows by default. For end-to-end client timing diagnostics of all tool calls, set `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=1`; those rows are a compatibility/diagnostic fallback, not the normal read/write source.
+Sync-wait latency is measured by `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`, because it measures local-hosted propagation rather than one server tool handler. Those flows write `sync_wait` rows by default. The same smoke/test-drive flows also write client-observed end-to-end samples by default with metadata source `hosted_mcp_client_e2e` and `timingLayer = "client_e2e"`. These rows include client/network/MCP response parsing overhead and are reported separately from countable server tool calls to avoid double-counting usage. Disable those diagnostic client rows with `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=0`.
 
 If Postgres is unavailable, or if `BRAIN_HOSTED_MCP_LATENCY_CACHE=1` is set, the smoke flow writes a bounded fallback cache to:
 
@@ -130,15 +130,16 @@ Treat Postgres as the source of record and the JSON file as a fallback/cache, no
 
 The cockpit also reports aggregate operation usage from the same Postgres telemetry rows. The top-level cards show total recorded operations, operations in the last 24H, and operations in the last 7D. The Overview tab breaks those counts down by operation kind, including read, write, sync-wait, and other operational calls, with failed operations counted separately.
 
-The Activity tab separates content-state activity from operation telemetry. Recent Brain Activity shows Brain state changes, such as file revisions and conflict open/resolution events. Operation Log is the event log: a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Rows include tool name, operation kind, safe target metadata, source, success/failure state, timestamp, and latency. Cockpit Watch is local to the open browser session and reports refresh-observed status, sync, and conflict-count changes.
+The Activity tab separates content-state activity from operation telemetry. Recent Brain Activity shows Brain state changes, such as file revisions and conflict open/resolution events. Operation Log is the event log: a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Rows include tool name, operation kind, timing layer, safe target metadata, source, success/failure state, timestamp, latency, and DB summary when present. Cockpit Watch is local to the open browser session and reports refresh-observed status, sync, and conflict-count changes.
 
-The Latency tab groups successful samples into three operator-level buckets:
+The Latency tab groups successful samples into several operator views:
 
-- read operations;
-- write operations;
-- sync wait operations.
+- timing layers: server tool handler, client-observed end-to-end, and sync wait;
+- operation kinds: read, write, sync wait, and other operational calls;
+- exact tools, sorted by the slowest p95 values in the bounded history;
+- slowest individual operations in the current bounded sample set.
 
-For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
+For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, DB contribution when present, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
 
 Refresh remains read-only. The additional usage and operation-log views use bounded server-side Postgres reads over the existing telemetry table. They do not add hidden writes, a metrics daemon, another datastore, or a separate analytics service.
 

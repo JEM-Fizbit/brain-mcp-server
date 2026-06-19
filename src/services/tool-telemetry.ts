@@ -9,6 +9,12 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import { revisionStoreProvider } from "./active-brain-store.js";
 import { resolveToolBrain } from "./request-context.js";
+import {
+  createOperationTelemetryContext,
+  runWithOperationTelemetry,
+  summarizeOperationTelemetry,
+  type DbTelemetrySummary,
+} from "./operation-telemetry.js";
 
 const { Pool } = pg;
 
@@ -140,6 +146,7 @@ async function recordToolLatency(input: {
   durationMs: number;
   ok: boolean;
   error?: string | null;
+  dbTelemetry?: DbTelemetrySummary;
 }): Promise<void> {
   if (!telemetryEnabled()) return;
   const pool = telemetryPool();
@@ -150,12 +157,16 @@ async function recordToolLatency(input: {
   const kind = classifyToolOperation(input.toolName, input.args);
   const target = targetForToolOperation(input.toolName, input.args);
   const metadata = {
+    version: 3,
     source: "hosted_mcp_server",
+    timingLayer: "server_tool",
+    durationType: "server_tool_handler",
     name: input.toolName,
     kind,
     target,
     ok: input.ok,
     error: input.error || null,
+    db: input.dbTelemetry || null,
   };
 
   try {
@@ -186,9 +197,25 @@ async function recordToolLatency(input: {
   }
 }
 
+function recordToolLatencyBestEffort(input: {
+  toolName: string;
+  args: unknown;
+  extra: ToolExtra;
+  durationMs: number;
+  ok: boolean;
+  error?: string | null;
+  dbTelemetry?: DbTelemetrySummary;
+}): Promise<void> | void {
+  const write = recordToolLatency(input);
+  if (process.env.BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE === "1") return write;
+  write.catch(() => undefined);
+  return undefined;
+}
+
 function wrapToolCallback(toolName: string, callback: ToolCallbackLike): ToolCallbackLike {
   return async (argsOrExtra: unknown, maybeExtra?: unknown) => {
     const startedAt = performance.now();
+    const telemetryContext = createOperationTelemetryContext();
     const hasArgs = maybeExtra !== undefined;
     const args = hasArgs ? argsOrExtra : {};
     const extra = (hasArgs ? maybeExtra : argsOrExtra) as ToolExtra;
@@ -196,21 +223,26 @@ function wrapToolCallback(toolName: string, callback: ToolCallbackLike): ToolCal
     let thrown: unknown;
 
     try {
-      result = await callback(argsOrExtra, maybeExtra);
+      result = await runWithOperationTelemetry(telemetryContext, () =>
+        Promise.resolve(callback(argsOrExtra, maybeExtra))
+      );
       return result;
     } catch (error) {
       thrown = error;
       throw error;
     } finally {
       const isErrorResult = toolReturnedError(result);
-      await recordToolLatency({
+      const operationTelemetry = summarizeOperationTelemetry(telemetryContext);
+      const maybeWrite = recordToolLatencyBestEffort({
         toolName,
         args,
         extra,
         durationMs: performance.now() - startedAt,
         ok: !thrown && !isErrorResult,
         error: thrown ? errorMessage(thrown) : isErrorResult ? "tool_returned_error" : null,
+        dbTelemetry: operationTelemetry.db,
       });
+      if (maybeWrite) await maybeWrite;
     }
   };
 }

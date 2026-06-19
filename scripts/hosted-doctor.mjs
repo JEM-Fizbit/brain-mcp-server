@@ -12,8 +12,11 @@ import {
   latestSuccessfulLatency,
   operationEventLogFromSyncEventRows,
   operationKindLabel,
+  slowestLatencyOperations,
   summarizeOperationUsage,
   summarizeLatencyHistory,
+  summarizeLatencyHistoryByTimingLayer,
+  summarizeLatencyHistoryByTool,
 } from "./lib/latency-summary.mjs";
 
 loadLocalEnv();
@@ -356,20 +359,27 @@ async function checkUserOperationLatency() {
     try {
       const pool = new Pool({ connectionString: databaseUrl });
       try {
+        const primarySourceFilter =
+          "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')";
+        const clientSourceFilter =
+          "and metadata->>'source' in ('hosted_mcp_client_e2e', 'smoke-hosted-oauth')";
         const serverTelemetry = await readPostgresOperationTelemetry(
           pool,
-          "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')"
+          primarySourceFilter
         );
+        const clientTelemetry = await readPostgresOperationTelemetry(pool, clientSourceFilter);
         const history = serverTelemetry.history;
-        if (history.length > 0) {
+        const clientHistory = clientTelemetry.history;
+        if (history.length > 0 || clientHistory.length > 0) {
           addUserOperationLatencyCheck({
             source: "postgres",
-            telemetrySource: "hosted_mcp_server_plus_sync_wait",
-            checkedAt: history.at(-1)?.at || null,
+            telemetrySource: "hosted_mcp_server_plus_sync_wait_plus_client_e2e",
+            checkedAt: latestAt([history, clientHistory]),
             history,
+            clientHistory,
             operationCount: history.length,
             usageStats: serverTelemetry.usageStats,
-            eventLog: serverTelemetry.eventLog,
+            eventLog: mergeEventLogs(serverTelemetry.eventLog, clientTelemetry.eventLog),
           });
           return;
         }
@@ -500,6 +510,23 @@ function operationLogRowsQuery(sourceFilter) {
   `;
 }
 
+function latestAt(histories) {
+  return histories
+    .flat()
+    .map((operation) => operation.at)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+}
+
+function mergeEventLogs(...logs) {
+  return logs
+    .flat()
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
+    .slice(0, userOperationEventLogLimit);
+}
+
 async function readPostgresOperationTelemetry(pool, sourceFilter) {
   const eventLogCutoff = new Date(
     Date.now() - userOperationEventLogWindowDays * 24 * 60 * 60 * 1000
@@ -591,9 +618,9 @@ function eventLogFromHistory(history, source) {
     .reverse()
     .map((operation) => ({
       eventType: HOSTED_MCP_LATENCY_EVENT_TYPE,
-      source,
       filename: operation.target?.endsWith(".md") ? operation.target : null,
       ...operation,
+      source: operation.source || source,
     }));
 }
 
@@ -609,13 +636,22 @@ function addUserOperationLatencyCheck({
   latestSyncWaitLatencyMs,
   operationCount,
   history,
+  clientHistory = [],
   usageStats,
   eventLog,
   postgresState,
   postgresError,
 }) {
   const operationSummaries = summarizeLatencyHistory(history);
+  const clientOperationSummaries = summarizeLatencyHistory(clientHistory);
+  const timingLayerSummaries = summarizeLatencyHistoryByTimingLayer([
+    ...history,
+    ...clientHistory,
+  ]);
+  const toolSummaries = summarizeLatencyHistoryByTool([...history, ...clientHistory]);
+  const slowestOperations = slowestLatencyOperations([...history, ...clientHistory]);
   const operations = history.slice(-12).reverse();
+  const clientOperations = clientHistory.slice(-12).reverse();
 
   addCheck("user_operation_latency", status, {
     source,
@@ -625,19 +661,25 @@ function addUserOperationLatencyCheck({
     postgresState,
     postgresError,
     checkedAt,
-    latestOperationAt: latestOperationAt || history.at(-1)?.at || null,
+    latestOperationAt: latestOperationAt || latestAt([history, clientHistory]),
     latestReadLatencyMs: latestReadLatencyMs ?? latestSuccessfulLatency(history, "read"),
     latestWriteLatencyMs: latestWriteLatencyMs ?? latestSuccessfulLatency(history, "write"),
     latestSyncWaitLatencyMs:
       latestSyncWaitLatencyMs ?? latestSuccessfulLatency(history, "sync_wait"),
     operationCount: operationCount ?? operations.length,
     historyCount: history.length,
+    clientHistoryCount: clientHistory.length,
     usageStats: usageStats || summarizeOperationUsage(history),
     eventLogWindowDays: userOperationEventLogWindowDays,
     eventLogLimit: userOperationEventLogLimit,
     eventLog: eventLog || eventLogFromHistory(history, source),
     operationSummaries,
+    clientOperationSummaries,
+    timingLayerSummaries,
+    toolSummaries,
+    slowestOperations,
     operations,
+    clientOperations,
   });
 }
 

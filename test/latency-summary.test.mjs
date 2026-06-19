@@ -6,8 +6,11 @@ import {
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
   operationEventLogFromSyncEventRows,
+  slowestLatencyOperations,
   summarizeOperationUsage,
   summarizeLatencyHistory,
+  summarizeLatencyHistoryByTimingLayer,
+  summarizeLatencyHistoryByTool,
 } from "../scripts/lib/latency-summary.mjs";
 
 const previousSnapshot = {
@@ -144,13 +147,16 @@ test("latency snapshot preserves legacy fields while adding history summaries", 
     checkedAt: "2026-06-18T10:02:06.000Z",
   });
 
-  assert.equal(snapshot.version, 2);
+  assert.equal(snapshot.version, 3);
   assert.equal(snapshot.latestReadLatencyMs, 500);
   assert.equal(snapshot.latestWriteLatencyMs, 1200);
   assert.equal(snapshot.latestSyncWaitLatencyMs, 6400);
   assert.equal(snapshot.historyCount, 4);
   assert.equal(snapshot.operations.length, 2);
   assert.ok(snapshot.operationSummaries.some((summary) => summary.kind === "sync_wait"));
+  assert.ok(snapshot.timingLayerSummaries.some((summary) => summary.timingLayer === "unknown"));
+  assert.ok(snapshot.toolSummaries.some((summary) => summary.name === "brain_list_conflicts"));
+  assert.ok(snapshot.slowestOperations.some((operation) => operation.name === "hosted_to_local_sync"));
 });
 
 test("latency history can be built from Postgres sync_events rows", () => {
@@ -161,10 +167,31 @@ test("latency history can be built from Postgres sync_events rows", () => {
       duration_ms: "510",
       created_at: new Date("2026-06-18T10:03:00.000Z"),
       metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "server_tool",
         name: "brain_read_file",
         kind: "read",
         target: "NOW.md",
         ok: true,
+        db: {
+          queryCount: 1,
+          totalMs: 12.5,
+          averageMs: 12.5,
+          maxMs: 12.5,
+          rowCount: 1,
+          failedCount: 0,
+          truncatedCount: 0,
+          spans: [
+            {
+              name: "brain_runtime.select:brain.brain_files+brain.brain_file_revisions",
+              operation: "select",
+              target: "brain.brain_files+brain.brain_file_revisions",
+              durationMs: 12.5,
+              ok: true,
+              rowCount: 1,
+            },
+          ],
+        },
       },
     },
     {
@@ -185,8 +212,71 @@ test("latency history can be built from Postgres sync_events rows", () => {
   assert.equal(history.length, 2);
   assert.equal(history[0].latencyMs, 510);
   assert.equal(history[0].target, "NOW.md");
+  assert.equal(history[0].source, "hosted_mcp_server");
+  assert.equal(history[0].timingLayer, "server_tool");
+  assert.equal(history[0].db.queryCount, 1);
+  assert.equal(history[0].db.spans[0].operation, "select");
   assert.equal(history[1].ok, false);
   assert.equal(history[1].error, "conflict");
+});
+
+test("latency summaries separate timing layers, exact tools, slowest operations, and DB contribution", () => {
+  const history = latencyHistoryFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "220",
+      created_at: "2026-06-18T10:03:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "server_tool",
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+        db: {
+          queryCount: 1,
+          totalMs: 25,
+          averageMs: 25,
+          maxMs: 25,
+          rowCount: 1,
+          failedCount: 0,
+          truncatedCount: 0,
+          spans: [],
+        },
+      },
+    },
+    {
+      event_type: "hosted_mcp_latency",
+      filename: "NOW.md",
+      duration_ms: "360",
+      created_at: "2026-06-18T10:03:01.000Z",
+      metadata: {
+        source: "hosted_mcp_client_e2e",
+        timingLayer: "client_e2e",
+        durationType: "client_observed_tool_call",
+        name: "brain_read_file",
+        kind: "read",
+        target: "NOW.md",
+        ok: true,
+      },
+    },
+  ]);
+
+  const layerSummaries = summarizeLatencyHistoryByTimingLayer(history);
+  const toolSummaries = summarizeLatencyHistoryByTool(history);
+  const slowest = slowestLatencyOperations(history);
+
+  assert.deepEqual(
+    layerSummaries.map((summary) => summary.timingLayer),
+    ["server_tool", "client_e2e"]
+  );
+  assert.equal(
+    toolSummaries.find((summary) => summary.timingLayer === "server_tool").db.queryCount,
+    1
+  );
+  assert.equal(slowest[0].timingLayer, "client_e2e");
+  assert.equal(slowest[0].latencyMs, 360);
 });
 
 test("operation usage summarizes all-time and fixed-window counts", () => {
