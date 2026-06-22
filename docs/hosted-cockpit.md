@@ -13,6 +13,7 @@ Use a local browser surface backed by a macOS LaunchAgent:
 - the stable local URL is `http://127.0.0.1:8787/`;
 - checks continue to come from `npm run hosted:doctor`;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
+- the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
 - user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
