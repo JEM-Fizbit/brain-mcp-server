@@ -37,6 +37,8 @@ docs/security/hosted-brain-supabase-security-gate.md
 
 Migration `003` creates a no-login `brain_runtime` role with Brain-schema table grants and matching RLS policies. Create a separate login role/user for the hosted runtime, grant it membership in `brain_runtime`, and use that login in `BRAIN_REVISION_DATABASE_URL`. For Supabase pooler URLs, preserve the tenant suffix in the username format, for example `brain_runtime_user.<project-ref>`. Keep the database owner and Supabase service-role database credentials for administration only.
 
+> **`BRAIN_REVISION_DATABASE_URL` must use the Supabase _transaction_ pooler (port `6543`), not the _session_ pooler (port `5432`).** The runtime is a long-running server with a `pg.Pool`, and it shares the project's pooler client budget with the always-on local sync daemon and operator scripts. Session mode has a hard client cap (`pool_size`, ~15) and exhausts under that combined load with `EMAXCONNSESSION: max clients reached in session mode` (user-visible as failed Brain writes). The transaction pooler multiplexes short-lived clients and removes the ceiling; the code is compatible (client-scoped `begin`/`commit`, no named prepared statements / session GUCs / advisory locks / `LISTEN`). A secret reset that reverts this to `:5432` will re-trigger the outage — keep it on `:6543`. Also keep `BRAIN_PG_POOL_MAX` (default 4) modest so the hosted runtime pool + telemetry pool + local sync pool sum well under the budget. Background and rationale: `ai-knowledge/protocols/SUPABASE_BEST_PRACTICES.md` § Connection Pooler Configuration.
+
 Create or update a GitHub OAuth app for the hosted callback:
 
 ```text
