@@ -20,6 +20,7 @@ import {
   summarizeLatencyHistoryByTimingLayer,
   summarizeLatencyHistoryByTool,
 } from "./lib/latency-summary.mjs";
+import { classifyPoolerUrl } from "../dist/services/pooler.js";
 
 loadLocalEnv();
 
@@ -177,7 +178,7 @@ async function checkPostgresSummary() {
     return;
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = new Pool({ max: 2, connectionString: databaseUrl });
   try {
     const result = await pool.query(
       `
@@ -219,7 +220,7 @@ async function checkRecentActivity() {
     return;
   }
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = new Pool({ max: 2, connectionString: databaseUrl });
   try {
     const result = await pool.query(
       `
@@ -398,7 +399,7 @@ async function checkUserOperationLatency() {
   let postgresFallback = null;
   if (databaseUrl) {
     try {
-      const pool = new Pool({ connectionString: databaseUrl });
+      const pool = new Pool({ max: 2, connectionString: databaseUrl });
       try {
         const primarySourceFilter =
           "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')";
@@ -978,6 +979,58 @@ function buildOperatorActions(status) {
   return actions;
 }
 
+async function checkPoolerConfig() {
+  const poolMax = Number(process.env.BRAIN_PG_POOL_MAX) || 4;
+  const classification = classifyPoolerUrl(databaseUrl);
+
+  if (process.env.BRAIN_REVISION_STORE !== "postgres" || !databaseUrl) {
+    addCheck("pooler_config", "pass", {
+      revisionStore: process.env.BRAIN_REVISION_STORE || "filesystem",
+      mode: classification.mode,
+      note: "postgres revision store not active; pooler config not applicable",
+    });
+    return;
+  }
+
+  // Live headroom: how many backend connections the runtime role currently
+  // holds across all clients. max:1 so this probe adds at most one connection.
+  let activeConnections = null;
+  let connectionError = null;
+  const pool = new Pool({ max: 1, connectionString: databaseUrl });
+  try {
+    const result = await pool.query(
+      "select count(*)::int as n from pg_stat_activity where usename = current_user"
+    );
+    activeConnections = result.rows[0]?.n ?? null;
+  } catch (error) {
+    connectionError = error.message;
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+
+  // Warn only on the deterministic session-mode config. activeConnections is
+  // reported for visibility but not auto-warned: the meaningful ceiling differs
+  // by pooler mode, and the count is partly confounded by this doctor run's own
+  // pools. The hard, known failure mode is session mode (~15-client cap).
+  const sessionRisk = classification.mode === "session";
+
+  addCheck("pooler_config", sessionRisk ? "warn" : "pass", {
+    mode: classification.mode,
+    pooler: classification.label,
+    host: classification.host,
+    port: classification.port,
+    poolMaxPerPool: poolMax,
+    activeConnections,
+    ...(connectionError ? { connectionError } : {}),
+    ...(sessionRisk
+      ? {
+          warning:
+            "session-mode pooler in use: hard per-project client cap (~15) is shared across the hosted runtime pool + telemetry pool + local sync daemon + operator scripts and risks EMAXCONNSESSION under concurrent load. Use the transaction pooler (:6543). See docs/deploy-fly.md.",
+        }
+      : {}),
+  });
+}
+
 const doctorStartedAt = Date.now();
 
 await Promise.all([
@@ -992,6 +1045,7 @@ await Promise.all([
   timedCheck("inbox", checkInbox),
   timedCheck("launchd", checkLaunchd),
   timedCheck("fly_status", checkFlyStatus),
+  timedCheck("pooler_config", checkPoolerConfig),
 ]);
 
 const failed = checks.filter((check) => check.status === "fail");

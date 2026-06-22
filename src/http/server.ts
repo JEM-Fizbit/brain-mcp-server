@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createBrainMcpServer } from "../mcp-server.js";
+import { classifyPoolerUrl } from "../services/pooler.js";
 import { buildOauthConfig, type OauthConfig } from "../oauth/config.js";
 import { protectedResourceMetadata, authorizationServerMetadata } from "../oauth/metadata.js";
 import { handleRegister } from "../oauth/register.js";
@@ -269,6 +270,16 @@ export async function handleHttpRequest(
 
 export async function startHttpServer(): Promise<void> {
   assertHttpRuntimeConfig();
+  if (process.env.BRAIN_REVISION_STORE === "postgres") {
+    const pooler = classifyPoolerUrl(process.env.BRAIN_REVISION_DATABASE_URL);
+    if (pooler.mode === "session") {
+      log(
+        "WARN",
+        "BRAIN_REVISION_DATABASE_URL uses the Supabase session pooler (hard ~15-client cap shared across all clients); risks EMAXCONNSESSION under concurrent load — switch to the transaction pooler (:6543). See docs/deploy-fly.md.",
+        { pooler: pooler.label, host: pooler.host, port: pooler.port }
+      );
+    }
+  }
   if (process.env.BRAIN_HTTP_WARMUP !== "0") {
     const startedAt = performance.now();
     await warmActiveBrainStore();
