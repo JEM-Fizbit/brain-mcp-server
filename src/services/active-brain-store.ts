@@ -54,7 +54,7 @@ export function activeBrainStore(): BrainStore {
       );
     }
     const pool = instrumentPostgresPool(
-      new Pool({ connectionString: databaseUrl }),
+      new Pool({ connectionString: databaseUrl, max: Number(process.env.BRAIN_PG_POOL_MAX) || 4 }),
       "brain_runtime"
     );
     store = new RevisionBrainStore(
