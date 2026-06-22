@@ -145,7 +145,7 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool({ connectionString: poolOrConnectionString })
+        ? new Pool({ connectionString: poolOrConnectionString, max: Number(process.env.BRAIN_PG_POOL_MAX) || 4 })
         : poolOrConnectionString;
   }
 
