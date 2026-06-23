@@ -95,6 +95,8 @@ After full Codex cutover, hosted may be the default `brain` connector and local 
 
 For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied. For a user-launchable local operator surface, generate the reviewable macOS LaunchAgent with `npm run hosted:cockpit:launchd:plist`; see [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md).
 
+Hosted deployments can also raise **real-time auth-failure alerts to Slack** (warn → channel, fail → operator DM), gated on `BRAIN_SLACK_BOT_TOKEN` (no-op without it). The cockpit doctor's `hosted_mcp_auth_failures` check surfaces the same condition in the Checks tab. See [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md) for thresholds, routing, and env vars.
+
 ## Client Setup
 
 ### Claude Code
