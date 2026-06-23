@@ -1,8 +1,12 @@
 const LOOPBACK_REDIRECT_RE =
   /^http:\/\/(?:localhost|127\.0\.0\.1):\d{1,5}\/[A-Za-z0-9_\-./]*$/;
 
+const CHATGPT_CONNECTOR_REDIRECT_RE = /^\/connector\/oauth\/[^/?#]+$/;
+const CHATGPT_LEGACY_REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect";
+
 const DEFAULT_ALLOWED_REDIRECT_URIS = [
   "https://claude.ai/api/mcp/auth_callback",
+  CHATGPT_LEGACY_REDIRECT_URI,
   "http://localhost:3000/oauth/callback",
 ];
 
@@ -77,6 +81,23 @@ export function buildOauthConfig(): OauthConfig {
 
 export function isAllowedRedirectUri(config: OauthConfig, uri: string): boolean {
   if (config.allowedRedirectUris.includes(uri)) return true;
+  if (uri === CHATGPT_LEGACY_REDIRECT_URI) return true;
+  try {
+    const parsed = new URL(uri);
+    if (
+      parsed.protocol === "https:" &&
+      parsed.hostname === "chatgpt.com" &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash &&
+      CHATGPT_CONNECTOR_REDIRECT_RE.test(parsed.pathname)
+    ) {
+      return true;
+    }
+  } catch {
+    // Fall through to loopback matching.
+  }
   return LOOPBACK_REDIRECT_RE.test(uri);
 }
 

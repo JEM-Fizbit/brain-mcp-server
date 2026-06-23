@@ -243,7 +243,7 @@ After any deployment that changes schema, RLS, functions, Storage, or user-data 
 
 - Keep `auto_stop_machines = "off"` unless OAuth state is durably backed by Postgres and hosted warmup behavior has been checked after scale-to-zero/startup.
 - If the app name changes, update `app`, `MCP_OAUTH_PUBLIC_BASE`, and GitHub OAuth callback URL together.
-- Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted. ChatGPT connector creation can generate a callback under `https://chatgpt.com/connector/oauth/<id>`; allowlist the exact callback from the `invalid_redirect_uri` error and retry creation.
+- Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted. ChatGPT connector callbacks under `https://chatgpt.com/connector/oauth/<id>` and the legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback are trusted by code; other remote callbacks should be added as exact values only.
 - Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.
 - Store Supabase database URLs and service keys only in deployment secrets or a password manager. They must not appear in docs, commits, logs, screenshots, or client-side environment variables.
 - `BRAIN_HTTP_TIMING_LOGS=1` enables coarse MCP request timing logs with method, path, status, and duration only; request bodies and authorization headers are not logged.
