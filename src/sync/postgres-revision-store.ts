@@ -22,6 +22,23 @@ const { Pool } = pg;
 type Pool = pg.Pool;
 type PoolClient = pg.PoolClient;
 
+function positiveNumberEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function postgresPoolOptions(connectionString: string): pg.PoolConfig {
+  const queryTimeoutMs = positiveNumberEnv("BRAIN_PG_QUERY_TIMEOUT_MS", 30_000);
+  return {
+    connectionString,
+    max: positiveNumberEnv("BRAIN_PG_POOL_MAX", 4),
+    connectionTimeoutMillis: positiveNumberEnv("BRAIN_PG_CONNECTION_TIMEOUT_MS", 5_000),
+    idleTimeoutMillis: positiveNumberEnv("BRAIN_PG_IDLE_TIMEOUT_MS", 10_000),
+    query_timeout: queryTimeoutMs,
+    statement_timeout: positiveNumberEnv("BRAIN_PG_STATEMENT_TIMEOUT_MS", queryTimeoutMs),
+  };
+}
+
 interface RevisionRow {
   id: string;
   brain_id: string;
@@ -161,7 +178,7 @@ export class PostgresRevisionStore implements RevisionStore {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool({ connectionString: poolOrConnectionString, max: Number(process.env.BRAIN_PG_POOL_MAX) || 4 })
+        ? new Pool(postgresPoolOptions(poolOrConnectionString))
         : poolOrConnectionString;
   }
 

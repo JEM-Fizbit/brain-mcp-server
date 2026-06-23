@@ -154,6 +154,26 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
 
+test("local sync daemon bounds Postgres stalls and shutdown", async () => {
+  const cli = await fs.readFile(path.join(repoRoot, "src", "sync", "cli.ts"), "utf-8");
+  const store = await fs.readFile(
+    path.join(repoRoot, "src", "sync", "postgres-revision-store.ts"),
+    "utf-8"
+  );
+
+  assert.match(cli, /BRAIN_SYNC_CLOSE_TIMEOUT_MS/);
+  assert.match(cli, /closeWithTimeout/);
+  assert.match(cli, /Promise\.race\(\[close, timeoutPromise\]\)/);
+  assert.match(cli, /Timed out closing sync store/);
+  assert.match(store, /BRAIN_PG_CONNECTION_TIMEOUT_MS/);
+  assert.match(store, /BRAIN_PG_QUERY_TIMEOUT_MS/);
+  assert.match(store, /BRAIN_PG_STATEMENT_TIMEOUT_MS/);
+  assert.match(store, /BRAIN_PG_IDLE_TIMEOUT_MS/);
+  assert.match(store, /connectionTimeoutMillis/);
+  assert.match(store, /query_timeout/);
+  assert.match(store, /statement_timeout/);
+});
+
 test("hosted MCP server records tool latency without payload content", async () => {
   const server = await fs.readFile(path.join(repoRoot, "src", "mcp-server.ts"), "utf-8");
   const telemetry = await fs.readFile(

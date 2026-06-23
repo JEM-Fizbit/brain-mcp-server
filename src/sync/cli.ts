@@ -23,6 +23,7 @@ interface SyncCliConfig {
   watchIntervalMs: number;
   watchCycles?: number;
   watchOutput: "summary" | "full";
+  closeTimeoutMs: number;
 }
 
 interface StoreHandle {
@@ -81,10 +82,17 @@ function usage(): string {
     "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
     "  BRAIN_SYNC_WATCH_CYCLES   Optional finite watch cycles for tests/jobs",
     "  BRAIN_SYNC_WATCH_OUTPUT   Watch output mode: summary|full (default: summary)",
+    "  BRAIN_SYNC_CLOSE_TIMEOUT_MS",
+    "                            Max milliseconds to wait for sync store shutdown (default: 5000)",
     "  BRAIN_REVISION_STORE      Revision store provider: file|postgres",
     "  BRAIN_REVISION_DATABASE_URL",
     "                            Required when BRAIN_REVISION_STORE=postgres",
   ].join("\n");
+}
+
+function positiveNumberEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function defaultStateFile(brainDir: string): string {
@@ -135,6 +143,7 @@ function readConfig(): SyncCliConfig {
       : undefined,
     watchOutput:
       process.env.BRAIN_SYNC_WATCH_OUTPUT === "full" ? "full" : "summary",
+    closeTimeoutMs: positiveNumberEnv("BRAIN_SYNC_CLOSE_TIMEOUT_MS", 5_000),
   };
 }
 
@@ -213,6 +222,27 @@ function createStore(config: SyncCliConfig): StoreHandle {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function closeWithTimeout(config: SyncCliConfig, storeHandle: StoreHandle): Promise<void> {
+  let timeout: NodeJS.Timeout | undefined;
+  const close = storeHandle.close();
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `Timed out closing sync store after ${config.closeTimeoutMs}ms`
+          )
+        ),
+      config.closeTimeoutMs
+    );
+  });
+  try {
+    await Promise.race([close, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 function createLockPayload(): SyncLockPayload {
@@ -446,7 +476,7 @@ async function runWithConfig(
       openConflicts,
     });
   } finally {
-    await storeHandle.close();
+    await closeWithTimeout(config, storeHandle);
   }
 }
 
