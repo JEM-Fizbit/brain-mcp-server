@@ -22,21 +22,28 @@ const { Pool } = pg;
 type Pool = pg.Pool;
 type PoolClient = pg.PoolClient;
 
-function positiveNumberEnv(name: string, fallback: number): number {
+export function positiveNumberEnv(name: string, fallback: number): number {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function postgresPoolOptions(connectionString: string): pg.PoolConfig {
+export function postgresPoolOptions(
+  connectionString: string,
+  options: { maxEnv?: string; defaultMax?: number; allowExitOnIdle?: boolean } = {}
+): pg.PoolConfig {
   const queryTimeoutMs = positiveNumberEnv("BRAIN_PG_QUERY_TIMEOUT_MS", 30_000);
-  return {
+  const poolOptions: pg.PoolConfig = {
     connectionString,
-    max: positiveNumberEnv("BRAIN_PG_POOL_MAX", 4),
+    max: positiveNumberEnv(options.maxEnv || "BRAIN_PG_POOL_MAX", options.defaultMax ?? 4),
     connectionTimeoutMillis: positiveNumberEnv("BRAIN_PG_CONNECTION_TIMEOUT_MS", 5_000),
     idleTimeoutMillis: positiveNumberEnv("BRAIN_PG_IDLE_TIMEOUT_MS", 10_000),
     query_timeout: queryTimeoutMs,
     statement_timeout: positiveNumberEnv("BRAIN_PG_STATEMENT_TIMEOUT_MS", queryTimeoutMs),
   };
+  if (options.allowExitOnIdle !== undefined) {
+    poolOptions.allowExitOnIdle = options.allowExitOnIdle;
+  }
+  return poolOptions;
 }
 
 interface RevisionRow {

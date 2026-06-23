@@ -1,5 +1,6 @@
 import pg from "pg";
 import { contentHash } from "../sync/hash.js";
+import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
 import type {
   CreateSourceInput,
   RecordArtifactTextInput,
@@ -145,7 +146,7 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool({ connectionString: poolOrConnectionString, max: Number(process.env.BRAIN_PG_POOL_MAX) || 4 })
+        ? new Pool(postgresPoolOptions(poolOrConnectionString))
         : poolOrConnectionString;
   }
 
