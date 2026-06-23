@@ -1,8 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LintSchema } from "../schemas/tools.js";
 import { runLint, formatLintReport } from "../services/lint.js";
-import * as log from "../services/log.js";
-import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
+import { activeBrainStore } from "../services/active-brain-store.js";
+import {
+  assertWriteRole,
+  resolveToolBrain,
+  revisionActor,
+} from "../services/request-context.js";
 
 export function registerLintTools(server: McpServer): void {
   server.tool(
@@ -26,11 +30,12 @@ export function registerLintTools(server: McpServer): void {
           report.unindexedWorkingBinaries.length +
           (report.journalRotation ? 1 : 0);
 
-        await log.appendLog(
+        await activeBrainStore().appendLog(
+          ctx.brainId,
           "LINT",
           ["(all files scanned)"],
           `Health check: ${issueCount} issue(s) found`,
-          ctx.brainId
+          revisionActor(ctx)
         );
 
         return { content: [{ type: "text", text: formatted }] };

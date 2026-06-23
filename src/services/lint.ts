@@ -5,9 +5,6 @@ import {
   NOW_FILE,
   LINE_LIMIT,
   BLOAT_EXEMPT,
-  STALENESS,
-  ACTIVE_PATTERNS,
-  IDENTITY_PATTERNS,
   INACTIVE_SECTION_PATTERNS,
   ACTIVE_SECTION_PATTERNS,
   DOMAIN_PACK_LIMIT,
@@ -19,9 +16,22 @@ import {
   JOURNAL_LINE_LIMIT,
   JOURNAL_BYTE_LIMIT,
 } from "../constants.js";
-import { listFileNames, getStalenessThreshold } from "./brain.js";
-import * as log from "./log.js";
-import { getBrainPaths } from "./registry.js";
+import { getStalenessThreshold } from "./brain.js";
+import {
+  activeBrainStore,
+  revisionStoreModeEnabled,
+} from "./active-brain-store.js";
+import type { BrainStore, FileMetadata } from "./brain-store.js";
+import { getBrainPaths, resolveBrain, stdioPrincipal } from "./registry.js";
+
+interface LintFileSnapshot {
+  name: string;
+  content: string;
+  lines: number;
+  bytes: number;
+  lastModified: Date | null;
+  staleDays: number | null;
+}
 
 export interface LintReport {
   bloat: { file: string; lines: number }[];
@@ -41,96 +51,47 @@ export interface LintReport {
   warnings: string[];
 }
 
-/**
- * Scan `working/` for non-markdown, non-.gitkeep files and verify each is
- * registered in `working/INDEX.md` with a `## {filename}` H2 section. Binaries
- * aren't indexed by brain_search, so the INDEX entry is what makes them
- * discoverable from inside a Brain session.
- */
-async function findUnindexedWorkingBinaries(brainId?: string): Promise<string[]> {
-  const { brainDir } = await getBrainPaths(brainId);
-  const workingDir = path.join(brainDir, WORKING_DIR);
-  let entries: string[];
-  try {
-    entries = await fs.readdir(workingDir);
-  } catch {
-    return [];
-  }
-
-  const binaries = entries.filter((name) => {
-    if (name === WORKING_INDEX_FILE) return false;
-    if (name === ".gitkeep" || name === ".DS_Store") return false;
-    if (name.toLowerCase().endsWith(".md")) return false;
-    return true;
-  });
-
-  if (binaries.length === 0) return [];
-
-  let indexContent = "";
-  try {
-    indexContent = await fs.readFile(
-      path.join(workingDir, WORKING_INDEX_FILE),
-      "utf-8"
-    );
-  } catch {
-    // INDEX.md missing entirely — every binary is unindexed.
-    return binaries.map((b) => `${WORKING_DIR}/${b}`);
-  }
-
-  const indexedFilenames = new Set<string>();
-  const h2Pattern = /^##\s+(.+?)\s*$/gm;
-  let match: RegExpExecArray | null;
-  while ((match = h2Pattern.exec(indexContent)) !== null) {
-    indexedFilenames.add(match[1].trim());
-  }
-
-  const unindexed: string[] = [];
-  for (const binary of binaries) {
-    if (!indexedFilenames.has(binary)) {
-      unindexed.push(`${WORKING_DIR}/${binary}`);
-    }
-  }
-  return unindexed;
+function countLines(content: string): number {
+  return content.split("\n").length;
 }
 
-/**
- * Check whether `JOURNAL.md` has grown past the rotation threshold. JOURNAL is
- * a durable narrative timeline; once it crosses ~500 lines or ~80 KB the
- * rotation procedure in `brain/archive/INDEX.md` should be run to move older
- * entries into a numbered archive segment. Size-triggered so cadence auto-
- * scales with actual usage volume.
- */
-async function checkJournalRotation(brainId?: string): Promise<LintReport["journalRotation"]> {
-  const { brainDir } = await getBrainPaths(brainId);
-  const journalPath = path.join(brainDir, JOURNAL_FILE);
-  let content: string;
-  let bytes: number;
-  try {
-    const stat = await fs.stat(journalPath);
-    bytes = stat.size;
-    content = await fs.readFile(journalPath, "utf-8");
-  } catch {
-    return null;
-  }
-
-  const lines = content.split("\n").length;
-  const overLines = lines > JOURNAL_LINE_LIMIT;
-  const overBytes = bytes > JOURNAL_BYTE_LIMIT;
-  if (!overLines && !overBytes) return null;
-
-  const triggeredBy: "lines" | "bytes" | "both" =
-    overLines && overBytes ? "both" : overLines ? "lines" : "bytes";
-  return { lines, bytes, triggeredBy };
+function byteLength(content: string): number {
+  return Buffer.byteLength(content, "utf-8");
 }
 
-/** Extract all .md file references from a markdown file */
-async function extractFileReferences(
-  filename: string,
-  brainId?: string
-): Promise<Set<string>> {
-  const { brainDir } = await getBrainPaths(brainId);
-  const filePath = path.join(brainDir, filename);
-  const content = await fs.readFile(filePath, "utf-8");
+function isFileMetadata(file: FileMetadata | string): file is FileMetadata {
+  return typeof file !== "string";
+}
+
+async function listBrainMarkdownFiles(
+  store: BrainStore,
+  brainId: string
+): Promise<LintFileSnapshot[]> {
+  const entries = await store.listFiles(brainId, "brain");
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const name = isFileMetadata(entry) ? entry.name : entry;
+      const content = await store.readFile(brainId, name);
+      return {
+        name,
+        content,
+        lines: isFileMetadata(entry) ? entry.lines : countLines(content),
+        bytes: isFileMetadata(entry) ? entry.bytes : byteLength(content),
+        lastModified: isFileMetadata(entry) ? entry.lastModified : null,
+        staleDays: isFileMetadata(entry) ? entry.staleDays : null,
+      };
+    })
+  );
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function resolveLintBrainId(brainId?: string): Promise<string> {
+  if (brainId) return brainId;
+  const { brain } = await resolveBrain(undefined, stdioPrincipal());
+  return brain.id;
+}
+
+function extractFileReferencesFromContent(content: string): Set<string> {
   const refs = new Set<string>();
 
   // Match backtick-quoted filenames like `01_identity.md`
@@ -149,9 +110,97 @@ async function extractFileReferences(
   return refs;
 }
 
-export async function runLint(brainId?: string): Promise<LintReport> {
+/**
+ * Scan `working/` for non-markdown, non-.gitkeep files and verify each is
+ * registered in `working/INDEX.md` with a `## {filename}` H2 section. Binaries
+ * aren't indexed by brain_search, so the INDEX entry is what makes them
+ * discoverable from inside a Brain session.
+ */
+async function findUnindexedWorkingBinaries(
+  brainId?: string
+): Promise<{ files: string[]; warning?: string }> {
+  if (revisionStoreModeEnabled()) {
+    return {
+      files: [],
+      warning:
+        "Working binary index check skipped: active Brain store is revision-backed, so hosted lint can inspect synced Markdown only. Run local brain_lint to scan unsynced working/ binaries.",
+    };
+  }
+
   const { brainDir } = await getBrainPaths(brainId);
-  const allFiles = await listFileNames(brainId);
+  const workingDir = path.join(brainDir, WORKING_DIR);
+  let entries: string[];
+  try {
+    entries = await fs.readdir(workingDir);
+  } catch {
+    return { files: [] };
+  }
+
+  const binaries = entries.filter((name) => {
+    if (name === WORKING_INDEX_FILE) return false;
+    if (name === ".gitkeep" || name === ".DS_Store") return false;
+    if (name.toLowerCase().endsWith(".md")) return false;
+    return true;
+  });
+
+  if (binaries.length === 0) return { files: [] };
+
+  let indexContent = "";
+  try {
+    indexContent = await fs.readFile(
+      path.join(workingDir, WORKING_INDEX_FILE),
+      "utf-8"
+    );
+  } catch {
+    // INDEX.md missing entirely — every binary is unindexed.
+    return { files: binaries.map((b) => `${WORKING_DIR}/${b}`) };
+  }
+
+  const indexedFilenames = new Set<string>();
+  const h2Pattern = /^##\s+(.+?)\s*$/gm;
+  let match: RegExpExecArray | null;
+  while ((match = h2Pattern.exec(indexContent)) !== null) {
+    indexedFilenames.add(match[1].trim());
+  }
+
+  const unindexed: string[] = [];
+  for (const binary of binaries) {
+    if (!indexedFilenames.has(binary)) {
+      unindexed.push(`${WORKING_DIR}/${binary}`);
+    }
+  }
+  return { files: unindexed };
+}
+
+/**
+ * Check whether `JOURNAL.md` has grown past the rotation threshold. JOURNAL is
+ * a durable narrative timeline; once it crosses ~500 lines or ~80 KB the
+ * rotation procedure in `brain/archive/INDEX.md` should be run to move older
+ * entries into a numbered archive segment. Size-triggered so cadence auto-
+ * scales with actual usage volume.
+ */
+function checkJournalRotation(
+  content: string | undefined
+): LintReport["journalRotation"] {
+  if (content === undefined) return null;
+
+  const lines = countLines(content);
+  const bytes = byteLength(content);
+  const overLines = lines > JOURNAL_LINE_LIMIT;
+  const overBytes = bytes > JOURNAL_BYTE_LIMIT;
+  if (!overLines && !overBytes) return null;
+
+  const triggeredBy: "lines" | "bytes" | "both" =
+    overLines && overBytes ? "both" : overLines ? "lines" : "bytes";
+  return { lines, bytes, triggeredBy };
+}
+
+export async function runLint(brainId?: string): Promise<LintReport> {
+  const resolvedBrainId = await resolveLintBrainId(brainId);
+  const store = activeBrainStore();
+  const files = await listBrainMarkdownFiles(store, resolvedBrainId);
+  const allFiles = files.map((file) => file.name);
+  const fileContentMap = new Map(files.map((file) => [file.name, file.content]));
   const now = Date.now();
 
   const bloat: LintReport["bloat"] = [];
@@ -159,32 +208,33 @@ export async function runLint(brainId?: string): Promise<LintReport> {
   const fileLinesMap = new Map<string, number>();
 
   // Check bloat and staleness for all files
-  for (const name of allFiles) {
-    const filePath = path.join(brainDir, name);
-    const [stat, content] = await Promise.all([
-      fs.stat(filePath),
-      fs.readFile(filePath, "utf-8"),
-    ]);
-
-    const lines = content.split("\n").length;
+  for (const file of files) {
+    const { name, lines } = file;
     fileLinesMap.set(name, lines);
 
     if (lines > LINE_LIMIT && !BLOAT_EXEMPT.has(path.basename(name))) {
       bloat.push({ file: name, lines });
     }
 
-    const daysSinceModified = Math.floor(
-      (now - stat.mtimeMs) / (1000 * 60 * 60 * 24)
-    );
+    const daysSinceModified = file.lastModified
+      ? Math.floor((now - file.lastModified.getTime()) / (1000 * 60 * 60 * 24))
+      : file.staleDays;
     const threshold = getStalenessThreshold(name);
-    if (daysSinceModified > threshold) {
+    if (daysSinceModified !== null && daysSinceModified > threshold) {
       stale.push({ file: name, days: daysSinceModified });
     }
   }
 
   // Orphan detection: files not referenced in 00_loader.md
-  const loaderRefs = await extractFileReferences(LOADER_FILE, brainId);
+  const loaderContent = fileContentMap.get(LOADER_FILE);
+  const loaderRefs = loaderContent
+    ? extractFileReferencesFromContent(loaderContent)
+    : new Set<string>();
   const orphans: string[] = [];
+  const warnings: string[] = [];
+  if (!loaderContent) {
+    warnings.push(`Orphan check skipped: ${LOADER_FILE} was not found.`);
+  }
   for (const name of allFiles) {
     const base = path.basename(name);
     const dir = path.dirname(name);
@@ -205,83 +255,75 @@ export async function runLint(brainId?: string): Promise<LintReport> {
 
   // Drift detection: check NOW.md mentions against Active project sections
   const drift: string[] = [];
-  const warnings: string[] = [];
-  try {
-    const nowPath = path.join(brainDir, NOW_FILE);
-    const nowContent = await fs.readFile(nowPath, "utf-8");
+  const nowContent = fileContentMap.get(NOW_FILE);
+  const projectsContent = fileContentMap.get("05_projects.md");
+  if (nowContent && projectsContent) {
     const nowLower = nowContent.toLowerCase();
+    const lines = projectsContent.split("\n");
 
-      const projectsPath = path.join(brainDir, "05_projects.md");
-    try {
-      const projectsContent = await fs.readFile(projectsPath, "utf-8");
-      const lines = projectsContent.split("\n");
-
-      // First pass: build {section: [project headings]} map.
-      const sections = new Map<string, string[]>();
-      let currentSection = "";
-      for (const line of lines) {
-        const h2Match = line.match(/^##\s+(.+)/);
-        if (h2Match) {
-          currentSection = h2Match[1].trim();
-          if (!sections.has(currentSection)) sections.set(currentSection, []);
-          continue;
-        }
-        const h3Match = line.match(/^###\s+(.+)/);
-        if (!h3Match || !currentSection) continue;
-        const project = h3Match[1].trim();
-        if (project.length <= 3 || project.includes("---")) continue;
-        sections.get(currentSection)!.push(project);
+    // First pass: build {section: [project headings]} map.
+    const sections = new Map<string, string[]>();
+    let currentSection = "";
+    for (const line of lines) {
+      const h2Match = line.match(/^##\s+(.+)/);
+      if (h2Match) {
+        currentSection = h2Match[1].trim();
+        if (!sections.has(currentSection)) sections.set(currentSection, []);
+        continue;
       }
-
-      const activeSections = [...sections.keys()].filter((name) =>
-        ACTIVE_SECTION_PATTERNS.some((p) => p.test(name))
-      );
-
-      const checkProject = (project: string) => {
-        const projectLower = project.toLowerCase();
-        const segments = projectLower
-          .split(/\s*[—–\-\(\),\/]\s*/)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 3);
-        const mentioned = segments.some((seg) => nowLower.includes(seg));
-        if (!mentioned) {
-          drift.push(
-            `Project "${project}" in 05_projects.md not mentioned in NOW.md — still active?`
-          );
-        }
-      };
-
-      if (activeSections.length > 0) {
-        // Active-section scoping: only drift-check projects under Active sections.
-        for (const section of activeSections) {
-          for (const project of sections.get(section)!) checkProject(project);
-        }
-      } else {
-        // Defensive fallback: no parseable Active section. Warn and use the
-        // legacy inactive-section filter so drift checks still surface signal
-        // rather than crashing or going silent.
-        warnings.push(
-          "Drift check: no Active section found in 05_projects.md (expected a heading matching /active/i). " +
-            "Falling back to legacy filter — every project not under an inactive section will be drift-checked. " +
-            "Add an Active section header to 05_projects.md to silence this warning."
-        );
-        for (const [section, projects] of sections) {
-          if (INACTIVE_SECTION_PATTERNS.some((p) => p.test(section))) continue;
-          for (const project of projects) checkProject(project);
-        }
-      }
-    } catch {
-      // 05_projects.md doesn't exist, skip
+      const h3Match = line.match(/^###\s+(.+)/);
+      if (!h3Match || !currentSection) continue;
+      const project = h3Match[1].trim();
+      if (project.length <= 3 || project.includes("---")) continue;
+      sections.get(currentSection)!.push(project);
     }
-  } catch {
-    // NOW.md doesn't exist, skip
+
+    const activeSections = [...sections.keys()].filter((name) =>
+      ACTIVE_SECTION_PATTERNS.some((p) => p.test(name))
+    );
+
+    const checkProject = (project: string) => {
+      const projectLower = project.toLowerCase();
+      const segments = projectLower
+        .split(/\s*[—–\-\(\),\/]\s*/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 3);
+      const mentioned = segments.some((seg) => nowLower.includes(seg));
+      if (!mentioned) {
+        drift.push(
+          `Project "${project}" in 05_projects.md not mentioned in NOW.md — still active?`
+        );
+      }
+    };
+
+    if (activeSections.length > 0) {
+      // Active-section scoping: only drift-check projects under Active sections.
+      for (const section of activeSections) {
+        for (const project of sections.get(section)!) checkProject(project);
+      }
+    } else {
+      // Defensive fallback: no parseable Active section. Warn and use the
+      // legacy inactive-section filter so drift checks still surface signal
+      // rather than crashing or going silent.
+      warnings.push(
+        "Drift check: no Active section found in 05_projects.md (expected a heading matching /active/i). " +
+          "Falling back to legacy filter — every project not under an inactive section will be drift-checked. " +
+          "Add an Active section header to 05_projects.md to silence this warning."
+      );
+      for (const [section, projects] of sections) {
+        if (INACTIVE_SECTION_PATTERNS.some((p) => p.test(section))) continue;
+        for (const project of projects) checkProject(project);
+      }
+    }
   }
 
   // Unindexed working binaries
-  const unindexedWorkingBinaries = await findUnindexedWorkingBinaries(brainId);
+  const workingBinaryCheck = await findUnindexedWorkingBinaries(resolvedBrainId);
+  const unindexedWorkingBinaries = workingBinaryCheck.files;
+  if (workingBinaryCheck.warning) warnings.push(workingBinaryCheck.warning);
 
   // Journal rotation threshold
-  const journalRotation = await checkJournalRotation(brainId);
+  const journalRotation = checkJournalRotation(fileContentMap.get(JOURNAL_FILE));
 
   // Large domain packs
   const largeDomainPacks: LintReport["largeDomainPacks"] = [];
