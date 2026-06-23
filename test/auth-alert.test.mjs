@@ -256,6 +256,43 @@ test("maybeAlertOnAuthFailure records ok:false when the post fails and still doe
   assert.equal(dispatches[0].ok, false);
 });
 
+test("maybeAlertOnAuthFailure fires once for a concurrent burst (cooldown race)", async () => {
+  const NOW2 = new Date("2026-06-23T12:00:00Z");
+  const posts = [];
+  const dispatches = [];
+  const config = { ...fakeDeps().deps.config };
+  function burstDeps() {
+    return {
+      now: () => NOW2,
+      isoDate: () => "2026-06-23",
+      config,
+      // Reflects dispatches recorded so far, like the DB cooldown read.
+      loadState: async () => ({
+        failureCount: 5,
+        reasons: [{ reason: "missing_bearer", n: 5 }],
+        httpStatus: "401",
+        lastWarnAt:
+          dispatches.filter((d) => d.severity === "warn").map((d) => d.at).sort().at(-1) ||
+          null,
+        lastFailAt: null,
+      }),
+      postMessage: async (channel) => {
+        posts.push({ channel });
+        return { ok: true };
+      },
+      recordDispatch: async (row) => {
+        dispatches.push({ severity: row.severity, at: NOW2 });
+      },
+    };
+  }
+  // Four concurrent evaluations, as happens for a burst of auth failures.
+  await Promise.all([burstDeps(), burstDeps(), burstDeps(), burstDeps()].map((d) =>
+    maybeAlertOnAuthFailure(d)
+  ));
+  assert.equal(posts.length, 1, `expected exactly one post for the burst, got ${posts.length}`);
+  assert.equal(dispatches.length, 1);
+});
+
 test("maybeAlertOnAuthFailure stays silent below the threshold", async () => {
   const { deps, posts } = fakeDeps({
     loadState: async () => ({

@@ -320,6 +320,24 @@ function resolveDeps(deps?: Partial<AuthAlertDeps>): AuthAlertDeps {
   };
 }
 
+// Auth failures arrive concurrently and each fires a fire-and-forget alert
+// evaluation, so the cooldown's read-then-write is a race: without
+// serialization, every evaluation in a burst reads "no recent alert" before any
+// of them records a dispatch, and they all post. This in-process mutex
+// serializes evaluations so each sees the prior dispatch before deciding. The
+// hosted server runs a single machine; the DB cooldown query still throttles
+// across restarts (and, coarsely, across machines if ever scaled).
+let alertLock: Promise<unknown> = Promise.resolve();
+
+function withAlertLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = alertLock.then(fn, fn);
+  alertLock = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
 export async function maybeAlertOnAuthFailure(
   deps?: Partial<AuthAlertDeps>
 ): Promise<AuthAlertOutcome> {
@@ -327,7 +345,10 @@ export async function maybeAlertOnAuthFailure(
   if (!resolved.config.enabled || !resolved.config.botToken) {
     return { fired: false, reason: "disabled" };
   }
+  return withAlertLock(() => evaluateAndAlert(resolved));
+}
 
+async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutcome> {
   let state: AuthFailureState;
   try {
     state = await resolved.loadState(resolved.config.thresholds.windowMinutes);
