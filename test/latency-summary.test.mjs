@@ -364,6 +364,52 @@ test("operation event log preserves safe metadata from sync_events rows", () => 
   assert.equal(events[1].filename, "NOW.md");
 });
 
+test("operation event log includes auth events without requiring latency duration", () => {
+  const events = operationEventLogFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_auth",
+      filename: null,
+      duration_ms: null,
+      created_at: "2026-06-18T10:04:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "auth",
+        durationType: "auth_failure",
+        name: "oauth_token",
+        kind: "auth",
+        target: "invalid_grant",
+        ok: false,
+        error: "invalid_grant",
+      },
+    },
+  ]);
+  const history = latencyHistoryFromSyncEventRows([
+    {
+      event_type: "hosted_mcp_auth",
+      filename: null,
+      duration_ms: null,
+      created_at: "2026-06-18T10:04:00.000Z",
+      metadata: {
+        source: "hosted_mcp_server",
+        timingLayer: "auth",
+        durationType: "auth_failure",
+        name: "oauth_token",
+        kind: "auth",
+        target: "invalid_grant",
+        ok: false,
+        error: "invalid_grant",
+      },
+    },
+  ]);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].eventType, "hosted_mcp_auth");
+  assert.equal(events[0].kind, "auth");
+  assert.equal(events[0].target, "invalid_grant");
+  assert.equal(events[0].latencyMs, 0);
+  assert.equal(history.length, 0);
+});
+
 test("latency SLOs warn on slow reads and identify DB hotspots", () => {
   const history = latencyHistoryFromSyncEventRows([
     {

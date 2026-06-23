@@ -10,12 +10,18 @@ import { handleRegister } from "../oauth/register.js";
 import { handleAuthorizeGet, handleGitHubCallback } from "../oauth/github.js";
 import { handleToken } from "../oauth/token.js";
 import { makeFileStateProvider, type StateProvider } from "../oauth/state.js";
+import { makePostgresStateProvider } from "../oauth/postgres-state.js";
 import { resolveAuth, wwwAuthenticateHeader } from "./mcp-auth.js";
 import {
   assertHttpRuntimeConfig,
+  oauthStateProvider,
   runtimeStatus,
 } from "../services/runtime-config.js";
 import { warmActiveBrainStore } from "../services/active-brain-store.js";
+import {
+  authReasonCode,
+  recordAuthEventBestEffort,
+} from "../services/auth-telemetry.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -101,6 +107,15 @@ function methodNotAllowed(res: ServerResponse, allow = "POST"): void {
   sendText(res, 405, "method not allowed", { Allow: allow });
 }
 
+function makeHttpStateProvider(): StateProvider {
+  if (oauthStateProvider() !== "postgres") return makeFileStateProvider();
+  const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("BRAIN_REVISION_DATABASE_URL is required when BRAIN_OAUTH_STATE_STORE=postgres");
+  }
+  return makePostgresStateProvider(databaseUrl);
+}
+
 async function handleMcp(
   req: AuthenticatedRequest,
   res: ServerResponse,
@@ -115,6 +130,7 @@ async function handleMcp(
 
   const auth = resolveAuth(req.headers.authorization, ctx.config);
   if (!auth.ok) {
+    const reason = authReasonCode(auth.reason);
     sendJson(
       res,
       401,
@@ -125,6 +141,13 @@ async function handleMcp(
       },
       { "WWW-Authenticate": wwwAuthenticateHeader(ctx.config, auth.reason) }
     );
+    const maybeWrite = recordAuthEventBestEffort({
+      name: "mcp_authorization",
+      reason,
+      httpStatus: 401,
+      durationMs: performance.now() - startedAt,
+    });
+    if (maybeWrite) await maybeWrite;
     logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
     return;
   }
@@ -240,6 +263,7 @@ export async function handleHttpRequest(
     }
 
     if (req.method === "POST" && pathname === "/token") {
+      const startedAt = performance.now();
       const rawBody = await readRawBody(req, MAX_OAUTH_BODY_BYTES);
       const result = await handleToken(
         new URLSearchParams(rawBody),
@@ -248,6 +272,16 @@ export async function handleHttpRequest(
         ctx.state
       );
       sendJson(res, result.status, result.body);
+      if (result.status >= 400) {
+        const reason = authReasonCode(result.body?.error || "oauth_token_error");
+        const maybeWrite = recordAuthEventBestEffort({
+          name: "oauth_token",
+          reason,
+          httpStatus: result.status,
+          durationMs: performance.now() - startedAt,
+        });
+        if (maybeWrite) await maybeWrite;
+      }
       return;
     }
 
@@ -292,7 +326,7 @@ export async function startHttpServer(): Promise<void> {
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
   const ctx: HttpContext = {
     config: buildOauthConfig(),
-    state: makeFileStateProvider(),
+    state: makeHttpStateProvider(),
   };
 
   const server = http.createServer((req, res) => {

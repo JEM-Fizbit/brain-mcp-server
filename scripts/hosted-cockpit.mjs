@@ -900,7 +900,7 @@ const page = String.raw`<!doctype html>
 
           <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-operations" role="tabpanel" aria-labelledby="activity-subtab-operations">
             <h2>Operation Log</h2>
-            <div class="section-note">The event log: hosted MCP tool-call metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp.</div>
+            <div class="section-note">The event log: hosted MCP tool-call and auth metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp. Auth failures usually indicate stale or disconnected client credentials and may require connector re-enrollment.</div>
             <div class="activity-list" id="operation-events"></div>
           </section>
 
@@ -1427,6 +1427,7 @@ const page = String.raw`<!doctype html>
         if (kind === "read") return "read";
         if (kind === "write") return "write";
         if (kind === "sync_wait") return "sync wait";
+        if (kind === "auth") return "auth";
         return kind || "operation";
       }
 
@@ -1434,6 +1435,7 @@ const page = String.raw`<!doctype html>
         if (layer === "server_tool") return "server tool";
         if (layer === "client_e2e") return "client E2E";
         if (layer === "sync_wait") return "sync wait";
+        if (layer === "auth") return "auth";
         return layer || "unknown layer";
       }
 

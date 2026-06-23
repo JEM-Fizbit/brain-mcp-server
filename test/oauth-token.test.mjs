@@ -25,6 +25,7 @@ const config = {
   resourceUri: RESOURCE_URI,
   accessTokenTtlSec: 3600,
   refreshTokenTtlSec: 30 * 24 * 60 * 60,
+  refreshTokenReuseGraceSec: 0,
   signingSecret: "test-signing-secret",
 };
 
@@ -144,4 +145,24 @@ test("refresh token rotates and cannot be reused", async () => {
   const second = await handleToken(form, null, config, state);
   assert.equal(second.status, 400);
   assert.equal(second.body.error, "invalid_grant");
+});
+
+test("refresh token can be retried inside configured reuse grace", async () => {
+  const { result, state } = await exchange();
+  const refresh = result.body.refresh_token;
+  const graceConfig = { ...config, refreshTokenReuseGraceSec: 15 };
+
+  const form = new URLSearchParams();
+  form.set("grant_type", "refresh_token");
+  form.set("client_id", CLIENT_ID);
+  form.set("refresh_token", refresh);
+
+  const first = await handleToken(form, null, graceConfig, state);
+  assert.equal(first.status, 200);
+  assert.notEqual(first.body.refresh_token, refresh);
+
+  const second = await handleToken(form, null, graceConfig, state);
+  assert.equal(second.status, 200);
+  assert.notEqual(second.body.refresh_token, refresh);
+  assert.notEqual(second.body.refresh_token, first.body.refresh_token);
 });
