@@ -63,6 +63,8 @@ fly secrets set \
   GITHUB_OAUTH_CLIENT_SECRET="<hosted-github-oauth-client-secret>" \
   GITHUB_ALLOWED_LOGINS="JEM-Fizbit" \
   GITHUB_ALLOWED_EMAILS="johnemilad@hotmail.com" \
+  BRAIN_OAUTH_STATE_STORE="postgres" \
+  MCP_OAUTH_REFRESH_REUSE_GRACE_SEC="15" \
   BRAIN_REVISION_STORE="postgres" \
   BRAIN_REVISION_DATABASE_URL="<brain-runtime-postgres-url>" \
   BRAIN_ARTIFACT_STORE="supabase" \
@@ -76,6 +78,10 @@ fly secrets set \
 Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source metadata/search. Add it only for an ingestion/admin process with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`, such as source artifact byte upload. Hosted MCP source reads currently return manifests and extracted text, not original bytes.
 
 Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for the Supabase-backed hosted runtime. Those belong to the retired git hot path.
+
+Hosted OAuth client registration, auth-code, OAuth-state, and refresh-token metadata should use `BRAIN_OAUTH_STATE_STORE=postgres`. File-backed OAuth state is acceptable for local harnesses only; on Fly it can be lost with machine replacement and leave Claude/ChatGPT connectors holding stale credentials. `MCP_OAUTH_REFRESH_REUSE_GRACE_SEC=15` preserves normal refresh-token rotation while tolerating short cloud-client refresh races across web, desktop, and mobile surfaces.
+
+When migrating an already-enrolled connector from file-backed OAuth state to Postgres-backed OAuth state, expect one re-enrollment per client account. Existing Claude-held refresh tokens cannot be migrated from the server side because the server only stores their hash. After re-enrollment, future redeploys and Fly machine replacement should not require reconnecting solely because the server lost OAuth state.
 
 The current pilot Supabase project is John's private-org project `brain-platform-pilot` (`omnwbcdtmtvxasgdmvwr`). ERS production must use an ERS-owned Supabase project with the same migrations and environment contract.
 
@@ -95,7 +101,7 @@ curl -s https://jem-brain-mcp.fly.dev/health | jq .
 curl -i https://jem-brain-mcp.fly.dev/.well-known/oauth-protected-resource/mcp
 ```
 
-`/health` should report `runtime.revisionStore=postgres`, `runtime.artifactStore=supabase`, and `runtime.gitHotPath=disabled`. It must not include database URLs, Supabase keys, or other secret values.
+`/health` should report `runtime.revisionStore=postgres`, `runtime.artifactStore=supabase`, `runtime.oauthStateStore=postgres`, and `runtime.gitHotPath=disabled`. It must not include database URLs, Supabase keys, or other secret values.
 
 Then enroll a remote MCP client against:
 
@@ -235,7 +241,7 @@ After any deployment that changes schema, RLS, functions, Storage, or user-data 
 
 ## Notes
 
-- Keep `auto_stop_machines = "off"` while OAuth state handling is file/local-process based.
+- Keep `auto_stop_machines = "off"` unless OAuth state is durably backed by Postgres and hosted warmup behavior has been checked after scale-to-zero/startup.
 - If the app name changes, update `app`, `MCP_OAUTH_PUBLIC_BASE`, and GitHub OAuth callback URL together.
 - Add client callback URLs to `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only when a client requires a non-loopback redirect that is not already trusted. ChatGPT connector creation can generate a callback under `https://chatgpt.com/connector/oauth/<id>`; allowlist the exact callback from the `invalid_redirect_uri` error and retry creation.
 - Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.

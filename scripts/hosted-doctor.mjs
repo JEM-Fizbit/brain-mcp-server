@@ -7,6 +7,7 @@ import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
   diagnoseLatencyPerformance,
+  HOSTED_MCP_AUTH_EVENT_TYPE,
   HOSTED_MCP_LATENCY_EVENT_TYPE,
   latencyHistoryFromSnapshot,
   latencyHistoryFromSyncEventRows,
@@ -152,6 +153,7 @@ async function checkHostedHealth() {
       body.ok === true &&
       runtime.revisionStore === "postgres" &&
       runtime.artifactStore === "supabase" &&
+      runtime.oauthStateStore === "postgres" &&
       runtime.gitHotPath === "disabled" &&
       runtime.autoSyncEnabled === false;
     addCheck("hosted_health", ok ? "pass" : "fail", {
@@ -160,6 +162,7 @@ async function checkHostedHealth() {
       transport: body.transport,
       revisionStore: runtime.revisionStore,
       artifactStore: runtime.artifactStore,
+      oauthStateStore: runtime.oauthStateStore,
       artifactByteAccess: runtime.artifactByteAccess,
       gitHotPath: runtime.gitHotPath,
       autoSyncEnabled: runtime.autoSyncEnabled,
@@ -532,7 +535,7 @@ function operationUsageRowsQuery(sourceFilter) {
       )::int as failed_7d
     from brain.sync_events
     where brain_id = $1
-      and event_type = $2
+      and event_type = any($2::text[])
       ${sourceFilter}
     group by kind
     order by kind
@@ -544,7 +547,7 @@ function operationLogRowsQuery(sourceFilter) {
     select event_type, filename, duration_ms, metadata, created_at
     from brain.sync_events
     where brain_id = $1
-      and event_type = $2
+      and event_type = any($2::text[])
       ${sourceFilter}
       and created_at >= $3::timestamptz
     order by created_at desc
@@ -581,11 +584,11 @@ async function readPostgresOperationTelemetry(pool, sourceFilter) {
     ]),
     pool.query(operationUsageRowsQuery(sourceFilter), [
       brainId,
-      HOSTED_MCP_LATENCY_EVENT_TYPE,
+      [HOSTED_MCP_LATENCY_EVENT_TYPE, HOSTED_MCP_AUTH_EVENT_TYPE],
     ]),
     pool.query(operationLogRowsQuery(sourceFilter), [
       brainId,
-      HOSTED_MCP_LATENCY_EVENT_TYPE,
+      [HOSTED_MCP_LATENCY_EVENT_TYPE, HOSTED_MCP_AUTH_EVENT_TYPE],
       eventLogCutoff,
       userOperationEventLogLimit,
     ]),

@@ -23,6 +23,7 @@ export interface OauthConfig {
   authCodeTtlSec: number;
   accessTokenTtlSec: number;
   refreshTokenTtlSec: number;
+  refreshTokenReuseGraceSec: number;
   oauthStateTtlSec: number;
 }
 
@@ -66,6 +67,10 @@ export function buildOauthConfig(): OauthConfig {
     authCodeTtlSec: 10 * 60,
     accessTokenTtlSec: 60 * 60,
     refreshTokenTtlSec: 30 * 24 * 60 * 60,
+    refreshTokenReuseGraceSec: Math.max(
+      0,
+      Number(process.env.MCP_OAUTH_REFRESH_REUSE_GRACE_SEC || 0)
+    ),
     oauthStateTtlSec: 10 * 60,
   };
 }

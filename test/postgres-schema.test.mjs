@@ -26,6 +26,13 @@ const runtimeRolePath = path.join(
   "migrations",
   "2026-06-14_003_brain_runtime_role.sql"
 );
+const oauthStatePath = path.join(
+  __dirname,
+  "..",
+  "db",
+  "migrations",
+  "2026-06-22_001_durable_oauth_state.sql"
+);
 const pilotSeedPath = path.join(
   __dirname,
   "..",
@@ -103,6 +110,29 @@ test("production schema enables RLS on private Brain tables", async () => {
       `${table} should have RLS enabled`
     );
   }
+});
+
+test("durable OAuth state stays private and runtime-only", async () => {
+  const sql = await fs.readFile(oauthStatePath, "utf-8");
+  const executableSql = sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+
+  assert.match(sql, /create table if not exists brain\.oauth_state/i);
+  assert.match(sql, /primary key \(store, state_key\)/i);
+  assert.match(sql, /value jsonb not null/i);
+  assert.match(sql, /expires_at timestamptz/i);
+  assert.match(sql, /oauth_state_expires_idx/i);
+  assert.match(sql, /alter table brain\.oauth_state enable row level security/i);
+  assert.match(sql, /grant select, insert, update, delete on brain\.oauth_state to brain_runtime/i);
+  assert.match(sql, /create policy brain_runtime_all_oauth_state/i);
+  assert.match(executableSql, /revoke all on table brain\.oauth_state from public/i);
+  assert.match(executableSql, /revoke all on table brain\.oauth_state from anon/i);
+  assert.match(executableSql, /revoke all on table brain\.oauth_state from authenticated/i);
+  assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to public/i);
+  assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to anon/i);
+  assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to authenticated/i);
 });
 
 test("pilot seed bootstraps Brain registry without public grants", async () => {

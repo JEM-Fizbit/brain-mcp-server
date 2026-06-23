@@ -1,20 +1,23 @@
 const DEFAULT_HISTORY_LIMIT = 240;
 const DEFAULT_TREND_LIMIT = 24;
 export const HOSTED_MCP_LATENCY_EVENT_TYPE = "hosted_mcp_latency";
+export const HOSTED_MCP_AUTH_EVENT_TYPE = "hosted_mcp_auth";
 const KIND_LABELS = {
   read: "Read operations",
   write: "Write operations",
   sync_wait: "Sync wait",
   operation: "Other operations",
+  auth: "Auth events",
 };
-const KIND_ORDER = ["read", "write", "sync_wait", "operation"];
+const KIND_ORDER = ["read", "write", "sync_wait", "operation", "auth"];
 const TIMING_LAYER_LABELS = {
   server_tool: "Server tool handler",
   client_e2e: "Client-observed E2E",
   sync_wait: "Sync wait",
+  auth: "Auth",
   unknown: "Unknown timing layer",
 };
-const TIMING_LAYER_ORDER = ["server_tool", "client_e2e", "sync_wait", "unknown"];
+const TIMING_LAYER_ORDER = ["server_tool", "client_e2e", "sync_wait", "auth", "unknown"];
 const DEFAULT_USAGE_WINDOWS = [
   { key: "24h", label: "24H", durationMs: 24 * 60 * 60 * 1000 },
   { key: "7d", label: "7D", durationMs: 7 * 24 * 60 * 60 * 1000 },
@@ -41,6 +44,7 @@ const STATUS_RANK = {
 };
 
 function asFiniteLatency(value) {
+  if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   if (!Number.isFinite(number) || number < 0) return null;
   return number;
@@ -175,7 +179,10 @@ export function latencyHistoryFromSyncEventRows(rows) {
 export function operationEventFromSyncEventRow(row) {
   if (!row || typeof row !== "object") return null;
   const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
-  const operation = latencyOperationFromSyncEventRow(row);
+  const operation = latencyOperationFromSyncEventRow({
+    ...row,
+    duration_ms: row.duration_ms ?? 0,
+  });
   if (!operation) return null;
   return {
     eventType: String(row.event_type || HOSTED_MCP_LATENCY_EVENT_TYPE),

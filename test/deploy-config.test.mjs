@@ -11,6 +11,8 @@ test("Fly config uses Supabase stores instead of the retired git hot path", asyn
   const flyConfig = await fs.readFile(path.join(repoRoot, "fly.toml"), "utf-8");
 
   assert.match(flyConfig, /BRAIN_REVISION_STORE = "postgres"/);
+  assert.match(flyConfig, /BRAIN_OAUTH_STATE_STORE = "postgres"/);
+  assert.match(flyConfig, /MCP_OAUTH_REFRESH_REUSE_GRACE_SEC = "15"/);
   assert.match(flyConfig, /BRAIN_ARTIFACT_STORE = "supabase"/);
   assert.match(flyConfig, /BRAIN_ARTIFACT_BYTE_ACCESS = "metadata_only"/);
   assert.match(flyConfig, /BRAIN_SUPABASE_STORAGE_BUCKET = "brain-artifacts"/);
@@ -100,6 +102,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
 
   assert.equal(packageJson.scripts["hosted:doctor"], "node scripts/hosted-doctor.mjs");
   assert.match(script, /hosted_health/);
+  assert.match(script, /oauthStateStore/);
   assert.match(script, /postgres_summary/);
   assert.match(script, /recent_activity/);
   assert.match(script, /brain_file_revisions/);
@@ -109,6 +112,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_FILE/);
   assert.match(script, /brain\.sync_events/);
   assert.match(script, /HOSTED_MCP_LATENCY_EVENT_TYPE/);
+  assert.match(script, /HOSTED_MCP_AUTH_EVENT_TYPE/);
   assert.match(script, /hosted_mcp_server/);
   assert.match(script, /sync_wait/);
   assert.match(script, /latestReadLatencyMs/);
@@ -127,6 +131,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /dbSpanTargets/);
   assert.match(script, /operationUsageRowsQuery/);
   assert.match(script, /eventLogWindowDays/);
+  assert.match(script, /event_type = any\(\$2::text\[\]\)/);
   assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT/);
   assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_DAYS/);
   assert.match(script, /count_24h/);
@@ -155,6 +160,10 @@ test("hosted MCP server records tool latency without payload content", async () 
     path.join(repoRoot, "src", "services", "tool-telemetry.ts"),
     "utf-8"
   );
+  const authTelemetry = await fs.readFile(
+    path.join(repoRoot, "src", "services", "auth-telemetry.ts"),
+    "utf-8"
+  );
 
   assert.match(server, /instrumentToolLatency\(server\)/);
   assert.match(telemetry, /hosted_mcp_latency/);
@@ -169,6 +178,12 @@ test("hosted MCP server records tool latency without payload content", async () 
   assert.match(telemetry, /brain_update_file/);
   assert.match(telemetry, /brain_resolve_conflict/);
   assert.match(telemetry, /tool_returned_error/);
+  assert.match(authTelemetry, /hosted_mcp_auth/);
+  assert.match(authTelemetry, /auth_failed|missing_bearer|token_expired/);
+  assert.match(authTelemetry, /recordAuthEventBestEffort/);
+  assert.match(authTelemetry, /BRAIN_HOSTED_MCP_AUTH_DB_WRITE/);
+  assert.match(authTelemetry, /brain\.sync_events/);
+  assert.doesNotMatch(authTelemetry, /req\.headers|rawBody|request body/i);
   assert.doesNotMatch(telemetry, /content:\s*input|input\.content|old_content|source_content/);
 });
 
@@ -238,7 +253,7 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /formatDuration/);
   assert.match(script, /Recent Brain Activity/);
   assert.match(script, /Brain content state changes/);
-  assert.match(script, /hosted MCP tool-call metadata/);
+  assert.match(script, /hosted MCP tool-call and auth metadata/);
   assert.match(script, /activity-subtab-operations/);
   assert.match(script, /activity-subtab-brain/);
   assert.match(script, /activity-subtab-watch/);

@@ -152,6 +152,15 @@ async function refreshTokenGrant(
     return error("invalid_target", "resource does not match original grant");
   }
 
+  const now = Math.floor(Date.now() / 1000);
+  const reuseGraceSec = Math.max(0, Number(config.refreshTokenReuseGraceSec || 0));
+  const existingExpiresAt = Number(record.expires_at || 0);
+  const graceExpiresAt = reuseGraceSec > 0
+    ? record.refresh_reuse_grace === true
+      ? existingExpiresAt
+      : Math.min(existingExpiresAt || now + reuseGraceSec, now + reuseGraceSec)
+    : 0;
+
   const { token } = issueAccessToken(config, {
     sub: `${record.provider}:${record.provider_user_id}`,
     clientId: client.client_id,
@@ -164,13 +173,25 @@ async function refreshTokenGrant(
   });
 
   const newRefresh = generateRefreshToken();
-  const now = Math.floor(Date.now() / 1000);
-  await state.put("refresh_tokens", hashRefreshToken(newRefresh), {
+  const newRefreshHash = hashRefreshToken(newRefresh);
+  const nextRecord = {
     ...record,
     expires_at: now + config.refreshTokenTtlSec,
     last_used_at: now,
+    refresh_reuse_grace: false,
     rotated_from: hash.slice(0, 8),
-  });
+  };
+  delete nextRecord.rotated_to;
+  await state.put("refresh_tokens", newRefreshHash, nextRecord);
+  if (reuseGraceSec > 0 && graceExpiresAt > now) {
+    await state.put("refresh_tokens", hash, {
+      ...record,
+      expires_at: graceExpiresAt,
+      last_used_at: now,
+      refresh_reuse_grace: true,
+      rotated_to: newRefreshHash.slice(0, 8),
+    });
+  }
 
   return {
     status: 200,

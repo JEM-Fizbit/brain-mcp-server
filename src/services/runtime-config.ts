@@ -12,9 +12,14 @@ export interface RuntimeStatus {
   transport: "http" | "stdio";
   revisionStore: "filesystem" | "file" | "postgres";
   artifactStore: "filesystem" | "supabase";
+  oauthStateStore: "file" | "postgres";
   artifactByteAccess: "metadata_only" | "admin";
   gitHotPath: "disabled" | "filesystem";
   autoSyncEnabled: boolean;
+}
+
+export function oauthStateProvider(): RuntimeStatus["oauthStateStore"] {
+  return process.env.BRAIN_OAUTH_STATE_STORE === "postgres" ? "postgres" : "file";
 }
 
 export function artifactByteAccessMode(): RuntimeStatus["artifactByteAccess"] {
@@ -28,6 +33,7 @@ export function runtimeStatus(): RuntimeStatus {
     transport: process.env.TRANSPORT === "http" ? "http" : "stdio",
     revisionStore: revisionStoreProvider(),
     artifactStore: artifactStoreProvider(),
+    oauthStateStore: oauthStateProvider(),
     artifactByteAccess: artifactByteAccessMode(),
     gitHotPath: revisionStoreModeEnabled() ? "disabled" : "filesystem",
     autoSyncEnabled: truthy(process.env.BRAIN_AUTO_SYNC),
@@ -47,6 +53,10 @@ export function assertHttpRuntimeConfig(): void {
         "Hosted Postgres runtime requires BRAIN_ARTIFACT_STORE=supabase so source artifacts do not fall back to local filesystem storage"
       );
     }
+  }
+
+  if (status.oauthStateStore === "postgres" && !process.env.BRAIN_REVISION_DATABASE_URL) {
+    missing.push("BRAIN_REVISION_DATABASE_URL");
   }
 
   if (status.artifactStore === "supabase") {

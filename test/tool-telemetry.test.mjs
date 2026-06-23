@@ -14,6 +14,9 @@ const {
   runWithOperationTelemetry,
   summarizeOperationTelemetry,
 } = await import(path.join(__dirname, "..", "dist", "services", "operation-telemetry.js"));
+const { authReasonCode } = await import(
+  path.join(__dirname, "..", "dist", "services", "auth-telemetry.js")
+);
 
 test("tool telemetry classifies hosted MCP reads and writes", () => {
   assert.equal(classifyToolOperation("brain_read_file", {}), "read");
@@ -112,4 +115,17 @@ test("postgres pool instrumentation preserves callback-style connect", async () 
   const summary = summarizeOperationTelemetry(context);
   assert.equal(summary.db.queryCount, 1);
   assert.equal(summary.db.spans[0].target, "brain.brain_files");
+});
+
+test("auth telemetry reason codes are sanitized", () => {
+  assert.equal(
+    authReasonCode("missing Authorization: Bearer header"),
+    "missing_bearer"
+  );
+  assert.equal(authReasonCode("token expired"), "token_expired");
+  assert.equal(authReasonCode("invalid_grant"), "invalid_grant");
+  assert.equal(
+    authReasonCode("oauth failed for Bearer secret-token with spaces"),
+    "auth_failed"
+  );
 });

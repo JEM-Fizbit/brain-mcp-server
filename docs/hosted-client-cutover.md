@@ -158,7 +158,7 @@ Name: brain
 Remote MCP server URL: https://jem-brain-mcp.fly.dev/mcp
 ```
 
-Authenticate through GitHub OAuth when prompted. Mobile inherits the connector from the same account, so no separate mobile step is required once the web connector is authorized. The hosted runtime allowlist controls access; loopback and the built-in Claude callback are accepted automatically. If Claude reports `invalid_redirect_uri` during connector creation, add the exact callback to the deployed allowlist and retry:
+Authenticate through GitHub OAuth when prompted. Mobile inherits the connector from the same account, so no separate mobile step is required once the web connector is authorized. The hosted runtime allowlist controls access; loopback and the built-in Claude callback are accepted automatically. If mobile silently loses access while web/desktop still look configured, check the cockpit Operation Log for `hosted_mcp_auth` rows such as `invalid_grant`, `token_expired`, or `missing_bearer`; those indicate stale/disconnected client credentials and the practical fix is to disconnect/reconnect the connector under **Customize -> Connectors**. If Claude reports `invalid_redirect_uri` during connector creation, add the exact callback to the deployed allowlist and retry:
 
 ```bash
 flyctl secrets set \
