@@ -111,6 +111,8 @@ Warn means use judgement. Typical examples are stale sync health, stale or missi
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
+If `sync_health` is stale while `sync_lock` and `launchd` still show an active local sync process, treat the watcher as wedged rather than healthy. The sync daemon bounds Postgres connect/query/statement/idle waits and store shutdown by default; if it still wedges, restart `com.jem.brain-sync`, inspect `.brain-sync/launchd.err.log`, and rerun `npm run hosted:doctor`.
+
 Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not manually delete database rows to make the cockpit green.
 
 ## Latency Trend Semantics
