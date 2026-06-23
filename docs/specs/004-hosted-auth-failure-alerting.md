@@ -25,7 +25,7 @@ The alert is posted **server-side from the Fly app** by calling the Slack Web AP
 Non-negotiable constraints (from `CLAUDE.md` → Hosted Cockpit And Telemetry):
 
 - Best-effort and non-blocking by default — alerting must add no user-facing latency to the auth path. An `_AWAIT` flag enables synchronous behavior for diagnostics/tests only.
-- Sanitization — alerts and dispatch rows carry only reason codes, HTTP status, and counts. Never tokens, headers, request/response bodies, SQL text, or connector payloads.
+- Sanitization — alerts and dispatch rows carry only reason codes, HTTP status, and counts. OAuth token failures use the detailed sanitized server-side class when available (for example `unknown_client_id` vs `client_authentication_failed`) so stale-client and bad-secret conditions are distinguishable without recording raw credentials. Never tokens, headers, request/response bodies, SQL text, or connector payloads.
 - No new metrics database, daemon, or analytics service. Cooldown/dispatch state reuses `brain.sync_events`.
 
 ## Components

@@ -75,15 +75,9 @@ Connector URL: https://jem-brain-mcp.fly.dev/mcp
 
 Use ChatGPT Settings -> Connectors -> Create. After creation, start a new ChatGPT conversation, add the Brain connector from the composer tools menu, authenticate through GitHub OAuth when prompted, and verify `brain_sync_status` reports the hosted/revision provider with open conflicts `0`.
 
-ChatGPT may generate a connector-specific OAuth callback such as `https://chatgpt.com/connector/oauth/<id>` during creation. If ChatGPT reports `invalid_redirect_uri`, add that exact callback to the deployed allowlist and retry connector creation:
+ChatGPT generates connector-specific OAuth callbacks under `https://chatgpt.com/connector/oauth/<id>`. The hosted Brain OAuth server accepts that documented ChatGPT callback path automatically, along with loopback redirects, the built-in Claude callback, and ChatGPT's legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback. Use `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only for other exact non-loopback client callbacks.
 
-```bash
-flyctl secrets set \
-  MCP_OAUTH_ALLOWED_REDIRECT_URIS="https://chatgpt.com/connector/oauth/<id>" \
-  --app jem-brain-mcp
-```
-
-The hosted Brain OAuth server accepts loopback redirects automatically, plus the built-in Claude callback, but remote ChatGPT callbacks must be explicitly allowlisted.
+If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, check the cockpit Operation Log for `oauth_token` failures such as `unknown_client_id` or `invalid_client`. A connector that is still holding a pre-migration dynamic `client_id` must be disconnected/recreated in ChatGPT so it performs dynamic client registration again.
 
 OpenAI account cutover verification passed on 2026-06-16 for both ERS and personal ChatGPT accounts:
 

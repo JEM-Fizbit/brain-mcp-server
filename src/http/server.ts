@@ -273,10 +273,14 @@ export async function handleHttpRequest(
       );
       sendJson(res, result.status, result.body);
       if (result.status >= 400) {
-        const reason = authReasonCode(result.body?.error || "oauth_token_error");
+        const reason = authReasonCode(
+          result.body?.error_description || result.body?.error || "oauth_token_error"
+        );
+        const target = authReasonCode(result.body?.error || "oauth_token_error");
         const maybeWrite = recordAuthEventBestEffort({
           name: "oauth_token",
           reason,
+          target,
           httpStatus: result.status,
           durationMs: performance.now() - startedAt,
         });

@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-23 — Trust ChatGPT's documented MCP connector OAuth callback path by pattern
+
+**Decision:** Accept ChatGPT MCP app OAuth redirect URIs under `https://chatgpt.com/connector/oauth/<callback-id>` by code, plus the documented legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback. Keep the trust narrow: HTTPS only, exact `chatgpt.com` host, no query or fragment, and a single callback-id path segment. Continue to use `MCP_OAUTH_ALLOWED_REDIRECT_URIS` for other exact non-loopback callbacks.
+
+**Why:** ChatGPT creates connector-specific callback IDs, and the previous exact-secret allowlist caused connector registration failures whenever the callback changed. During the 2026-06-23 ChatGPT re-enrollment failure, hosted Postgres had no ChatGPT dynamic-client record and a live DCR probe returned `invalid_redirect_uri` for the documented ChatGPT callback shape. Trusting only that documented callback class removes the per-app secret churn without broadly opening OAuth redirects.
+
+**Alternatives rejected:** Exact per-ChatGPT-callback Fly secrets (too brittle for connector recreation); broad `https://chatgpt.com/*` trust (unnecessarily wide); moving to CIMD/private-key JWT in this hardening slice (valuable later, but larger than needed to restore DCR).
+
+**Related:** `src/oauth/config.ts`; `test/oauth-register.test.mjs`; `docs/hosted-client-cutover.md`; `docs/deploy-fly.md`; OpenAI Apps SDK authentication docs.
+
+---
+
 ## 2026-06-23 — Hosted Brain MCP ownership: personal-owned, ERS beta-shared; fork at cutover
 
 **Decision:** The hosted Brain MCP (this repo + Fly app `jem-brain-mcp` + Supabase `brain-platform-pilot`) is a **personal-owned** asset, currently **shared with ERS for beta hardening** with John as the sole user. It is dual-registered in both the personal and ERS asset registers. At full multi-tenant / multi-Brain ERS cutover a **dedicated ERS MCP is forked** (separate Fly.io instance(s), Supabase migrated to ERS control, all other dependencies audited + migrated); the personal MCP/infra stays personal. The JEM Brain and the `mcp__brain__*` connector are personal; the ERS Brain content is a separate ERS asset. Canonical detail: [`docs/OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md).
