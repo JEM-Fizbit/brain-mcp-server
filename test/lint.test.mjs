@@ -13,6 +13,9 @@ process.env.BRAIN_DIR = tmpDir;
 const { runLint } = await import(
   path.join(__dirname, "..", "dist", "services", "lint.js")
 );
+const { FileRevisionStore } = await import(
+  path.join(__dirname, "..", "dist", "sync", "index.js")
+);
 
 async function writeFixture(files) {
   const entries = await fs.readdir(tmpDir);
@@ -231,4 +234,72 @@ test("journal rotation: byte size over threshold flags with bytes reason", async
     report.journalRotation.bytes > 80 * 1024,
     "byte size should exceed the 80 KB threshold"
   );
+});
+
+test("revision-store lint does not scan BRAIN_DIR", async () => {
+  const revisionRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-lint-revision-"));
+  const storeFile = path.join(revisionRoot, "revision-store.json");
+  const oldEnv = {
+    BRAIN_DIR: process.env.BRAIN_DIR,
+    BRAIN_EXPERIMENTAL_REVISION_STORE_FILE:
+      process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE,
+  };
+
+  process.env.BRAIN_DIR = path.join(revisionRoot, "missing-local-brain");
+  process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE = storeFile;
+
+  try {
+    const store = new FileRevisionStore(storeFile);
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "00_loader.md",
+      baseRevisionId: null,
+      content: "# Loader\n\nReferences: `NOW.md`, `05_projects.md`\n",
+      origin: "hosted_mcp",
+    });
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "NOW.md",
+      baseRevisionId: null,
+      content: "# NOW\n\n- Working on HostedProject.\n",
+      origin: "hosted_mcp",
+    });
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "05_projects.md",
+      baseRevisionId: null,
+      content: [
+        "# Projects",
+        "",
+        "## Active",
+        "",
+        "### HostedProject",
+        "Hosted project.",
+        "",
+      ].join("\n"),
+      origin: "hosted_mcp",
+    });
+
+    const report = await runLint("ai-brain-jem");
+
+    assert.deepEqual(report.bloat, []);
+    assert.deepEqual(report.unindexedWorkingBinaries, []);
+    assert.ok(
+      report.warnings.some((warning) => /revision-backed/i.test(warning)),
+      "hosted revision lint should explain that local working binaries are skipped"
+    );
+  } finally {
+    if (oldEnv.BRAIN_DIR === undefined) {
+      delete process.env.BRAIN_DIR;
+    } else {
+      process.env.BRAIN_DIR = oldEnv.BRAIN_DIR;
+    }
+    if (oldEnv.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE === undefined) {
+      delete process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE;
+    } else {
+      process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE =
+        oldEnv.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE;
+    }
+    await fs.rm(revisionRoot, { recursive: true, force: true });
+  }
 });

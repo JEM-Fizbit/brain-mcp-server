@@ -325,6 +325,24 @@ test("HTTP MCP source read reports missing source metadata without provider", as
   assert.match(result, /Revision store has no source metadata provider/);
 });
 
+test("HTTP MCP lint reads and logs through revision store harness", async () => {
+  const harness = await setupHarness("lint");
+  const lint = await callTool(harness, "brain_lint");
+
+  assert.match(lint, /# Brain Lint Report/);
+  assert.doesNotMatch(lint, /ENOENT/);
+
+  const store = new FileRevisionStore(harness.storeFile);
+  const hosted = await store.readFile("ai-brain-jem", "LOG.md");
+  assert.match(hosted.content, /Health check:/);
+  assert.equal(hosted.origin, "hosted_mcp");
+  assert.deepEqual(hosted.actor, {
+    provider: "github",
+    id: "123",
+    name: "johnemilad",
+  });
+});
+
 test("HTTP MCP exposes hosted sync status and conflict listing", async () => {
   const harness = await setupHarness("sync-status");
 
