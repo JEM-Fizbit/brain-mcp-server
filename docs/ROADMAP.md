@@ -5,6 +5,8 @@
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
+> **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md) — who owns what (JEM Brain + connector = personal; hosted MCP = personal-owned, ERS beta-shared) and the Phase 0 (personal beta) → Phase 1 (fork a dedicated ERS MCP) plan that this roadmap's cutover work realizes.
+
 The core product direction is local-first hosted Brain:
 
 - local Markdown remains a first-class, inspectable, portable working surface;

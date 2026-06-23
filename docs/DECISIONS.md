@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-23 — Hosted Brain MCP ownership: personal-owned, ERS beta-shared; fork at cutover
+
+**Decision:** The hosted Brain MCP (this repo + Fly app `jem-brain-mcp` + Supabase `brain-platform-pilot`) is a **personal-owned** asset, currently **shared with ERS for beta hardening** with John as the sole user. It is dual-registered in both the personal and ERS asset registers. At full multi-tenant / multi-Brain ERS cutover a **dedicated ERS MCP is forked** (separate Fly.io instance(s), Supabase migrated to ERS control, all other dependencies audited + migrated); the personal MCP/infra stays personal. The JEM Brain and the `mcp__brain__*` connector are personal; the ERS Brain content is a separate ERS asset. Canonical detail: [`docs/OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md).
+
+**Why:** The personal/ERS boundary for the shared hosted MCP kept needing re-explanation. Locking it once — with a canonical doc as the source of truth — prevents drift and re-litigation, and sets a clear trigger (multi-user and/or multi-Brain need) for the fork.
+
+**Alternatives rejected:** Treating the hosted MCP as ERS-owned now (it is personal-owned; ERS is only beta-using it). Moving the personal asset to ERS at migration instead of forking (the personal MCP stays personal — the ERS service is a separate forked deployment).
+
+**Related:** `docs/OWNERSHIP_AND_LIFECYCLE.md`; `jem-registry/personal-assets.md`; `ers-registry/ers-assets.md`; `BACKLOG.md` (ERS Brain MCP fork item); `docs/ROADMAP.md`.
+
+---
+
 ## 2026-06-23 — Surface hosted auth failures and alert to Slack in real time
 
 **Decision:** Add a `hosted_mcp_auth_failures` doctor check (so the Checks tab and overall status reflect `hosted_mcp_auth` rows) and a real-time, server-side Slack alerter that posts from the Fly app when an auth failure is recorded: `warn` (≥ 3 failures / trailing 60m) to `#claude-ops`, `fail` (≥ 10) to the operator DM with `[Action needed]`, with a per-severity cooldown. Alerting is gated on `BRAIN_SLACK_BOT_TOKEN` and posts via Slack `chat.postMessage` (bot identity), not the slack-claude-jembot MCP connector (unreachable from the Fly runtime).

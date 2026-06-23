@@ -15,6 +15,8 @@ Keep this file aligned with `CLAUDE.md`. Global/user-level operating rules live 
 
 Hosted Brain is the normal remote path for `ai-brain-jem`; local stdio remains the recovery and local-filesystem fallback.
 
+**Ownership & lifecycle:** the hosted MCP is **personal-owned and ERS beta-shared** (John sole user). See [`docs/OWNERSHIP_AND_LIFECYCLE.md`](docs/OWNERSHIP_AND_LIFECYCLE.md) for ownership boundaries and the fork-to-dedicated-ERS-MCP plan at multi-tenant cutover.
+
 ## Current Operator Surfaces
 
 - Hosted MCP endpoint: `https://jem-brain-mcp.fly.dev/mcp`.
