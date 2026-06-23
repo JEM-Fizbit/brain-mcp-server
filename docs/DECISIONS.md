@@ -8,6 +8,30 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-23 — Surface hosted auth failures and alert to Slack in real time
+
+**Decision:** Add a `hosted_mcp_auth_failures` doctor check (so the Checks tab and overall status reflect `hosted_mcp_auth` rows) and a real-time, server-side Slack alerter that posts from the Fly app when an auth failure is recorded: `warn` (≥ 3 failures / trailing 60m) to `#claude-ops`, `fail` (≥ 10) to the operator DM with `[Action needed]`, with a per-severity cooldown. Alerting is gated on `BRAIN_SLACK_BOT_TOKEN` and posts via Slack `chat.postMessage` (bot identity), not the slack-claude-jembot MCP connector (unreachable from the Fly runtime).
+
+**Why:** Auth telemetry was written and displayed in the cockpit Operation Log but wired into no health check and no notification path — so a persistent OAuth failure could run for hours while the Checks tab stayed green and the operator was never told (observed 2026-06-23). Real-time server-side delivery catches failures 24/7 regardless of whether the operator's Mac is awake; piggybacking on the existing best-effort/non-blocking auth-telemetry write keeps it off the latency-critical path.
+
+**Alternatives rejected:** Scheduled local doctor poll (misses failures while the Mac sleeps); scheduled cloud routine driving the jembot MCP (most moving parts; the interactively-authed MCP may be absent in headless cron runs). A new metrics DB/daemon — rejected; cooldown/dispatch state reuses `brain.sync_events` via a new `hosted_mcp_auth_alert` event type.
+
+**Related:** `docs/specs/004-hosted-auth-failure-alerting.md`; `src/services/auth-alert.ts`; `src/services/slack.ts`; `scripts/hosted-doctor.mjs`; `docs/hosted-cockpit.md`.
+
+---
+
+## 2026-06-23 — Durable OAuth state migration intentionally invalidates pre-existing connector registrations
+
+**Decision:** Record that the 2026-06-22 `Harden hosted OAuth connector state` deploy (`brain.oauth_state` migration, releases v17/v18) intentionally starts the client-registration store empty, which is a one-time forced re-auth of every connector holding a pre-migration `client_id`. The resulting `invalid_client` spike on the `oauth_token` endpoint is an expected, self-healing consequence as connectors re-register via dynamic client registration — not an incident.
+
+**Why:** The migration moved OAuth client/session state into Postgres so a Fly machine replacement can no longer strand cloud-synced clients. The migration file documents that rationale, but the operational side-effect (existing connectors invalidated → expected `invalid_client` wave) was not recorded anywhere, so the spike read as a fresh fire on 2026-06-23 — compounded by `hosted_mcp_auth` telemetry being introduced in the same deploy, giving the errors no pre-deploy baseline. This entry makes the next such spike immediately attributable.
+
+**Alternatives rejected:** Leaving the consequence implicit in the migration header and commit message (what caused the 2026-06-23 confusion); attempting to migrate/preserve old in-memory registrations (unnecessary — dynamic client registration re-establishes them).
+
+**Related:** `db/migrations/2026-06-22_001_durable_oauth_state.sql`; commit `52324c4`; `src/oauth/postgres-state.ts`; the 2026-06-23 `hosted_mcp_auth` analysis.
+
+---
+
 ## 2026-06-17 — Verify hosted Brain on Claude personal and ERS accounts
 
 **Decision:** Treat hosted Brain as activated and verified for both the Claude personal Max account and the Claude ERS account, strictly for John's personal use of `ai-brain-jem`.

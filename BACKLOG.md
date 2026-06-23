@@ -14,7 +14,8 @@
 
 <!-- backlog items below; newest first -->
 
+- Set up a PAT-based local Supabase MCP in Claude Code so one connection spans all orgs. The Supabase OAuth connector grants only one org per connection, but the Brain DB lives in the `ERSG Prototypes` org while personal projects live in `johnemilad@hotmail.com's Org` — forcing a re-auth dance to switch between them. A Supabase Personal Access Token is account-scoped, so a single local connector (e.g. `@supabase/mcp-server-supabase --access-token`) would see every org at once and retire the switching.
 - Add operator-selectable time windows (1H / 1D / 1W / 1M) to the cockpit/doctor latency views — currently fixed to 24H + 7D. Lets latency be inspected over different horizons (e.g., spot a recent regression vs the long-run baseline) instead of a blended fixed window.
-- Expand hosted Brain observability beyond the initial cockpit SLO layer: representative latency/reliability measures for every MCP tool, real-world organic end-to-end usage sampling, correlation IDs if needed, dashboard rollups, and alerting once baseline distributions are known.
+- Expand hosted Brain observability beyond the initial cockpit SLO layer: representative latency/reliability measures for every MCP tool, real-world organic end-to-end usage sampling, correlation IDs if needed, and dashboard rollups. (Auth-failure Slack alerting shipped via spec 004; latency/SLO alerting still pending baseline distributions.)
 - Convert the Brain Cockpit desktop launcher into a distributable macOS app package: signed/notarized bundle, installer or DMG packaging, versioned update path, reusable branding/icon assets, and documented install/uninstall flow for non-terminal users.
 - Reduce hosted Brain MCP latency: instrument request/tool timings end-to-end, measure Codex client overhead vs server work, and optimize common read/write flows so hosted does not feel worse than local files.

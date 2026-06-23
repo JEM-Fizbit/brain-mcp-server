@@ -22,6 +22,10 @@ import {
   summarizeLatencyHistoryByTool,
 } from "./lib/latency-summary.mjs";
 import { classifyPoolerUrl } from "../dist/services/pooler.js";
+import {
+  readAuthAlertThresholds,
+  severityForCount,
+} from "../dist/services/auth-alert.js";
 
 loadLocalEnv();
 
@@ -877,6 +881,66 @@ function checkByName(name) {
   return checks.find((check) => check.name === name);
 }
 
+async function checkAuthFailures() {
+  const { windowMinutes, warnThreshold, failThreshold } = readAuthAlertThresholds(
+    process.env
+  );
+  if (!databaseUrl) {
+    addCheck("hosted_mcp_auth_failures", "warn", {
+      databaseUrl: "missing",
+      windowMinutes,
+      warnThreshold,
+      failThreshold,
+    });
+    return;
+  }
+
+  const pool = new Pool({ max: 2, connectionString: databaseUrl });
+  try {
+    const result = await pool.query(
+      `
+        with failures as (
+          select metadata->>'error' as reason
+          from brain.sync_events
+          where brain_id = $1
+            and event_type = $2
+            and metadata->>'ok' = 'false'
+            and created_at >= now() - make_interval(mins => $3::int)
+        )
+        select
+          (select count(*) from failures)::int as failure_count,
+          (select coalesce(jsonb_agg(r), '[]'::jsonb) from (
+              select reason, count(*)::int as n
+              from failures
+              where reason is not null
+              group by reason
+              order by count(*) desc
+              limit 5
+          ) r) as reasons
+      `,
+      [brainId, HOSTED_MCP_AUTH_EVENT_TYPE, windowMinutes]
+    );
+    const row = result.rows[0] || {};
+    const failureCount = Number(row.failure_count || 0);
+    const reasons = Array.isArray(row.reasons) ? row.reasons : [];
+    const status = severityForCount(failureCount, { warnThreshold, failThreshold }) || "pass";
+    addCheck("hosted_mcp_auth_failures", status, {
+      windowMinutes,
+      warnThreshold,
+      failThreshold,
+      failureCount,
+      reasons,
+    });
+  } catch (error) {
+    addCheck("hosted_mcp_auth_failures", "warn", {
+      error: String(error?.message || error).slice(0, 180),
+      windowMinutes,
+    });
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
 function buildOperatorActions(status) {
   const actions = [];
   const postgres = checkByName("postgres_summary");
@@ -933,6 +997,18 @@ function buildOperatorActions(status) {
     });
   }
 
+  const authFailures = checkByName("hosted_mcp_auth_failures");
+  if (authFailures?.status === "warn" || authFailures?.status === "fail") {
+    const count = authFailures.details?.failureCount || 0;
+    const windowMinutes = authFailures.details?.windowMinutes || 60;
+    actions.push({
+      level: authFailures.status,
+      title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m.`,
+      detail:
+        "Check brain.sync_events hosted_mcp_auth rows and the cockpit Operation Log. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.",
+    });
+  }
+
   const latencyFinding = (latency?.details?.performanceFindings || [])
     .find((finding) => finding.level === "fail") ||
     (latency?.details?.performanceFindings || [])
@@ -950,6 +1026,7 @@ function buildOperatorActions(status) {
     "launchd",
     "lint_nudge",
     "inbox",
+    "hosted_mcp_auth_failures",
   ]);
   if (latencyFinding) handledWarnings.add("user_operation_latency");
   for (const check of checks.filter((check) => check.status === "warn")) {
@@ -963,6 +1040,7 @@ function buildOperatorActions(status) {
 
   for (const check of checks.filter((check) => check.status === "fail")) {
     if (check.name === "sync_health") continue;
+    if (check.name === "hosted_mcp_auth_failures") continue;
     if (check.name === "user_operation_latency" && latencyFinding) continue;
     actions.push({
       level: "fail",
@@ -1044,6 +1122,7 @@ await Promise.all([
   timedCheck("sync_lock", checkSyncLock),
   timedCheck("sync_health", checkSyncHealth),
   timedCheck("user_operation_latency", checkUserOperationLatency),
+  timedCheck("hosted_mcp_auth_failures", checkAuthFailures),
   timedCheck("lint_nudge", checkLintNudge),
   timedCheck("inbox", checkInbox),
   timedCheck("launchd", checkLaunchd),

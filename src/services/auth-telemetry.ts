@@ -1,5 +1,6 @@
 import pg from "pg";
 import { revisionStoreProvider } from "./active-brain-store.js";
+import { maybeAlertOnAuthFailure } from "./auth-alert.js";
 
 const { Pool } = pg;
 
@@ -113,6 +114,17 @@ async function recordAuthEvent(input: {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[auth-telemetry] Could not record auth event: ${message.slice(0, 180)}`);
+    return;
+  }
+
+  // Best-effort, non-blocking alert evaluation. Gated on a Slack bot token, so
+  // it is a no-op unless hosted alerting is configured; it never adds latency to
+  // or throws into the auth path. Set BRAIN_AUTH_ALERT_AWAIT=1 for diagnostics.
+  const alert = maybeAlertOnAuthFailure();
+  if (process.env.BRAIN_AUTH_ALERT_AWAIT === "1") {
+    await alert.catch(() => undefined);
+  } else {
+    void Promise.resolve(alert).catch(() => undefined);
   }
 }
 
