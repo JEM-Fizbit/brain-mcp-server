@@ -3,7 +3,7 @@ import { LOADER_FILE, NOW_FILE } from "../constants.js";
 import { filesystemBrainStore, type BrainStore, type FileMetadata } from "./brain-store.js";
 import { RevisionBrainStore } from "./revision-brain-store.js";
 import { revisionBrainStoreFromFile } from "./revision-brain-store.js";
-import { PostgresRevisionStore } from "../sync/postgres-revision-store.js";
+import { PostgresRevisionStore, postgresPoolOptions } from "../sync/postgres-revision-store.js";
 import { PostgresSourceMetadataStore } from "../sources/postgres-source-store.js";
 import { instrumentPostgresPool } from "./operation-telemetry.js";
 
@@ -54,7 +54,7 @@ export function activeBrainStore(): BrainStore {
       );
     }
     const pool = instrumentPostgresPool(
-      new Pool({ connectionString: databaseUrl, max: Number(process.env.BRAIN_PG_POOL_MAX) || 4 }),
+      new Pool(postgresPoolOptions(databaseUrl)),
       "brain_runtime"
     );
     store = new RevisionBrainStore(

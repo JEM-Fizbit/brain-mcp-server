@@ -160,6 +160,18 @@ test("local sync daemon bounds Postgres stalls and shutdown", async () => {
     path.join(repoRoot, "src", "sync", "postgres-revision-store.ts"),
     "utf-8"
   );
+  const activeStore = await fs.readFile(
+    path.join(repoRoot, "src", "services", "active-brain-store.ts"),
+    "utf-8"
+  );
+  const sourceStore = await fs.readFile(
+    path.join(repoRoot, "src", "sources", "postgres-source-store.ts"),
+    "utf-8"
+  );
+  const oauthStore = await fs.readFile(
+    path.join(repoRoot, "src", "oauth", "postgres-state.ts"),
+    "utf-8"
+  );
 
   assert.match(cli, /BRAIN_SYNC_CLOSE_TIMEOUT_MS/);
   assert.match(cli, /closeWithTimeout/);
@@ -172,6 +184,10 @@ test("local sync daemon bounds Postgres stalls and shutdown", async () => {
   assert.match(store, /connectionTimeoutMillis/);
   assert.match(store, /query_timeout/);
   assert.match(store, /statement_timeout/);
+  assert.match(activeStore, /postgresPoolOptions\(databaseUrl\)/);
+  assert.match(sourceStore, /postgresPoolOptions\(poolOrConnectionString\)/);
+  assert.match(oauthStore, /postgresPoolOptions\(poolOrConnectionString/);
+  assert.match(oauthStore, /BRAIN_OAUTH_STATE_PG_POOL_MAX/);
 });
 
 test("hosted MCP server records tool latency without payload content", async () => {
