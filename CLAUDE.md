@@ -20,6 +20,19 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 
 ---
 
+## Brain Access Precedence
+
+For Brain context, status, file reads, searches, lint, log reads, and narrow Brain writes, reach for the hosted Brain MCP first. Treat `brain-local`, direct filesystem reads, and OneDrive/CloudStorage mirrors as fallback paths only.
+
+- Use explicit `brain_id` whenever more than one Brain is visible or the request could touch both. `ai-brain-jem` is permitted for JEM/personal Brain context; `ers-brain` is permitted for ERS/company Brain context. Platform work that affects both Brains should check both explicitly.
+- Read-only hosted tools are pre-approved for normal project work: sync status, context load, file read, search, file/source listing, log read, and lint/doctor once the relevant hosted tool is known to work for that Brain.
+- Hosted writes remain governed by the normal Brain write rule: write only when the user explicitly asks to save/update/log, or when the task clearly requires a narrow project-memory update. Use the hosted tool path for the write unless it is unavailable and the user has approved fallback.
+- If the hosted connector appears to expose only part of the tool surface, run tool discovery again before falling back. If hosted access is still unavailable or insufficient, say exactly which hosted call failed or was missing before using `brain-local` or local files.
+- Do not silently switch to local access because hosted is slow. Use hosted as the authoritative path, report unusually slow hosted calls, and capture the performance issue in the relevant telemetry/backlog path when it affects operations.
+- Do not print full Brain files unless the user explicitly asks. Return targeted excerpts, metadata, filenames, and conclusions.
+
+---
+
 ## Roadmap & Backlog System
 
 This project uses the layered roadmap/backlog/spec system. Universal protocol: [ai-knowledge/protocols/ROADMAP_AND_BACKLOG.md](https://github.com/JEM-Fizbit/ai-knowledge/blob/main/protocols/ROADMAP_AND_BACKLOG.md). Triggers are semantic — invoke whenever the user gestures at open work (capture, retrieval, promotion, ship); don't wait for the literal word "backlog."
