@@ -23,15 +23,17 @@ The current John-only ERS pilot now works, but it has accumulated too many opera
 
 This is acceptable as a controlled single-operator pilot, but it is not acceptable as the default ERS production model. It is especially weak for Windows/PC colleagues, because the current helper is macOS-specific and requires Full Disk Access, local app install, per-user state paths, and launchd. A Windows equivalent is possible, but it would create a second support surface rather than simplifying the architecture.
 
-The menu-bar app remains urgent for John/operator ergonomics, but it should not be productized until we decide whether local helper apps are a real long-term architecture or only a temporary adapter.
+The menu-bar app remains urgent for John/operator ergonomics and should proceed as a consolidated **operator pilot app** for John's own platform. It should not be positioned as the ERS colleague rollout architecture until the colleague human surface is decided.
 
 ## Recommendation
 
-Adopt a **hosted hub + SharePoint adapter** target architecture for ERS production.
+Adopt a **hosted hub + human-facing web surface** target architecture for ERS production if the raw local Markdown/Obsidian constraint can be relaxed for colleagues. Keep Markdown as the Brain's durable, LLM-friendly content format and export/import representation, but do not require colleagues to understand or edit `.md` files.
 
-Supabase remains the hosted operational hub for MCP reads/writes, revision history, conflict tracking, source metadata, artifacts, telemetry, and access/audit control. SharePoint/OneDrive remains the ERS human-facing file surface. A new hosted Microsoft Graph adapter should synchronize Markdown between Supabase revisions and the ERS SharePoint document library directly.
+If ERS must preserve direct human editing of Markdown files in SharePoint/OneDrive, use the **hosted hub + SharePoint adapter** architecture as the fallback target.
 
-The current macOS helper should be retained as a **John-only/operator bridge** while the Graph adapter is designed and proven. It should not become the colleague rollout default unless the Graph adapter proves unworkable.
+Supabase remains the hosted operational hub for MCP reads/writes, revision history, conflict tracking, source metadata, artifacts, telemetry, and access/audit control. A browser-based Brain surface can render Markdown as structured pages, search results, entity/project views, task/review queues, and source manifests. SharePoint/OneDrive remains important as an ERS document/source surface and may receive generated Markdown/HTML exports, but it does not need to be the primary human editing interface unless ERS explicitly wants file-based Brain editing.
+
+The current macOS helper should be retained and improved as a **John-only/operator bridge**. The consolidated menu-bar app should be prioritized to reduce John's operator overhead and make the pilot stable and usable. It should not become the colleague rollout default unless a deliberate future decision makes local helper apps a supported product surface.
 
 ## Target Architecture
 
@@ -59,6 +61,27 @@ Claude / ChatGPT / Codex / future ERS clients
 ```
 
 For JEM/personal use, local Markdown and the macOS helper can remain a pragmatic path. For ERS colleague rollout, the installed local helper should be optional, not required.
+
+If the raw Markdown/Obsidian constraint is relaxed for ERS colleagues, the target simplifies further:
+
+```text
+Claude / ChatGPT / Codex / future ERS clients
+                  |
+                  v
+        Hosted Brain MCP / OAuth / authz
+                  |
+                  v
+     Supabase Postgres revision/conflict store
+     Supabase Storage artifact/archive store
+                  |
+          -----------------------
+          |          |          |
+          v          v          v
+   Browser UI   Markdown   SharePoint/Graph
+ for humans     export     source/inbox/export
+```
+
+In this variant, Markdown remains the portable, LLM-digestible content format. It stops being the required human interface for most colleagues.
 
 ## Architecture Options Considered
 
@@ -102,7 +125,7 @@ A hosted worker/service syncs Supabase revisions with the ERS SharePoint/OneDriv
 - Must account for OneDrive caching/eventual consistency and SharePoint version behavior.
 - Needs a hosted background worker or scheduled job.
 
-**Verdict:** Recommended ERS production target. Run a read-only Graph spike before menu-bar productization.
+**Verdict:** Recommended ERS production target if raw Markdown/Obsidian remains a colleague requirement. Run a read-only Graph spike before productizing any colleague-facing local sync app. This does not block the John/operator menu-bar app.
 
 ### Option C - Supabase-only canonical Brain, SharePoint as export/projection
 
@@ -140,6 +163,27 @@ OneDrive or Git remains canonical, and hosted MCP reads/writes through that laye
 
 **Verdict:** Reject.
 
+### Option E - Hosted hub with browser human surface; Markdown as storage/interchange
+
+Supabase-backed hosted Brain is the operational source for MCP and human UI. Humans use a browser surface that renders Markdown into readable pages, search, filters, entity/project views, task queues, and review workflows. Markdown remains the stored/revisioned text format and export/import format, but colleagues do not edit raw `.md` files unless they choose to.
+
+**Pros:**
+
+- Strongest colleague usability: no Obsidian, local folders, Git, helper app, or OS-specific install.
+- Cross-platform immediately: browser works on macOS, Windows, mobile, and managed devices.
+- Keeps Markdown's LLM advantages: plain text, diffs, reviewability, exportability.
+- Simplifies support and onboarding.
+- Aligns with future ERS multi-user auth, audit, and permissions.
+
+**Cons:**
+
+- Requires building a real human-facing web app, not only MCP tools.
+- Needs edit/review UX so humans can safely change Brain content without raw files.
+- Requires role-based access, audit, and probably a better content model around Markdown sections/frontmatter over time.
+- SharePoint/OneDrive no longer acts as the primary editing surface, which is a product decision.
+
+**Verdict:** Preferred if John accepts that ERS colleagues do not need raw Markdown/Obsidian as their normal surface. This makes the Graph adapter a source/inbox/export connector rather than the main bidirectional Brain editing bridge.
+
 ## Surface Support Matrix
 
 | Surface | Current role | Target role | Decision needed |
@@ -147,8 +191,9 @@ OneDrive or Git remains canonical, and hosted MCP reads/writes through that laye
 | Supabase Postgres | Hosted revision/conflict/telemetry store | Keep as operational hub | Confirm ERS-owned project before production |
 | Supabase Storage | Source/artifact storage | Keep for immutable artifacts and extracted text support | Confirm ERS bucket ownership and byte-access policy |
 | Hosted MCP | Remote/client access | Keep as normal API surface | Fork/deploy ERS-owned service before team rollout |
-| SharePoint/OneDrive | ERS human-facing Markdown surface | Keep as ERS human surface | Decide direct Graph adapter scope |
-| macOS sync helper | John-only bridge to OneDrive | Transitional/operator-only unless Option B fails | Do not productize as colleague default yet |
+| SharePoint/OneDrive | ERS human-facing Markdown surface | Keep as document/source surface; make raw Markdown editing optional if browser UI is chosen | Decide whether it is primary editing surface or source/export surface |
+| Browser Brain UI | Not built | Preferred colleague human surface if Markdown/Obsidian constraint is relaxed | Decide minimum read/write/review scope |
+| macOS sync helper | John-only bridge to OneDrive | Consolidated John/operator tool; optional fallback for others | Build menu-bar app for John, not colleague default |
 | Helper LaunchAgent | Auto-start implementation detail | Hide inside packaged app or retire | Not user-facing |
 | Cockpit/doctor | Local operator dashboard | Move toward central/cloud operator dashboard | Local cockpit remains pilot fallback |
 | GitHub repo backup | Backup/version layer | Async export/recovery only | Define export cadence and recovery authority |
@@ -192,13 +237,39 @@ Deprecation condition: hosted MCP plus SharePoint/Graph sync must pass the local
 
 ## Menu-Bar App Position
 
-The Brain Sync menu-bar app is still useful, but its scope must be explicit before implementation:
+The Brain Sync menu-bar app is now approved as a near-term John/operator priority. Its purpose is to make the current pilot lean, usable, and stable without terminal/operator overhead.
 
-- **John/operator menu-bar app:** good near-term value. Shows helper health, last sync, conflicts, doctor status, restart/open logs/open cockpit actions. It can wrap the current macOS helper and LaunchAgent.
+- **John/operator menu-bar app:** proceed. Shows helper health, last sync, conflicts, doctor status, restart/open logs/open cockpit actions. It can wrap the current macOS helper and LaunchAgent.
 - **ERS colleague app:** defer. Do not make colleagues install a sync app unless the Graph adapter is rejected.
-- **Distributable package:** defer until we know whether the app is a narrow operator tool or a cross-platform sync product.
+- **Distributable package:** defer for broad colleague rollout until we know whether the app is a narrow operator tool or a cross-platform sync product. A lightweight John/operator package is acceptable if it reduces fragility.
 
-If we build now, name it as an **operator pilot app**, not "the ERS Brain Sync product."
+Build it as an **operator pilot app**, not "the ERS Brain Sync product."
+
+## Relaxing The Raw Markdown / Obsidian Constraint
+
+Relaxing this constraint materially changes the recommendation.
+
+The original local-first contract protected a real user workflow: John works directly in Markdown and needs local files to remain first-class. That remains valid for John. It does not automatically follow that ERS colleagues should use the same surface.
+
+For most colleagues, raw Markdown and Obsidian are likely implementation details. A better human surface may be:
+
+- browser-readable Brain pages rendered from Markdown;
+- search and source-backed snippets;
+- entity/project/person views;
+- change-review workflows;
+- task/inbox queues;
+- "suggest an update" forms that create reviewed Markdown patches;
+- export to Markdown/HTML/PDF/SharePoint when needed.
+
+In this model:
+
+- Markdown remains valuable as the **content representation**: plain text, diffable, portable, LLM-friendly, easy to export.
+- Markdown is not necessarily the **primary human UI**.
+- SharePoint/OneDrive remains useful for source documents, published exports, and possibly an advanced raw-file mode.
+- The Graph adapter becomes less urgent as a bidirectional Brain-file sync layer and more useful as source ingestion/export plumbing.
+- The local helper becomes a John/operator convenience, not a platform requirement.
+
+This is likely the cleanest path for ERS production if the product requirement is "colleagues can use the Brain" rather than "colleagues can edit Brain Markdown files."
 
 ## Windows / PC Portability
 
@@ -239,11 +310,26 @@ References:
 ### Phase 0 - Freeze architecture creep
 
 - Keep the current macOS helper running for John.
+- Build the consolidated John/operator menu-bar app as the next usability/stability slice.
 - Do not add colleague onboarding to the helper.
-- Do not start menu-bar implementation until the operator-vs-product scope is approved.
+- Label the menu-bar app as operator-pilot tooling, not ERS colleague product UI.
 - Keep Git and local MCP as fallback surfaces, but label them as candidates for deprecation from normal ERS operations.
 
-### Phase 1 - Graph adapter spike
+### Phase 1 - Decide colleague human surface
+
+Before implementing a Graph sync adapter as the main ERS production path, decide whether colleagues need raw Markdown/Obsidian editing.
+
+If the answer is no:
+
+- prioritize a hosted browser Brain UI/read-review surface;
+- keep Markdown as the backend/interchange format;
+- narrow Graph to SharePoint source ingestion and export/publishing.
+
+If the answer is yes:
+
+- proceed to the SharePoint/Graph adapter spike below.
+
+### Phase 2 - Graph adapter spike
 
 Build a read-only spike against the ERS Brain SharePoint folder:
 
@@ -257,9 +343,9 @@ Build a read-only spike against the ERS Brain SharePoint folder:
 
 Exit criterion: clear evidence whether Graph can reliably observe ERS Brain Markdown changes without local OneDrive helper involvement.
 
-### Phase 2 - Minimal bidirectional Graph sync
+### Phase 3 - Minimal bidirectional Graph sync
 
-If Phase 1 passes:
+If raw SharePoint Markdown editing remains required and the Graph spike passes:
 
 - local/SharePoint edit to Supabase revision;
 - hosted MCP write to SharePoint file;
@@ -269,14 +355,14 @@ If Phase 1 passes:
 
 Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP, and a hosted MCP write appears in SharePoint/OneDrive, without a local helper.
 
-### Phase 3 - Operator surface consolidation
+### Phase 4 - Operator surface consolidation
 
 - Convert local cockpit/doctor into a central/cloud operator dashboard or scheduled health service where feasible.
 - Keep local cockpit only for John/developer fallback.
 - Route alerts to Slack/email with per-Brain labels.
 - Track lint, inbox, sync, conflicts, auth, and latency centrally.
 
-### Phase 4 - Deprecation and packaging decisions
+### Phase 5 - Deprecation and packaging decisions
 
 - Decide whether local helper apps remain optional fallback or become a supported product.
 - Decide whether Git export is required for ERS production.
@@ -286,6 +372,7 @@ Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP,
 ## Acceptance Criteria
 
 - Architecture review explicitly chooses one target path for ERS colleague rollout.
+- Colleague human surface is classified as raw Markdown/Obsidian, browser UI, or both.
 - Git backup/export is classified as hot path, backup/export, or deprecated.
 - Local stdio MCP is classified as normal user surface, developer fallback, or deprecated.
 - macOS helper/menu-bar scope is classified as John/operator-only or colleague product.
@@ -297,7 +384,8 @@ Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP,
 ## Out Of Scope
 
 - Implementing the Graph adapter.
-- Building the menu-bar app.
+- Building the menu-bar app in this review document.
+- Building the browser Brain UI.
 - Changing current running helper/LaunchAgent behavior.
 - Removing Git, local MCP, or cockpit.
 - Changing Supabase schema or security policy.
@@ -317,6 +405,7 @@ Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP,
 No code is changed by this review. The next implementation spec should test:
 
 - Graph read-only enumeration of ERS Brain Markdown files;
+- browser UI feasibility for rendering/searching/updating Markdown-backed Brain content if raw file editing is relaxed;
 - Graph delta behavior after manual OneDrive/Obsidian edits;
 - hosted-head comparison for Graph-observed files;
 - permission and token lifecycle failure modes;
@@ -348,7 +437,7 @@ node scripts/hosted-doctor.mjs
 
 ## Assumptions
 
-- ERS users should continue to see SharePoint/OneDrive as the normal shared file surface for Brain Markdown unless John decides otherwise.
+- ERS users may not need raw Markdown/Obsidian as their normal surface; this is now an explicit product decision.
 - John remains the only user during the current pilot.
 - ERS production requires ERS-owned Supabase and a dedicated ERS MCP deployment before team rollout.
 - Local helper apps are acceptable for John/operator use but undesirable as a colleague prerequisite.
@@ -357,7 +446,8 @@ node scripts/hosted-doctor.mjs
 
 ## Required User Decisions
 
-1. Should the first implementation slice be a read-only SharePoint/Graph adapter spike?
-2. Is the macOS menu-bar app allowed to proceed as a John/operator-only pilot while the Graph adapter is evaluated?
-3. Should Git remain a required ERS backup/export layer after Supabase and SharePoint versioning are verified?
-4. Should local MCP stay documented only for John/developers once hosted MCP and Graph sync are proven?
+1. Should the next implementation slice be the consolidated John/operator menu-bar app?
+2. For ERS colleagues, is raw Markdown/Obsidian editing required, optional/advanced, or unnecessary?
+3. If raw Markdown editing is unnecessary for colleagues, should the next architecture spike be a hosted browser Brain UI instead of a bidirectional SharePoint/Graph sync adapter?
+4. Should Git remain a required ERS backup/export layer after Supabase and SharePoint versioning are verified?
+5. Should local MCP stay documented only for John/developers once hosted MCP and Graph sync are proven?
