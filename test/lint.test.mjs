@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "brain-lint-test-"));
 process.env.BRAIN_DIR = tmpDir;
 
-const { runLint } = await import(
+const { runLint, formatLintReport } = await import(
   path.join(__dirname, "..", "dist", "services", "lint.js")
 );
 const { FileRevisionStore } = await import(
@@ -234,6 +234,45 @@ test("journal rotation: byte size over threshold flags with bytes reason", async
     report.journalRotation.bytes > 80 * 1024,
     "byte size should exceed the 80 KB threshold"
   );
+});
+
+test("lint flags stale open Capture / Triage Queue items", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `TASKS.md`\n",
+    "NOW.md": "# NOW\n",
+    "TASKS.md": [
+      "# TASKS",
+      "",
+      "## Capture / Triage Queue",
+      "",
+      "Temporary capture queue.",
+      "",
+      "- [ ] 2026-06-01 — IDEA — Browser-based Brain viewer",
+      "  - Source: ChatGPT iPhone",
+      "  - Route hint: brain-platform",
+      "  - Triage: Route to canonical destination, then mark transferred/closed.",
+      "",
+      "- [x] 2026-06-01 — NOTE — Already triaged item",
+      "  - Triage: Closed.",
+      "",
+      "## Active",
+      "",
+    ].join("\n"),
+  });
+
+  const report = await runLint();
+  assert.ok(report.captureQueue, "capture queue signal should be present");
+  assert.equal(report.captureQueue.openCount, 1);
+  assert.equal(report.captureQueue.staleCount, 1);
+  assert.ok(
+    report.captureQueue.oldestOpenDays >= 7,
+    "oldest open item should exceed the stale threshold"
+  );
+
+  const formatted = formatLintReport(report);
+  assert.match(formatted, /## Capture \/ Triage Queue/);
+  assert.match(formatted, /1 open item/);
+  assert.match(formatted, /Browser-based Brain viewer/);
 });
 
 test("revision-store lint does not scan BRAIN_DIR", async () => {

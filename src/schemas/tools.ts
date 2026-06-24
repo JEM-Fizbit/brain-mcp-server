@@ -168,22 +168,37 @@ export const ReadLogSchema = BrainIdSchema.extend({
     .describe("Number of newest-first log entries to skip before returning results. Use with limit for pagination. Default: 0."),
 });
 
-export const ReportItemSchema = BrainIdSchema.extend({
+export const CaptureItemSchema = BrainIdSchema.extend({
   kind: z
-    .enum(["bug", "feature", "observation", "investigation", "follow_up"])
-    .describe("Type of conversationally reported item to capture."),
+    .enum([
+      "bug",
+      "feature",
+      "observation",
+      "investigation",
+      "follow_up",
+      "idea",
+      "question",
+      "reminder",
+      "note",
+      "routing",
+    ])
+    .describe("Type of conversationally captured item to triage."),
   title: z
     .string()
     .min(1)
-    .describe("Short human-scannable title for the intake item."),
+    .describe("Short human-scannable title for the capture item."),
   source: z
     .string()
     .optional()
     .describe("Where the item was reported, e.g. ChatGPT mobile or Claude web."),
+  route_hint: z
+    .string()
+    .optional()
+    .describe("Likely onward destination or owning area after triage."),
   target: z
     .string()
     .optional()
-    .describe("Likely owning project, repo, Brain area, or system."),
+    .describe("Compatibility alias for route_hint."),
   details: z
     .string()
     .optional()
@@ -193,6 +208,8 @@ export const ReportItemSchema = BrainIdSchema.extend({
     .default("normal")
     .describe("Triage urgency. Default: normal."),
 });
+
+export const ReportItemSchema = CaptureItemSchema;
 
 const sourceCategoryEnum = z.enum([
   "bios",

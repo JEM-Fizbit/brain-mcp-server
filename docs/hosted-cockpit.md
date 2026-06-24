@@ -255,7 +255,7 @@ the same Brain.
 
 Green means hosted Brain is ready for normal use.
 
-Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
+Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
