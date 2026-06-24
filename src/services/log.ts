@@ -32,10 +32,10 @@ export function appendLogEntryToContent(content: string, entry: string): string 
   const dividerIndex = base.indexOf(divider);
 
   if (dividerIndex === -1) {
-    const legacyEntryMatch = /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/m.exec(base);
-    if (legacyEntryMatch?.index !== undefined) {
-      const prefix = base.slice(0, legacyEntryMatch.index).trimEnd();
-      const rest = base.slice(legacyEntryMatch.index).trimStart();
+    const firstEntryMatch = firstRecognizedEntryMatch(base);
+    if (firstEntryMatch?.index !== undefined) {
+      const prefix = base.slice(0, firstEntryMatch.index).trimEnd();
+      const rest = base.slice(firstEntryMatch.index).trimStart();
       return `${prefix}\n\n${entry}\n${rest}`.trimEnd() + "\n";
     }
     return `${entry}\n${base}`.trimEnd() + "\n";
@@ -53,6 +53,15 @@ function isStandardEntryStart(line: string): boolean {
 
 function isLegacyEntryStart(line: string): boolean {
   return /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/.test(line);
+}
+
+function firstRecognizedEntryMatch(content: string): RegExpExecArray | null {
+  const matches = [
+    /^## \[\d{4}-\d{2}-\d{2}\]/m.exec(content),
+    /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/m.exec(content),
+  ].filter((match): match is RegExpExecArray => Boolean(match));
+
+  return matches.sort((a, b) => a.index - b.index)[0] || null;
 }
 
 function isRootHeading(line: string): boolean {
