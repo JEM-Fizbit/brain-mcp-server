@@ -72,6 +72,8 @@ async function recordAuthEvent(input: {
   httpStatus: number;
   durationMs: number;
   target?: string | null;
+  clientId?: string | null;
+  grantType?: string | null;
 }): Promise<void> {
   if (!authTelemetryEnabled()) return;
   const pool = telemetryPool();
@@ -88,6 +90,11 @@ async function recordAuthEvent(input: {
     ok: false,
     error: input.reason,
     httpStatus: input.httpStatus,
+    // Non-secret OAuth identifiers for tracking/classification (spec 005).
+    // client_id is attacker-controlled on the failure path, so it is sanitized
+    // and length-bounded. Never record tokens, secrets, headers, or bodies.
+    clientId: input.clientId ? safeText(input.clientId, "unknown") : null,
+    grantType: input.grantType ? safeText(input.grantType, "unknown") : null,
     db: null,
   };
 
@@ -134,6 +141,8 @@ export function recordAuthEventBestEffort(input: {
   httpStatus: number;
   durationMs: number;
   target?: string | null;
+  clientId?: string | null;
+  grantType?: string | null;
 }): Promise<void> | void {
   const write = recordAuthEvent(input);
   if (process.env.BRAIN_HOSTED_MCP_AUTH_AWAIT_DB_WRITE === "1") return write;

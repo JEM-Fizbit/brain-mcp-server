@@ -327,13 +327,130 @@ test("auth failure summaries report trends, reasons, targets, and recent metadat
   assert.equal(summary.recentFailures.length, 2);
   assert.deepEqual(Object.keys(summary.recentFailures[0]).sort(), [
     "at",
+    "clientId",
     "durationMs",
+    "grantType",
     "httpStatus",
     "name",
     "reason",
     "source",
     "target",
   ]);
+});
+
+test("auth summary flags a sustained single unregistered client as a stale connector", async () => {
+  const { authFailureSummaryFromSyncEventRows } = await import(
+    "../scripts/lib/latency-summary.mjs"
+  );
+  const now = "2026-06-24T09:00:00.000Z";
+  // Same zombie client id, unknown_client_id on refresh_token, spanning > grace.
+  const zombie = (createdAt) => ({
+    event_type: "hosted_mcp_auth",
+    duration_ms: 4,
+    created_at: createdAt,
+    metadata: {
+      ok: false,
+      error: "unknown_client_id",
+      name: "oauth_token",
+      source: "hosted_mcp_server",
+      httpStatus: 401,
+      clientId: "mcp_client_zombie",
+      grantType: "refresh_token",
+    },
+  });
+  const rows = [
+    zombie("2026-06-24T08:20:00.000Z"),
+    zombie("2026-06-24T08:40:00.000Z"),
+    zombie("2026-06-24T08:58:00.000Z"),
+  ];
+  const summary = authFailureSummaryFromSyncEventRows(rows, {
+    now,
+    windowMinutes: 60,
+    warnThreshold: 3,
+    failThreshold: 3,
+    staleGraceMinutes: 10,
+    registeredClientIds: ["mcp_client_real_chatgpt", "mcp_client_real_claude"],
+  });
+  assert.equal(summary.status, "fail");
+  assert.equal(summary.connectorState, "stale_connector");
+  assert.equal(summary.staleClientId, "mcp_client_zombie");
+  assert.equal(summary.effectiveStatus, "warn");
+  assert.equal(summary.clients[0].clientId, "mcp_client_zombie");
+  assert.equal(summary.grantTypes[0].grantType, "refresh_token");
+});
+
+test("auth summary keeps full severity when the stale pattern is ambiguous", async () => {
+  const { authFailureSummaryFromSyncEventRows } = await import(
+    "../scripts/lib/latency-summary.mjs"
+  );
+  const now = "2026-06-24T09:00:00.000Z";
+  const base = (extra, createdAt) => ({
+    event_type: "hosted_mcp_auth",
+    duration_ms: 4,
+    created_at: createdAt,
+    metadata: {
+      ok: false,
+      name: "oauth_token",
+      source: "hosted_mcp_server",
+      httpStatus: 401,
+      ...extra,
+    },
+  });
+  const opts = {
+    now,
+    windowMinutes: 60,
+    warnThreshold: 3,
+    failThreshold: 3,
+    staleGraceMinutes: 10,
+  };
+
+  // (a) registered set unknown -> cannot confirm stale -> full severity
+  const unknownReg = authFailureSummaryFromSyncEventRows(
+    [
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:20:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:40:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:58:00.000Z"),
+    ],
+    opts
+  );
+  assert.equal(unknownReg.connectorState, "incident");
+  assert.equal(unknownReg.effectiveStatus, "fail");
+
+  // (b) two distinct client ids -> not single -> full severity
+  const multiClient = authFailureSummaryFromSyncEventRows(
+    [
+      base({ error: "unknown_client_id", clientId: "z1", grantType: "refresh_token" }, "2026-06-24T08:20:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z2", grantType: "refresh_token" }, "2026-06-24T08:40:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z1", grantType: "refresh_token" }, "2026-06-24T08:58:00.000Z"),
+    ],
+    { ...opts, registeredClientIds: [] }
+  );
+  assert.equal(multiClient.connectorState, "incident");
+  assert.equal(multiClient.effectiveStatus, "fail");
+
+  // (c) within grace window (short burst) -> not yet stale -> full severity
+  const shortBurst = authFailureSummaryFromSyncEventRows(
+    [
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:58:30.000Z"),
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:59:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:59:40.000Z"),
+    ],
+    { ...opts, registeredClientIds: [], staleGraceMinutes: 30 }
+  );
+  assert.equal(shortBurst.connectorState, "incident");
+  assert.equal(shortBurst.effectiveStatus, "fail");
+
+  // (d) mixed reasons (missing_bearer) -> ambiguous -> full severity
+  const multiReason = authFailureSummaryFromSyncEventRows(
+    [
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:20:00.000Z"),
+      base({ error: "missing_bearer", name: "mcp_authorization" }, "2026-06-24T08:40:00.000Z"),
+      base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:58:00.000Z"),
+    ],
+    { ...opts, registeredClientIds: [] }
+  );
+  assert.equal(multiReason.connectorState, "incident");
+  assert.equal(multiReason.effectiveStatus, "fail");
 });
 
 test("latency summaries separate timing layers, exact tools, slowest operations, and DB contribution", () => {

@@ -25,6 +25,7 @@ export interface AuthAlertThresholds {
   warnThreshold: number;
   failThreshold: number;
   cooldownMinutes: number;
+  staleGraceMinutes: number;
 }
 
 export function severityForCount(
@@ -36,6 +37,33 @@ export function severityForCount(
   return null;
 }
 
+// Conservative stale-connector test, shared in spirit with the cockpit summary's
+// connectorState (scripts/lib/latency-summary.mjs, spec 005). Both must encode
+// the same rule so the doctor verdict and the Slack alert agree. Returns true
+// only when a SINGLE unregistered client id has been looping unknown_client_id
+// on a refresh-token grant past the grace window; any ambiguity returns false
+// (full severity).
+export function computeStaleConnector(input: {
+  failingClientIds: string[];
+  allUnknownClientRefresh: boolean;
+  registeredClientIds: string[] | null;
+  firstFailureAt: Date | null;
+  lastFailureAt: Date | null;
+  now: Date;
+  graceMinutes: number;
+}): boolean {
+  if (!input.registeredClientIds) return false; // unknown registered set -> conservative
+  if (!input.allUnknownClientRefresh) return false;
+  const ids = input.failingClientIds.filter(Boolean);
+  if (ids.length !== 1) return false; // single client only
+  if (new Set(input.registeredClientIds).has(ids[0])) return false; // must be unregistered
+  if (!input.firstFailureAt || !input.lastFailureAt) return false;
+  const graceMs = Math.max(1, input.graceMinutes) * 60 * 1000;
+  const spanMs = input.lastFailureAt.getTime() - input.firstFailureAt.getTime();
+  const firstAgeMs = input.now.getTime() - input.firstFailureAt.getTime();
+  return Math.max(spanMs, 0) >= graceMs || firstAgeMs >= graceMs;
+}
+
 export interface AuthAlertDecisionInput {
   failureCount: number;
   warnThreshold: number;
@@ -44,6 +72,9 @@ export interface AuthAlertDecisionInput {
   lastWarnAt: Date | null;
   lastFailAt: Date | null;
   now: Date;
+  // When true, a benign stale-connector loop (an unrecognized client id retrying
+  // a refresh-token grant) is capped at `warn` so it never pages the operator DM.
+  staleConnector?: boolean;
 }
 
 export type AuthAlertDecision =
@@ -51,11 +82,16 @@ export type AuthAlertDecision =
   | { fire: true; severity: AuthAlertSeverity };
 
 export function decideAuthAlert(input: AuthAlertDecisionInput): AuthAlertDecision {
-  const severity = severityForCount(input.failureCount, {
+  const raw = severityForCount(input.failureCount, {
     warnThreshold: input.warnThreshold,
     failThreshold: input.failThreshold,
   });
-  if (!severity) return { fire: false, reason: "below_threshold" };
+  if (!raw) return { fire: false, reason: "below_threshold" };
+  // Stale-connector downgrade: never page `fail` for a benign loop. This mirrors
+  // the doctor's effectiveStatus rule (spec 005) so the cockpit verdict and the
+  // Slack alert agree. Criteria are computed in computeStaleConnector below.
+  const severity: AuthAlertSeverity =
+    input.staleConnector && raw === "fail" ? "warn" : raw;
 
   const cooldownMs = input.cooldownMinutes * 60 * 1000;
   const within = (at: Date | null): boolean =>
@@ -90,6 +126,8 @@ export function readAuthAlertThresholds(
     warnThreshold: intEnv(env, "BRAIN_AUTH_ALERT_WARN_THRESHOLD", 3),
     failThreshold: intEnv(env, "BRAIN_AUTH_ALERT_FAIL_THRESHOLD", 10),
     cooldownMinutes: intEnv(env, "BRAIN_AUTH_ALERT_COOLDOWN_MINUTES", 30),
+    // Shares the doctor's grace knob so both sides classify identically.
+    staleGraceMinutes: intEnv(env, "BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES", 10),
   };
 }
 
@@ -131,6 +169,7 @@ export interface AuthFailureState {
   httpStatus: string | null;
   lastWarnAt: Date | null;
   lastFailAt: Date | null;
+  staleConnector: boolean;
 }
 
 export interface AuthAlertConfig {
@@ -220,6 +259,7 @@ async function defaultLoadState(
     httpStatus: null,
     lastWarnAt: null,
     lastFailAt: null,
+    staleConnector: false,
   };
   const connectionString = process.env.BRAIN_REVISION_DATABASE_URL;
   if (!connectionString) return empty;
@@ -228,7 +268,12 @@ async function defaultLoadState(
   const result = await pool.query(
     `
       with failures as (
-        select metadata->>'error' as reason, metadata->>'httpStatus' as http_status
+        select
+          metadata->>'error' as reason,
+          metadata->>'httpStatus' as http_status,
+          metadata->>'clientId' as client_id,
+          metadata->>'grantType' as grant_type,
+          created_at
         from brain.sync_events
         where brain_id = $1
           and event_type = 'hosted_mcp_auth'
@@ -256,6 +301,14 @@ async function defaultLoadState(
         ) r) as reasons,
         (select http_status from failures where http_status is not null
             group by http_status order by count(*) desc limit 1) as http_status,
+        (select coalesce(jsonb_agg(distinct client_id), '[]'::jsonb)
+            from failures where client_id is not null) as failing_client_ids,
+        (select coalesce(bool_and(reason = 'unknown_client_id' and grant_type = 'refresh_token'), false)
+            from failures) as all_unknown_refresh,
+        (select min(created_at) from failures) as first_failure_at,
+        (select max(created_at) from failures) as last_failure_at,
+        (select coalesce(jsonb_agg(state_key), '[]'::jsonb)
+            from brain.oauth_state where store = 'clients') as registered_client_ids,
         (select last_at from alerts where severity = 'warn') as last_warn_at,
         (select last_at from alerts where severity = 'fail') as last_fail_at
     `,
@@ -263,6 +316,19 @@ async function defaultLoadState(
   );
   const row = result.rows[0] || {};
   const reasonsRaw = Array.isArray(row.reasons) ? row.reasons : [];
+  const staleConnector = computeStaleConnector({
+    failingClientIds: Array.isArray(row.failing_client_ids)
+      ? row.failing_client_ids.map(String)
+      : [],
+    allUnknownClientRefresh: row.all_unknown_refresh === true,
+    registeredClientIds: Array.isArray(row.registered_client_ids)
+      ? row.registered_client_ids.map(String)
+      : null,
+    firstFailureAt: row.first_failure_at ? new Date(row.first_failure_at) : null,
+    lastFailureAt: row.last_failure_at ? new Date(row.last_failure_at) : null,
+    now: new Date(),
+    graceMinutes: config.thresholds.staleGraceMinutes,
+  });
   return {
     failureCount: Number(row.failure_count || 0),
     reasons: reasonsRaw.map((entry: { reason: string; n: number }) => ({
@@ -272,6 +338,7 @@ async function defaultLoadState(
     httpStatus: row.http_status ? String(row.http_status) : null,
     lastWarnAt: row.last_warn_at ? new Date(row.last_warn_at) : null,
     lastFailAt: row.last_fail_at ? new Date(row.last_fail_at) : null,
+    staleConnector,
   };
 }
 
@@ -364,6 +431,7 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
     lastWarnAt: state.lastWarnAt,
     lastFailAt: state.lastFailAt,
     now: resolved.now(),
+    staleConnector: state.staleConnector,
   });
   if (!decision.fire) return { fired: false, reason: decision.reason };
 

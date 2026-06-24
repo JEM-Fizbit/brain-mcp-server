@@ -1765,6 +1765,8 @@ const page = String.raw`<!doctype html>
       function renderAuthFailureBreakdowns(details) {
         const rows =
           authBreakdownRows("Reason", details.reasons, "reason") +
+          authBreakdownRows("Client", details.clients, "clientId") +
+          authBreakdownRows("Grant", details.grantTypes, "grantType") +
           authBreakdownRows("Target", details.targets, "target") +
           authBreakdownRows("Name", details.names, "name") +
           authBreakdownRows("HTTP", details.httpStatuses, "httpStatus");
@@ -1836,8 +1838,14 @@ const page = String.raw`<!doctype html>
           renderAuthFailureSummaryCard("Failure Rate", formatPercent(details.failureRate), formatCount(details.totalAuthEvents || 0) + " auth events"),
         ].join("");
 
+        const staleBanner = details.connectorState === "stale_connector"
+          ? "<div class=\"event-meta\">Classified as a stale connector: a single unregistered client" +
+            (details.staleClientId ? " (" + escapeHtml(details.staleClientId) + ")" : "") +
+            " is looping unknown_client_id on a refresh-token grant. This is expected post-migration noise (a connector that needs full removal, not a re-auth) and is downgraded from fail to warn — see DECISIONS.md.</div>"
+          : "";
         document.getElementById("auth-failure-summary").innerHTML =
           "<div class=\"latency-summary-grid auth-summary-grid\">" + summaryCards + "</div>" +
+          staleBanner +
           (details.eventLimitReached ? "<div class=\"event-meta\">Auth event limit reached; counts may be clipped at " + escapeHtml(formatCount(details.eventLimit)) + " rows.</div>" : "");
         document.getElementById("auth-failure-trend").innerHTML = renderAuthFailureTrend(details);
         document.getElementById("auth-failure-breakdowns").innerHTML = renderAuthFailureBreakdowns(details);

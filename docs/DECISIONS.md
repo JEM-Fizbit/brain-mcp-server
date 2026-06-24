@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-24 — Record non-secret client identity on auth telemetry; classify stale-connector loops separately
+
+**Decision:** Hosted auth-failure telemetry (`brain.sync_events`, `event_type = 'hosted_mcp_auth'`) now records two **non-secret** OAuth identifiers in `metadata` when derivable: the raw `clientId` and the `grantType`. The cockpit auth summary (`authFailureSummaryFromSyncEventRows`) exposes per-`clientId` and per-`grantType` breakdowns and derives a `connectorState`. A **conservative** `stale_connector` verdict — a single *unregistered* `clientId` looping `unknown_client_id` on a `refresh_token` grant, sustained past a grace window — is downgraded from `fail` to `warn` by both the `hosted_mcp_auth_failures` doctor check (via `effectiveStatus`) and the spec-004 Slack alerter (via `computeStaleConnector` + `decideAuthAlert`), so a benign post-migration zombie connector no longer pages at full severity. Any ambiguity (multi-client, multi-reason, unknown registered set, short burst) keeps full severity. Grace window: `BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES` (default 10), shared by doctor and alerter.
+
+**Why:** A frozen/half-deleted ChatGPT connector kept presenting a pre-migration `client_id` on a ~11-minute timer (observed 2026-06-24). The server rejected it correctly, but the failure was unidentifiable (no client identity recorded) and tripped `fail` + Slack pages indefinitely — contradicting the 2026-06-23 decision that the post-migration `invalid_client` wave is expected and self-healing. The rejected `client_id` is the one stable, unique signature, available at `src/oauth/token.ts` and previously discarded. Recording it (and `grantType`) makes the zombie precisely identifiable and lets monitoring tell expected stale-connector noise apart from a real auth incident. The server cannot stop a remote client's retry loop (a `401` is already the spec-correct "give up"); this is an observability/classification fix, not enforcement.
+
+**Alternatives rejected:** Recording a hash of the `client_id` (breaks the join to the `clients` registration store for surface/name resolution, with no benefit — `client_id` is non-secret); capturing `User-Agent`/IP now to identify unregistered clients (deferred to the observability BACKLOG item and gated by the Supabase security review — higher privacy cost, and `client_id` alone classifies the zombie); a broad downgrade whenever `unknown_client_id` dominates (risks masking a real incident — kept conservative); importing the `.mjs` summary classifier into the `src/` alerter (cross-layer dependency that may not ship in the Fly image — instead a small shared-rule helper is duplicated in spirit and pinned by tests on both sides).
+
+**Related:** `docs/specs/005-auth-client-identity-and-stale-connector-classification.md`; `src/oauth/token.ts`; `src/services/auth-telemetry.ts`; `src/services/auth-alert.ts`; `scripts/lib/latency-summary.mjs`; `scripts/hosted-doctor.mjs`; `scripts/hosted-cockpit.mjs`; `docs/security/hosted-brain-supabase-security-gate.md`; `DECISIONS.md` 2026-06-23 (expected post-migration `invalid_client` wave).
+
+---
+
 ## 2026-06-23 — Trust ChatGPT's documented MCP connector OAuth callback path by pattern
 
 **Decision:** Accept ChatGPT MCP app OAuth redirect URIs under `https://chatgpt.com/connector/oauth/<callback-id>` by code, plus the documented legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback. Keep the trust narrow: HTTPS only, exact `chatgpt.com` host, no query or fragment, and a single callback-id path segment. Continue to use `MCP_OAUTH_ALLOWED_REDIRECT_URIS` for other exact non-loopback callbacks.

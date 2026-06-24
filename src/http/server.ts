@@ -283,6 +283,8 @@ export async function handleHttpRequest(
           target,
           httpStatus: result.status,
           durationMs: performance.now() - startedAt,
+          clientId: result.clientId,
+          grantType: result.grantType,
         });
         if (maybeWrite) await maybeWrite;
       }

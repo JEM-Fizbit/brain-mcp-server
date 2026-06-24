@@ -23,10 +23,7 @@ import {
   summarizeLatencyHistoryByTool,
 } from "./lib/latency-summary.mjs";
 import { classifyPoolerUrl } from "../dist/services/pooler.js";
-import {
-  readAuthAlertThresholds,
-  severityForCount,
-} from "../dist/services/auth-alert.js";
+import { readAuthAlertThresholds } from "../dist/services/auth-alert.js";
 
 loadLocalEnv();
 
@@ -72,6 +69,10 @@ const authFailureRecentLimit = Math.max(
 const authFailureBucketCount = Math.max(
   2,
   Number(process.env.BRAIN_HOSTED_MCP_AUTH_BUCKETS || 6)
+);
+const authStaleGraceMinutes = Math.max(
+  1,
+  Number(process.env.BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES || 10)
 );
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
@@ -922,15 +923,30 @@ async function checkAuthFailures() {
       `,
       [brainId, HOSTED_MCP_AUTH_EVENT_TYPE, windowMinutes, authFailureEventLimit]
     );
+    // Registered client ids let the summary tell a benign stale-connector loop
+    // (an unrecognized client id retrying refresh) apart from a real incident.
+    // Best-effort: if this read fails, the summary keeps full severity.
+    let registeredClientIds;
+    try {
+      const clientRows = await pool.query(
+        `select state_key from brain.oauth_state where store = 'clients'`
+      );
+      registeredClientIds = clientRows.rows.map((row) => row.state_key);
+    } catch {
+      registeredClientIds = undefined;
+    }
     const summary = authFailureSummaryFromSyncEventRows(result.rows, {
       windowMinutes,
       warnThreshold,
       failThreshold,
       bucketCount: authFailureBucketCount,
       recentLimit: authFailureRecentLimit,
+      staleGraceMinutes: authStaleGraceMinutes,
+      registeredClientIds,
     });
-    const failureCount = Number(summary.failureCount || 0);
-    const status = severityForCount(failureCount, { warnThreshold, failThreshold }) || "pass";
+    // effectiveStatus encodes the stale-connector downgrade so the doctor verdict
+    // and the Slack alerter (which reads the same field) always agree.
+    const status = summary.effectiveStatus || "pass";
     addCheck("hosted_mcp_auth_failures", status, {
       ...summary,
       eventLimit: authFailureEventLimit,
@@ -1017,12 +1033,22 @@ function buildOperatorActions(status) {
       lastFailure === null || lastFailure === undefined
         ? "no last-failure age available"
         : `last failure ${lastFailure}m ago`;
-    actions.push({
-      level: authFailures.status,
-      title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m (${trend}).`,
-      detail:
-        `${activityState === "active" ? "Failures are still recent" : "Failures appear stale"} (${lastFailureLabel}). Check the cockpit Auth panel and brain.sync_events hosted_mcp_auth rows. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.`,
-    });
+    if (authFailures.details?.connectorState === "stale_connector") {
+      const staleClientId = authFailures.details?.staleClientId;
+      actions.push({
+        level: authFailures.status,
+        title: `Stale connector looping: ${count} unknown_client_id auth failures in the last ${windowMinutes}m (${trend}).`,
+        detail:
+          `A single unregistered client${staleClientId ? ` (${staleClientId})` : ""} is retrying a refresh-token grant the server purged. This is expected post-migration noise, not an incident, and is downgraded to warn. Fix it at the client: fully REMOVE the connector (a re-auth reuses the dead client id) — likely a frozen/half-deleted connector on the provider side. It stops on its own when the provider tears down the connector or its cached refresh token expires.`,
+      });
+    } else {
+      actions.push({
+        level: authFailures.status,
+        title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m (${trend}).`,
+        detail:
+          `${activityState === "active" ? "Failures are still recent" : "Failures appear stale"} (${lastFailureLabel}). Check the cockpit Auth panel and brain.sync_events hosted_mcp_auth rows. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.`,
+      });
+    }
   }
 
   const latencyFinding = (latency?.details?.performanceFindings || [])

@@ -233,6 +233,8 @@ function authEventFromSyncEventRow(row) {
     name: boundedText(metadata.name, "auth_event"),
     target: boundedText(metadata.target || row.filename, null),
     source: boundedText(metadata.source, null),
+    clientId: boundedText(metadata.clientId, null),
+    grantType: boundedText(metadata.grantType, null),
     httpStatus:
       metadata.httpStatus === undefined || metadata.httpStatus === null
         ? null
@@ -322,6 +324,8 @@ export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
       name: event.name,
       target: event.target,
       source: event.source,
+      clientId: event.clientId,
+      grantType: event.grantType,
       httpStatus: event.httpStatus,
       durationMs: event.durationMs,
     }));
@@ -335,6 +339,63 @@ export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
         ? "warn"
         : "pass";
   const active = minutesSinceLastFailure !== null && minutesSinceLastFailure <= activeThresholdMinutes;
+
+  // Stale-connector classification (conservative). A pre-migration / half-deleted
+  // connector loops `unknown_client_id` on a refresh-token grant with a client id
+  // the server no longer recognizes. This is benign noise, not an auth incident
+  // (see DECISIONS.md 2026-06-23). We only downgrade severity when ALL of:
+  //   - the registered client-id set is known (caller passed registeredClientIds),
+  //   - every current failure is unknown_client_id on a refresh_token grant,
+  //   - every failure carries a client id and they are all the SAME single id,
+  //   - that id is NOT currently registered, and
+  //   - the failures have been sustained past the grace window (so a brand-new
+  //     enrollment briefly failing before its DCR completes is not masked).
+  // Any ambiguity (multi-client, multi-reason, unknown registered set, or a short
+  // burst) keeps full severity.
+  const staleGraceMinutes = Math.max(1, Number(options.staleGraceMinutes || 10));
+  const registeredInput = options.registeredClientIds;
+  const registeredKnown =
+    registeredInput instanceof Set || Array.isArray(registeredInput);
+  const registeredSet = registeredKnown
+    ? registeredInput instanceof Set
+      ? registeredInput
+      : new Set(registeredInput)
+    : null;
+  const failingClientIds = new Set(
+    currentFailures.map((event) => event.clientId).filter(Boolean)
+  );
+  let connectorState = failureCount === 0 ? "clear" : "incident";
+  let staleClientId = null;
+  if (failureCount > 0 && registeredSet) {
+    const allUnknownClientRefresh = currentFailures.every(
+      (event) =>
+        event.reason === "unknown_client_id" && event.grantType === "refresh_token"
+    );
+    const everyFailureHasClientId = currentFailures.every((event) => event.clientId);
+    const singleClient = failingClientIds.size === 1;
+    const allUnregistered = [...failingClientIds].every((id) => !registeredSet.has(id));
+    const spanMs =
+      firstFailure && lastFailure
+        ? Date.parse(lastFailure.at) - Date.parse(firstFailure.at)
+        : 0;
+    const firstAgeMs = firstFailure ? safeNow - Date.parse(firstFailure.at) : 0;
+    const graceMs = staleGraceMinutes * 60 * 1000;
+    const sustained = Math.max(spanMs, 0) >= graceMs || firstAgeMs >= graceMs;
+    if (
+      allUnknownClientRefresh &&
+      everyFailureHasClientId &&
+      singleClient &&
+      allUnregistered &&
+      sustained
+    ) {
+      connectorState = "stale_connector";
+      staleClientId = [...failingClientIds][0];
+    }
+  }
+  // Consumers (doctor + Slack alerter) read effectiveStatus so their verdicts
+  // agree: a pure stale-connector loop is capped at `warn` instead of `fail`.
+  const effectiveStatus =
+    connectorState === "stale_connector" && status === "fail" ? "warn" : status;
 
   return {
     windowMinutes,
@@ -357,10 +418,17 @@ export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
     minutesSinceLastFailure,
     active,
     activityState: failureCount === 0 ? "clear" : active ? "active" : "stale",
+    connectorState,
+    effectiveStatus,
+    staleClientId,
+    staleGraceMinutes,
+    registeredClientIdsKnown: registeredKnown,
     reasons: countBy(currentFailures, "reason", "auth_failed").slice(0, 8),
     targets: countBy(currentFailures, "target", "unknown").slice(0, 8),
     names: countBy(currentFailures, "name", "auth_event").slice(0, 8),
     httpStatuses: countBy(currentFailures, "httpStatus", "unknown").slice(0, 8),
+    clients: countBy(currentFailures, "clientId", "unknown").slice(0, 8),
+    grantTypes: countBy(currentFailures, "grantType", "unknown").slice(0, 8),
     trend,
     recentFailures,
   };
