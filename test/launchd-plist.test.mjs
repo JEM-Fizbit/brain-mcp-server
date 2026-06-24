@@ -364,6 +364,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   const logDir = path.join(tmpRoot, "logs", "ers-brain");
   const nodePath = "/opt/example/bin/node";
   const doctorScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-doctor.mjs");
+  const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
+  const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
 
   const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
     env: {
@@ -380,6 +382,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
       BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
       BRAIN_MENUBAR_NODE: nodePath,
       BRAIN_MENUBAR_DOCTOR_SCRIPT: doctorScriptPath,
+      BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
+      BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
     },
   });
 
@@ -422,12 +426,32 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.doctorScriptPath, doctorScriptPath);
   assert.equal(config.doctorOutputPath, path.join(logDir, "hosted-doctor.out.json"));
   assert.equal(config.doctorErrorPath, path.join(logDir, "hosted-doctor.err.log"));
+  assert.equal(config.stackStatusFile, path.join(logDir, "brain-monitor-stack.json"));
+  assert.equal(config.env.BRAIN_SYNC_SUPERVISOR, "menubar");
+  assert.equal(config.env.BRAIN_MONITOR_STACK_FILE, path.join(logDir, "brain-monitor-stack.json"));
+  assert.equal(config.syncProcess.launchPath, nodePath);
+  assert.deepEqual(config.syncProcess.arguments, [syncCliPath, "watch"]);
+  assert.equal(config.syncProcess.stdoutPath, path.join(logDir, "monitor-sync.out.log"));
+  assert.equal(config.syncProcess.stderrPath, path.join(logDir, "monitor-sync.err.log"));
+  assert.equal(config.syncProcess.env.BRAIN_ID, "ers-brain");
+  assert.equal(config.syncProcess.env.BRAIN_DIR, path.join(brainRoot, "brain"));
+  assert.equal(config.cockpitProcess.launchPath, nodePath);
+  assert.deepEqual(config.cockpitProcess.arguments, [cockpitScriptPath]);
+  assert.equal(config.cockpitProcess.stdoutPath, path.join(logDir, "monitor-cockpit.out.log"));
+  assert.equal(config.cockpitProcess.stderrPath, path.join(logDir, "monitor-cockpit.err.log"));
+  assert.equal(config.cockpitProcess.env.BRAIN_COCKPIT_PORT, "8798");
   assert.match(source, /NSStatusBar/);
+  assert.match(source, /startManagedProcesses/);
+  assert.match(source, /startManagedProcess:@"sync"/);
+  assert.match(source, /startManagedProcess:@"cockpit"/);
+  assert.match(source, /writeStackStatus/);
+  assert.match(source, /scheduleStackHeartbeat/);
+  assert.match(source, /NSTimer/);
   assert.match(source, /Open Cockpit/);
   assert.match(source, /Refresh Doctor/);
-  assert.match(source, /Restart Sync Helper/);
+  assert.match(source, /Restart Local Stack/);
   assert.match(source, /Open Sync Logs/);
-  assert.match(source, /launchctl/);
+  assert.doesNotMatch(source, /launchctl/);
   assert.match(source, /health\[@"report"\]/);
   assert.match(source, /report\[@"conflicts"\]/);
   assert.notEqual(stat.mode & 0o111, 0);
