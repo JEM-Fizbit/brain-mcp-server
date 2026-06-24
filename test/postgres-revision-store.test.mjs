@@ -10,32 +10,42 @@ const { loadLocalEnv } = await import(
 );
 
 loadLocalEnv(path.join(__dirname, ".."));
-const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
+const testDatabaseUrl = process.env.BRAIN_POSTGRES_TEST_DATABASE_URL;
+const allowRuntimeDatabaseUrl =
+  process.env.BRAIN_POSTGRES_TEST_ALLOW_RUNTIME_URL === "1";
+const databaseUrl =
+  testDatabaseUrl ||
+  (allowRuntimeDatabaseUrl ? process.env.BRAIN_REVISION_DATABASE_URL : undefined);
+const shouldApplyMigration = Boolean(testDatabaseUrl);
 
 test("PostgresRevisionStore compare-and-swap flow", async (t) => {
   if (!databaseUrl) {
-    t.skip("set BRAIN_REVISION_DATABASE_URL to run Postgres integration test");
+    t.skip(
+      "set BRAIN_POSTGRES_TEST_DATABASE_URL to run the mutating Postgres integration test"
+    );
     return;
   }
 
   const { PostgresRevisionStore } = await import(
     path.join(__dirname, "..", "dist", "sync", "index.js")
   );
-  const migration = await fs.readFile(
-    path.join(
-      __dirname,
-      "..",
-      "db",
-      "migrations",
-      "2026-06-14_001_hosted_brain_postgres.sql"
-    ),
-    "utf-8"
-  );
   const store = new PostgresRevisionStore(databaseUrl);
   const brainId = `test-brain-${Date.now()}`;
 
   try {
-    await store.pool.query(migration);
+    if (shouldApplyMigration) {
+      const migration = await fs.readFile(
+        path.join(
+          __dirname,
+          "..",
+          "db",
+          "migrations",
+          "2026-06-14_001_hosted_brain_postgres.sql"
+        ),
+        "utf-8"
+      );
+      await store.pool.query(migration);
+    }
     await store.pool.query(
       `
         insert into brain.brains (id, type, template_used, integration_mode)
