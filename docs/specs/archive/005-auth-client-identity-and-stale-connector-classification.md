@@ -1,6 +1,7 @@
 # 005 — Auth client identity recording + stale-connector classification
 
-**Status:** approved
+**Status:** done
+**Shipped:** 2026-06-24, commit c53dd83 (deployed to Fly `jem-brain-mcp`; `clientId`/`grantType` recording confirmed live via controlled probe)
 **Source:** Live investigation 2026-06-24 (zombie ChatGPT connector looping `unknown_client_id`); planning thread "harden how we record client identity"
 **Roadmap link:** ad-hoc (hardening slice within the hosted-Brain pilot; relates to the BACKLOG "expand hosted observability" item)
 **Decisions impact:** locks a new `DECISIONS.md` entry — "Record non-secret client identity on hosted auth telemetry; classify stale-connector loops separately from auth incidents"
