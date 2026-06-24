@@ -14,6 +14,25 @@ const appPath =
 const appName = path.basename(appPath, ".app") || "Brain Monitor";
 const bundleId =
   process.env.BRAIN_MENUBAR_BUNDLE_ID || "com.jem.brain-menubar";
+const nodePath =
+  process.env.BRAIN_MENUBAR_NODE ||
+  process.env.BRAIN_COCKPIT_LAUNCHD_NODE ||
+  process.execPath;
+const doctorScriptPath =
+  process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
+  path.join(repoRoot, "scripts", "hosted-doctor.mjs");
+const syncCliPath =
+  process.env.BRAIN_MENUBAR_SYNC_CLI ||
+  process.env.BRAIN_SYNC_HELPER_SYNC_CLI ||
+  process.env.BRAIN_SYNC_LAUNCHD_SYNC_CLI ||
+  path.join(repoRoot, "dist", "sync", "cli.js");
+const cockpitScriptPath =
+  process.env.BRAIN_MENUBAR_COCKPIT_SCRIPT ||
+  process.env.BRAIN_COCKPIT_LAUNCHD_SCRIPT ||
+  path.join(repoRoot, "scripts", "hosted-cockpit.mjs");
+const runtimePath =
+  process.env.BRAIN_MENUBAR_PATH ||
+  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 const brainRoot =
   process.env.BRAIN_REPO_ROOT || path.join(os.homedir(), "Projects", "ai-brain-jem");
 const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
@@ -44,22 +63,6 @@ const cockpitPort = Number(
 );
 const cockpitUrl =
   configuredCockpitUrl || `http://${cockpitHost}:${cockpitPort}/`;
-const nodePath =
-  process.env.BRAIN_MENUBAR_NODE ||
-  process.env.BRAIN_COCKPIT_LAUNCHD_NODE ||
-  process.execPath;
-const doctorScriptPath =
-  process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
-  path.join(repoRoot, "scripts", "hosted-doctor.mjs");
-const syncCliPath =
-  process.env.BRAIN_MENUBAR_SYNC_CLI ||
-  process.env.BRAIN_SYNC_HELPER_SYNC_CLI ||
-  process.env.BRAIN_SYNC_LAUNCHD_SYNC_CLI ||
-  path.join(repoRoot, "dist", "sync", "cli.js");
-const cockpitScriptPath =
-  process.env.BRAIN_MENUBAR_COCKPIT_SCRIPT ||
-  process.env.BRAIN_COCKPIT_LAUNCHD_SCRIPT ||
-  path.join(repoRoot, "scripts", "hosted-cockpit.mjs");
 const doctorOutputPath =
   process.env.BRAIN_MENUBAR_DOCTOR_OUTPUT ||
   path.join(logDir, "hosted-doctor.out.json");
@@ -73,9 +76,6 @@ const syncStdoutPath = path.join(logDir, "monitor-sync.out.log");
 const syncStderrPath = path.join(logDir, "monitor-sync.err.log");
 const cockpitStdoutPath = path.join(logDir, "monitor-cockpit.out.log");
 const cockpitStderrPath = path.join(logDir, "monitor-cockpit.err.log");
-const runtimePath =
-  process.env.BRAIN_MENUBAR_PATH ||
-  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 const contentsDir = path.join(appPath, "Contents");
 const macosDir = path.join(contentsDir, "MacOS");
 const resourcesDir = path.join(contentsDir, "Resources");
@@ -83,32 +83,186 @@ const executablePath = path.join(macosDir, appName);
 const nativeSourcePath = path.join(resourcesDir, "brain-menubar-app.m");
 const configPath = path.join(resourcesDir, "brain-menubar-config.json");
 
+function parseUrl(value) {
+  try {
+    return value ? new URL(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeProfile(rawProfile, index) {
+  const raw = rawProfile || {};
+  const profileBrainRoot =
+    raw.brainRoot ||
+    raw.brainRepoRoot ||
+    (index === 0 ? brainRoot : undefined);
+  const profileBrainDir =
+    raw.brainDir ||
+    (profileBrainRoot ? path.join(profileBrainRoot, "brain") : undefined);
+  if (!profileBrainDir) {
+    throw new Error(`Brain profile ${index} must include brainRoot or brainDir`);
+  }
+
+  const profileSyncDir = path.resolve(profileBrainDir, "..", ".brain-sync");
+  const profileBrainId = raw.brainId || raw.id || (index === 0 ? brainId : undefined);
+  if (!profileBrainId) {
+    throw new Error(`Brain profile ${index} must include id or brainId`);
+  }
+
+  const profileStateFile =
+    raw.stateFile ||
+    raw.syncStateFile ||
+    (index === 0 ? stateFile : path.join(profileSyncDir, "state.json"));
+  const profileLockFile = raw.lockFile || raw.syncLockFile || undefined;
+  const profileHealthFile =
+    raw.healthFile ||
+    raw.syncHealthFile ||
+    (index === 0 ? healthFile : `${profileStateFile}.health.json`);
+  const profileLogDir = raw.logDir || (index === 0 ? logDir : profileSyncDir);
+  const profileIntervalMs = Number(raw.intervalMs || raw.syncIntervalMs || intervalMs);
+  const profileCockpitUrl = raw.cockpitUrl || (index === 0 ? cockpitUrl : "");
+  const parsedProfileCockpitUrl = parseUrl(profileCockpitUrl);
+  const profileCockpitHost =
+    raw.cockpitHost ||
+    parsedProfileCockpitUrl?.hostname ||
+    (index === 0 ? cockpitHost : "127.0.0.1");
+  const profileCockpitPort = Number(
+    raw.cockpitPort || parsedProfileCockpitUrl?.port || (index === 0 ? cockpitPort : 8787)
+  );
+  const resolvedCockpitUrl =
+    profileCockpitUrl || `http://${profileCockpitHost}:${profileCockpitPort}/`;
+  const profileStackStatusFile =
+    raw.stackStatusFile ||
+    raw.monitorStackFile ||
+    path.join(profileLogDir, "brain-monitor-stack.json");
+  const profileDoctorOutputPath =
+    raw.doctorOutputPath || path.join(profileLogDir, "hosted-doctor.out.json");
+  const profileDoctorErrorPath =
+    raw.doctorErrorPath || path.join(profileLogDir, "hosted-doctor.err.log");
+
+  if (!Number.isInteger(profileIntervalMs) || profileIntervalMs < 1000) {
+    throw new Error(
+      `Brain profile ${profileBrainId} interval must be an integer >= 1000: ${profileIntervalMs}`
+    );
+  }
+  if (
+    !Number.isInteger(profileCockpitPort) ||
+    profileCockpitPort < 1 ||
+    profileCockpitPort > 65535
+  ) {
+    throw new Error(
+      `Brain profile ${profileBrainId} cockpit port must be valid: ${profileCockpitPort}`
+    );
+  }
+
+  const syncStdout = path.join(profileLogDir, "monitor-sync.out.log");
+  const syncStderr = path.join(profileLogDir, "monitor-sync.err.log");
+  const cockpitStdout = path.join(profileLogDir, "monitor-cockpit.out.log");
+  const cockpitStderr = path.join(profileLogDir, "monitor-cockpit.err.log");
+  const baseEnv = {
+    BRAIN_ID: profileBrainId,
+    BRAIN_DIR: profileBrainDir,
+    BRAIN_SYNC_STATE_FILE: profileStateFile,
+    ...(profileLockFile ? { BRAIN_SYNC_LOCK_FILE: profileLockFile } : {}),
+    BRAIN_SYNC_HEALTH_FILE: profileHealthFile,
+    BRAIN_SYNC_SUPERVISOR: "menubar",
+    BRAIN_MONITOR_STACK_FILE: profileStackStatusFile,
+    PATH: runtimePath,
+  };
+
+  return {
+    brainId: profileBrainId,
+    displayName: raw.displayName || raw.name || profileBrainId,
+    brainDir: profileBrainDir,
+    stateFile: profileStateFile,
+    ...(profileLockFile ? { lockFile: profileLockFile } : {}),
+    healthFile: profileHealthFile,
+    logDir: profileLogDir,
+    cockpitUrl: resolvedCockpitUrl,
+    nodePath,
+    doctorScriptPath,
+    syncCliPath,
+    cockpitScriptPath,
+    doctorOutputPath: profileDoctorOutputPath,
+    doctorErrorPath: profileDoctorErrorPath,
+    stackStatusFile: profileStackStatusFile,
+    env: baseEnv,
+    syncProcess: {
+      name: "sync",
+      launchPath: nodePath,
+      arguments: [syncCliPath, "watch"],
+      currentDirectoryPath: repoRoot,
+      stdoutPath: syncStdout,
+      stderrPath: syncStderr,
+      env: {
+        ...baseEnv,
+        BRAIN_SYNC_INTERVAL_MS: String(profileIntervalMs),
+      },
+    },
+    cockpitProcess: {
+      name: "cockpit",
+      launchPath: nodePath,
+      arguments: [cockpitScriptPath],
+      currentDirectoryPath: repoRoot,
+      stdoutPath: cockpitStdout,
+      stderrPath: cockpitStderr,
+      env: {
+        ...baseEnv,
+        BRAIN_COCKPIT_HOST: profileCockpitHost,
+        BRAIN_COCKPIT_PORT: String(profileCockpitPort),
+        BRAIN_COCKPIT_PORT_FALLBACK: "0",
+      },
+    },
+  };
+}
+
+function readProfiles() {
+  if (!process.env.BRAIN_MENUBAR_PROFILES_JSON) {
+    return [normalizeProfile({}, 0)];
+  }
+  let rawProfiles;
+  try {
+    rawProfiles = JSON.parse(process.env.BRAIN_MENUBAR_PROFILES_JSON);
+  } catch (error) {
+    throw new Error(`BRAIN_MENUBAR_PROFILES_JSON must be valid JSON: ${error.message}`);
+  }
+  if (!Array.isArray(rawProfiles) || rawProfiles.length === 0) {
+    throw new Error("BRAIN_MENUBAR_PROFILES_JSON must be a non-empty array");
+  }
+  return rawProfiles.map((profile, index) => normalizeProfile(profile, index));
+}
+
+const brainProfiles = readProfiles();
+const primaryProfile = brainProfiles[0];
+
 for (const [name, value] of [
   ["BRAIN_MENUBAR_APP", appPath],
-  ["BRAIN_DIR", brainDir],
-  ["BRAIN_SYNC_STATE_FILE", stateFile],
-  ["BRAIN_SYNC_LOCK_FILE", lockFile],
-  ["BRAIN_SYNC_HEALTH_FILE", healthFile],
-  ["BRAIN_SYNC_LAUNCHD_LOG_DIR", logDir],
   ["BRAIN_MENUBAR_NODE", nodePath],
   ["BRAIN_MENUBAR_DOCTOR_SCRIPT", doctorScriptPath],
   ["BRAIN_MENUBAR_SYNC_CLI", syncCliPath],
   ["BRAIN_MENUBAR_COCKPIT_SCRIPT", cockpitScriptPath],
-  ["BRAIN_MENUBAR_DOCTOR_OUTPUT", doctorOutputPath],
-  ["BRAIN_MENUBAR_DOCTOR_ERROR", doctorErrorPath],
-  ["BRAIN_MONITOR_STACK_FILE", stackStatusFile],
 ]) {
   if (value && !path.isAbsolute(value)) {
     throw new Error(`${name} must be absolute: ${value}`);
   }
 }
 
-if (!Number.isInteger(intervalMs) || intervalMs < 1000) {
-  throw new Error(`BRAIN_SYNC_INTERVAL_MS must be an integer >= 1000: ${intervalMs}`);
-}
-
-if (!Number.isInteger(cockpitPort) || cockpitPort < 1 || cockpitPort > 65535) {
-  throw new Error(`BRAIN_COCKPIT_PORT must be a valid TCP port: ${cockpitPort}`);
+for (const profile of brainProfiles) {
+  for (const [name, value] of [
+    [`${profile.brainId}.brainDir`, profile.brainDir],
+    [`${profile.brainId}.stateFile`, profile.stateFile],
+    [`${profile.brainId}.lockFile`, profile.lockFile],
+    [`${profile.brainId}.healthFile`, profile.healthFile],
+    [`${profile.brainId}.logDir`, profile.logDir],
+    [`${profile.brainId}.doctorOutputPath`, profile.doctorOutputPath],
+    [`${profile.brainId}.doctorErrorPath`, profile.doctorErrorPath],
+    [`${profile.brainId}.stackStatusFile`, profile.stackStatusFile],
+  ]) {
+    if (value && !path.isAbsolute(value)) {
+      throw new Error(`${name} must be absolute: ${value}`);
+    }
+  }
 }
 
 function xmlEscape(value) {
@@ -156,71 +310,26 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 const config = {
   launcherKind: "native_menubar",
   repoRoot,
-  brainId,
-  brainDir,
-  stateFile,
-  healthFile,
-  logDir,
+  brainId: primaryProfile.brainId,
+  brainDir: primaryProfile.brainDir,
+  stateFile: primaryProfile.stateFile,
+  ...(primaryProfile.lockFile ? { lockFile: primaryProfile.lockFile } : {}),
+  healthFile: primaryProfile.healthFile,
+  logDir: primaryProfile.logDir,
   syncLaunchdLabel,
   cockpitLaunchdLabel,
-  cockpitUrl,
+  cockpitUrl: primaryProfile.cockpitUrl,
   nodePath,
   doctorScriptPath,
   syncCliPath,
   cockpitScriptPath,
-  doctorOutputPath,
-  doctorErrorPath,
-  stackStatusFile,
-  syncProcess: {
-    name: "sync",
-    launchPath: nodePath,
-    arguments: [syncCliPath, "watch"],
-    currentDirectoryPath: repoRoot,
-    stdoutPath: syncStdoutPath,
-    stderrPath: syncStderrPath,
-    env: {
-      BRAIN_ID: brainId,
-      BRAIN_DIR: brainDir,
-      BRAIN_SYNC_STATE_FILE: stateFile,
-      ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
-      BRAIN_SYNC_HEALTH_FILE: healthFile,
-      BRAIN_SYNC_INTERVAL_MS: String(intervalMs),
-      BRAIN_SYNC_SUPERVISOR: "menubar",
-      BRAIN_MONITOR_STACK_FILE: stackStatusFile,
-      PATH: runtimePath,
-    },
-  },
-  cockpitProcess: {
-    name: "cockpit",
-    launchPath: nodePath,
-    arguments: [cockpitScriptPath],
-    currentDirectoryPath: repoRoot,
-    stdoutPath: cockpitStdoutPath,
-    stderrPath: cockpitStderrPath,
-    env: {
-      BRAIN_ID: brainId,
-      BRAIN_DIR: brainDir,
-      BRAIN_SYNC_STATE_FILE: stateFile,
-      ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
-      BRAIN_SYNC_HEALTH_FILE: healthFile,
-      BRAIN_SYNC_SUPERVISOR: "menubar",
-      BRAIN_MONITOR_STACK_FILE: stackStatusFile,
-      BRAIN_COCKPIT_HOST: cockpitHost,
-      BRAIN_COCKPIT_PORT: String(cockpitPort),
-      BRAIN_COCKPIT_PORT_FALLBACK: "0",
-      PATH: runtimePath,
-    },
-  },
-  env: {
-    BRAIN_ID: brainId,
-    BRAIN_DIR: brainDir,
-    BRAIN_SYNC_STATE_FILE: stateFile,
-    ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
-    BRAIN_SYNC_HEALTH_FILE: healthFile,
-    BRAIN_SYNC_SUPERVISOR: "menubar",
-    BRAIN_MONITOR_STACK_FILE: stackStatusFile,
-    PATH: runtimePath,
-  },
+  doctorOutputPath: primaryProfile.doctorOutputPath,
+  doctorErrorPath: primaryProfile.doctorErrorPath,
+  stackStatusFile: primaryProfile.stackStatusFile,
+  syncProcess: primaryProfile.syncProcess,
+  cockpitProcess: primaryProfile.cockpitProcess,
+  env: primaryProfile.env,
+  brains: brainProfiles,
 };
 
 const nativeSource = `#import <Cocoa/Cocoa.h>
@@ -230,6 +339,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSStatusItem *statusItem;
 @property (strong) NSDictionary *config;
 @property (strong) NSMutableDictionary *managedTasks;
+@property (strong) NSMutableDictionary *managedProcessConfigs;
 @property (strong) NSMutableSet *intentionalStops;
 @property (strong) NSTimer *stackHeartbeatTimer;
 @property (copy) NSString *lastAction;
@@ -242,6 +352,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
   self.config = [self loadConfig];
   self.managedTasks = [NSMutableDictionary dictionary];
+  self.managedProcessConfigs = [NSMutableDictionary dictionary];
   self.intentionalStops = [NSMutableSet set];
   self.lastAction = @"Ready";
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
@@ -308,6 +419,64 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return nil;
 }
 
+- (NSArray *)brainProfiles {
+  id profiles = self.config[@"brains"];
+  if ([profiles isKindOfClass:[NSArray class]] && [profiles count] > 0) {
+    return (NSArray *)profiles;
+  }
+  return @[self.config];
+}
+
+- (NSDictionary *)firstBrainProfile {
+  NSArray *profiles = [self brainProfiles];
+  return profiles.count > 0 && [profiles[0] isKindOfClass:[NSDictionary class]]
+    ? (NSDictionary *)profiles[0]
+    : self.config;
+}
+
+- (NSString *)brainIdForProfile:(NSDictionary *)profile {
+  return [self stringFromValue:profile[@"brainId"] fallback:@"unknown"];
+}
+
+- (NSString *)displayNameForProfile:(NSDictionary *)profile {
+  NSString *displayName = [self stringFromValue:profile[@"displayName"] fallback:nil];
+  return displayName.length > 0 ? displayName : [self brainIdForProfile:profile];
+}
+
+- (NSString *)syncTaskNameForProfile:(NSDictionary *)profile {
+  return [NSString stringWithFormat:@"sync:%@", [self brainIdForProfile:profile]];
+}
+
+- (NSString *)cockpitTaskNameForProfile:(NSDictionary *)profile {
+  return [NSString stringWithFormat:@"cockpit:%@", [self brainIdForProfile:profile]];
+}
+
+- (NSDictionary *)profileForBrainId:(NSString *)brainId {
+  for (NSDictionary *profile in [self brainProfiles]) {
+    if ([[self brainIdForProfile:profile] isEqualToString:brainId]) {
+      return profile;
+    }
+  }
+  return [self firstBrainProfile];
+}
+
+- (NSDictionary *)profileForSender:(id)sender {
+  if ([sender respondsToSelector:@selector(representedObject)]) {
+    id representedObject = [sender representedObject];
+    if ([representedObject isKindOfClass:[NSString class]]) {
+      return [self profileForBrainId:(NSString *)representedObject];
+    }
+  }
+  return [self firstBrainProfile];
+}
+
+- (NSString *)actionTitle:(NSString *)singleTitle multiFormat:(NSString *)multiFormat profile:(NSDictionary *)profile {
+  if ([self brainProfiles].count <= 1) {
+    return singleTitle;
+  }
+  return [NSString stringWithFormat:multiFormat, [self displayNameForProfile:profile]];
+}
+
 - (NSString *)stringFromValue:(id)value fallback:(NSString *)fallback {
   if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
     return (NSString *)value;
@@ -364,25 +533,27 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)writeStackStatus {
-  NSString *path = [self stringConfig:@"stackStatusFile" fallback:@""];
-  if (path.length == 0) {
-    return;
-  }
-
   NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
-  NSDictionary *status = @{
-    @"supervisor": @"menubar",
-    @"checkedAt": [formatter stringFromDate:[NSDate date]],
-    @"sync": [self statusForManagedTask:@"sync"],
-    @"cockpit": [self statusForManagedTask:@"cockpit"]
-  };
-  NSData *data = [NSJSONSerialization dataWithJSONObject:status options:NSJSONWritingPrettyPrinted error:nil];
-  if (!data) {
-    return;
-  }
+  for (NSDictionary *profile in [self brainProfiles]) {
+    NSString *path = [self stringFromValue:profile[@"stackStatusFile"] fallback:@""];
+    if (path.length == 0) {
+      continue;
+    }
+    NSDictionary *status = @{
+      @"supervisor": @"menubar",
+      @"brainId": [self brainIdForProfile:profile],
+      @"checkedAt": [formatter stringFromDate:[NSDate date]],
+      @"sync": [self statusForManagedTask:[self syncTaskNameForProfile:profile]],
+      @"cockpit": [self statusForManagedTask:[self cockpitTaskNameForProfile:profile]]
+    };
+    NSData *data = [NSJSONSerialization dataWithJSONObject:status options:NSJSONWritingPrettyPrinted error:nil];
+    if (!data) {
+      continue;
+    }
 
-  [self ensureParentDirectoryForPath:path];
-  [data writeToFile:path atomically:YES];
+    [self ensureParentDirectoryForPath:path];
+    [data writeToFile:path atomically:YES];
+  }
 }
 
 - (void)heartbeatStackStatus:(NSTimer *)timer {
@@ -402,20 +573,26 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (void)startManagedProcesses {
   [self.intentionalStops removeAllObjects];
-  [self startManagedProcess:@"sync" configKey:@"syncProcess"];
-  [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
+  for (NSDictionary *profile in [self brainProfiles]) {
+    [self startManagedProcessesForProfile:profile];
+  }
   [self writeStackStatus];
 }
 
-- (void)startManagedProcess:(NSString *)name configKey:(NSString *)configKey {
+- (void)startManagedProcessesForProfile:(NSDictionary *)profile {
+  [self startManagedProcess:[self syncTaskNameForProfile:profile] processConfig:profile[@"syncProcess"]];
+  [self startManagedProcess:[self cockpitTaskNameForProfile:profile] processConfig:profile[@"cockpitProcess"]];
+}
+
+- (void)startManagedProcess:(NSString *)name processConfig:(NSDictionary *)processConfig {
   if ([self isTaskRunningNamed:name]) {
     return;
   }
 
-  NSDictionary *processConfig = [self dictionaryConfig:configKey];
-  if (!processConfig) {
+  if (![processConfig isKindOfClass:[NSDictionary class]]) {
     return;
   }
+  self.managedProcessConfigs[name] = processConfig;
   NSString *launchPath = [self stringFromValue:processConfig[@"launchPath"] fallback:@""];
   NSArray *arguments = [processConfig[@"arguments"] isKindOfClass:[NSArray class]]
     ? processConfig[@"arguments"]
@@ -487,10 +664,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)restartManagedProcessNamed:(NSString *)name {
-  if ([name isEqualToString:@"sync"]) {
-    [self startManagedProcess:@"sync" configKey:@"syncProcess"];
-  } else if ([name isEqualToString:@"cockpit"]) {
-    [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
+  NSDictionary *processConfig = self.managedProcessConfigs[name];
+  if (processConfig) {
+    [self startManagedProcess:name processConfig:processConfig];
   }
   [self rebuildMenu:nil];
 }
@@ -508,96 +684,161 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self writeStackStatus];
 }
 
+- (void)stopManagedProcessesForProfile:(NSDictionary *)profile {
+  [self.intentionalStops addObject:[self syncTaskNameForProfile:profile]];
+  [self.intentionalStops addObject:[self cockpitTaskNameForProfile:profile]];
+  for (NSString *name in @[[self syncTaskNameForProfile:profile], [self cockpitTaskNameForProfile:profile]]) {
+    NSTask *task = self.managedTasks[name];
+    if (task.isRunning) {
+      [task terminate];
+    }
+  }
+  [self writeStackStatus];
+}
+
 - (void)restartLocalStack:(id)sender {
+  NSDictionary *profile = [self profileForSender:sender];
+  [self stopManagedProcessesForProfile:profile];
+  [self performSelector:@selector(startLocalStackAfterStop:) withObject:[self brainIdForProfile:profile] afterDelay:2.0];
+}
+
+- (void)restartAllLocalStacks:(id)sender {
   (void)sender;
   [self stopManagedProcesses:nil];
   [self performSelector:@selector(startLocalStackAfterStop:) withObject:nil afterDelay:2.0];
 }
 
 - (void)startLocalStackAfterStop:(id)sender {
-  (void)sender;
-  [self startManagedProcesses];
-  self.lastAction = @"Local stack restarted";
+  if ([sender isKindOfClass:[NSString class]]) {
+    NSDictionary *profile = [self profileForBrainId:(NSString *)sender];
+    [self.intentionalStops removeObject:[self syncTaskNameForProfile:profile]];
+    [self.intentionalStops removeObject:[self cockpitTaskNameForProfile:profile]];
+    [self startManagedProcessesForProfile:profile];
+    self.lastAction = [NSString stringWithFormat:@"%@ stack restarted", [self displayNameForProfile:profile]];
+  } else {
+    [self startManagedProcesses];
+    self.lastAction = @"All local stacks restarted";
+  }
   [self rebuildMenu:nil];
+}
+
+- (NSString *)statusTitleForProfiles {
+  BOOL sawWarn = NO;
+  BOOL sawKnown = NO;
+  for (NSDictionary *profile in [self brainProfiles]) {
+    NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+    NSString *status = [self healthStatusFrom:health];
+    if ([status isEqualToString:@"fail"] || [status isEqualToString:@"error"]) {
+      return @"Brain Fail";
+    }
+    if ([status isEqualToString:@"warn"] || [status isEqualToString:@"warning"] || [status isEqualToString:@"missing"]) {
+      sawWarn = YES;
+    }
+    if ([status isEqualToString:@"ok"] || [status isEqualToString:@"pass"]) {
+      sawKnown = YES;
+    }
+  }
+  if (sawWarn) {
+    return @"Brain Warn";
+  }
+  return sawKnown ? @"Brain OK" : @"Brain";
+}
+
+- (void)addActionItem:(NSMenu *)menu title:(NSString *)title action:(SEL)action profile:(NSDictionary *)profile {
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
+  item.target = self;
+  item.representedObject = [self brainIdForProfile:profile];
+  [menu addItem:item];
 }
 
 - (void)rebuildMenu:(id)sender {
   (void)sender;
-  NSString *brainId = [self stringConfig:@"brainId" fallback:@"unknown"];
-  NSString *healthFile = [self stringConfig:@"healthFile" fallback:@""];
-  NSDictionary *health = [self readJsonAtPath:healthFile];
-  NSDictionary *report = nil;
-  id reportValue = health[@"report"];
-  if ([reportValue isKindOfClass:[NSDictionary class]]) {
-    report = (NSDictionary *)reportValue;
-  }
-  NSString *status = [self healthStatusFrom:health];
-  NSString *checkedAt = [self stringFromValue:health[@"checkedAt"] fallback:nil];
-  if (checkedAt.length == 0) {
-    checkedAt = [self stringFromValue:health[@"lastCheckedAt"] fallback:nil];
-  }
-  if (checkedAt.length == 0) {
-    checkedAt = [self stringFromValue:health[@"updatedAt"] fallback:@"not reported"];
-  }
-  NSString *lastSyncAt = [self stringFromValue:health[@"lastSyncAt"] fallback:nil];
-  if (lastSyncAt.length == 0) {
-    lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
-  }
-  if (lastSyncAt.length == 0) {
-    lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
-  }
-  NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
-  if (conflicts.length == 0) {
-    conflicts = [self stringFromValue:health[@"conflicts"] fallback:nil];
-  }
-  if (conflicts.length == 0) {
-    conflicts = [self stringFromValue:report[@"conflicts"] fallback:nil];
-  }
-  if (conflicts.length == 0) {
-    conflicts = [self stringFromValue:health[@"openConflictCount"] fallback:@"not reported"];
-  }
-  NSString *cycle = [self stringFromValue:health[@"cycle"] fallback:@"not reported"];
-  NSString *durationMs = [self stringFromValue:report[@"totalMs"] fallback:nil];
-  NSString *duration = durationMs.length > 0 ? [NSString stringWithFormat:@"%@ms", durationMs] : @"not reported";
-  NSString *pushed = [self stringFromValue:report[@"pushed"] fallback:@"not reported"];
-  NSString *pulled = [self stringFromValue:report[@"pulled"] fallback:@"not reported"];
-  NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
-  NSString *syncState = [self isTaskRunningNamed:@"sync"] ? @"running" : @"stopped";
-  NSString *cockpitState = [self isTaskRunningNamed:@"cockpit"] ? @"running" : @"stopped";
-
-  self.statusItem.button.title = [self statusTitleForHealth:health];
+  NSArray *profiles = [self brainProfiles];
+  self.statusItem.button.title = [self statusTitleForProfiles];
 
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Brain Monitor"];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brain: %@", brainId]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Status: %@", status]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAt]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu", (unsigned long)profiles.count]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
   [menu addItem:[NSMenuItem separatorItem]];
+
+  for (NSDictionary *profile in [self brainProfiles]) {
+    NSString *displayName = [self displayNameForProfile:profile];
+    NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+    NSDictionary *report = nil;
+    id reportValue = health[@"report"];
+    if ([reportValue isKindOfClass:[NSDictionary class]]) {
+      report = (NSDictionary *)reportValue;
+    }
+    NSString *status = [self healthStatusFrom:health];
+    NSString *checkedAt = [self stringFromValue:health[@"checkedAt"] fallback:nil];
+    if (checkedAt.length == 0) {
+      checkedAt = [self stringFromValue:health[@"lastCheckedAt"] fallback:nil];
+    }
+    if (checkedAt.length == 0) {
+      checkedAt = [self stringFromValue:health[@"updatedAt"] fallback:@"not reported"];
+    }
+    NSString *lastSyncAt = [self stringFromValue:health[@"lastSyncAt"] fallback:nil];
+    if (lastSyncAt.length == 0) {
+      lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
+    }
+    if (lastSyncAt.length == 0) {
+      lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
+    }
+    NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
+    if (conflicts.length == 0) {
+      conflicts = [self stringFromValue:health[@"conflicts"] fallback:nil];
+    }
+    if (conflicts.length == 0) {
+      conflicts = [self stringFromValue:report[@"conflicts"] fallback:nil];
+    }
+    if (conflicts.length == 0) {
+      conflicts = [self stringFromValue:health[@"openConflictCount"] fallback:@"not reported"];
+    }
+    NSString *cycle = [self stringFromValue:health[@"cycle"] fallback:@"not reported"];
+    NSString *durationMs = [self stringFromValue:report[@"totalMs"] fallback:nil];
+    NSString *duration = durationMs.length > 0 ? [NSString stringWithFormat:@"%@ms", durationMs] : @"not reported";
+    NSString *pushed = [self stringFromValue:report[@"pushed"] fallback:@"not reported"];
+    NSString *pulled = [self stringFromValue:report[@"pulled"] fallback:@"not reported"];
+    NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
+    NSString *syncState = [self isTaskRunningNamed:[self syncTaskNameForProfile:profile]] ? @"running" : @"stopped";
+    NSString *cockpitState = [self isTaskRunningNamed:[self cockpitTaskNameForProfile:profile]] ? @"running" : @"stopped";
+
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", displayName, status]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAt]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
+
+    [self addActionItem:menu
+                  title:[self actionTitle:@"Refresh Doctor" multiFormat:@"Refresh %@ Doctor" profile:profile]
+                 action:@selector(refreshDoctor:)
+                profile:profile];
+    [self addActionItem:menu
+                  title:[self actionTitle:@"Open Cockpit" multiFormat:@"Open %@ Cockpit" profile:profile]
+                 action:@selector(openCockpit:)
+                profile:profile];
+    [self addActionItem:menu
+                  title:[self actionTitle:@"Open Sync Logs" multiFormat:@"Open %@ Sync Logs" profile:profile]
+                 action:@selector(openLogs:)
+                profile:profile];
+    [self addActionItem:menu
+                  title:[self actionTitle:@"Restart Local Stack" multiFormat:@"Restart %@ Local Stack" profile:profile]
+                 action:@selector(restartLocalStack:)
+                profile:profile];
+    [menu addItem:[NSMenuItem separatorItem]];
+  }
 
   NSMenuItem *refresh = [[NSMenuItem alloc] initWithTitle:@"Refresh Status" action:@selector(rebuildMenu:) keyEquivalent:@""];
   refresh.target = self;
   [menu addItem:refresh];
 
-  NSMenuItem *doctor = [[NSMenuItem alloc] initWithTitle:@"Refresh Doctor" action:@selector(refreshDoctor:) keyEquivalent:@""];
-  doctor.target = self;
-  [menu addItem:doctor];
-
-  NSMenuItem *cockpit = [[NSMenuItem alloc] initWithTitle:@"Open Cockpit" action:@selector(openCockpit:) keyEquivalent:@""];
-  cockpit.target = self;
-  [menu addItem:cockpit];
-
-  NSMenuItem *logs = [[NSMenuItem alloc] initWithTitle:@"Open Sync Logs" action:@selector(openLogs:) keyEquivalent:@""];
-  logs.target = self;
-  [menu addItem:logs];
-
-  NSMenuItem *restart = [[NSMenuItem alloc] initWithTitle:@"Restart Local Stack" action:@selector(restartLocalStack:) keyEquivalent:@""];
-  restart.target = self;
-  [menu addItem:restart];
+  if (profiles.count > 1) {
+    NSMenuItem *restartAll = [[NSMenuItem alloc] initWithTitle:@"Restart All Local Stacks" action:@selector(restartAllLocalStacks:) keyEquivalent:@""];
+    restartAll.target = self;
+    [menu addItem:restartAll];
+  }
 
   [menu addItem:[NSMenuItem separatorItem]];
   NSMenuItem *quit = [[NSMenuItem alloc] initWithTitle:@"Quit Brain Monitor" action:@selector(terminate:) keyEquivalent:@"q"];
@@ -608,13 +849,13 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)openCockpit:(id)sender {
-  (void)sender;
-  [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
-  NSString *urlString = [self stringConfig:@"cockpitUrl" fallback:@"http://127.0.0.1:8787/"];
+  NSDictionary *profile = [self profileForSender:sender];
+  [self startManagedProcess:[self cockpitTaskNameForProfile:profile] processConfig:profile[@"cockpitProcess"]];
+  NSString *urlString = [self stringFromValue:profile[@"cockpitUrl"] fallback:@"http://127.0.0.1:8787/"];
   NSURL *url = [NSURL URLWithString:urlString];
   if (url) {
     [[NSWorkspace sharedWorkspace] openURL:url];
-    self.lastAction = @"Opened cockpit";
+    self.lastAction = [NSString stringWithFormat:@"Opened %@ cockpit", [self displayNameForProfile:profile]];
   } else {
     self.lastAction = @"Invalid cockpit URL";
   }
@@ -622,11 +863,11 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)openLogs:(id)sender {
-  (void)sender;
-  NSString *logDir = [self stringConfig:@"logDir" fallback:@""];
+  NSDictionary *profile = [self profileForSender:sender];
+  NSString *logDir = [self stringFromValue:profile[@"logDir"] fallback:@""];
   if (logDir.length > 0) {
     [[NSWorkspace sharedWorkspace] openURL:[NSURL fileURLWithPath:logDir isDirectory:YES]];
-    self.lastAction = @"Opened logs";
+    self.lastAction = [NSString stringWithFormat:@"Opened %@ logs", [self displayNameForProfile:profile]];
   } else {
     self.lastAction = @"No log directory configured";
   }
@@ -634,18 +875,17 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)refreshDoctor:(id)sender {
-  (void)sender;
-  [self runDoctorTask];
+  [self runDoctorTaskForProfile:[self profileForSender:sender]];
   [self rebuildMenu:nil];
 }
 
-- (void)runDoctorTask {
-  NSString *nodePath = [self stringConfig:@"nodePath" fallback:@""];
-  NSString *doctorScriptPath = [self stringConfig:@"doctorScriptPath" fallback:@""];
+- (void)runDoctorTaskForProfile:(NSDictionary *)profile {
+  NSString *nodePath = [self stringFromValue:profile[@"nodePath"] fallback:[self stringConfig:@"nodePath" fallback:@""]];
+  NSString *profileDoctorScriptPath = [self stringFromValue:profile[@"doctorScriptPath"] fallback:[self stringConfig:@"doctorScriptPath" fallback:@""]];
   NSString *repoRoot = [self stringConfig:@"repoRoot" fallback:@""];
-  NSString *outputPath = [self stringConfig:@"doctorOutputPath" fallback:@""];
-  NSString *errorPath = [self stringConfig:@"doctorErrorPath" fallback:@""];
-  if (nodePath.length == 0 || doctorScriptPath.length == 0 || outputPath.length == 0 || errorPath.length == 0) {
+  NSString *outputPath = [self stringFromValue:profile[@"doctorOutputPath"] fallback:@""];
+  NSString *errorPath = [self stringFromValue:profile[@"doctorErrorPath"] fallback:@""];
+  if (nodePath.length == 0 || profileDoctorScriptPath.length == 0 || outputPath.length == 0 || errorPath.length == 0) {
     self.lastAction = @"Doctor config missing";
     return;
   }
@@ -665,12 +905,12 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
   NSTask *task = [[NSTask alloc] init];
   task.launchPath = nodePath;
-  task.arguments = @[doctorScriptPath];
+  task.arguments = @[profileDoctorScriptPath];
   if (repoRoot.length > 0) {
     task.currentDirectoryPath = repoRoot;
   }
   NSMutableDictionary *environment = [[[NSProcessInfo processInfo] environment] mutableCopy];
-  NSDictionary *configuredEnv = self.config[@"env"];
+  NSDictionary *configuredEnv = profile[@"env"];
   if ([configuredEnv isKindOfClass:[NSDictionary class]]) {
     for (NSString *key in configuredEnv) {
       id value = configuredEnv[key];
@@ -683,16 +923,17 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   task.standardOutput = stdoutHandle;
   task.standardError = stderrHandle;
   __weak typeof(self) weakSelf = self;
+  NSString *displayName = [self displayNameForProfile:profile];
   task.terminationHandler = ^(NSTask *finishedTask) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      weakSelf.lastAction = [NSString stringWithFormat:@"Doctor exited %d", finishedTask.terminationStatus];
+      weakSelf.lastAction = [NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus];
       [weakSelf rebuildMenu:nil];
     });
   };
 
   @try {
     [task launch];
-    self.lastAction = @"Doctor running";
+    self.lastAction = [NSString stringWithFormat:@"%@ doctor running", displayName];
   } @catch (NSException *exception) {
     self.lastAction = [NSString stringWithFormat:@"Doctor failed: %@", exception.name];
   }
@@ -722,9 +963,14 @@ int main(int argc, const char *argv[]) {
 
 await fs.mkdir(macosDir, { recursive: true });
 await fs.mkdir(resourcesDir, { recursive: true });
-await fs.mkdir(logDir, { recursive: true });
-await fs.mkdir(path.dirname(stateFile), { recursive: true });
-await fs.mkdir(path.dirname(healthFile), { recursive: true });
+for (const profile of brainProfiles) {
+  await fs.mkdir(profile.logDir, { recursive: true });
+  await fs.mkdir(path.dirname(profile.stateFile), { recursive: true });
+  await fs.mkdir(path.dirname(profile.healthFile), { recursive: true });
+  await fs.mkdir(path.dirname(profile.stackStatusFile), { recursive: true });
+  await fs.mkdir(path.dirname(profile.doctorOutputPath), { recursive: true });
+  await fs.mkdir(path.dirname(profile.doctorErrorPath), { recursive: true });
+}
 await fs.writeFile(path.join(contentsDir, "Info.plist"), plist, "utf-8");
 await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
 await fs.writeFile(nativeSourcePath, nativeSource, "utf-8");
@@ -750,20 +996,22 @@ console.log(
       launcherKind: "native_menubar",
       signed: true,
       bundleId,
-      brainId,
-      brainDir,
-      stateFile,
-      healthFile,
-      logDir,
+      brainId: primaryProfile.brainId,
+      brainIds: brainProfiles.map((profile) => profile.brainId),
+      brainCount: brainProfiles.length,
+      brainDir: primaryProfile.brainDir,
+      stateFile: primaryProfile.stateFile,
+      healthFile: primaryProfile.healthFile,
+      logDir: primaryProfile.logDir,
       syncLaunchdLabel,
       cockpitLaunchdLabel,
-      cockpitUrl,
+      cockpitUrl: primaryProfile.cockpitUrl,
       nodePath,
       doctorScriptPath,
-      doctorOutputPath,
-      doctorErrorPath,
+      doctorOutputPath: primaryProfile.doctorOutputPath,
+      doctorErrorPath: primaryProfile.doctorErrorPath,
       note:
-        "Launch the app to show Brain status in the macOS menu bar. It supervises the local sync watcher and cockpit server, opens logs, restarts the local stack, and refreshes hosted doctor output.",
+        "Launch the app to show Brain status in the macOS menu bar. It supervises configured local sync watchers and cockpit servers, opens logs, restarts local stacks, and refreshes hosted doctor output.",
     },
     null,
     2

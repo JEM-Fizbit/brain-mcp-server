@@ -7,10 +7,13 @@ Brain Cockpit is the local read-only operator surface for the hosted JEM Brain p
 
 ## Current Recommendation
 
-Use a local browser surface backed by a macOS LaunchAgent:
+Use the consolidated local menu-bar operator app as the normal John/operator
+surface. It supervises the JEM and ERS local sync watchers plus their cockpit
+servers, and it exposes each local cockpit as a loopback browser surface:
 
 - cockpit stays bound to `127.0.0.1`;
-- the stable local URL is `http://127.0.0.1:8787/`;
+- the stable JEM local URL is `http://127.0.0.1:8787/`;
+- the stable ERS local URL is `http://127.0.0.1:8788/`;
 - checks continue to come from `npm run hosted:doctor`;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
 - the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
@@ -20,7 +23,11 @@ Use a local browser surface backed by a macOS LaunchAgent:
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
 
-## Generate The LaunchAgent
+## Legacy Standalone Cockpit LaunchAgent
+
+The standalone cockpit LaunchAgent remains available as a rollback/debugging
+path, but it should not run beside the consolidated menu-bar app for the same
+Brain.
 
 From the repo:
 
@@ -65,7 +72,7 @@ The generated plist runs `scripts/hosted-cockpit.mjs` directly through an absolu
 
 The plist also sets a conservative runtime `PATH` including Homebrew locations so `hosted:doctor` can find operator tools such as `flyctl` when running under launchd's sparse default environment. Override with `BRAIN_COCKPIT_LAUNCHD_PATH` if the tool layout changes.
 
-## Install On macOS
+## Legacy Standalone Install On macOS
 
 Review the generated plist first, then install it as a user LaunchAgent:
 
@@ -81,7 +88,7 @@ Then open:
 http://127.0.0.1:8787/
 ```
 
-## Install The Desktop Launcher
+## Legacy Desktop Launcher
 
 To create a double-clickable launcher app:
 
@@ -163,15 +170,15 @@ rather than running Node directly. To stop the helper app, terminate the
 ## Install The Menu-Bar Operator App
 
 For John/operator use, generate a native macOS status-bar app that owns the
-local stack:
+local JEM/ERS stack:
 
 - shows the selected Brain id, sync health status, last check/sync, and open
   conflict count from the configured sync health JSON;
-- starts and supervises the local sync watcher;
-- starts and supervises the local cockpit server;
-- opens the local cockpit;
-- opens the sync log directory;
-- restarts the local stack;
+- starts and supervises each configured Brain's local sync watcher;
+- starts and supervises each configured Brain's local cockpit server;
+- opens each local cockpit;
+- opens each sync log directory;
+- restarts one Brain's local stack or all local stacks;
 - runs `scripts/hosted-doctor.mjs` and writes bounded stdout/stderr under the
   configured log directory.
 
@@ -187,6 +194,37 @@ BRAIN_COCKPIT_URL="http://127.0.0.1:8788/" \
 BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
 BRAIN_MENUBAR_APP="$HOME/Applications/<Brain> Monitor.app" \
 BRAIN_MENUBAR_BUNDLE_ID="com.example.<brain>-monitor" \
+npm run sync:menubar:install
+```
+
+For one operator app that supervises both JEM and ERS, pass
+`BRAIN_MENUBAR_PROFILES_JSON` as a JSON array. Each profile supports `id` or
+`brainId`, `name` or `displayName`, `brainRoot` or `brainDir`, `stateFile`,
+`healthFile`, `logDir`, and `cockpitUrl`:
+
+```bash
+BRAIN_MENUBAR_APP="$HOME/Applications/Brain Monitor.app" \
+BRAIN_MENUBAR_BUNDLE_ID="com.jem.brain-monitor" \
+BRAIN_MENUBAR_PROFILES_JSON='[
+  {
+    "id": "ai-brain-jem",
+    "name": "JEM",
+    "brainRoot": "/Users/johnemilad/Projects/ai-brain-jem",
+    "stateFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json",
+    "healthFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json.health.json",
+    "logDir": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync",
+    "cockpitUrl": "http://127.0.0.1:8787/"
+  },
+  {
+    "id": "ers-brain",
+    "name": "ERS",
+    "brainRoot": "/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain",
+    "stateFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json",
+    "healthFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json.health.json",
+    "logDir": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync",
+    "cockpitUrl": "http://127.0.0.1:8788/"
+  }
+]' \
 npm run sync:menubar:install
 ```
 
@@ -210,7 +248,8 @@ launchctl kickstart -k "gui/$(id -u)/com.example.<brain>-monitor"
 ```
 
 When this consolidated monitor is active, do not also run the legacy sync-helper
-LaunchAgent or the standalone cockpit LaunchAgent for the same Brain.
+LaunchAgent, standalone sync LaunchAgent, or standalone cockpit LaunchAgent for
+the same Brain.
 
 ## Operator Contract
 
