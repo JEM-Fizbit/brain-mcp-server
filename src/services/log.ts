@@ -41,12 +41,56 @@ export function appendLogEntryToContent(content: string, entry: string): string 
   return rest ? `${prefix}\n${entry}\n${rest}` : `${prefix}\n${entry}`;
 }
 
+function isStandardEntryStart(line: string): boolean {
+  return /^## \[\d{4}-\d{2}-\d{2}\]/.test(line);
+}
+
+function isLegacyEntryStart(line: string): boolean {
+  return /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/.test(line);
+}
+
+function parseLogEntries(content: string): string[] {
+  const entries: string[] = [];
+  let current: string[] = [];
+  let currentIsStandard = false;
+
+  const flush = (): void => {
+    const entry = current.join("\n").trim();
+    if (entry) entries.push(entry);
+    current = [];
+    currentIsStandard = false;
+  };
+
+  for (const line of content.split("\n")) {
+    if (isStandardEntryStart(line)) {
+      flush();
+      current = [line];
+      currentIsStandard = true;
+      continue;
+    }
+
+    if (isLegacyEntryStart(line)) {
+      flush();
+      current = [line.trim()];
+      flush();
+      continue;
+    }
+
+    if (currentIsStandard) {
+      current.push(line);
+    }
+  }
+
+  flush();
+  return entries;
+}
+
 export function readLogContent(
   content: string,
   limit: number = 20,
   offset: number = 0
 ): string {
-  const entries = content.split(/(?=^## \[)/m).filter((e) => e.startsWith("## ["));
+  const entries = parseLogEntries(content);
 
   if (entries.length === 0) {
     return "No log entries yet.";

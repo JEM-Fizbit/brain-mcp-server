@@ -64,3 +64,21 @@ test("readLog paginates the newest-first stream with offset", async () => {
   const beyondEnd = await log.readLog(2, undefined, 99);
   assert.equal(beyondEnd, "No log entries at offset 99. Total entries: 5.");
 });
+
+test("readLogContent reads legacy one-line date entries", () => {
+  const content = [
+    "# Brain Change Log",
+    "",
+    "- 2026-06-24 — `brain/entities/ers_genomics.md` — UPDATE | US subsidiary details added.",
+    "2026-06-23 — UPDATE — TASKS.md — Added task intake item.",
+    "",
+  ].join("\n");
+
+  const latest = log.readLogContent(content, 1, 0);
+  assert.match(latest, /US subsidiary details added/);
+  assert.doesNotMatch(latest, /Added task intake item/);
+
+  const second = log.readLogContent(content, 1, 1);
+  assert.match(second, /Added task intake item/);
+  assert.doesNotMatch(second, /US subsidiary details added/);
+});
