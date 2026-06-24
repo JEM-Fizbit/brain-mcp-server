@@ -1,7 +1,7 @@
 import { isResourceMatch, normalizeResource, type OauthConfig } from "./config.js";
 import { generateAuthCode, generateOauthState } from "./jwt.js";
 import type { StateProvider } from "./state.js";
-import { resolveBrain, type BrainPrincipal } from "../services/registry.js";
+import { accessibleRoles, loadRegistry, type BrainPrincipal } from "../services/registry.js";
 
 interface AuthorizeParams {
   response_type: string;
@@ -238,9 +238,9 @@ export async function handleGitHubCallback(
     name: identity.name,
   };
 
-  try {
-    await resolveBrain(undefined, principal);
-  } catch {
+  const registry = await loadRegistry();
+  const roles = accessibleRoles(registry, principal);
+  if (Object.keys(roles).length === 0) {
     return {
       status: 403,
       headers: { "Content-Type": "text/html; charset=utf-8" },
