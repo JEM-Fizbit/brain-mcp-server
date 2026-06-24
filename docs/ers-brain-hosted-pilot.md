@@ -145,6 +145,19 @@ It shows sync health in the macOS menu bar and provides menu actions to refresh
 doctor output, open/kick the local cockpit, open logs, and restart the sync
 helper LaunchAgent.
 
+Install the companion login LaunchAgent so it starts automatically after reboot:
+
+```bash
+BRAIN_MENUBAR_APP="$HOME/Applications/ERS Brain Monitor.app" \
+BRAIN_MENUBAR_LAUNCHD_LABEL="com.jem.ers-brain-monitor" \
+BRAIN_MENUBAR_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.jem.ers-brain-monitor.plist" \
+BRAIN_MENUBAR_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
+npm run sync:menubar:launchd:plist
+
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.jem.ers-brain-monitor.plist"
+launchctl kickstart -k "gui/$(id -u)/com.jem.ers-brain-monitor"
+```
+
 ## Verification Commands
 
 Metadata row:

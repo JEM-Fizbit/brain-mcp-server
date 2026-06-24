@@ -190,6 +190,19 @@ in the macOS menu bar. The app is config-driven and per-Brain, so it can sit
 beside separate JEM/ERS helper and cockpit labels. Broad signed/notarized
 installer packaging remains separate backlog work.
 
+To start the menu-bar app automatically at login:
+
+```bash
+BRAIN_MENUBAR_APP="$HOME/Applications/<Brain> Monitor.app" \
+BRAIN_MENUBAR_LAUNCHD_LABEL="com.example.<brain>-monitor" \
+BRAIN_MENUBAR_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.example.<brain>-monitor.plist" \
+BRAIN_MENUBAR_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
+npm run sync:menubar:launchd:plist
+
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.example.<brain>-monitor.plist"
+launchctl kickstart -k "gui/$(id -u)/com.example.<brain>-monitor"
+```
+
 ## Operator Contract
 
 Green means hosted Brain is ready for normal use.

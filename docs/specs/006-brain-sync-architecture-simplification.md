@@ -246,9 +246,10 @@ The Brain Sync menu-bar app is now approved as a near-term John/operator priorit
 Build it as an **operator pilot app**, not "the ERS Brain Sync product."
 
 Implementation note 2026-06-24: the initial native macOS operator app generator
-has shipped as `npm run sync:menubar:install`. It wraps the current helper,
-cockpit, doctor, and log surfaces for John/operator use. Signed/notarized
-distribution and any colleague-facing tray/menu-bar product remain deferred.
+has shipped as `npm run sync:menubar:install`, with login auto-start generated
+by `npm run sync:menubar:launchd:plist`. It wraps the current helper, cockpit,
+doctor, and log surfaces for John/operator use. Signed/notarized distribution
+and any colleague-facing tray/menu-bar product remain deferred.
 
 ## Relaxing The Raw Markdown / Obsidian Constraint
 
