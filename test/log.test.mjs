@@ -82,3 +82,46 @@ test("readLogContent reads legacy one-line date entries", () => {
   assert.match(second, /Added task intake item/);
   assert.doesNotMatch(second, /US subsidiary details added/);
 });
+
+test("appendLogEntryToContent inserts below a legacy preamble", () => {
+  const content = [
+    "# LOG — ERS Brain change log",
+    "",
+    "Append-only. One line per change.",
+    "",
+    "- 2026-06-24 — existing entry",
+    "",
+  ].join("\n");
+  const entry = log.formatLogEntry("UPDATE", ["TASKS.md"], "new entry", "2026-06-25");
+
+  const next = log.appendLogEntryToContent(content, entry);
+
+  assert.ok(
+    next.indexOf("# LOG — ERS Brain change log") < next.indexOf("new entry"),
+    "preamble should stay at the top"
+  );
+  assert.ok(
+    next.indexOf("new entry") < next.indexOf("existing entry"),
+    "new entry should be above older legacy entries"
+  );
+});
+
+test("readLogContent does not attach a legacy preamble to a standard entry", () => {
+  const content = [
+    "## [2026-06-25] UPDATE | new entry",
+    "Files: TASKS.md",
+    "",
+    "# LOG — ERS Brain change log",
+    "",
+    "Append-only. One line per change.",
+    "",
+    "- 2026-06-24 — existing entry",
+    "",
+  ].join("\n");
+
+  const latest = log.readLogContent(content, 1, 0);
+
+  assert.match(latest, /new entry/);
+  assert.doesNotMatch(latest, /# LOG/);
+  assert.doesNotMatch(latest, /existing entry/);
+});
