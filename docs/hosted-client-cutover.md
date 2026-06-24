@@ -77,7 +77,7 @@ Use ChatGPT Settings -> Connectors -> Create. After creation, start a new ChatGP
 
 ChatGPT generates connector-specific OAuth callbacks under `https://chatgpt.com/connector/oauth/<id>`. The hosted Brain OAuth server accepts that documented ChatGPT callback path automatically, along with loopback redirects, the built-in Claude callback, and ChatGPT's legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback. Use `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only for other exact non-loopback client callbacks.
 
-If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, check the cockpit Operation Log for `oauth_token` failures such as `unknown_client_id` or `invalid_client`. A connector that is still holding a pre-migration dynamic `client_id` must be disconnected/recreated in ChatGPT so it performs dynamic client registration again.
+If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, tool-surface change, or redeploy that invalidates dynamic client registrations, check the cockpit Operation Log for `oauth_token` failures such as `unknown_client_id` or `invalid_client`. For ChatGPT, **do not rely on disconnect/reconnect**: it can preserve the stale connector registration and repeat the authorization failure. Fully delete/remove the old Brain connector from the affected ChatGPT account or workspace, then create it again from scratch so ChatGPT performs fresh dynamic client registration and receives a new `client_id`.
 
 OpenAI account cutover verification passed on 2026-06-16 for both ERS and personal ChatGPT accounts:
 
