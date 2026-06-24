@@ -40,6 +40,12 @@ const menuBarScriptPath = path.join(
   "scripts",
   "install-brain-menubar-app.mjs"
 );
+const menuBarLaunchdScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "write-brain-menubar-launchd-plist.mjs"
+);
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-launchd-test-"));
 
 after(async () => {
@@ -427,6 +433,37 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.notEqual(stat.mode & 0o111, 0);
 });
 
+test("menu-bar LaunchAgent opens the operator app at login", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.ers-brain-monitor.plist");
+  const appPath = path.join(tmpRoot, "Applications", "ERS Brain Monitor.app");
+  const logDir = path.join(tmpRoot, "logs", "ers-brain");
+
+  const { stdout } = await exec(process.execPath, [menuBarLaunchdScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_LAUNCHD_LABEL: "com.example.ers-brain-monitor",
+      BRAIN_MENUBAR_LAUNCHD_PLIST: outputPath,
+      BRAIN_MENUBAR_LAUNCHD_LOG_DIR: logDir,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.outputPath, outputPath);
+  assert.equal(result.appPath, appPath);
+  assert.equal(result.label, "com.example.ers-brain-monitor");
+  assert.match(plist, /<key>ProgramArguments<\/key>\s*<array>\s*<string>\/usr\/bin\/open<\/string>\s*<string>-W<\/string>/);
+  assert.match(plist, new RegExp(`<string>${appPath}</string>`));
+  assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>LimitLoadToSessionType<\/key>\s*<string>Aqua<\/string>/);
+  assert.match(plist, /<key>ProcessType<\/key>\s*<string>Interactive<\/string>/);
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "menubar-launchd.out.log")}</string>`));
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "menubar-launchd.err.log")}</string>`));
+});
+
 test("launchd and launcher generators avoid user-specific absolute defaults", async () => {
   const syncGenerator = await fs.readFile(scriptPath, "utf-8");
   const cockpitGenerator = await fs.readFile(cockpitScriptPath, "utf-8");
@@ -434,6 +471,7 @@ test("launchd and launcher generators avoid user-specific absolute defaults", as
   const syncHelperGenerator = await fs.readFile(syncHelperScriptPath, "utf-8");
   const syncHelperLaunchdGenerator = await fs.readFile(syncHelperLaunchdScriptPath, "utf-8");
   const menuBarGenerator = await fs.readFile(menuBarScriptPath, "utf-8");
+  const menuBarLaunchdGenerator = await fs.readFile(menuBarLaunchdScriptPath, "utf-8");
 
   for (const generator of [
     syncGenerator,
@@ -442,6 +480,7 @@ test("launchd and launcher generators avoid user-specific absolute defaults", as
     syncHelperGenerator,
     syncHelperLaunchdGenerator,
     menuBarGenerator,
+    menuBarLaunchdGenerator,
   ]) {
     assert.doesNotMatch(generator, /\/Users\/johnemilad/);
   }
@@ -452,4 +491,5 @@ test("launchd and launcher generators avoid user-specific absolute defaults", as
   assert.match(syncHelperGenerator, /os\.homedir\(\)/);
   assert.match(syncHelperLaunchdGenerator, /os\.homedir\(\)/);
   assert.match(menuBarGenerator, /os\.homedir\(\)/);
+  assert.match(menuBarLaunchdGenerator, /os\.homedir\(\)/);
 });

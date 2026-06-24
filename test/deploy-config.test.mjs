@@ -311,6 +311,10 @@ test("hosted cockpit is local-only and read-only", async () => {
     packageJson.scripts["sync:menubar:install"],
     "node scripts/install-brain-menubar-app.mjs"
   );
+  assert.equal(
+    packageJson.scripts["sync:menubar:launchd:plist"],
+    "node scripts/write-brain-menubar-launchd-plist.mjs"
+  );
   assert.match(script, /BRAIN_COCKPIT_HOST \|\| "127\.0\.0\.1"/);
   assert.match(script, /requestedPort \|\| 8787/);
   assert.match(script, /BRAIN_COCKPIT_PORT_FALLBACK/);
