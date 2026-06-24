@@ -168,6 +168,32 @@ export const ReadLogSchema = BrainIdSchema.extend({
     .describe("Number of newest-first log entries to skip before returning results. Use with limit for pagination. Default: 0."),
 });
 
+export const ReportItemSchema = BrainIdSchema.extend({
+  kind: z
+    .enum(["bug", "feature", "observation", "investigation", "follow_up"])
+    .describe("Type of conversationally reported item to capture."),
+  title: z
+    .string()
+    .min(1)
+    .describe("Short human-scannable title for the intake item."),
+  source: z
+    .string()
+    .optional()
+    .describe("Where the item was reported, e.g. ChatGPT mobile or Claude web."),
+  target: z
+    .string()
+    .optional()
+    .describe("Likely owning project, repo, Brain area, or system."),
+  details: z
+    .string()
+    .optional()
+    .describe("Brief metadata-only detail. Do not include secrets or long Brain/file content."),
+  urgency: z
+    .enum(["low", "normal", "high"])
+    .default("normal")
+    .describe("Triage urgency. Default: normal."),
+});
+
 const sourceCategoryEnum = z.enum([
   "bios",
   "cv",

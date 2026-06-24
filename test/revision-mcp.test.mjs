@@ -297,6 +297,52 @@ test("HTTP MCP log writes through revision store with actor metadata", async () 
   });
 });
 
+test("HTTP MCP reads hosted LOG.md through revision store without local brain_dir", async () => {
+  const harness = await setupHarness("hosted-read-log-no-brain-dir", {
+    storage_backend: "postgres",
+    storage_config: {},
+  });
+
+  await callTool(harness, "brain_log", {
+    opType: "UPDATE",
+    filesTouched: ["NOW.md"],
+    summary: "Hosted read-log entry",
+  });
+
+  const result = await callTool(harness, "brain_read_log", {
+    limit: 1,
+    offset: 0,
+  });
+
+  assert.match(result, /Hosted read-log entry/);
+  assert.doesNotMatch(result, /storage_config\.brain_dir/);
+});
+
+test("HTTP MCP report item creates a hosted Brain intake queue in TASKS.md", async () => {
+  const harness = await setupHarness("report-item-hosted", {
+    storage_backend: "postgres",
+    storage_config: {},
+  });
+
+  const result = await callTool(harness, "brain_report_item", {
+    kind: "bug",
+    title: "Hosted log ordering",
+    source: "ChatGPT mobile",
+    target: "brain-mcp-server",
+    details: "New hosted LOG.md entries should be newest-first.",
+    urgency: "normal",
+  });
+
+  assert.match(result, /Captured bug in TASKS\.md Inbox \/ Handoff Queue/);
+
+  const store = new FileRevisionStore(harness.storeFile);
+  const hosted = await store.readFile("ai-brain-jem", "TASKS.md");
+  assert.match(hosted.content, /## Inbox \/ Handoff Queue/);
+  assert.match(hosted.content, /BUG — Hosted log ordering/);
+  assert.match(hosted.content, /Source: ChatGPT mobile/);
+  assert.match(hosted.content, /Target: brain-mcp-server/);
+});
+
 test("HTTP MCP list and search use revision store harness", async () => {
   const harness = await setupHarness("list-search");
   const files = await callTool(harness, "brain_list_files");

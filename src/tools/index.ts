@@ -9,6 +9,7 @@ import { registerInboxTools } from "./inbox.js";
 import { registerRegistryTools } from "./registry.js";
 import { registerSemanticTools } from "./semantic.js";
 import { registerSyncTools } from "./sync.js";
+import { registerTaskTools } from "./tasks.js";
 
 export function registerAllTools(server: McpServer): void {
   registerRegistryTools(server);
@@ -18,6 +19,7 @@ export function registerAllTools(server: McpServer): void {
   registerUpdateTools(server);
   registerStatusTools(server);
   registerLogTools(server);
+  registerTaskTools(server);
   registerLintTools(server);
   registerIngestTools(server);
   registerInboxTools(server);
