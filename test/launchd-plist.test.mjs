@@ -34,6 +34,12 @@ const syncHelperLaunchdScriptPath = path.join(
   "scripts",
   "write-sync-helper-launchd-plist.mjs"
 );
+const menuBarScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "install-brain-menubar-app.mjs"
+);
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-launchd-test-"));
 
 after(async () => {
@@ -344,12 +350,90 @@ test("sync helper LaunchAgent opens the helper app at login", async () => {
   assert.match(plist, new RegExp(`<string>${path.join(logDir, "sync-helper-launchd.err.log")}</string>`));
 });
 
+test("menu-bar app surfaces sync health and operator controls", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "ERS Brain Monitor.app");
+  const brainRoot = path.join(tmpRoot, "ers-brain");
+  const stateFile = path.join(tmpRoot, "state", "ers-brain", "state.json");
+  const healthFile = path.join(tmpRoot, "state", "ers-brain", "state.health.json");
+  const logDir = path.join(tmpRoot, "logs", "ers-brain");
+  const nodePath = "/opt/example/bin/node";
+  const doctorScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-doctor.mjs");
+
+  const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_BUNDLE_ID: "com.example.ers-brain-monitor",
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      BRAIN_SYNC_HEALTH_FILE: healthFile,
+      BRAIN_SYNC_LAUNCHD_LABEL: "com.example.ers-brain-sync.helper",
+      BRAIN_COCKPIT_LAUNCHD_LABEL: "com.example.ers-brain-cockpit",
+      BRAIN_COCKPIT_URL: "http://127.0.0.1:8798/",
+      BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
+      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_DOCTOR_SCRIPT: doctorScriptPath,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const infoPlist = await fs.readFile(path.join(appPath, "Contents", "Info.plist"), "utf-8");
+  const executablePath = path.join(appPath, "Contents", "MacOS", "ERS Brain Monitor");
+  const executable = await fs.readFile(executablePath);
+  const source = await fs.readFile(
+    path.join(appPath, "Contents", "Resources", "brain-menubar-app.m"),
+    "utf-8"
+  );
+  const config = JSON.parse(
+    await fs.readFile(
+      path.join(appPath, "Contents", "Resources", "brain-menubar-config.json"),
+      "utf-8"
+    )
+  );
+  const stat = await fs.stat(executablePath);
+
+  assert.equal(result.appPath, appPath);
+  assert.equal(result.launcherKind, "native_menubar");
+  assert.equal(result.signed, true);
+  assert.equal(result.brainId, "ers-brain");
+  assert.equal(result.brainDir, path.join(brainRoot, "brain"));
+  assert.equal(result.stateFile, stateFile);
+  assert.equal(result.healthFile, healthFile);
+  assert.equal(result.logDir, logDir);
+  assert.equal(result.cockpitUrl, "http://127.0.0.1:8798/");
+  assert.match(infoPlist, /<key>CFBundlePackageType<\/key>\s*<string>APPL<\/string>/);
+  assert.match(infoPlist, /<key>LSUIElement<\/key>\s*<true\/>/);
+  assert.notEqual(executable.subarray(0, 2).toString("utf-8"), "#!");
+  assert.equal(config.brainId, "ers-brain");
+  assert.equal(config.brainDir, path.join(brainRoot, "brain"));
+  assert.equal(config.stateFile, stateFile);
+  assert.equal(config.healthFile, healthFile);
+  assert.equal(config.syncLaunchdLabel, "com.example.ers-brain-sync.helper");
+  assert.equal(config.cockpitLaunchdLabel, "com.example.ers-brain-cockpit");
+  assert.equal(config.cockpitUrl, "http://127.0.0.1:8798/");
+  assert.equal(config.nodePath, nodePath);
+  assert.equal(config.doctorScriptPath, doctorScriptPath);
+  assert.equal(config.doctorOutputPath, path.join(logDir, "hosted-doctor.out.json"));
+  assert.equal(config.doctorErrorPath, path.join(logDir, "hosted-doctor.err.log"));
+  assert.match(source, /NSStatusBar/);
+  assert.match(source, /Open Cockpit/);
+  assert.match(source, /Refresh Doctor/);
+  assert.match(source, /Restart Sync Helper/);
+  assert.match(source, /Open Sync Logs/);
+  assert.match(source, /launchctl/);
+  assert.match(source, /health\[@"report"\]/);
+  assert.match(source, /report\[@"conflicts"\]/);
+  assert.notEqual(stat.mode & 0o111, 0);
+});
+
 test("launchd and launcher generators avoid user-specific absolute defaults", async () => {
   const syncGenerator = await fs.readFile(scriptPath, "utf-8");
   const cockpitGenerator = await fs.readFile(cockpitScriptPath, "utf-8");
   const launcherGenerator = await fs.readFile(launcherScriptPath, "utf-8");
   const syncHelperGenerator = await fs.readFile(syncHelperScriptPath, "utf-8");
   const syncHelperLaunchdGenerator = await fs.readFile(syncHelperLaunchdScriptPath, "utf-8");
+  const menuBarGenerator = await fs.readFile(menuBarScriptPath, "utf-8");
 
   for (const generator of [
     syncGenerator,
@@ -357,6 +441,7 @@ test("launchd and launcher generators avoid user-specific absolute defaults", as
     launcherGenerator,
     syncHelperGenerator,
     syncHelperLaunchdGenerator,
+    menuBarGenerator,
   ]) {
     assert.doesNotMatch(generator, /\/Users\/johnemilad/);
   }
@@ -366,4 +451,5 @@ test("launchd and launcher generators avoid user-specific absolute defaults", as
   assert.match(launcherGenerator, /os\.homedir\(\)/);
   assert.match(syncHelperGenerator, /os\.homedir\(\)/);
   assert.match(syncHelperLaunchdGenerator, /os\.homedir\(\)/);
+  assert.match(menuBarGenerator, /os\.homedir\(\)/);
 });
