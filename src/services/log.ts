@@ -32,6 +32,12 @@ export function appendLogEntryToContent(content: string, entry: string): string 
   const dividerIndex = base.indexOf(divider);
 
   if (dividerIndex === -1) {
+    const legacyEntryMatch = /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/m.exec(base);
+    if (legacyEntryMatch?.index !== undefined) {
+      const prefix = base.slice(0, legacyEntryMatch.index).trimEnd();
+      const rest = base.slice(legacyEntryMatch.index).trimStart();
+      return `${prefix}\n\n${entry}\n${rest}`.trimEnd() + "\n";
+    }
     return `${entry}\n${base}`.trimEnd() + "\n";
   }
 
@@ -47,6 +53,10 @@ function isStandardEntryStart(line: string): boolean {
 
 function isLegacyEntryStart(line: string): boolean {
   return /^\s*-?\s*\d{4}-\d{2}-\d{2}\s+—/.test(line);
+}
+
+function isRootHeading(line: string): boolean {
+  return /^#(?!#)/.test(line);
 }
 
 function parseLogEntries(content: string): string[] {
@@ -72,6 +82,11 @@ function parseLogEntries(content: string): string[] {
     if (isLegacyEntryStart(line)) {
       flush();
       current = [line.trim()];
+      flush();
+      continue;
+    }
+
+    if (currentIsStandard && isRootHeading(line)) {
       flush();
       continue;
     }
