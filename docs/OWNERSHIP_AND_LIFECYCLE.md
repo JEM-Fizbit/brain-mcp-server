@@ -22,9 +22,9 @@ The hosted Brain MCP is a **personal** asset currently **shared with ERS for bet
 
 ## Product lifecycle
 
-**Phase 0 — Personal beta (now).** The hosted Brain MCP is personal-owned and serves John's single JEM Brain. ERS uses it for beta testing and hardening, with John as the only user. It is dual-registered (personal + ERS) to reflect the shared use. The personal MCP and all its infrastructure stay personal.
+**Phase 0 — Personal beta (now).** The hosted Brain MCP is personal-owned and is operated by John as the only user. It began with John's single JEM Brain and now includes a John-only ERS Brain pilot to prove multi-Brain routing before ERS production. ERS uses the server for beta testing and hardening, with John as the only user. It is dual-registered (personal + ERS) to reflect the shared use. The personal MCP and all its infrastructure stay personal.
 
-**Phase 1 — Multi-tenant ERS cutover (future).** When the product graduates to a multi-tenant, multi-Brain ERS service, we **fork** this repo into a dedicated ERS MCP. The personal MCP/infra remains personal and unchanged; the ERS service is a separate deployment.
+**Phase 1 — Multi-tenant ERS cutover (future).** When the product graduates from John-only pilot use to an ERS production service, we **fork** this repo into a dedicated ERS MCP. The personal MCP/infra remains personal and unchanged; the ERS service is a separate deployment.
 
 ### Fork scope (Phase 0 → Phase 1)
 
@@ -35,7 +35,7 @@ The hosted Brain MCP is a **personal** asset currently **shared with ERS for bet
 
 ### Fork trigger
 
-Move from Phase 0 to Phase 1 when ERS needs **more than John as a user** (real multi-user access) and/or the service must serve **Brains beyond the JEM Brain** (multi-Brain). Until then, Phase 0 holds and the asset stays personal-owned + dual-registered.
+Move from Phase 0 to Phase 1 when ERS needs **more than John as a user** (real multi-user access), when ERS needs a production service/SLO owned by ERS, or when governance requires ERS-owned infrastructure for ERS Brain data. A John-only multi-Brain pilot on the personal MCP is allowed inside Phase 0 so the routing, sync, and fallback contracts can be proven before the fork. Until Phase 1, the asset stays personal-owned + dual-registered.
 
 ## Pointers
 

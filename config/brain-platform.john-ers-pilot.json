@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "default_brain_id": "ai-brain-jem",
+  "brains": [
+    {
+      "id": "ai-brain-jem",
+      "type": "personal",
+      "template_used": "personal",
+      "integration_mode": "vertical",
+      "storage_backend": "postgres",
+      "storage_config": {},
+      "vector_backend": null,
+      "vector_scope": ["sources"],
+      "metadata": {
+        "environment": "john-only-pilot",
+        "local_first": true,
+        "content_owner": "personal",
+        "production_cutover_requires_ers_owned_project": false
+      }
+    },
+    {
+      "id": "ers-brain",
+      "type": "shared",
+      "template_used": "ers",
+      "integration_mode": "vertical",
+      "storage_backend": "postgres",
+      "storage_config": {},
+      "vector_backend": null,
+      "vector_scope": ["sources"],
+      "metadata": {
+        "environment": "john-only-pilot",
+        "local_first": true,
+        "content_owner": "ers",
+        "canonical_local_checkout": "SharePoint/OneDrive 01_ers-brain",
+        "production_cutover_requires_ers_owned_project": true,
+        "team_access": false
+      }
+    }
+  ],
+  "principals": [
+    {
+      "provider": "github",
+      "provider_user_id": "220941196",
+      "login": "johnemilad",
+      "roles": {
+        "ai-brain-jem": "owner",
+        "ers-brain": "owner"
+      }
+    }
+  ]
+}

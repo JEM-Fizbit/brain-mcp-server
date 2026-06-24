@@ -13,6 +13,7 @@ This is the hosted target for remote MCP clients that need a public HTTPS URL. F
 - Revision store: Supabase Postgres (`brain` schema)
 - Artifact store: private Supabase Storage bucket (`brain-artifacts`)
 - OAuth state root: deployment secret/storage path as configured by the hosted MCP server
+- Brain registry: image-bundled `config/brain-platform.john-ers-pilot.json`
 - Local Markdown mirror: maintained by the local sync agent, not by a Fly git checkout
 
 ## Why Fly Still Fits
@@ -32,6 +33,7 @@ db/migrations/2026-06-14_001_hosted_brain_postgres.sql
 db/migrations/2026-06-14_002_harden_hosted_brain_advisors.sql
 db/migrations/2026-06-14_003_brain_runtime_role.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
+db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql
 docs/security/hosted-brain-supabase-security-gate.md
 ```
 
@@ -61,7 +63,7 @@ fly secrets set \
   MCP_OAUTH_SIGNING_SECRET="$(openssl rand -base64 48)" \
   GITHUB_OAUTH_CLIENT_ID="<hosted-github-oauth-client-id>" \
   GITHUB_OAUTH_CLIENT_SECRET="<hosted-github-oauth-client-secret>" \
-  GITHUB_ALLOWED_LOGINS="JEM-Fizbit" \
+  GITHUB_ALLOWED_LOGINS="<fallback-github-login>" \
   GITHUB_ALLOWED_EMAILS="johnemilad@hotmail.com" \
   BRAIN_OAUTH_STATE_STORE="postgres" \
   MCP_OAUTH_REFRESH_REUSE_GRACE_SEC="15" \
@@ -79,11 +81,15 @@ Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source me
 
 Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for the Supabase-backed hosted runtime. Those belong to the retired git hot path.
 
+The image-bundled registry is the current access authority for the two-Brain pilot and matches John by stable GitHub provider id. `GITHUB_ALLOWED_LOGINS` and `GITHUB_ALLOWED_EMAILS` are fallback controls for the default Brain only; do not use them as the ERS Brain access model.
+
 Hosted OAuth client registration, auth-code, OAuth-state, and refresh-token metadata should use `BRAIN_OAUTH_STATE_STORE=postgres`. File-backed OAuth state is acceptable for local harnesses only; on Fly it can be lost with machine replacement and leave Claude/ChatGPT connectors holding stale credentials. `MCP_OAUTH_REFRESH_REUSE_GRACE_SEC=15` preserves normal refresh-token rotation while tolerating short cloud-client refresh races across web, desktop, and mobile surfaces.
 
 When migrating an already-enrolled connector from file-backed OAuth state to Postgres-backed OAuth state, expect one re-enrollment per client account. Existing Claude-held refresh tokens cannot be migrated from the server side because the server only stores their hash. After re-enrollment, future redeploys and Fly machine replacement should not require reconnecting solely because the server lost OAuth state.
 
 The current pilot Supabase project is John's private-org project `brain-platform-pilot` (`omnwbcdtmtvxasgdmvwr`). ERS production must use an ERS-owned Supabase project with the same migrations and environment contract.
+
+The Fly runtime reads the non-secret hosted registry from `/app/config/brain-platform.john-ers-pilot.json`. Do not depend on `/data/config/registry.json` for the current deployment; volume state can lag the committed two-Brain registry.
 
 For local operator scripts, copy `.env.local.example` to `.env.local` and fill the secret values once. The Postgres/Supabase smoke, seed, verify, inventory, and upload scripts load `.env.local` automatically; deployment still uses the hosting secret manager.
 
@@ -235,7 +241,7 @@ Unload it with:
 launchctl unload ~/Library/LaunchAgents/com.jem.brain-sync.plist
 ```
 
-The plist runs the compiled sync CLI directly through the absolute Node path captured when the plist is generated, relies on the repo `.env.local` for private Supabase settings, and writes logs under the Brain `.brain-sync/` directory. Run `npm run build` before regenerating the plist, and regenerate it after changing Node installations.
+The plist runs the compiled sync CLI directly through the absolute Node path captured when the plist is generated, relies on the repo `.env.local` for private Supabase settings, and writes logs under the Brain `.brain-sync/` directory by default. Set `BRAIN_SYNC_STATE_FILE`, `BRAIN_SYNC_LOCK_FILE`, `BRAIN_SYNC_HEALTH_FILE`, or `BRAIN_SYNC_LAUNCHD_LOG_DIR` to move daemon state and logs outside the Brain checkout. For SharePoint/OneDrive CloudStorage Brains, use a daemon-local checkout plus explicit state/log paths; macOS may deny launchd background processes direct access to the cloud-backed working tree even when Terminal can read it. Run `npm run build` before regenerating the plist, and regenerate it after changing Node installations.
 
 After any deployment that changes schema, RLS, functions, Storage, or user-data access, rerun the security gate in `docs/security/hosted-brain-supabase-security-gate.md`.
 

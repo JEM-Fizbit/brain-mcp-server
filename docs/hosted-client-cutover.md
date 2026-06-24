@@ -87,13 +87,17 @@ OpenAI account cutover verification passed on 2026-06-16 for both ERS and person
 - open conflicts: 0;
 - latest cursor: `2026-06-16T11:05:57.337Z`.
 
-Claude account cutover verification passed on 2026-06-17 for both the personal Max account and the ERS account. This is John-only, user-scope access to `ai-brain-jem`; it is not an ERS team rollout. Both verifications used the hosted/revision provider, hosted file count `52` or higher, open conflicts `0`, and no Brain file contents printed during the smoke.
+Claude account cutover verification passed on 2026-06-17 for both the personal Max account and the ERS account. This is John-only, user-scope access to hosted Brain; it is not an ERS team rollout. The original verifications used `ai-brain-jem` with the hosted/revision provider, hosted file count `52` or higher, open conflicts `0`, and no Brain file contents printed during the smoke.
+
+On 2026-06-24 the hosted registry was expanded for the John-only ERS Brain pilot. `ers-brain` is seeded into Supabase revisions and private source/artifact storage, but it remains John-only pilot traffic until hosted client smoke and the ERS local sync LaunchAgent are verified. See [`docs/ers-brain-hosted-pilot.md`](ers-brain-hosted-pilot.md).
 
 ## Claude Client Cutover
 
 Claude has been cut over so the default `brain` MCP connector points at hosted across local Claude Code surfaces, and the Claude personal Max and ERS custom connectors have been activated and verified for John's personal use. The naming convention matches Codex: hosted is the default `brain`, local stdio is retained as `brain-local`.
 
-> **Tenancy — single-user / single-Brain (important).** The hosted runtime is still **single-tenant**: it serves exactly one Brain (`ai-brain-jem`), and access is gated by GitHub OAuth to John's identity plus the hosted allowlist. Adding the connector in the **ERS Teams** account is John reaching his *own* JEM Brain from that account — it is **not** a team rollout. **John remains the sole user on every account and surface** until the multi-tenant Brain Platform (one `mcp__brain__*` namespace + `brain_id` + per-Brain substrate + per-user attribution) is built and rolled out (roadmap: `~/Projects/ai-brain-jem/docs/PLAN_brain_roadmap.md`; architecture: `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`). When adding the ERS connector, add it at **user/personal scope, not org/workspace-wide**, so it is not surfaced to other ERS users — the server-side OAuth + allowlist already enforces John-only regardless, but user-scope keeps it clean.
+> **Tenancy — single-user / multi-Brain pilot (important).** The hosted runtime is still **single-user**: John is the only authorized user, and access is gated by GitHub OAuth plus the hosted registry. It now serves `ai-brain-jem` and the John-only pilot `ers-brain`. This is **not** ERS team access. When adding the connector in the **ERS Teams** account, add it at **user/personal scope, not org/workspace-wide**, so it is not surfaced to other ERS users. The ERS-owned Supabase / dedicated ERS MCP fork remains required before production or multi-user ERS rollout.
+
+When more than one Brain is visible, pass `brain_id` explicitly. Use `ai-brain-jem` for JEM/personal context and `ers-brain` for ERS Brain work.
 
 ### Claude Code (`~/.claude.json`, top-level `mcpServers`)
 
@@ -232,9 +236,14 @@ brain_load_context({ "brain_id": "ai-brain-jem" })
 brain_list_files({ "brain_id": "ai-brain-jem" })
 brain_sync_status({ "brain_id": "ai-brain-jem" })
 brain_read_file({ "brain_id": "ai-brain-jem", "filename": "NOW.md" })
+brain_describe({ "brain_id": "ers-brain" })
+brain_sync_status({ "brain_id": "ers-brain" })
+brain_load_context({ "brain_id": "ers-brain" })
+brain_list_sources({ "brain_id": "ers-brain" })
+brain_lint({ "brain_id": "ers-brain" })
 ```
 
-5. Exercise one narrow reviewed write. Prefer the established smoke file unless a real work update is already needed:
+5. Exercise one narrow reviewed write against the intended Brain. Prefer the established JEM smoke file unless a real work update is already needed; for ERS, use an ERS-specific smoke file only after the ERS local sync LaunchAgent is running:
 
 ```text
 brain_update_file({

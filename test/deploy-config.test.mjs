@@ -38,6 +38,61 @@ test("Fly image does not install or configure deploy-key SSH access", async () =
   assert.match(entrypoint, /exec "\$@"/);
 });
 
+test("Fly image carries the John-only JEM and ERS pilot registry", async () => {
+  const flyConfig = await fs.readFile(path.join(repoRoot, "fly.toml"), "utf-8");
+  const dockerfile = await fs.readFile(path.join(repoRoot, "Dockerfile"), "utf-8");
+  const entrypoint = await fs.readFile(
+    path.join(repoRoot, "scripts", "fly-entrypoint.sh"),
+    "utf-8"
+  );
+  const registry = JSON.parse(
+    await fs.readFile(
+      path.join(repoRoot, "config", "brain-platform.john-ers-pilot.json"),
+      "utf-8"
+    )
+  );
+
+  assert.match(
+    flyConfig,
+    /BRAIN_PLATFORM_CONFIG = "\/app\/config\/brain-platform\.john-ers-pilot\.json"/
+  );
+  assert.match(dockerfile, /COPY config \.\/config/);
+  assert.match(entrypoint, /\/data\/config\/registry\.json/);
+  assert.equal(registry.version, 1);
+  assert.equal(registry.default_brain_id, "ai-brain-jem");
+  assert.deepEqual(
+    registry.brains.map((brain) => brain.id).sort(),
+    ["ai-brain-jem", "ers-brain"]
+  );
+  assert.ok(
+    registry.brains.every((brain) => brain.storage_backend === "postgres")
+  );
+  const john = registry.principals.find((principal) => principal.login === "johnemilad");
+  assert.ok(john);
+  assert.equal(john.provider_user_id, "220941196");
+  assert.equal(john.roles["ai-brain-jem"], "owner");
+  assert.equal(john.roles["ers-brain"], "owner");
+  assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
+});
+
+test("ERS Brain pilot seed is data-only and private by default", async () => {
+  const seed = await fs.readFile(
+    path.join(repoRoot, "db", "seeds", "2026-06-24_001_bootstrap_ers_brain_pilot.sql"),
+    "utf-8"
+  );
+
+  assert.match(seed, /insert into brain\.brains/i);
+  assert.match(seed, /'ers-brain'/);
+  assert.match(seed, /'shared'/);
+  assert.match(seed, /john-only-pilot/);
+  assert.match(seed, /production_cutover_requires_ers_owned_project/);
+  assert.doesNotMatch(seed, /\bgrant\b/i);
+  assert.doesNotMatch(seed, /\bcreate policy\b/i);
+  assert.doesNotMatch(seed, /\banon\b/i);
+  assert.doesNotMatch(seed, /\bauthenticated\b/i);
+  assert.doesNotMatch(seed, /\bpublic\b/i);
+});
+
 test("hosted OAuth smoke caches refresh grants without logging access tokens", async () => {
   const packageJson = JSON.parse(
     await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
@@ -152,6 +207,17 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /databaseUrl: "set"/);
   assert.doesNotMatch(script, /databaseUrl[,}]/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
+});
+
+test("source list verifier supports non-JEM expected counts", async () => {
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "verify-postgres-source-list.mjs"),
+    "utf-8"
+  );
+
+  assert.match(script, /BRAIN_EXPECTED_SOURCE_COUNT/);
+  assert.match(script, /BRAIN_EXPECTED_CATEGORY_COUNTS/);
+  assert.doesNotMatch(script, /assert\.equal\(all\.length,\s*70\)/);
 });
 
 test("local sync daemon bounds Postgres stalls and shutdown", async () => {

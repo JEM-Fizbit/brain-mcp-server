@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-06-17
+**Last updated:** 2026-06-24
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
@@ -35,7 +35,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - the real hosted client shadow rehearsal passed for `ai-brain-jem`, so hosted MCP is now the normal remote JEM path;
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
-- the hosted runtime remains single-tenant and single-Brain: John is still the only user, and `ai-brain-jem` is the only served Brain;
+- the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
 
 ## Cutover Principle
@@ -120,6 +120,14 @@ Planned work:
 - add tests for ambiguous Brain access and role boundaries;
 - decide which Brain metadata belongs in registry JSON versus Postgres.
 
+Current pilot status (2026-06-24):
+
+- `ers-brain` is registered in the John-only hosted registry;
+- ERS Markdown seed passed with 40 files, byte-for-byte mirror verification, and 0 conflicts;
+- ERS sources are inventoried/uploaded into the private artifact store: 128 artifacts, 57 extracted text records, 0 missing/failed extraction;
+- local sync/cockpit LaunchAgent generators now pin `BRAIN_ID` so an ERS daemon cannot silently default to `ai-brain-jem`;
+- local ERS connector remains available as fallback until hosted ERS client smoke passes and the ERS sync agent is running.
+
 Exit criteria:
 
 - one user can safely operate multiple Brains through hosted MCP;
@@ -193,7 +201,7 @@ Recommended order:
 2. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
 3. Document and rehearse hosted recovery/reseed from local Markdown.
 4. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.
-5. Start the multi-Brain design after the JEM pilot path is boring.
+5. Complete the ERS hosted client smoke and ERS sync LaunchAgent install/rehearsal, then keep local ERS stdio/filesystem access as fallback only.
 
 ## Non-Goals For Now
 

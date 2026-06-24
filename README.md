@@ -81,6 +81,7 @@ This repo includes:
 - `fly.toml` for the first Supabase-backed Fly.io target, `jem-brain-mcp`
 - [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
 - [`docs/hosted-client-cutover.md`](./docs/hosted-client-cutover.md) for the JEM hosted client shadow rehearsal and promotion gate
+- [`docs/ers-brain-hosted-pilot.md`](./docs/ers-brain-hosted-pilot.md) for the John-only ERS Brain hosted pilot
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the staged JEM cutover, ERS migration, and multi-tenant roadmap
 
 Hosted endpoint shape:
@@ -92,6 +93,8 @@ https://jem-brain-mcp.fly.dev/mcp
 For hosted client cutover, add the HTTP endpoint as a separate `brain-hosted` connector first and keep the local stdio `brain` connector available as fallback.
 
 After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint through Settings -> Connectors -> Create.
+
+The current hosted registry is John-only and contains `ai-brain-jem` plus the pilot `ers-brain`. When more than one Brain is visible, pass `brain_id` explicitly in tool calls.
 
 For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied. For a user-launchable local operator surface, generate the reviewable macOS LaunchAgent with `npm run hosted:cockpit:launchd:plist`; see [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md).
 

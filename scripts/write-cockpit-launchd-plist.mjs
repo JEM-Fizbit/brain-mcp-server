@@ -9,6 +9,11 @@ const brainRoot =
   process.env.BRAIN_REPO_ROOT || path.join(os.homedir(), "Projects", "ai-brain-jem");
 const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
 const syncDir = path.resolve(brainDir, "..", ".brain-sync");
+const brainId = process.env.BRAIN_ID || "ai-brain-jem";
+const syncStateFile = process.env.BRAIN_SYNC_STATE_FILE;
+const syncLockFile = process.env.BRAIN_SYNC_LOCK_FILE;
+const syncHealthFile = process.env.BRAIN_SYNC_HEALTH_FILE;
+const syncLaunchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL;
 const label =
   process.env.BRAIN_COCKPIT_LAUNCHD_LABEL || "com.jem.brain-cockpit";
 const nodePath = process.env.BRAIN_COCKPIT_LAUNCHD_NODE || process.execPath;
@@ -36,6 +41,16 @@ if (!path.isAbsolute(cockpitScriptPath)) {
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error(`BRAIN_COCKPIT_PORT must be a valid TCP port: ${port}`);
+}
+
+for (const [name, value] of [
+  ["BRAIN_SYNC_STATE_FILE", syncStateFile],
+  ["BRAIN_SYNC_LOCK_FILE", syncLockFile],
+  ["BRAIN_SYNC_HEALTH_FILE", syncHealthFile],
+]) {
+  if (value && !path.isAbsolute(value)) {
+    throw new Error(`${name} must be absolute: ${value}`);
+  }
 }
 
 function xmlEscape(value) {
@@ -66,6 +81,34 @@ const plist = `<?xml version="1.0" encoding="UTF-8"?>
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>BRAIN_ID</key>
+    <string>${xmlEscape(brainId)}</string>
+    <key>BRAIN_DIR</key>
+    <string>${xmlEscape(brainDir)}</string>
+    ${
+      syncStateFile
+        ? `<key>BRAIN_SYNC_STATE_FILE</key>
+    <string>${xmlEscape(syncStateFile)}</string>`
+        : ""
+    }
+    ${
+      syncLockFile
+        ? `<key>BRAIN_SYNC_LOCK_FILE</key>
+    <string>${xmlEscape(syncLockFile)}</string>`
+        : ""
+    }
+    ${
+      syncHealthFile
+        ? `<key>BRAIN_SYNC_HEALTH_FILE</key>
+    <string>${xmlEscape(syncHealthFile)}</string>`
+        : ""
+    }
+    ${
+      syncLaunchdLabel
+        ? `<key>BRAIN_SYNC_LAUNCHD_LABEL</key>
+    <string>${xmlEscape(syncLaunchdLabel)}</string>`
+        : ""
+    }
     <key>BRAIN_COCKPIT_HOST</key>
     <string>${xmlEscape(host)}</string>
     <key>BRAIN_COCKPIT_PORT</key>
@@ -98,7 +141,12 @@ console.log(
     {
       outputPath,
       label,
+      brainId,
       url: `http://${host}:${port}/`,
+      syncStateFile: syncStateFile || null,
+      syncLockFile: syncLockFile || null,
+      syncHealthFile: syncHealthFile || null,
+      syncLaunchdLabel: syncLaunchdLabel || null,
       nodePath,
       cockpitScriptPath,
       host,
