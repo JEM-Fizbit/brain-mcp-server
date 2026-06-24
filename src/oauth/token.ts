@@ -210,16 +210,32 @@ export async function handleToken(
   authHeader: string | null | undefined,
   config: OauthConfig,
   state: StateProvider
-): Promise<{ status: number; body: any }> {
-  const auth = await authenticateClient(form, authHeader, state);
-  if ("response" in auth) return auth.response;
-
+): Promise<{ status: number; body: any; clientId: string | null; grantType: string | null }> {
+  // Surface the presented client id and grant type on every path (including
+  // failures) so the HTTP layer can attach them to non-secret auth telemetry.
+  // Both are public, non-secret OAuth identifiers — see DECISIONS.md and spec 005.
+  const requestedClientId =
+    parseBasicAuth(authHeader)?.client_id || form.get("client_id") || "";
   const grantType = form.get("grant_type") || "";
+  const identity = {
+    clientId: requestedClientId || null,
+    grantType: grantType || null,
+  };
+
+  const auth = await authenticateClient(form, authHeader, state);
+  if ("response" in auth) return { ...auth.response, ...identity };
+
+  // On a recognized client, prefer the authenticated client id of record.
+  identity.clientId = auth.client.client_id || identity.clientId;
+
   if (grantType === "authorization_code") {
-    return authorizationCodeGrant(form, auth.client, config, state);
+    return { ...(await authorizationCodeGrant(form, auth.client, config, state)), ...identity };
   }
   if (grantType === "refresh_token") {
-    return refreshTokenGrant(form, auth.client, config, state);
+    return { ...(await refreshTokenGrant(form, auth.client, config, state)), ...identity };
   }
-  return error("unsupported_grant_type", `grant_type '${grantType}' is not supported`);
+  return {
+    ...error("unsupported_grant_type", `grant_type '${grantType}' is not supported`),
+    ...identity,
+  };
 }

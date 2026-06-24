@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const {
   severityForCount,
   decideAuthAlert,
+  computeStaleConnector,
   readAuthAlertThresholds,
   formatReasonSummary,
   buildAuthAlertMessage,
@@ -68,6 +69,70 @@ test("decideAuthAlert fires fail at the fail threshold", () => {
   });
 });
 
+test("decideAuthAlert caps a stale-connector loop at warn instead of paging fail", () => {
+  // Above the fail threshold, but a benign stale connector -> warn, not fail.
+  assert.deepEqual(
+    decideAuthAlert({ ...base, failureCount: 50, staleConnector: true }),
+    { fire: true, severity: "warn" }
+  );
+  // A real incident at the same count still pages fail.
+  assert.deepEqual(
+    decideAuthAlert({ ...base, failureCount: 50, staleConnector: false }),
+    { fire: true, severity: "fail" }
+  );
+});
+
+// --- computeStaleConnector (pure) ----------------------------------------
+
+const STALE_BASE = {
+  failingClientIds: ["mcp_client_zombie"],
+  allUnknownClientRefresh: true,
+  registeredClientIds: ["mcp_client_real"],
+  firstFailureAt: minutesAgo(40),
+  lastFailureAt: minutesAgo(1),
+  now: NOW,
+  graceMinutes: 10,
+};
+
+test("computeStaleConnector flags a single sustained unregistered client", () => {
+  assert.equal(computeStaleConnector(STALE_BASE), true);
+});
+
+test("computeStaleConnector is conservative under ambiguity", () => {
+  // unknown registered set
+  assert.equal(
+    computeStaleConnector({ ...STALE_BASE, registeredClientIds: null }),
+    false
+  );
+  // multiple distinct failing clients
+  assert.equal(
+    computeStaleConnector({ ...STALE_BASE, failingClientIds: ["a", "b"] }),
+    false
+  );
+  // not all unknown_client_id-on-refresh
+  assert.equal(
+    computeStaleConnector({ ...STALE_BASE, allUnknownClientRefresh: false }),
+    false
+  );
+  // the failing client is actually registered
+  assert.equal(
+    computeStaleConnector({
+      ...STALE_BASE,
+      registeredClientIds: ["mcp_client_zombie"],
+    }),
+    false
+  );
+  // short burst within the grace window
+  assert.equal(
+    computeStaleConnector({
+      ...STALE_BASE,
+      firstFailureAt: new Date(NOW.getTime() - 90 * 1000),
+      lastFailureAt: new Date(NOW.getTime() - 5 * 1000),
+    }),
+    false
+  );
+});
+
 test("decideAuthAlert suppresses warn when a warn fired within the cooldown", () => {
   assert.deepEqual(
     decideAuthAlert({ ...base, failureCount: 4, lastWarnAt: minutesAgo(10) }),
@@ -111,6 +176,7 @@ test("readAuthAlertThresholds returns documented defaults for an empty env", () 
     warnThreshold: 3,
     failThreshold: 10,
     cooldownMinutes: 30,
+    staleGraceMinutes: 10,
   });
 });
 
@@ -121,8 +187,15 @@ test("readAuthAlertThresholds honors env overrides", () => {
       BRAIN_AUTH_ALERT_WARN_THRESHOLD: "5",
       BRAIN_AUTH_ALERT_FAIL_THRESHOLD: "20",
       BRAIN_AUTH_ALERT_COOLDOWN_MINUTES: "15",
+      BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES: "25",
     }),
-    { windowMinutes: 120, warnThreshold: 5, failThreshold: 20, cooldownMinutes: 15 }
+    {
+      windowMinutes: 120,
+      warnThreshold: 5,
+      failThreshold: 20,
+      cooldownMinutes: 15,
+      staleGraceMinutes: 25,
+    }
   );
 });
 

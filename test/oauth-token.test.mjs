@@ -109,6 +109,27 @@ async function exchange({ tokenResource, recordResource = RESOURCE_URI } = {}) {
   };
 }
 
+test("handleToken surfaces client_id and grant_type for non-secret telemetry", async () => {
+  // Success path: the authenticated client id of record is surfaced.
+  const { result } = await exchange({});
+  assert.equal(result.status, 200);
+  assert.equal(result.clientId, CLIENT_ID);
+  assert.equal(result.grantType, "authorization_code");
+
+  // Failure path: an unknown client id is still surfaced (this is the stale /
+  // zombie connector signature) alongside the rejected grant type.
+  const state = makeState({});
+  const form = new URLSearchParams();
+  form.set("grant_type", "refresh_token");
+  form.set("client_id", "mcp_client_zombie");
+  form.set("refresh_token", "whatever");
+  const rejected = await handleToken(form, null, config, state);
+  assert.equal(rejected.status, 401);
+  assert.equal(rejected.body.error, "invalid_client");
+  assert.equal(rejected.clientId, "mcp_client_zombie");
+  assert.equal(rejected.grantType, "refresh_token");
+});
+
 test("authorization_code exchange accepts auth-code-bound resource when token resource is omitted", async () => {
   const { result } = await exchange();
 

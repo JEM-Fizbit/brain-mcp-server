@@ -54,6 +54,7 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - Do not use the database owner or Supabase service-role database connection for routine hosted Brain revision traffic after a dedicated `brain_runtime` login is available.
 - Run Supabase security advisors after each migration that touches schemas, functions, RLS, Storage, or user data.
 - Source artifact byte uploads require `BRAIN_ARTIFACT_BYTE_ACCESS=admin` plus `BRAIN_SUPABASE_SERVICE_ROLE_KEY` in a local/deployment secret. Do not paste it into chat or commit it to the repository.
+- Auth telemetry (`hosted_mcp_auth` rows) may record the non-secret OAuth `clientId` and `grantType` for tracking and stale-connector classification (spec 005). A `clientId` is a public identifier already stored plaintext in `brain.oauth_state` `clients`; recording it is permitted. Do not record `User-Agent`, IP, or other network identifiers without an explicit gate review (deferred — see the BACKLOG observability item), and never record tokens, refresh tokens, authorization headers, request bodies, client secrets, or Brain content.
 
 ## Before Production Cutover
 
