@@ -121,6 +121,30 @@ npm run hosted:cockpit:launchd:plist
 
 The cockpit remains local-only and read-only.
 
+## Menu-Bar Operator App
+
+For John's ERS pilot workstation, use the menu-bar app to keep the sync helper,
+cockpit, doctor, and logs reachable without terminal commands:
+
+```bash
+BRAIN_ID="ers-brain" \
+BRAIN_REPO_ROOT="/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain" \
+BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json" \
+BRAIN_SYNC_HEALTH_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json.health.json" \
+BRAIN_SYNC_LAUNCHD_LABEL="com.jem.ers-brain-sync.helper" \
+BRAIN_COCKPIT_LAUNCHD_LABEL="com.jem.ers-brain-cockpit" \
+BRAIN_COCKPIT_URL="http://127.0.0.1:8788/" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
+BRAIN_MENUBAR_APP="$HOME/Applications/ERS Brain Monitor.app" \
+BRAIN_MENUBAR_BUNDLE_ID="com.jem.ers-brain-monitor" \
+npm run sync:menubar:install
+```
+
+The app is a John/operator pilot surface, not ERS colleague rollout packaging.
+It shows sync health in the macOS menu bar and provides menu actions to refresh
+doctor output, open/kick the local cockpit, open logs, and restart the sync
+helper LaunchAgent.
+
 ## Verification Commands
 
 Metadata row:

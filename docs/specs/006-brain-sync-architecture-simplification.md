@@ -245,6 +245,11 @@ The Brain Sync menu-bar app is now approved as a near-term John/operator priorit
 
 Build it as an **operator pilot app**, not "the ERS Brain Sync product."
 
+Implementation note 2026-06-24: the initial native macOS operator app generator
+has shipped as `npm run sync:menubar:install`. It wraps the current helper,
+cockpit, doctor, and log surfaces for John/operator use. Signed/notarized
+distribution and any colleague-facing tray/menu-bar product remain deferred.
+
 ## Relaxing The Raw Markdown / Obsidian Constraint
 
 Relaxing this constraint materially changes the recommendation.
@@ -446,7 +451,7 @@ node scripts/hosted-doctor.mjs
 
 ## Required User Decisions
 
-1. Should the next implementation slice be the consolidated John/operator menu-bar app?
+1. Should the next implementation slice be the consolidated John/operator menu-bar app? Answered: yes; initial operator app shipped 2026-06-24.
 2. For ERS colleagues, is raw Markdown/Obsidian editing required, optional/advanced, or unnecessary?
 3. If raw Markdown editing is unnecessary for colleagues, should the next architecture spike be a hosted browser Brain UI instead of a bidirectional SharePoint/Graph sync adapter?
 4. Should Git remain a required ERS backup/export layer after Supabase and SharePoint versioning are verified?

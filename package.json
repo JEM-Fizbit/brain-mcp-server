@@ -18,6 +18,7 @@
     "sync:launchd:plist": "node scripts/write-sync-launchd-plist.mjs",
     "sync:helper:install": "node scripts/install-sync-helper-app.mjs",
     "sync:helper:launchd:plist": "node scripts/write-sync-helper-launchd-plist.mjs",
+    "sync:menubar:install": "node scripts/install-brain-menubar-app.mjs",
     "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",

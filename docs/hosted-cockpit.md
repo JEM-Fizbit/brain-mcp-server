@@ -154,8 +154,41 @@ launchctl kickstart -k "gui/$(id -u)/com.example.<brain>-sync.helper"
 The LaunchAgent opens the helper app with LaunchServices and waits for it,
 rather than running Node directly. To stop the helper app, terminate the
 `<Brain> Sync` process from Activity Monitor or unload the helper LaunchAgent.
-The helper is intentionally small; a signed/notarized packaged app with menu-bar
-controls remains separate backlog work.
+
+## Install The Menu-Bar Operator App
+
+For John/operator use, generate a native macOS status-bar app that wraps the
+existing local surfaces:
+
+- shows the selected Brain id, sync health status, last check/sync, and open
+  conflict count from the configured sync health JSON;
+- opens or kickstarts the local cockpit;
+- opens the sync log directory;
+- restarts the sync helper LaunchAgent;
+- runs `scripts/hosted-doctor.mjs` and writes bounded stdout/stderr under the
+  configured log directory.
+
+It is a local read-only operator wrapper. It does not expose Brain writes,
+conflict resolution, hosted admin mutations, or public network binding.
+
+```bash
+BRAIN_ID="<brain-id>" \
+BRAIN_REPO_ROOT="$HOME/Library/CloudStorage/<brain-checkout>" \
+BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json" \
+BRAIN_SYNC_HEALTH_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json.health.json" \
+BRAIN_SYNC_LAUNCHD_LABEL="com.example.<brain>-sync.helper" \
+BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.<brain>-cockpit" \
+BRAIN_COCKPIT_URL="http://127.0.0.1:8788/" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
+BRAIN_MENUBAR_APP="$HOME/Applications/<Brain> Monitor.app" \
+BRAIN_MENUBAR_BUNDLE_ID="com.example.<brain>-monitor" \
+npm run sync:menubar:install
+```
+
+Launch the generated app once to put `Brain OK`, `Brain Warn`, or `Brain Fail`
+in the macOS menu bar. The app is config-driven and per-Brain, so it can sit
+beside separate JEM/ERS helper and cockpit labels. Broad signed/notarized
+installer packaging remains separate backlog work.
 
 ## Operator Contract
 
