@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { SourceCategory, LogOpType } from "../constants.js";
+import { LOG_FILE, type SourceCategory, type LogOpType } from "../constants.js";
 import {
   MAX_SEARCH_RESULTS,
   MAX_SEARCH_RESULTS_CEILING,
@@ -27,6 +27,12 @@ import type {
   SourceManifestRecord,
   SourceMetadataStore,
 } from "../sources/types.js";
+import {
+  appendLogEntryToContent,
+  formatLogEntry,
+  LOG_HEADER,
+  readLogContent,
+} from "./log.js";
 
 function validateFilename(filename: string): void {
   if (path.isAbsolute(filename)) {
@@ -288,18 +294,36 @@ export class RevisionBrainStore implements BrainStore {
     summary: string,
     actor?: RevisionActor
   ): Promise<string> {
-    const line = `${new Date().toISOString().slice(0, 10)} — ${opType} — ${filesTouched.join(", ")} — ${summary}`;
-    return this.writeFile(brainId, "LOG.md", `${line}\n`, "append", undefined, actor);
+    const current = await this.revisionStore.getHead(brainId, LOG_FILE);
+    const existing = current
+      ? (await this.revisionStore.readFile(brainId, LOG_FILE)).content
+      : LOG_HEADER;
+    const nextContent = appendLogEntryToContent(
+      existing,
+      formatLogEntry(opType, filesTouched, summary)
+    );
+
+    const result = await this.revisionStore.proposeRevision({
+      brainId,
+      filename: LOG_FILE,
+      baseRevisionId: current?.revisionId || null,
+      content: nextContent,
+      origin: "hosted_mcp",
+      actor,
+    });
+
+    if (!result.ok) {
+      throw new Error(
+        `Revision conflict for ${LOG_FILE}: current head is ${result.currentHead?.revisionId || "none"}`
+      );
+    }
+
+    return `Updated ${LOG_FILE}: ${lineCount(nextContent)} lines, ${byteCount(nextContent)} bytes`;
   }
 
-  async readLog(brainId: string, limit = 20): Promise<string> {
-    const content = await this.readFile(brainId, "LOG.md");
-    return content
-      .split("\n")
-      .filter(Boolean)
-      .slice(-limit)
-      .reverse()
-      .join("\n");
+  async readLog(brainId: string, limit = 20, offset = 0): Promise<string> {
+    const content = await this.readFile(brainId, LOG_FILE);
+    return readLogContent(content, limit, offset);
   }
 
   async commit(

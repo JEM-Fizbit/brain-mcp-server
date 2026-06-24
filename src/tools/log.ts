@@ -58,7 +58,11 @@ export function registerLogTools(server: McpServer): void {
     async ({ brain_id, limit, offset }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const result = await log.readLog(limit, ctx.brainId, offset);
+        const result = await activeBrainStore().readLog(
+          ctx.brainId,
+          limit,
+          offset
+        );
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {

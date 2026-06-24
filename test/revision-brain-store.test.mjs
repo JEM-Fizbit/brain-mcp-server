@@ -211,3 +211,36 @@ test("RevisionBrainStore reads hosted source manifests from metadata", async () 
   assert.match(manifest, /original_filename: headshot\.jpg/);
   assert.match(manifest, /metadata only/);
 });
+
+test("RevisionBrainStore appends LOG.md entries newest-first below the preamble", async () => {
+  const store = new RevisionBrainStore(new MemoryRevisionStore());
+
+  await store.appendLog("ers-brain", "UPDATE", ["first.md"], "first entry");
+  await store.appendLog("ers-brain", "UPDATE", ["second.md"], "second entry");
+
+  const content = await store.readFile("ers-brain", "LOG.md");
+  const dividerIndex = content.indexOf("\n---\n");
+  const firstIndex = content.indexOf("first entry");
+  const secondIndex = content.indexOf("second entry");
+
+  assert.ok(dividerIndex > -1, "LOG.md should keep the standard preamble");
+  assert.ok(secondIndex > dividerIndex, "newest entry should be below preamble");
+  assert.ok(firstIndex > -1, "older entry should exist");
+  assert.ok(secondIndex < firstIndex, "newest entry should be above older entries");
+
+  const latest = await store.readLog("ers-brain", 1);
+  assert.match(latest, /second entry/);
+  assert.doesNotMatch(latest, /first entry/);
+});
+
+test("RevisionBrainStore keeps LOG.md ordering isolated by brain_id", async () => {
+  const store = new RevisionBrainStore(new MemoryRevisionStore());
+
+  await store.appendLog("ai-brain-jem", "UPDATE", ["NOW.md"], "JEM log entry");
+  await store.appendLog("ers-brain", "UPDATE", ["NOW.md"], "ERS log entry");
+
+  assert.match(await store.readLog("ai-brain-jem", 1), /JEM log entry/);
+  assert.doesNotMatch(await store.readLog("ai-brain-jem", 1), /ERS log entry/);
+  assert.match(await store.readLog("ers-brain", 1), /ERS log entry/);
+  assert.doesNotMatch(await store.readLog("ers-brain", 1), /JEM log entry/);
+});

@@ -45,6 +45,8 @@ This project uses the layered roadmap/backlog/spec system. Universal protocol: [
 
 Minimum-stack adoption: no strategic roadmap or audit-doc layers configured. Add later via `.backlogrc` if the project grows enough to need them.
 
+Conversationally reported work items may be captured in a Brain `TASKS.md` `## Inbox / Handoff Queue` via `brain_report_item`. Treat that queue as temporary handoff only: transfer project work to the owning repo `BACKLOG.md` or project tracker, then mark the Brain item transferred/closed.
+
 ### Verification commands (cite in every spec)
 
 - `npm run build` — TypeScript compile (use for type-only changes)
@@ -119,6 +121,7 @@ brain-mcp-server/
 │   │   ├── brain.ts      # Brain filesystem operations + loadContext with nudges
 │   │   ├── git.ts        # Git operations (commit, push, pull)
 │   │   ├── log.ts        # Change log operations (append, read, getLastOpDate)
+│   │   ├── task-intake.ts # TASKS.md intake/handoff queue formatting
 │   │   ├── lint.ts       # Health checks (bloat, stale, orphans, drift, unindexed working binaries)
 │   │   ├── ingest.ts     # Source ingestion (analyze, save to sources/, record provenance)
 │   │   ├── inbox.ts      # Inbox scanning (list pending files in inbox/)
@@ -130,6 +133,7 @@ brain-mcp-server/
 │       ├── update.ts     # brain_update_file, brain_commit
 │       ├── status.ts     # brain_list_files, brain_search, brain_list_sources
 │       ├── log.ts        # brain_log, brain_read_log
+│       ├── tasks.ts      # brain_report_item
 │       ├── lint.ts       # brain_lint
 │       ├── ingest.ts     # brain_ingest, brain_ingest_complete
 │       ├── inbox.ts      # brain_scan_inbox
@@ -137,7 +141,7 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (13 total)
+### Tools (14 total)
 
 **Core:**
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
@@ -151,6 +155,7 @@ brain-mcp-server/
 **Operations:**
 - `brain_log` — Append an entry to the Brain change log (LOG.md)
 - `brain_read_log` — Read recent change log entries
+- `brain_report_item` — Capture a temporary conversational bug/feature/observation/investigation/follow-up item in `TASKS.md` `## Inbox / Handoff Queue` before triage into the canonical backlog or project tracker.
 - `brain_lint` — Health check: bloat, staleness, orphans, drift, unindexed working binaries. Auto-logs the pass.
 - `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false saves source to sources/{category}/)
 - `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md, optionally deletes inbox file via `inbox_file` param)

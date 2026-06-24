@@ -68,6 +68,8 @@ This project uses the layered backlog/spec system:
 
 For user requests that capture open work, update `BACKLOG.md` narrowly. For shipped backlog work, remove the shipped line and leave durable detail in specs, docs, decisions, or commit history as appropriate.
 
+Conversationally reported work items may be captured in a Brain `TASKS.md` `## Inbox / Handoff Queue` via `brain_report_item`. Treat that queue as temporary handoff only: transfer project work to the owning repo `BACKLOG.md` or project tracker, then mark the Brain item transferred/closed.
+
 ## Verification
 
 Use the smallest meaningful verification for the change, then broaden when shared behaviour is touched.
