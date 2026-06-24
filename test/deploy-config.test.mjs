@@ -339,3 +339,17 @@ test("hosted test drive runs the operator rehearsal with a readable verdict", as
   assert.match(script, /finalDoctor\.actions/);
   assert.match(script, /brain_resolve_conflict/);
 });
+
+test("Postgres integration test requires an explicit test database URL", async () => {
+  const testFile = await fs.readFile(
+    path.join(repoRoot, "test", "postgres-revision-store.test.mjs"),
+    "utf-8"
+  );
+
+  assert.match(testFile, /BRAIN_POSTGRES_TEST_DATABASE_URL/);
+  assert.match(testFile, /BRAIN_POSTGRES_TEST_ALLOW_RUNTIME_URL/);
+  assert.doesNotMatch(
+    testFile,
+    /const databaseUrl = process\.env\.BRAIN_REVISION_DATABASE_URL;/
+  );
+});
