@@ -60,50 +60,70 @@ The raw local source file count may be one higher than the hosted inventory beca
 
 Use a separate ERS sync identity; do not reuse the JEM label or state file.
 
-For John's ERS pilot workstation, the menu-bar monitor is the preferred local
-stack owner. It is the only ERS login item; it starts and supervises the sync
-watcher plus cockpit server as child processes. Grant
-`~/Applications/ERS Brain Monitor.app` Full Disk Access in macOS Privacy &
-Security so the child sync watcher can read the OneDrive/SharePoint checkout.
+For John's workstation, the shared menu-bar monitor is the preferred local stack
+owner. It is the only JEM/ERS Brain login item; it starts and supervises each
+Brain's sync watcher plus cockpit server as child processes. Grant
+`~/Applications/Brain Monitor.app` Full Disk Access in macOS Privacy & Security
+so the ERS child sync watcher can read the OneDrive/SharePoint checkout.
 
-Generate the monitor:
+Generate the shared monitor:
 
 ```bash
 mkdir -p "$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync"
 
-BRAIN_ID="ers-brain" \
-BRAIN_REPO_ROOT="/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain" \
-BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json" \
-BRAIN_SYNC_HEALTH_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json.health.json" \
-BRAIN_COCKPIT_URL="http://127.0.0.1:8788/" \
-BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
-BRAIN_MENUBAR_APP="$HOME/Applications/ERS Brain Monitor.app" \
+BRAIN_MENUBAR_APP="$HOME/Applications/Brain Monitor.app" \
 BRAIN_MENUBAR_BUNDLE_ID="com.jem.ers-brain-monitor" \
+BRAIN_MENUBAR_PROFILES_JSON='[
+  {
+    "id": "ai-brain-jem",
+    "name": "JEM",
+    "brainRoot": "/Users/johnemilad/Projects/ai-brain-jem",
+    "stateFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json",
+    "healthFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json.health.json",
+    "logDir": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync",
+    "cockpitUrl": "http://127.0.0.1:8787/"
+  },
+  {
+    "id": "ers-brain",
+    "name": "ERS",
+    "brainRoot": "/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain",
+    "stateFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json",
+    "healthFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json.health.json",
+    "logDir": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync",
+    "cockpitUrl": "http://127.0.0.1:8788/"
+  }
+]' \
 npm run sync:menubar:install
 ```
 
-The generated monitor app must pin:
+John's current shared monitor intentionally reuses the previously authorized
+`com.jem.ers-brain-monitor` bundle identity so macOS Full Disk Access continues
+to cover the OneDrive-backed ERS sync child after consolidating JEM into the
+same app. Future fresh installs can use a new bundle id, but then the new app
+identity must be granted Full Disk Access before enabling the ERS profile.
+
+The generated monitor app must pin, per profile:
 
 ```text
-BRAIN_ID=ers-brain
-BRAIN_DIR=<OneDrive ERS checkout>/brain
-BRAIN_SYNC_STATE_FILE=<external sync state>/state.json
+BRAIN_ID=<brain id>
+BRAIN_DIR=<Brain checkout>/brain
+BRAIN_SYNC_STATE_FILE=<profile sync state>/state.json
 BRAIN_SYNC_SUPERVISOR=menubar
 ```
 
-This prevents the ERS sync daemon from defaulting to `ai-brain-jem`.
+This prevents either sync watcher from falling back to the wrong Brain defaults.
 
 Install the companion login LaunchAgent:
 
 ```bash
-BRAIN_MENUBAR_APP="$HOME/Applications/ERS Brain Monitor.app" \
-BRAIN_MENUBAR_LAUNCHD_LABEL="com.jem.ers-brain-monitor" \
-BRAIN_MENUBAR_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.jem.ers-brain-monitor.plist" \
-BRAIN_MENUBAR_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
+BRAIN_MENUBAR_APP="$HOME/Applications/Brain Monitor.app" \
+BRAIN_MENUBAR_LAUNCHD_LABEL="com.jem.brain-monitor" \
+BRAIN_MENUBAR_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.jem.brain-monitor.plist" \
+BRAIN_MENUBAR_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/brain-monitor" \
 npm run sync:menubar:launchd:plist
 
-launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.jem.ers-brain-monitor.plist"
-launchctl kickstart -k "gui/$(id -u)/com.jem.ers-brain-monitor"
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.jem.brain-monitor.plist"
+launchctl kickstart -k "gui/$(id -u)/com.jem.brain-monitor"
 ```
 
 Use the older sync helper app or a daemon-local checkout only as a temporary
@@ -113,7 +133,7 @@ fallback if the OneDrive monitor app cannot be authorized.
 
 The ERS cockpit remains local-only and read-only at
 `http://127.0.0.1:8788/`, but in the consolidated setup it is started by
-`ERS Brain Monitor.app`, not by a standalone cockpit LaunchAgent.
+`Brain Monitor.app`, not by a standalone cockpit LaunchAgent.
 
 ## Menu-Bar Operator App
 

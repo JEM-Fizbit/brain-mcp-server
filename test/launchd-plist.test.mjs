@@ -442,8 +442,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.cockpitProcess.env.BRAIN_COCKPIT_PORT, "8798");
   assert.match(source, /NSStatusBar/);
   assert.match(source, /startManagedProcesses/);
-  assert.match(source, /startManagedProcess:@"sync"/);
-  assert.match(source, /startManagedProcess:@"cockpit"/);
+  assert.match(source, /syncTaskNameForProfile/);
+  assert.match(source, /cockpitTaskNameForProfile/);
   assert.match(source, /writeStackStatus/);
   assert.match(source, /scheduleStackHeartbeat/);
   assert.match(source, /NSTimer/);
@@ -455,6 +455,81 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /health\[@"report"\]/);
   assert.match(source, /report\[@"conflicts"\]/);
   assert.notEqual(stat.mode & 0o111, 0);
+});
+
+test("menu-bar app can supervise multiple Brain local stacks", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Brain Monitor.app");
+  const jemRoot = path.join(tmpRoot, "ai-brain-jem");
+  const ersRoot = path.join(tmpRoot, "ers-brain");
+  const nodePath = "/opt/example/bin/node";
+  const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
+  const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
+  const profiles = [
+    {
+      id: "ai-brain-jem",
+      name: "JEM",
+      brainRoot: jemRoot,
+      stateFile: path.join(tmpRoot, "state", "jem", "state.json"),
+      healthFile: path.join(tmpRoot, "state", "jem", "state.health.json"),
+      logDir: path.join(tmpRoot, "logs", "jem"),
+      cockpitUrl: "http://127.0.0.1:8787/",
+    },
+    {
+      id: "ers-brain",
+      name: "ERS",
+      brainRoot: ersRoot,
+      stateFile: path.join(tmpRoot, "state", "ers", "state.json"),
+      healthFile: path.join(tmpRoot, "state", "ers", "state.health.json"),
+      logDir: path.join(tmpRoot, "logs", "ers"),
+      cockpitUrl: "http://127.0.0.1:8788/",
+    },
+  ];
+
+  const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_BUNDLE_ID: "com.example.brain-monitor",
+      BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
+      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
+      BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const source = await fs.readFile(
+    path.join(appPath, "Contents", "Resources", "brain-menubar-app.m"),
+    "utf-8"
+  );
+  const config = JSON.parse(
+    await fs.readFile(
+      path.join(appPath, "Contents", "Resources", "brain-menubar-config.json"),
+      "utf-8"
+    )
+  );
+
+  assert.equal(result.brainCount, 2);
+  assert.deepEqual(
+    result.brainIds,
+    ["ai-brain-jem", "ers-brain"]
+  );
+  assert.equal(config.brains.length, 2);
+  assert.equal(config.brains[0].brainId, "ai-brain-jem");
+  assert.equal(config.brains[0].displayName, "JEM");
+  assert.equal(config.brains[0].brainDir, path.join(jemRoot, "brain"));
+  assert.equal(config.brains[0].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8787");
+  assert.equal(config.brains[0].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "jem", "brain-monitor-stack.json"));
+  assert.equal(config.brains[1].brainId, "ers-brain");
+  assert.equal(config.brains[1].displayName, "ERS");
+  assert.equal(config.brains[1].brainDir, path.join(ersRoot, "brain"));
+  assert.equal(config.brains[1].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8788");
+  assert.equal(config.brains[1].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "ers", "brain-monitor-stack.json"));
+  assert.match(source, /for \(NSDictionary \*profile in \[self brainProfiles\]\)/);
+  assert.match(source, /syncTaskNameForProfile/);
+  assert.match(source, /cockpitTaskNameForProfile/);
+  assert.match(source, /Open %@ Cockpit/);
+  assert.match(source, /Restart All Local Stacks/);
 });
 
 test("menu-bar LaunchAgent opens the operator app at login", async () => {
