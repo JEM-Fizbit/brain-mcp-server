@@ -106,6 +106,37 @@ test("appendLogEntryToContent inserts below a legacy preamble", () => {
   );
 });
 
+test("appendLogEntryToContent prepends above existing standard entries in a legacy log", () => {
+  const content = [
+    "# LOG — ERS Brain change log",
+    "",
+    "Append-only. One line per change.",
+    "",
+    "## [2026-06-25] UPDATE | existing standard entry",
+    "Files: TASKS.md",
+    "",
+    "- 2026-06-24 — existing legacy entry",
+    "",
+  ].join("\n");
+  const entry = log.formatLogEntry("UPDATE", ["LOG.md"], "new standard entry", "2026-06-25");
+
+  const next = log.appendLogEntryToContent(content, entry);
+
+  assert.ok(
+    next.indexOf("Append-only. One line per change.") <
+      next.indexOf("new standard entry"),
+    "preamble should remain above inserted entries"
+  );
+  assert.ok(
+    next.indexOf("new standard entry") < next.indexOf("existing standard entry"),
+    "new entry should be above existing standard entries"
+  );
+  assert.ok(
+    next.indexOf("existing standard entry") < next.indexOf("existing legacy entry"),
+    "existing standard entries should remain above legacy entries"
+  );
+});
+
 test("readLogContent does not attach a legacy preamble to a standard entry", () => {
   const content = [
     "## [2026-06-25] UPDATE | new entry",
