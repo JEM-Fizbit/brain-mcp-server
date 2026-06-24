@@ -48,12 +48,12 @@ npm run hosted:cockpit:launchd:plist
 
 The generated plist pins both `BRAIN_ID` and `BRAIN_DIR`, so the doctor checks, local sync health, and logs align with the selected Brain. For the ERS Brain pilot, use a distinct label and port, for example `BRAIN_ID=ers-brain`, `BRAIN_COCKPIT_LAUNCHD_LABEL=com.jem.ers-brain-cockpit`, and `BRAIN_COCKPIT_PORT=8788`.
 
-If the Brain checkout lives under SharePoint/OneDrive CloudStorage, prefer a
-daemon-local checkout for launchd plus explicit sync state paths, for example
-`BRAIN_REPO_ROOT="$HOME/Library/Application Support/Brain MCP/<brain>-checkout"`
-and `BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json"`.
-This avoids macOS privacy/cloud-file access failures in background Node
-processes while keeping the human-facing cloud checkout available.
+If the Brain checkout lives under SharePoint/OneDrive CloudStorage, do not make
+a daemon-local checkout the normal authority. Keep the cloud-backed checkout as
+the human-facing local-first source, move sync state/logs outside the checkout,
+and run the sync loop through the helper app described below. A raw launchd Node
+process can be denied CloudStorage access by macOS privacy controls even when
+Terminal can read the same files.
 
 This writes a reviewable plist to:
 
@@ -109,11 +109,53 @@ npm run hosted:cockpit:launcher:install
 
 The launcher and LaunchAgent labels must match. If the LaunchAgent was generated with `BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.brain-cockpit"`, use the same value when installing the Desktop launcher.
 
-To stop it:
+To stop the cockpit LaunchAgent:
 
 ```bash
 launchctl bootout "gui/$(id -u)/com.jem.brain-cockpit"
 ```
+
+## Install The Sync Helper App
+
+For SharePoint/OneDrive CloudStorage Brains, generate a small native helper app
+and grant that app Full Disk Access in macOS Privacy & Security. This gives the
+sync loop a stable app identity for CloudStorage reads while keeping the
+OneDrive checkout as the primary human-facing Brain checkout.
+
+```bash
+BRAIN_ID="<brain-id>" \
+BRAIN_REPO_ROOT="$HOME/Library/CloudStorage/<brain-checkout>" \
+BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
+BRAIN_SYNC_HELPER_APP="$HOME/Applications/<Brain> Sync.app" \
+BRAIN_SYNC_HELPER_BUNDLE_ID="com.example.<brain>-sync.helper" \
+npm run sync:helper:install
+```
+
+After generation, add the app to Full Disk Access, then launch it. The helper
+execs the compiled sync CLI directly with pinned `BRAIN_ID`, `BRAIN_DIR`, sync
+state, and log paths. It writes `sync-helper.out.log` and `sync-helper.err.log`
+under the configured log directory.
+
+To start the helper automatically at login after Full Disk Access has been
+granted, generate and install the companion LaunchAgent:
+
+```bash
+BRAIN_SYNC_HELPER_APP="$HOME/Applications/<Brain> Sync.app" \
+BRAIN_SYNC_HELPER_LAUNCHD_LABEL="com.example.<brain>-sync.helper" \
+BRAIN_SYNC_HELPER_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.example.<brain>-sync.helper.plist" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
+npm run sync:helper:launchd:plist
+
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.example.<brain>-sync.helper.plist"
+launchctl kickstart -k "gui/$(id -u)/com.example.<brain>-sync.helper"
+```
+
+The LaunchAgent opens the helper app with LaunchServices and waits for it,
+rather than running Node directly. To stop the helper app, terminate the
+`<Brain> Sync` process from Activity Monitor or unload the helper LaunchAgent.
+The helper is intentionally small; a signed/notarized packaged app with menu-bar
+controls remains separate backlog work.
 
 ## Operator Contract
 

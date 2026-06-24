@@ -22,6 +22,18 @@ const launcherScriptPath = path.join(
   "scripts",
   "install-cockpit-launcher.mjs"
 );
+const syncHelperScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "install-sync-helper-app.mjs"
+);
+const syncHelperLaunchdScriptPath = path.join(
+  __dirname,
+  "..",
+  "scripts",
+  "write-sync-helper-launchd-plist.mjs"
+);
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-launchd-test-"));
 
 after(async () => {
@@ -232,16 +244,126 @@ test("desktop launcher app opens cockpit and kickstarts launchd service", async 
   assert.notEqual(stat.mode & 0o111, 0);
 });
 
+test("sync helper app runs the sync CLI with pinned Brain and state paths", async () => {
+  const appPath = path.join(tmpRoot, "ERS Brain Sync.app");
+  const brainRoot = path.join(tmpRoot, "ers-brain");
+  const stateFile = path.join(tmpRoot, "state", "ers-brain", "state.json");
+  const logDir = path.join(tmpRoot, "logs", "ers-brain");
+  const nodePath = "/opt/example/bin/node";
+  const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
+
+  const { stdout } = await exec(process.execPath, [syncHelperScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_SYNC_HELPER_APP: appPath,
+      BRAIN_SYNC_HELPER_BUNDLE_ID: "com.example.ers-brain-sync",
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
+      BRAIN_SYNC_LAUNCHD_NODE: nodePath,
+      BRAIN_SYNC_LAUNCHD_SYNC_CLI: syncCliPath,
+      BRAIN_SYNC_INTERVAL_MS: "7000",
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const infoPlist = await fs.readFile(path.join(appPath, "Contents", "Info.plist"), "utf-8");
+  const executablePath = path.join(appPath, "Contents", "MacOS", "ERS Brain Sync");
+  const executable = await fs.readFile(executablePath);
+  const config = JSON.parse(
+    await fs.readFile(
+      path.join(appPath, "Contents", "Resources", "sync-helper-config.json"),
+      "utf-8"
+    )
+  );
+  const stat = await fs.stat(executablePath);
+
+  assert.equal(result.appPath, appPath);
+  assert.equal(result.launcherKind, "native");
+  assert.equal(result.brainId, "ers-brain");
+  assert.equal(result.brainDir, path.join(brainRoot, "brain"));
+  assert.equal(result.stateFile, stateFile);
+  assert.equal(result.logDir, logDir);
+  assert.match(infoPlist, /<key>CFBundlePackageType<\/key>\s*<string>APPL<\/string>/);
+  assert.match(infoPlist, /<key>LSUIElement<\/key>\s*<true\/>/);
+  assert.notEqual(executable.subarray(0, 2).toString("utf-8"), "#!");
+  assert.equal(config.env.BRAIN_ID, "ers-brain");
+  assert.equal(config.env.BRAIN_DIR, path.join(brainRoot, "brain"));
+  assert.equal(config.env.BRAIN_SYNC_STATE_FILE, stateFile);
+  assert.equal(config.env.BRAIN_SYNC_INTERVAL_MS, "7000");
+  assert.equal(config.nodePath, nodePath);
+  assert.equal(config.syncCliPath, syncCliPath);
+  assert.deepEqual(config.args, ["watch"]);
+  assert.equal(config.stdoutPath, path.join(logDir, "sync-helper.out.log"));
+  assert.equal(config.stderrPath, path.join(logDir, "sync-helper.err.log"));
+  assert.notEqual(stat.mode & 0o111, 0);
+});
+
+test("sync helper defaults to the user Applications folder", async () => {
+  const { stdout } = await exec(process.execPath, [syncHelperScriptPath], {
+    env: {
+      ...process.env,
+      HOME: tmpRoot,
+      BRAIN_SYNC_LAUNCHD_LOG_DIR: path.join(tmpRoot, "logs"),
+    },
+  });
+
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.appPath, path.join(tmpRoot, "Applications", "Brain Sync.app"));
+});
+
+test("sync helper LaunchAgent opens the helper app at login", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.ers-brain-sync.helper.plist");
+  const appPath = path.join(tmpRoot, "Applications", "ERS Brain Sync.app");
+  const logDir = path.join(tmpRoot, "logs", "ers-brain");
+
+  const { stdout } = await exec(process.execPath, [syncHelperLaunchdScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_SYNC_HELPER_APP: appPath,
+      BRAIN_SYNC_HELPER_LAUNCHD_LABEL: "com.example.ers-brain-sync.helper",
+      BRAIN_SYNC_HELPER_LAUNCHD_PLIST: outputPath,
+      BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.outputPath, outputPath);
+  assert.equal(result.appPath, appPath);
+  assert.equal(result.label, "com.example.ers-brain-sync.helper");
+  assert.match(plist, /<key>ProgramArguments<\/key>\s*<array>\s*<string>\/usr\/bin\/open<\/string>\s*<string>-W<\/string>/);
+  assert.match(plist, new RegExp(`<string>${appPath}</string>`));
+  assert.match(plist, /<key>RunAtLoad<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>KeepAlive<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>LimitLoadToSessionType<\/key>\s*<string>Aqua<\/string>/);
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "sync-helper-launchd.out.log")}</string>`));
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "sync-helper-launchd.err.log")}</string>`));
+});
+
 test("launchd and launcher generators avoid user-specific absolute defaults", async () => {
   const syncGenerator = await fs.readFile(scriptPath, "utf-8");
   const cockpitGenerator = await fs.readFile(cockpitScriptPath, "utf-8");
   const launcherGenerator = await fs.readFile(launcherScriptPath, "utf-8");
+  const syncHelperGenerator = await fs.readFile(syncHelperScriptPath, "utf-8");
+  const syncHelperLaunchdGenerator = await fs.readFile(syncHelperLaunchdScriptPath, "utf-8");
 
-  for (const generator of [syncGenerator, cockpitGenerator, launcherGenerator]) {
+  for (const generator of [
+    syncGenerator,
+    cockpitGenerator,
+    launcherGenerator,
+    syncHelperGenerator,
+    syncHelperLaunchdGenerator,
+  ]) {
     assert.doesNotMatch(generator, /\/Users\/johnemilad/);
   }
 
   assert.match(syncGenerator, /os\.homedir\(\)/);
   assert.match(cockpitGenerator, /os\.homedir\(\)/);
   assert.match(launcherGenerator, /os\.homedir\(\)/);
+  assert.match(syncHelperGenerator, /os\.homedir\(\)/);
+  assert.match(syncHelperLaunchdGenerator, /os\.homedir\(\)/);
 });

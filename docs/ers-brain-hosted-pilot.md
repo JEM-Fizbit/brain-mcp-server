@@ -5,7 +5,7 @@
 
 This runbook covers the first multi-Brain rollout: serving the ERS Brain through the hosted Brain MCP while John remains the only user.
 
-This is **not** ERS team production access. The local ERS Brain checkout remains the canonical local-first mirror and fallback. ERS-owned Supabase, a dedicated ERS MCP deployment, onboarding/offboarding, and multi-user authorization remain later cutover work.
+This is **not** ERS team production access. The OneDrive-backed ERS Brain checkout remains the human-facing local-first source and fallback for Obsidian/manual edits. Supabase is the hosted MCP operational store for this pilot. ERS-owned Supabase, a dedicated ERS MCP deployment, onboarding/offboarding, and multi-user authorization remain later cutover work.
 
 ## Brain Identity
 
@@ -58,43 +58,52 @@ The raw local source file count may be one higher than the hosted inventory beca
 
 ## Local Sync
 
-Generate a separate ERS sync LaunchAgent; do not reuse the JEM label.
+Use a separate ERS sync identity; do not reuse the JEM label or state file.
 
-For background sync, use a daemon-local checkout outside SharePoint/OneDrive. The
-OneDrive checkout remains the human-facing ERS Brain checkout and fallback, but
-macOS can deny launchd background processes direct access to CloudStorage paths.
+For the OneDrive/SharePoint checkout, prefer the sync helper app over a raw
+LaunchAgent. The helper app can be granted Full Disk Access in macOS Privacy &
+Security, while a raw launchd Node process can be denied CloudStorage reads even
+when Terminal can read the same files.
 
 ```bash
-git clone git@github-work:ERS-Genomics/ersg-ai-context-hub.git \
-  "$HOME/Library/Application Support/Brain MCP/ers-brain-checkout"
-
-mkdir -p "$HOME/Library/Application Support/Brain MCP/ers-brain-sync"
+mkdir -p "$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync"
 
 BRAIN_ID="ers-brain" \
-BRAIN_REPO_ROOT="$HOME/Library/Application Support/Brain MCP/ers-brain-checkout" \
-BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-sync/state.json" \
-BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-sync" \
-BRAIN_SYNC_LAUNCHD_LABEL="com.jem.ers-brain-sync" \
-npm run sync:launchd:plist
+BRAIN_REPO_ROOT="/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain" \
+BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
+BRAIN_SYNC_HELPER_APP="$HOME/Applications/ERS Brain Sync.app" \
+BRAIN_SYNC_HELPER_BUNDLE_ID="com.jem.ers-brain-sync.helper" \
+npm run sync:helper:install
 ```
 
-Review the generated plist before installing. The plist must include both:
+The generated helper app must pin:
 
 ```text
 BRAIN_ID=ers-brain
-BRAIN_DIR=<daemon-local ERS checkout>/brain
-BRAIN_SYNC_STATE_FILE=<daemon-local sync state>/state.json
+BRAIN_DIR=<OneDrive ERS checkout>/brain
+BRAIN_SYNC_STATE_FILE=<external sync state>/state.json
 ```
 
 This prevents the ERS sync daemon from defaulting to `ai-brain-jem`.
 
-Install after review:
+After generation, add `~/Applications/ERS Brain Sync.app` to Full Disk Access,
+then launch it. Once a clean sync cycle is verified, install the companion login
+LaunchAgent:
 
 ```bash
-cp tmp/com.jem.ers-brain-sync.plist ~/Library/LaunchAgents/com.jem.ers-brain-sync.plist
-launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.jem.ers-brain-sync.plist
-launchctl kickstart -k "gui/$(id -u)/com.jem.ers-brain-sync"
+BRAIN_SYNC_HELPER_APP="$HOME/Applications/ERS Brain Sync.app" \
+BRAIN_SYNC_HELPER_LAUNCHD_LABEL="com.jem.ers-brain-sync.helper" \
+BRAIN_SYNC_HELPER_LAUNCHD_PLIST="$HOME/Library/LaunchAgents/com.jem.ers-brain-sync.helper.plist" \
+BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync" \
+npm run sync:helper:launchd:plist
+
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.jem.ers-brain-sync.helper.plist"
+launchctl kickstart -k "gui/$(id -u)/com.jem.ers-brain-sync.helper"
 ```
+
+Use a daemon-local checkout only as a temporary fallback if the OneDrive helper
+app cannot be authorized.
 
 ## Cockpit / Doctor
 
@@ -102,9 +111,9 @@ The cockpit can be run per Brain by pinning `BRAIN_ID` and `BRAIN_DIR`. Use a di
 
 ```bash
 BRAIN_ID="ers-brain" \
-BRAIN_REPO_ROOT="$HOME/Library/Application Support/Brain MCP/ers-brain-checkout" \
-BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-sync/state.json" \
-BRAIN_SYNC_LAUNCHD_LABEL="com.jem.ers-brain-sync" \
+BRAIN_REPO_ROOT="/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain" \
+BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json" \
+BRAIN_SYNC_LAUNCHD_LABEL="com.jem.ers-brain-sync.helper" \
 BRAIN_COCKPIT_LAUNCHD_LABEL="com.jem.ers-brain-cockpit" \
 BRAIN_COCKPIT_PORT=8788 \
 npm run hosted:cockpit:launchd:plist
