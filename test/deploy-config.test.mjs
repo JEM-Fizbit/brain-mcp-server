@@ -67,7 +67,7 @@ test("Fly image carries the John-only JEM and ERS pilot registry", async () => {
   assert.ok(
     registry.brains.every((brain) => brain.storage_backend === "postgres")
   );
-  const john = registry.principals.find((principal) => principal.login === "johnemilad");
+  const john = registry.principals.find((principal) => principal.login === "JEM-Fizbit");
   assert.ok(john);
   assert.equal(john.provider_user_id, "220941196");
   assert.equal(john.roles["ai-brain-jem"], "owner");
