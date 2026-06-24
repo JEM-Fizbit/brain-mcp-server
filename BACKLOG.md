@@ -14,6 +14,7 @@
 
 <!-- backlog items below; newest first -->
 
+- Expand the Brain monitor/menu-bar app to surface visible user-action-required indicators and guided resolution flows for operational issues such as stale Capture / Triage Queue items, unresolved link/reference errors, sync conflicts, auth reconnects, and other doctor/lint findings that need human judgement.
 - Explore whether ERS colleagues need raw Markdown/Obsidian editing at all. If not, prefer a hosted browser Brain UI with Markdown as the backend/interchange format, and narrow SharePoint/Graph to source ingestion/export instead of bidirectional raw-file sync.
 - Design a cloud-run Brain health/inbox operations service to replace fragile Claude scheduled Routines where appropriate. Scope: hosted lint/QA monitoring, per-Brain health checks, alerting/escalation, and periodic inbox sweep/ingest processing; preserve the local laptop inbox as a first-class drop folder and decide how local inbox state syncs or is mirrored before moving any processor to cloud execution.
 - Review and transition ERS Brain Claude automations for hosted `ers-brain`. Current `~/.claude/scheduled-tasks/ers-brain-auto-pull/` assumes GitHub-pull-to-SharePoint review flow; decide whether to keep it as a backup or replace/adapt it around hosted sync events, `brain_lint({ brain_id: "ers-brain" })`, per-Brain cockpit/doctor checks, and Slack/nudge routing that distinguishes ERS from JEM.
