@@ -57,6 +57,22 @@ function asIso(value) {
   return date.toISOString();
 }
 
+function asBoolean(value) {
+  if (value === true || value === "true") return true;
+  if (value === false || value === "false") return false;
+  return null;
+}
+
+function boundedText(value, fallback = null, limit = 100) {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value).replace(/\s+/g, " ").slice(0, limit) || fallback;
+}
+
+function roundedRatio(numerator, denominator) {
+  if (!denominator) return 0;
+  return Math.round((numerator / denominator) * 1000) / 1000;
+}
+
 function normalizedTimingLayer(operation) {
   if (operation?.timingLayer) return String(operation.timingLayer);
   if (operation?.kind === "sync_wait") return "sync_wait";
@@ -200,6 +216,154 @@ export function operationEventLogFromSyncEventRows(rows) {
     .map(operationEventFromSyncEventRow)
     .filter(Boolean)
     .sort((left, right) => Date.parse(right.at) - Date.parse(left.at));
+}
+
+function authEventFromSyncEventRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const at = asIso(row.created_at);
+  if (!at) return null;
+  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+  const ok = asBoolean(metadata.ok);
+  const durationMs =
+    asFiniteLatency(row.duration_ms) ?? asFiniteLatency(metadata.latencyMs);
+  return {
+    at,
+    ok,
+    reason: boundedText(metadata.error || metadata.reason, "auth_failed"),
+    name: boundedText(metadata.name, "auth_event"),
+    target: boundedText(metadata.target || row.filename, null),
+    source: boundedText(metadata.source, null),
+    httpStatus:
+      metadata.httpStatus === undefined || metadata.httpStatus === null
+        ? null
+        : boundedText(metadata.httpStatus, null, 20),
+    durationMs,
+  };
+}
+
+function countBy(events, key, fallback) {
+  const counts = new Map();
+  for (const event of events) {
+    const value = event[key] || fallback;
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  const total = events.length;
+  return [...counts.entries()]
+    .map(([value, count]) => ({
+      [key]: value,
+      count,
+      n: count,
+      share: roundedRatio(count, total),
+    }))
+    .sort((left, right) => right.count - left.count || String(left[key]).localeCompare(String(right[key])));
+}
+
+export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
+  const now = Date.parse(options.now || new Date().toISOString());
+  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const windowMinutes = Math.max(1, Number(options.windowMinutes || 60));
+  const warnThreshold = Math.max(0, Number(options.warnThreshold || 0));
+  const failThreshold = Math.max(0, Number(options.failThreshold || 0));
+  const bucketCount = Math.max(1, Math.min(24, Number(options.bucketCount || 6)));
+  const recentLimit = Math.max(1, Math.min(100, Number(options.recentLimit || 20)));
+  const activeThresholdMinutes = Math.max(
+    1,
+    Number(options.activeThresholdMinutes || Math.min(15, Math.max(5, Math.ceil(windowMinutes / 6))))
+  );
+  const windowMs = windowMinutes * 60 * 1000;
+  const windowStartedMs = safeNow - windowMs;
+  const previousWindowStartedMs = windowStartedMs - windowMs;
+  const events = (Array.isArray(rows) ? rows : [])
+    .filter((row) => !row.event_type || row.event_type === HOSTED_MCP_AUTH_EVENT_TYPE)
+    .map(authEventFromSyncEventRow)
+    .filter(Boolean)
+    .sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+
+  const currentEvents = events.filter((event) => {
+    const at = Date.parse(event.at);
+    return at >= windowStartedMs && at <= safeNow;
+  });
+  const previousEvents = events.filter((event) => {
+    const at = Date.parse(event.at);
+    return at >= previousWindowStartedMs && at < windowStartedMs;
+  });
+  const currentFailures = currentEvents.filter((event) => event.ok === false);
+  const currentSuccesses = currentEvents.filter((event) => event.ok === true);
+  const previousFailures = previousEvents.filter((event) => event.ok === false);
+  const lastFailure = currentFailures.at(-1) || null;
+  const firstFailure = currentFailures[0] || null;
+  const minutesSinceLastFailure = lastFailure
+    ? Math.floor((safeNow - Date.parse(lastFailure.at)) / (60 * 1000))
+    : null;
+  const bucketMs = windowMs / bucketCount;
+  const trend = Array.from({ length: bucketCount }, (_, index) => {
+    const bucketStartedMs = windowStartedMs + index * bucketMs;
+    const bucketEndedMs = index === bucketCount - 1 ? safeNow : bucketStartedMs + bucketMs;
+    const bucketEvents = currentEvents.filter((event) => {
+      const at = Date.parse(event.at);
+      return at >= bucketStartedMs && at < bucketEndedMs + (index === bucketCount - 1 ? 1 : 0);
+    });
+    const bucketFailures = bucketEvents.filter((event) => event.ok === false);
+    return {
+      bucketStartAt: new Date(bucketStartedMs).toISOString(),
+      bucketEndAt: new Date(bucketEndedMs).toISOString(),
+      totalAuthEvents: bucketEvents.length,
+      successCount: bucketEvents.filter((event) => event.ok === true).length,
+      failureCount: bucketFailures.length,
+    };
+  });
+
+  const recentFailures = [...currentFailures]
+    .sort((left, right) => Date.parse(right.at) - Date.parse(left.at))
+    .slice(0, recentLimit)
+    .map((event) => ({
+      at: event.at,
+      reason: event.reason,
+      name: event.name,
+      target: event.target,
+      source: event.source,
+      httpStatus: event.httpStatus,
+      durationMs: event.durationMs,
+    }));
+  const failureCount = currentFailures.length;
+  const previousFailureCount = previousFailures.length;
+  const failureDelta = failureCount - previousFailureCount;
+  const status =
+    failThreshold > 0 && failureCount >= failThreshold
+      ? "fail"
+      : warnThreshold > 0 && failureCount >= warnThreshold
+        ? "warn"
+        : "pass";
+  const active = minutesSinceLastFailure !== null && minutesSinceLastFailure <= activeThresholdMinutes;
+
+  return {
+    windowMinutes,
+    warnThreshold,
+    failThreshold,
+    activeThresholdMinutes,
+    windowStartedAt: new Date(windowStartedMs).toISOString(),
+    previousWindowStartedAt: new Date(previousWindowStartedMs).toISOString(),
+    status,
+    failureCount,
+    successCount: currentSuccesses.length,
+    totalAuthEvents: currentEvents.length,
+    failureRate: roundedRatio(failureCount, currentEvents.length),
+    previousFailureCount,
+    failureDelta,
+    failureDeltaPercent:
+      previousFailureCount > 0 ? roundedRatio(failureDelta, previousFailureCount) : null,
+    firstFailureAt: firstFailure?.at || null,
+    lastFailureAt: lastFailure?.at || null,
+    minutesSinceLastFailure,
+    active,
+    activityState: failureCount === 0 ? "clear" : active ? "active" : "stale",
+    reasons: countBy(currentFailures, "reason", "auth_failed").slice(0, 8),
+    targets: countBy(currentFailures, "target", "unknown").slice(0, 8),
+    names: countBy(currentFailures, "name", "auth_event").slice(0, 8),
+    httpStatuses: countBy(currentFailures, "httpStatus", "unknown").slice(0, 8),
+    trend,
+    recentFailures,
+  };
 }
 
 export function filenameForLatencyOperation(operation) {

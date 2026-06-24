@@ -894,6 +894,7 @@ const page = String.raw`<!doctype html>
         <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
           <div class="subtab-list" role="tablist" aria-label="Activity sections">
             <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
+            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-auth" type="button" role="tab" aria-controls="activity-view-auth" aria-selected="false">Auth</button>
             <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
             <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
           </div>
@@ -902,6 +903,15 @@ const page = String.raw`<!doctype html>
             <h2>Operation Log</h2>
             <div class="section-note">The event log: hosted MCP tool-call and auth metadata, including operation type, timing layer, safe target, status, latency, DB summary, and timestamp. Auth failures usually indicate stale or disconnected client credentials and may require connector re-enrollment.</div>
             <div class="activity-list" id="operation-events"></div>
+          </section>
+
+          <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-auth" role="tabpanel" aria-labelledby="activity-subtab-auth" hidden>
+            <h2>Auth Failures</h2>
+            <div class="section-note">Hosted MCP authorization telemetry: current-window failure counts, trend versus the prior window, safe reason/target metadata, and recent metadata-only auth events.</div>
+            <div class="activity-list" id="auth-failure-summary"></div>
+            <div class="activity-list" id="auth-failure-trend"></div>
+            <div class="activity-list" id="auth-failure-breakdowns"></div>
+            <div class="activity-list" id="auth-failure-recent"></div>
           </section>
 
           <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-brain" role="tabpanel" aria-labelledby="activity-subtab-brain" hidden>
@@ -1091,6 +1101,19 @@ const page = String.raw`<!doctype html>
         const number = Number(value);
         if (!Number.isFinite(number)) return "-";
         return new Intl.NumberFormat().format(number);
+      }
+
+      function formatPercent(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "-";
+        return (number * 100).toFixed(number > 0 && number < 0.01 ? 2 : 1) + "%";
+      }
+
+      function formatSignedCount(value) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "-";
+        if (number === 0) return "flat";
+        return (number > 0 ? "+" : "") + formatCount(number);
       }
 
       function formatDuration(ms) {
@@ -1493,6 +1516,33 @@ const page = String.raw`<!doctype html>
         "</svg>";
       }
 
+      function renderCountSparkline(points, key) {
+        const values = (Array.isArray(points) ? points : [])
+          .map((point) => Number(point[key]))
+          .filter(Number.isFinite);
+        if (values.length < 2) {
+          return "<div class=\"sparkline event-meta\">Need at least two buckets for trend.</div>";
+        }
+
+        const width = 180;
+        const height = 38;
+        const pad = 3;
+        const min = Math.min(0, ...values);
+        const max = Math.max(1, ...values);
+        const range = max - min || 1;
+        const step = (width - pad * 2) / Math.max(1, values.length - 1);
+        const coords = values.map((value, index) => {
+          const x = pad + index * step;
+          const y = height - pad - ((value - min) / range) * (height - pad * 2);
+          return x.toFixed(1) + "," + y.toFixed(1);
+        }).join(" ");
+
+        return "<svg class=\"sparkline\" viewBox=\"0 0 " + width + " " + height + "\" preserveAspectRatio=\"none\" aria-hidden=\"true\">" +
+          "<rect class=\"sparkline-area\" x=\"0\" y=\"0\" width=\"" + width + "\" height=\"" + height + "\" rx=\"6\"></rect>" +
+          "<polyline points=\"" + escapeHtml(coords) + "\"></polyline>" +
+        "</svg>";
+      }
+
       function renderLatencySummaryCards(summaries) {
         if (!Array.isArray(summaries) || summaries.length === 0) return "";
         return "<div class=\"latency-summary-grid\">" + summaries.map((summary) => {
@@ -1649,6 +1699,151 @@ const page = String.raw`<!doctype html>
           renderDbSpanTargets(dbTargets);
       }
 
+      function authFailureCheckSummary(check) {
+        const details = check?.details || {};
+        if (!details.windowMinutes) return detailSummary(details) || "-";
+        const topReason = Array.isArray(details.reasons) ? details.reasons[0] : null;
+        const parts = [
+          formatCount(details.failureCount || 0) + " failures / " + formatCount(details.windowMinutes) + "m",
+          formatPercent(details.failureRate) + " fail rate",
+          formatSignedCount(details.failureDelta || 0) + " vs prior window",
+          details.lastFailureAt ? "last " + ageLabel(details.lastFailureAt) : "no recent failure",
+          topReason ? "top: " + topReason.reason + " x" + formatCount(topReason.count || topReason.n) : null,
+          "Activity > Auth",
+        ].filter(Boolean);
+        return escapeHtml(parts.join(" · "));
+      }
+
+      function renderAuthFailureSummaryCard(label, value, meta, valueHtml) {
+        return "<div class=\"latency-card\">" +
+          "<div class=\"latency-card-header\">" +
+            "<div>" +
+              "<div class=\"event-title\">" + escapeHtml(label) + "</div>" +
+              "<div class=\"event-meta\">" + escapeHtml(meta || "") + "</div>" +
+            "</div>" +
+            "<div class=\"latency-latest\">" + (valueHtml ? value : escapeHtml(value)) + "</div>" +
+          "</div>" +
+        "</div>";
+      }
+
+      function renderAuthFailureTrend(details) {
+        const trend = Array.isArray(details.trend) ? details.trend : [];
+        if (trend.length === 0) return "<div class=\"event muted\">No auth trend buckets have been reported yet.</div>";
+        const rows = trend.map((bucket) =>
+          "<tr>" +
+            "<td title=\"" + escapeHtml(localDateTime(bucket.bucketStartAt) + " to " + localDateTime(bucket.bucketEndAt)) + "\">" + escapeHtml(localTime(bucket.bucketStartAt)) + "</td>" +
+            "<td>" + escapeHtml(formatCount(bucket.failureCount || 0)) + "</td>" +
+            "<td>" + escapeHtml(formatCount(bucket.successCount || 0)) + "</td>" +
+            "<td>" + escapeHtml(formatCount(bucket.totalAuthEvents || 0)) + "</td>" +
+          "</tr>"
+        ).join("");
+        return "<div class=\"recent-heading\">Failure Trend</div>" +
+          "<div class=\"latency-card\">" +
+            "<div class=\"event-title\">" + escapeHtml(formatCount(details.failureCount || 0) + " failures in the last " + formatCount(details.windowMinutes || 0) + "m") + "</div>" +
+            "<div class=\"event-meta\">" + escapeHtml(formatSignedCount(details.failureDelta || 0) + " versus previous window · " + (details.activityState || "unknown")) + "</div>" +
+            renderCountSparkline(trend, "failureCount") +
+          "</div>" +
+          "<div class=\"operation-table-wrap\">" +
+            "<table class=\"operation-log-table\">" +
+              "<thead><tr><th style=\"width: 40%\">Bucket Start</th><th style=\"width: 20%\">Failures</th><th style=\"width: 20%\">Successes</th><th style=\"width: 20%\">Total</th></tr></thead>" +
+              "<tbody>" + rows + "</tbody>" +
+            "</table>" +
+          "</div>";
+      }
+
+      function authBreakdownRows(label, rows, key) {
+        return (Array.isArray(rows) ? rows : []).map((row) =>
+          "<tr>" +
+            "<td>" + escapeHtml(label) + "</td>" +
+            "<td title=\"" + escapeHtml(row[key] || "-") + "\">" + escapeHtml(row[key] || "-") + "</td>" +
+            "<td>" + escapeHtml(formatCount(row.count || row.n || 0)) + "</td>" +
+            "<td>" + escapeHtml(formatPercent(row.share)) + "</td>" +
+          "</tr>"
+        ).join("");
+      }
+
+      function renderAuthFailureBreakdowns(details) {
+        const rows =
+          authBreakdownRows("Reason", details.reasons, "reason") +
+          authBreakdownRows("Target", details.targets, "target") +
+          authBreakdownRows("Name", details.names, "name") +
+          authBreakdownRows("HTTP", details.httpStatuses, "httpStatus");
+        if (!rows) return "<div class=\"event muted\">No auth failure breakdowns have been reported yet.</div>";
+        return "<div class=\"recent-heading\">Reasons And Targets</div>" +
+          "<div class=\"operation-table-wrap\">" +
+            "<table class=\"operation-log-table\">" +
+              "<thead><tr><th style=\"width: 18%\">Group</th><th style=\"width: 44%\">Value</th><th style=\"width: 18%\">Count</th><th style=\"width: 20%\">Share</th></tr></thead>" +
+              "<tbody>" + rows + "</tbody>" +
+            "</table>" +
+          "</div>";
+      }
+
+      function renderAuthFailureRecent(details) {
+        const rows = Array.isArray(details.recentFailures) ? details.recentFailures : [];
+        if (rows.length === 0) return "<div class=\"event muted\">No auth failures recorded in the current window.</div>";
+        return "<div class=\"recent-heading\">Recent Auth Events</div>" +
+          "<div class=\"operation-table-wrap\">" +
+            "<table class=\"operation-log-table\">" +
+              "<thead><tr>" +
+                "<th style=\"width: 14%\">When</th>" +
+                "<th style=\"width: 22%\">Reason</th>" +
+                "<th style=\"width: 16%\">Name</th>" +
+                "<th style=\"width: 18%\">Target</th>" +
+                "<th style=\"width: 10%\">HTTP</th>" +
+                "<th style=\"width: 10%\">Latency</th>" +
+                "<th style=\"width: 10%\">Source</th>" +
+              "</tr></thead>" +
+              "<tbody>" +
+                rows.map((event) =>
+                  "<tr>" +
+                    "<td title=\"" + escapeHtml(localDateTime(event.at)) + "\">" + escapeHtml(localTime(event.at)) + "</td>" +
+                    "<td title=\"" + escapeHtml(event.reason || "-") + "\">" + escapeHtml(event.reason || "-") + "</td>" +
+                    "<td title=\"" + escapeHtml(event.name || "-") + "\">" + escapeHtml(event.name || "-") + "</td>" +
+                    "<td title=\"" + escapeHtml(event.target || "-") + "\">" + escapeHtml(event.target || "-") + "</td>" +
+                    "<td>" + escapeHtml(event.httpStatus || "-") + "</td>" +
+                    "<td>" + escapeHtml(formatDuration(event.durationMs)) + "</td>" +
+                    "<td title=\"" + escapeHtml(event.source || "-") + "\">" + escapeHtml(sourceLabel(event.source)) + "</td>" +
+                  "</tr>"
+                ).join("") +
+              "</tbody>" +
+            "</table>" +
+          "</div>";
+      }
+
+      function renderAuthFailures(payload) {
+        const check = byName(payload, "hosted_mcp_auth_failures");
+        const details = check?.details || {};
+        if (!check) {
+          document.getElementById("auth-failure-summary").innerHTML = "<div class=\"event muted\">Auth failure telemetry has not been reported by the doctor.</div>";
+          document.getElementById("auth-failure-trend").innerHTML = "";
+          document.getElementById("auth-failure-breakdowns").innerHTML = "";
+          document.getElementById("auth-failure-recent").innerHTML = "";
+          return;
+        }
+
+        const topReason = Array.isArray(details.reasons) ? details.reasons[0] : null;
+        const activityCopy = details.activityState === "active"
+          ? "still arriving"
+          : details.activityState === "stale"
+            ? "aging out"
+            : "clear";
+        const summaryCards = [
+          renderAuthFailureSummaryCard("Status", statusPill(check.status), activityCopy, true),
+          renderAuthFailureSummaryCard("Failures", formatCount(details.failureCount || 0), "current " + formatCount(details.windowMinutes || 0) + "m window"),
+          renderAuthFailureSummaryCard("Trend", formatSignedCount(details.failureDelta || 0), "versus previous window"),
+          renderAuthFailureSummaryCard("Last Failure", details.lastFailureAt ? ageLabel(details.lastFailureAt) : "-", details.lastFailureAt ? localDateTime(details.lastFailureAt) : "none in current window"),
+          renderAuthFailureSummaryCard("Top Reason", topReason ? topReason.reason : "-", topReason ? "x" + formatCount(topReason.count || topReason.n) + " · " + formatPercent(topReason.share) : "none"),
+          renderAuthFailureSummaryCard("Failure Rate", formatPercent(details.failureRate), formatCount(details.totalAuthEvents || 0) + " auth events"),
+        ].join("");
+
+        document.getElementById("auth-failure-summary").innerHTML =
+          "<div class=\"latency-summary-grid auth-summary-grid\">" + summaryCards + "</div>" +
+          (details.eventLimitReached ? "<div class=\"event-meta\">Auth event limit reached; counts may be clipped at " + escapeHtml(formatCount(details.eventLimit)) + " rows.</div>" : "");
+        document.getElementById("auth-failure-trend").innerHTML = renderAuthFailureTrend(details);
+        document.getElementById("auth-failure-breakdowns").innerHTML = renderAuthFailureBreakdowns(details);
+        document.getElementById("auth-failure-recent").innerHTML = renderAuthFailureRecent(details);
+      }
+
       function renderSlowestOperations(operations) {
         const rows = Array.isArray(operations) ? operations : [];
         if (rows.length === 0) return "";
@@ -1803,7 +1998,12 @@ const page = String.raw`<!doctype html>
 
         document.getElementById("checks").innerHTML = (payload.checks || [])
           .filter((check) => check.name !== "recent_activity")
-          .map((check) => "<tr><td>" + escapeHtml(check.name) + "</td><td><span class=\"pill " + escapeHtml(check.status) + "\">" + escapeHtml(check.status) + "</span></td><td class=\"details\">" + (detailSummary(check.details) || "-") + "</td></tr>")
+          .map((check) => {
+            const details = check.name === "hosted_mcp_auth_failures"
+              ? authFailureCheckSummary(check)
+              : detailSummary(check.details);
+            return "<tr><td>" + escapeHtml(check.name) + "</td><td><span class=\"pill " + escapeHtml(check.status) + "\">" + escapeHtml(check.status) + "</span></td><td class=\"details\">" + (details || "-") + "</td></tr>";
+          })
           .join("");
 
         document.getElementById("actions").innerHTML = actionItems(payload)
@@ -1813,6 +2013,7 @@ const page = String.raw`<!doctype html>
         renderActivity(payload);
         renderOperationUsage(payload);
         renderOperationEvents(payload);
+        renderAuthFailures(payload);
         renderOperationLog();
         renderUserOperationLatencies(payload);
         renderLatencies(payload);

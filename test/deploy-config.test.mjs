@@ -291,8 +291,15 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /Brain content state changes/);
   assert.match(script, /hosted MCP tool-call and auth metadata/);
   assert.match(script, /activity-subtab-operations/);
+  assert.match(script, /activity-subtab-auth/);
   assert.match(script, /activity-subtab-brain/);
   assert.match(script, /activity-subtab-watch/);
+  assert.match(script, /Auth Failures/);
+  assert.match(script, /auth-failure-summary/);
+  assert.match(script, /auth-failure-trend/);
+  assert.match(script, /auth-failure-recent/);
+  assert.match(script, /renderAuthFailures/);
+  assert.match(script, /authFailureCheckSummary/);
   assert.match(script, /setupActivityViews/);
   assert.match(script, /setupSubtabGroup/);
   assert.match(script, /Client-Observed E2E/);

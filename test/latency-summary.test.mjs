@@ -223,6 +223,119 @@ test("latency history can be built from Postgres sync_events rows", () => {
   assert.equal(history[1].error, "conflict");
 });
 
+test("auth failure summaries report trends, reasons, targets, and recent metadata", async () => {
+  const { authFailureSummaryFromSyncEventRows } = await import(
+    "../scripts/lib/latency-summary.mjs"
+  );
+  const now = "2026-06-24T09:00:00.000Z";
+  const rows = [
+    {
+      event_type: "hosted_mcp_auth",
+      duration_ms: 91,
+      created_at: "2026-06-24T08:58:00.000Z",
+      metadata: {
+        ok: false,
+        error: "unknown_client_id",
+        name: "oauth_token",
+        target: "chatgpt",
+        source: "hosted_mcp_server",
+        httpStatus: 401,
+      },
+    },
+    {
+      event_type: "hosted_mcp_auth",
+      duration_ms: 45,
+      created_at: "2026-06-24T08:44:00.000Z",
+      metadata: {
+        ok: false,
+        error: "missing_bearer",
+        name: "mcp_request",
+        target: "claude",
+        source: "hosted_mcp_server",
+        httpStatus: 401,
+      },
+    },
+    {
+      event_type: "hosted_mcp_auth",
+      duration_ms: 38,
+      created_at: "2026-06-24T08:36:00.000Z",
+      metadata: {
+        ok: true,
+        name: "oauth_token",
+        target: "claude",
+        source: "hosted_mcp_server",
+        httpStatus: 200,
+      },
+    },
+    {
+      event_type: "hosted_mcp_auth",
+      duration_ms: 88,
+      created_at: "2026-06-24T08:08:00.000Z",
+      metadata: {
+        ok: false,
+        error: "unknown_client_id",
+        name: "oauth_token",
+        target: "chatgpt",
+        source: "hosted_mcp_server",
+        httpStatus: 401,
+      },
+    },
+    {
+      event_type: "hosted_mcp_auth",
+      duration_ms: 75,
+      created_at: "2026-06-24T07:30:00.000Z",
+      metadata: {
+        ok: false,
+        error: "token_expired",
+        name: "oauth_token",
+        target: "chatgpt",
+        source: "hosted_mcp_server",
+        httpStatus: 401,
+      },
+    },
+  ];
+
+  const summary = authFailureSummaryFromSyncEventRows(rows, {
+    now,
+    windowMinutes: 60,
+    warnThreshold: 3,
+    failThreshold: 10,
+    bucketCount: 4,
+    recentLimit: 2,
+  });
+
+  assert.equal(summary.windowMinutes, 60);
+  assert.equal(summary.failureCount, 3);
+  assert.equal(summary.successCount, 1);
+  assert.equal(summary.totalAuthEvents, 4);
+  assert.equal(summary.failureRate, 0.75);
+  assert.equal(summary.previousFailureCount, 1);
+  assert.equal(summary.failureDelta, 2);
+  assert.equal(summary.lastFailureAt, "2026-06-24T08:58:00.000Z");
+  assert.equal(summary.firstFailureAt, "2026-06-24T08:08:00.000Z");
+  assert.equal(summary.minutesSinceLastFailure, 2);
+  assert.equal(summary.active, true);
+  assert.equal(summary.reasons[0].reason, "unknown_client_id");
+  assert.equal(summary.reasons[0].count, 2);
+  assert.equal(summary.reasons[0].share, 0.667);
+  assert.equal(summary.targets[0].target, "chatgpt");
+  assert.equal(summary.targets[0].count, 2);
+  assert.deepEqual(
+    summary.trend.map((bucket) => bucket.failureCount),
+    [1, 0, 1, 1]
+  );
+  assert.equal(summary.recentFailures.length, 2);
+  assert.deepEqual(Object.keys(summary.recentFailures[0]).sort(), [
+    "at",
+    "durationMs",
+    "httpStatus",
+    "name",
+    "reason",
+    "source",
+    "target",
+  ]);
+});
+
 test("latency summaries separate timing layers, exact tools, slowest operations, and DB contribution", () => {
   const history = latencyHistoryFromSyncEventRows([
     {

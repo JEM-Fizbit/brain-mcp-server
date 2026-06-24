@@ -7,6 +7,7 @@ import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
   diagnoseLatencyPerformance,
+  authFailureSummaryFromSyncEventRows,
   HOSTED_MCP_AUTH_EVENT_TYPE,
   HOSTED_MCP_LATENCY_EVENT_TYPE,
   latencyHistoryFromSnapshot,
@@ -59,6 +60,18 @@ const userOperationEventLogLimit = Math.max(
 const userOperationEventLogWindowDays = Math.max(
   1,
   Number(process.env.BRAIN_HOSTED_MCP_EVENT_LOG_DAYS || 30)
+);
+const authFailureEventLimit = Math.max(
+  100,
+  Number(process.env.BRAIN_HOSTED_MCP_AUTH_EVENT_LIMIT || 1000)
+);
+const authFailureRecentLimit = Math.max(
+  1,
+  Number(process.env.BRAIN_HOSTED_MCP_AUTH_RECENT_LIMIT || 20)
+);
+const authFailureBucketCount = Math.max(
+  2,
+  Number(process.env.BRAIN_HOSTED_MCP_AUTH_BUCKETS || 6)
 );
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
@@ -899,37 +912,29 @@ async function checkAuthFailures() {
   try {
     const result = await pool.query(
       `
-        with failures as (
-          select metadata->>'error' as reason
-          from brain.sync_events
-          where brain_id = $1
-            and event_type = $2
-            and metadata->>'ok' = 'false'
-            and created_at >= now() - make_interval(mins => $3::int)
-        )
-        select
-          (select count(*) from failures)::int as failure_count,
-          (select coalesce(jsonb_agg(r), '[]'::jsonb) from (
-              select reason, count(*)::int as n
-              from failures
-              where reason is not null
-              group by reason
-              order by count(*) desc
-              limit 5
-          ) r) as reasons
+        select event_type, filename, duration_ms, metadata, created_at
+        from brain.sync_events
+        where brain_id = $1
+          and event_type = $2
+          and created_at >= now() - make_interval(mins => ($3::int * 2))
+        order by created_at desc
+        limit $4
       `,
-      [brainId, HOSTED_MCP_AUTH_EVENT_TYPE, windowMinutes]
+      [brainId, HOSTED_MCP_AUTH_EVENT_TYPE, windowMinutes, authFailureEventLimit]
     );
-    const row = result.rows[0] || {};
-    const failureCount = Number(row.failure_count || 0);
-    const reasons = Array.isArray(row.reasons) ? row.reasons : [];
-    const status = severityForCount(failureCount, { warnThreshold, failThreshold }) || "pass";
-    addCheck("hosted_mcp_auth_failures", status, {
+    const summary = authFailureSummaryFromSyncEventRows(result.rows, {
       windowMinutes,
       warnThreshold,
       failThreshold,
-      failureCount,
-      reasons,
+      bucketCount: authFailureBucketCount,
+      recentLimit: authFailureRecentLimit,
+    });
+    const failureCount = Number(summary.failureCount || 0);
+    const status = severityForCount(failureCount, { warnThreshold, failThreshold }) || "pass";
+    addCheck("hosted_mcp_auth_failures", status, {
+      ...summary,
+      eventLimit: authFailureEventLimit,
+      eventLimitReached: result.rows.length >= authFailureEventLimit,
     });
   } catch (error) {
     addCheck("hosted_mcp_auth_failures", "warn", {
@@ -1001,11 +1006,22 @@ function buildOperatorActions(status) {
   if (authFailures?.status === "warn" || authFailures?.status === "fail") {
     const count = authFailures.details?.failureCount || 0;
     const windowMinutes = authFailures.details?.windowMinutes || 60;
+    const delta = Number(authFailures.details?.failureDelta || 0);
+    const trend =
+      delta === 0
+        ? "flat versus the previous window"
+        : `${delta > 0 ? "+" : ""}${delta} versus the previous window`;
+    const activityState = authFailures.details?.activityState || "active";
+    const lastFailure = authFailures.details?.minutesSinceLastFailure;
+    const lastFailureLabel =
+      lastFailure === null || lastFailure === undefined
+        ? "no last-failure age available"
+        : `last failure ${lastFailure}m ago`;
     actions.push({
       level: authFailures.status,
-      title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m.`,
+      title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m (${trend}).`,
       detail:
-        "Check brain.sync_events hosted_mcp_auth rows and the cockpit Operation Log. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.",
+        `${activityState === "active" ? "Failures are still recent" : "Failures appear stale"} (${lastFailureLabel}). Check the cockpit Auth panel and brain.sync_events hosted_mcp_auth rows. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.`,
     });
   }
 
