@@ -28,7 +28,8 @@ export function registerLintTools(server: McpServer): void {
           report.drift.length +
           report.largeDomainPacks.length +
           report.unindexedWorkingBinaries.length +
-          (report.journalRotation ? 1 : 0);
+          (report.journalRotation ? 1 : 0) +
+          (report.captureQueue ? 1 : 0);
 
         await activeBrainStore().appendLog(
           ctx.brainId,

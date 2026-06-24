@@ -9,7 +9,7 @@ const { appendIntakeItemToTasks } = await import(
   path.join(__dirname, "..", "dist", "services", "task-intake.js")
 );
 
-test("appendIntakeItemToTasks creates the handoff queue before Active", () => {
+test("appendIntakeItemToTasks creates the capture triage queue before Active", () => {
   const existing = [
     "# TASKS",
     "",
@@ -27,7 +27,7 @@ test("appendIntakeItemToTasks creates the handoff queue before Active", () => {
       kind: "feature",
       title: "Conversational intake",
       source: "Claude mobile",
-      target: "brain-mcp-server",
+      route_hint: "brain-mcp-server",
       details: "Capture before triage.",
       urgency: "normal",
     },
@@ -35,12 +35,14 @@ test("appendIntakeItemToTasks creates the handoff queue before Active", () => {
   );
 
   assert.ok(
-    next.indexOf("## Inbox / Handoff Queue") < next.indexOf("## Active"),
+    next.indexOf("## Capture / Triage Queue") < next.indexOf("## Active"),
     "queue should be discoverable before regular active work"
   );
+  assert.doesNotMatch(next, /## Inbox \/ Handoff Queue/);
+  assert.match(next, /Not the document-ingestion inbox/);
   assert.match(next, /FEATURE — Conversational intake/);
   assert.match(next, /Source: Claude mobile/);
-  assert.match(next, /Target: brain-mcp-server/);
+  assert.match(next, /Route hint: brain-mcp-server/);
   assert.match(next, /Details: Capture before triage\./);
 });
 
@@ -48,7 +50,7 @@ test("appendIntakeItemToTasks prepends newer items within an existing queue", ()
   const existing = [
     "# TASKS",
     "",
-    "## Inbox / Handoff Queue",
+    "## Capture / Triage Queue",
     "",
     "Temporary queue.",
     "",
@@ -76,4 +78,42 @@ test("appendIntakeItemToTasks prepends newer items within an existing queue", ()
     "newer intake items should be first in the queue"
   );
   assert.match(next, /Urgency: high/);
+});
+
+test("appendIntakeItemToTasks migrates an existing handoff queue heading", () => {
+  const existing = [
+    "# TASKS",
+    "",
+    "## Inbox / Handoff Queue",
+    "",
+    "Temporary queue.",
+    "",
+    "- [ ] 2026-06-23 — BUG — Older item",
+    "  - Source: ChatGPT mobile",
+    "  - Triage: Transfer to the authoritative backlog, then mark transferred/closed.",
+    "",
+    "## Active",
+    "",
+  ].join("\n");
+
+  const next = appendIntakeItemToTasks(
+    existing,
+    {
+      kind: "idea",
+      title: "Browser-based Brain viewer",
+      source: "ChatGPT iPhone",
+      route_hint: "brain-platform",
+      urgency: "normal",
+    },
+    new Date("2026-06-24T12:00:00.000Z")
+  );
+
+  assert.match(next, /## Capture \/ Triage Queue/);
+  assert.doesNotMatch(next, /## Inbox \/ Handoff Queue/);
+  assert.ok(
+    next.indexOf("IDEA — Browser-based Brain viewer") <
+      next.indexOf("BUG — Older item"),
+    "newer capture items should be first after heading migration"
+  );
+  assert.match(next, /Route hint: brain-platform/);
 });

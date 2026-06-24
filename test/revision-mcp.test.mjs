@@ -318,8 +318,34 @@ test("HTTP MCP reads hosted LOG.md through revision store without local brain_di
   assert.doesNotMatch(result, /storage_config\.brain_dir/);
 });
 
-test("HTTP MCP report item creates a hosted Brain intake queue in TASKS.md", async () => {
-  const harness = await setupHarness("report-item-hosted", {
+test("HTTP MCP capture item creates a hosted Brain triage queue in TASKS.md", async () => {
+  const harness = await setupHarness("capture-item-hosted", {
+    storage_backend: "postgres",
+    storage_config: {},
+  });
+
+  const result = await callTool(harness, "brain_capture_item", {
+    kind: "idea",
+    title: "Browser-based Brain viewer",
+    source: "ChatGPT mobile",
+    route_hint: "brain-platform",
+    details: "Explore a non-Markdown human surface.",
+    urgency: "normal",
+  });
+
+  assert.match(result, /Captured idea in TASKS\.md Capture \/ Triage Queue/);
+
+  const store = new FileRevisionStore(harness.storeFile);
+  const hosted = await store.readFile("ai-brain-jem", "TASKS.md");
+  assert.match(hosted.content, /## Capture \/ Triage Queue/);
+  assert.match(hosted.content, /Not the document-ingestion inbox/);
+  assert.match(hosted.content, /IDEA — Browser-based Brain viewer/);
+  assert.match(hosted.content, /Source: ChatGPT mobile/);
+  assert.match(hosted.content, /Route hint: brain-platform/);
+});
+
+test("HTTP MCP report item remains a compatibility alias for capture", async () => {
+  const harness = await setupHarness("report-item-compat-hosted", {
     storage_backend: "postgres",
     storage_config: {},
   });
@@ -333,14 +359,13 @@ test("HTTP MCP report item creates a hosted Brain intake queue in TASKS.md", asy
     urgency: "normal",
   });
 
-  assert.match(result, /Captured bug in TASKS\.md Inbox \/ Handoff Queue/);
+  assert.match(result, /Captured bug in TASKS\.md Capture \/ Triage Queue/);
 
   const store = new FileRevisionStore(harness.storeFile);
   const hosted = await store.readFile("ai-brain-jem", "TASKS.md");
-  assert.match(hosted.content, /## Inbox \/ Handoff Queue/);
+  assert.match(hosted.content, /## Capture \/ Triage Queue/);
   assert.match(hosted.content, /BUG — Hosted log ordering/);
-  assert.match(hosted.content, /Source: ChatGPT mobile/);
-  assert.match(hosted.content, /Target: brain-mcp-server/);
+  assert.match(hosted.content, /Route hint: brain-mcp-server/);
 });
 
 test("HTTP MCP list and search use revision store harness", async () => {

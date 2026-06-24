@@ -23,6 +23,10 @@ import {
 } from "./active-brain-store.js";
 import type { BrainStore, FileMetadata } from "./brain-store.js";
 import { getBrainPaths, resolveBrain, stdioPrincipal } from "./registry.js";
+import {
+  summarizeCaptureQueue,
+  type CaptureQueueStatus,
+} from "./task-intake.js";
 
 interface LintFileSnapshot {
   name: string;
@@ -47,6 +51,7 @@ export interface LintReport {
         triggeredBy: "lines" | "bytes" | "both";
       }
     | null;
+  captureQueue: CaptureQueueStatus | null;
   suggestedSemanticChecks: string[];
   warnings: string[];
 }
@@ -324,6 +329,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
 
   // Journal rotation threshold
   const journalRotation = checkJournalRotation(fileContentMap.get(JOURNAL_FILE));
+  const captureQueue = summarizeCaptureQueue(fileContentMap.get("TASKS.md"));
 
   // Large domain packs
   const largeDomainPacks: LintReport["largeDomainPacks"] = [];
@@ -352,6 +358,11 @@ export async function runLint(brainId?: string): Promise<LintReport> {
       `Consider splitting bloated files: ${bloat.map((b) => `${b.file} (${b.lines} lines)`).join(", ")}`
     );
   }
+  if (captureQueue) {
+    suggestedSemanticChecks.push(
+      `Triage TASKS.md Capture / Triage Queue: ${captureQueue.openCount} open item(s), ${captureQueue.staleCount} stale.`
+    );
+  }
   suggestedSemanticChecks.push(
     "Cross-check key facts in 01_identity.md against REF_extracted_facts.md for contradictions"
   );
@@ -367,6 +378,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
     largeDomainPacks,
     unindexedWorkingBinaries,
     journalRotation,
+    captureQueue,
     suggestedSemanticChecks,
     warnings,
   };
@@ -383,7 +395,8 @@ export function formatLintReport(report: LintReport): string {
     report.drift.length +
     report.largeDomainPacks.length +
     report.unindexedWorkingBinaries.length +
-    (report.journalRotation ? 1 : 0);
+    (report.journalRotation ? 1 : 0) +
+    (report.captureQueue ? 1 : 0);
 
   sections.push(
     issueCount === 0
@@ -453,6 +466,36 @@ export function formatLintReport(report: LintReport): string {
       `- Run the rotation procedure in \`${JOURNAL_ARCHIVE_DIR}/${JOURNAL_ARCHIVE_INDEX}\`: cut ≈30 days back at a date header, move older entries into \`${JOURNAL_ARCHIVE_DIR}/JOURNAL-YYYY-NN.md\`, register the segment in \`${JOURNAL_ARCHIVE_DIR}/${JOURNAL_ARCHIVE_INDEX}\` with date range + one-line summary, and log the rotation in LOG.md as an UPDATE op.`,
       ""
     );
+  }
+
+  // Capture / triage queue
+  if (report.captureQueue) {
+    const {
+      openCount,
+      staleCount,
+      oldestOpenDays,
+      staleItems,
+      thresholdDays,
+      thresholdCount,
+    } = report.captureQueue;
+    sections.push(
+      "## Capture / Triage Queue",
+      `- TASKS.md has ${openCount} open item${openCount === 1 ? "" : "s"} awaiting triage.`,
+      `- Thresholds: ${thresholdDays}+ days old or ${thresholdCount}+ open items.`,
+      oldestOpenDays === null
+        ? "- Oldest open item age: unknown."
+        : `- Oldest open item age: ${oldestOpenDays} day${oldestOpenDays === 1 ? "" : "s"}.`
+    );
+    if (staleCount > 0) {
+      sections.push(`- Stale open items (${staleCount}):`);
+      for (const item of staleItems.slice(0, 10)) {
+        sections.push(`  - ${item.date}: ${item.title} (${item.days} days)`);
+      }
+      if (staleItems.length > 10) {
+        sections.push(`  - ...and ${staleItems.length - 10} more.`);
+      }
+    }
+    sections.push("");
   }
 
   // Unindexed working binaries
