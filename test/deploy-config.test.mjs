@@ -209,6 +209,18 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
 
+test("hosted doctor supports monitor-owned sync supervision", async () => {
+  const script = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+
+  assert.match(script, /BRAIN_SYNC_SUPERVISOR/);
+  assert.match(script, /BRAIN_MONITOR_STACK_FILE/);
+  assert.match(script, /supervisor === "menubar"/);
+  assert.match(script, /brain-monitor-stack\.json/);
+});
+
 test("source list verifier supports non-JEM expected counts", async () => {
   const script = await fs.readFile(
     path.join(repoRoot, "scripts", "verify-postgres-source-list.mjs"),

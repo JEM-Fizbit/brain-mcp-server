@@ -115,12 +115,17 @@ To stop the cockpit LaunchAgent:
 launchctl bootout "gui/$(id -u)/com.jem.brain-cockpit"
 ```
 
-## Install The Sync Helper App
+## Legacy Sync Helper App
 
-For SharePoint/OneDrive CloudStorage Brains, generate a small native helper app
-and grant that app Full Disk Access in macOS Privacy & Security. This gives the
+For SharePoint/OneDrive CloudStorage Brains, prefer the menu-bar operator app
+below. It owns the sync watcher and cockpit server as child processes and is the
+only local login item needed for the consolidated John/operator stack.
+
+The older sync helper app remains documented as a rollback path. It gives the
 sync loop a stable app identity for CloudStorage reads while keeping the
-OneDrive checkout as the primary human-facing Brain checkout.
+OneDrive checkout as the primary human-facing Brain checkout, but it should not
+be installed beside the consolidated menu-bar stack unless deliberately
+debugging or rolling back.
 
 ```bash
 BRAIN_ID="<brain-id>" \
@@ -157,14 +162,16 @@ rather than running Node directly. To stop the helper app, terminate the
 
 ## Install The Menu-Bar Operator App
 
-For John/operator use, generate a native macOS status-bar app that wraps the
-existing local surfaces:
+For John/operator use, generate a native macOS status-bar app that owns the
+local stack:
 
 - shows the selected Brain id, sync health status, last check/sync, and open
   conflict count from the configured sync health JSON;
-- opens or kickstarts the local cockpit;
+- starts and supervises the local sync watcher;
+- starts and supervises the local cockpit server;
+- opens the local cockpit;
 - opens the sync log directory;
-- restarts the sync helper LaunchAgent;
+- restarts the local stack;
 - runs `scripts/hosted-doctor.mjs` and writes bounded stdout/stderr under the
   configured log directory.
 
@@ -176,8 +183,6 @@ BRAIN_ID="<brain-id>" \
 BRAIN_REPO_ROOT="$HOME/Library/CloudStorage/<brain-checkout>" \
 BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json" \
 BRAIN_SYNC_HEALTH_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json.health.json" \
-BRAIN_SYNC_LAUNCHD_LABEL="com.example.<brain>-sync.helper" \
-BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.<brain>-cockpit" \
 BRAIN_COCKPIT_URL="http://127.0.0.1:8788/" \
 BRAIN_SYNC_LAUNCHD_LOG_DIR="$HOME/Library/Application Support/Brain MCP/<brain>-sync" \
 BRAIN_MENUBAR_APP="$HOME/Applications/<Brain> Monitor.app" \
@@ -186,8 +191,9 @@ npm run sync:menubar:install
 ```
 
 Launch the generated app once to put `Brain OK`, `Brain Warn`, or `Brain Fail`
-in the macOS menu bar. The app is config-driven and per-Brain, so it can sit
-beside separate JEM/ERS helper and cockpit labels. Broad signed/notarized
+in the macOS menu bar. The app is config-driven and per-Brain. For CloudStorage
+Brains, grant the monitor app Full Disk Access; the sync watcher runs as the
+monitor's child process and uses that app identity. Broad signed/notarized
 installer packaging remains separate backlog work.
 
 To start the menu-bar app automatically at login:
@@ -203,6 +209,9 @@ launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.example.<brai
 launchctl kickstart -k "gui/$(id -u)/com.example.<brain>-monitor"
 ```
 
+When this consolidated monitor is active, do not also run the legacy sync-helper
+LaunchAgent or the standalone cockpit LaunchAgent for the same Brain.
+
 ## Operator Contract
 
 Green means hosted Brain is ready for normal use.
@@ -211,7 +220,11 @@ Warn means use judgement. Typical examples are stale sync health, stale or missi
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
-If `sync_health` is stale while `sync_lock` and `launchd` still show an active local sync process, treat the watcher as wedged rather than healthy. The sync daemon bounds Postgres connect/query/statement/idle waits and store shutdown by default; if it still wedges, restart `com.jem.brain-sync`, inspect `.brain-sync/launchd.err.log`, and rerun `npm run hosted:doctor`.
+If `sync_health` is stale while `sync_lock` and the local supervisor still show
+an active sync process, treat the watcher as wedged rather than healthy. The
+sync daemon bounds Postgres connect/query/statement/idle waits and store
+shutdown by default; if it still wedges, restart the local stack from the
+menu-bar app, inspect `monitor-sync.err.log`, and rerun `npm run hosted:doctor`.
 
 Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not manually delete database rows to make the cockpit green.
 

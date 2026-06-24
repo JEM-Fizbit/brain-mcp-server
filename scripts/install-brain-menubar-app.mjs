@@ -20,18 +20,30 @@ const brainDir = process.env.BRAIN_DIR || path.join(brainRoot, "brain");
 const syncDir = path.resolve(brainDir, "..", ".brain-sync");
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
 const stateFile = process.env.BRAIN_SYNC_STATE_FILE || path.join(syncDir, "state.json");
+const lockFile = process.env.BRAIN_SYNC_LOCK_FILE;
 const healthFile = process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
 const logDir = process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR || syncDir;
+const intervalMs = Number(process.env.BRAIN_SYNC_INTERVAL_MS || 5000);
 const syncLaunchdLabel =
   process.env.BRAIN_SYNC_HELPER_LAUNCHD_LABEL ||
   process.env.BRAIN_SYNC_LAUNCHD_LABEL ||
   "com.jem.brain-sync.helper";
 const cockpitLaunchdLabel =
   process.env.BRAIN_COCKPIT_LAUNCHD_LABEL || "com.jem.brain-cockpit";
-const cockpitHost = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
-const cockpitPort = Number(process.env.BRAIN_COCKPIT_PORT || 8787);
+const configuredCockpitUrl = process.env.BRAIN_COCKPIT_URL || "";
+let parsedCockpitUrl = null;
+try {
+  parsedCockpitUrl = configuredCockpitUrl ? new URL(configuredCockpitUrl) : null;
+} catch {
+  parsedCockpitUrl = null;
+}
+const cockpitHost =
+  process.env.BRAIN_COCKPIT_HOST || parsedCockpitUrl?.hostname || "127.0.0.1";
+const cockpitPort = Number(
+  process.env.BRAIN_COCKPIT_PORT || parsedCockpitUrl?.port || 8787
+);
 const cockpitUrl =
-  process.env.BRAIN_COCKPIT_URL || `http://${cockpitHost}:${cockpitPort}/`;
+  configuredCockpitUrl || `http://${cockpitHost}:${cockpitPort}/`;
 const nodePath =
   process.env.BRAIN_MENUBAR_NODE ||
   process.env.BRAIN_COCKPIT_LAUNCHD_NODE ||
@@ -39,12 +51,28 @@ const nodePath =
 const doctorScriptPath =
   process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
+const syncCliPath =
+  process.env.BRAIN_MENUBAR_SYNC_CLI ||
+  process.env.BRAIN_SYNC_HELPER_SYNC_CLI ||
+  process.env.BRAIN_SYNC_LAUNCHD_SYNC_CLI ||
+  path.join(repoRoot, "dist", "sync", "cli.js");
+const cockpitScriptPath =
+  process.env.BRAIN_MENUBAR_COCKPIT_SCRIPT ||
+  process.env.BRAIN_COCKPIT_LAUNCHD_SCRIPT ||
+  path.join(repoRoot, "scripts", "hosted-cockpit.mjs");
 const doctorOutputPath =
   process.env.BRAIN_MENUBAR_DOCTOR_OUTPUT ||
   path.join(logDir, "hosted-doctor.out.json");
 const doctorErrorPath =
   process.env.BRAIN_MENUBAR_DOCTOR_ERROR ||
   path.join(logDir, "hosted-doctor.err.log");
+const stackStatusFile =
+  process.env.BRAIN_MONITOR_STACK_FILE ||
+  path.join(logDir, "brain-monitor-stack.json");
+const syncStdoutPath = path.join(logDir, "monitor-sync.out.log");
+const syncStderrPath = path.join(logDir, "monitor-sync.err.log");
+const cockpitStdoutPath = path.join(logDir, "monitor-cockpit.out.log");
+const cockpitStderrPath = path.join(logDir, "monitor-cockpit.err.log");
 const runtimePath =
   process.env.BRAIN_MENUBAR_PATH ||
   "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
@@ -59,16 +87,24 @@ for (const [name, value] of [
   ["BRAIN_MENUBAR_APP", appPath],
   ["BRAIN_DIR", brainDir],
   ["BRAIN_SYNC_STATE_FILE", stateFile],
+  ["BRAIN_SYNC_LOCK_FILE", lockFile],
   ["BRAIN_SYNC_HEALTH_FILE", healthFile],
   ["BRAIN_SYNC_LAUNCHD_LOG_DIR", logDir],
   ["BRAIN_MENUBAR_NODE", nodePath],
   ["BRAIN_MENUBAR_DOCTOR_SCRIPT", doctorScriptPath],
+  ["BRAIN_MENUBAR_SYNC_CLI", syncCliPath],
+  ["BRAIN_MENUBAR_COCKPIT_SCRIPT", cockpitScriptPath],
   ["BRAIN_MENUBAR_DOCTOR_OUTPUT", doctorOutputPath],
   ["BRAIN_MENUBAR_DOCTOR_ERROR", doctorErrorPath],
+  ["BRAIN_MONITOR_STACK_FILE", stackStatusFile],
 ]) {
-  if (!path.isAbsolute(value)) {
+  if (value && !path.isAbsolute(value)) {
     throw new Error(`${name} must be absolute: ${value}`);
   }
+}
+
+if (!Number.isInteger(intervalMs) || intervalMs < 1000) {
+  throw new Error(`BRAIN_SYNC_INTERVAL_MS must be an integer >= 1000: ${intervalMs}`);
 }
 
 if (!Number.isInteger(cockpitPort) || cockpitPort < 1 || cockpitPort > 65535) {
@@ -130,14 +166,59 @@ const config = {
   cockpitUrl,
   nodePath,
   doctorScriptPath,
+  syncCliPath,
+  cockpitScriptPath,
   doctorOutputPath,
   doctorErrorPath,
+  stackStatusFile,
+  syncProcess: {
+    name: "sync",
+    launchPath: nodePath,
+    arguments: [syncCliPath, "watch"],
+    currentDirectoryPath: repoRoot,
+    stdoutPath: syncStdoutPath,
+    stderrPath: syncStderrPath,
+    env: {
+      BRAIN_ID: brainId,
+      BRAIN_DIR: brainDir,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
+      BRAIN_SYNC_HEALTH_FILE: healthFile,
+      BRAIN_SYNC_INTERVAL_MS: String(intervalMs),
+      BRAIN_SYNC_SUPERVISOR: "menubar",
+      BRAIN_MONITOR_STACK_FILE: stackStatusFile,
+      PATH: runtimePath,
+    },
+  },
+  cockpitProcess: {
+    name: "cockpit",
+    launchPath: nodePath,
+    arguments: [cockpitScriptPath],
+    currentDirectoryPath: repoRoot,
+    stdoutPath: cockpitStdoutPath,
+    stderrPath: cockpitStderrPath,
+    env: {
+      BRAIN_ID: brainId,
+      BRAIN_DIR: brainDir,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
+      BRAIN_SYNC_HEALTH_FILE: healthFile,
+      BRAIN_SYNC_SUPERVISOR: "menubar",
+      BRAIN_MONITOR_STACK_FILE: stackStatusFile,
+      BRAIN_COCKPIT_HOST: cockpitHost,
+      BRAIN_COCKPIT_PORT: String(cockpitPort),
+      BRAIN_COCKPIT_PORT_FALLBACK: "0",
+      PATH: runtimePath,
+    },
+  },
   env: {
     BRAIN_ID: brainId,
     BRAIN_DIR: brainDir,
     BRAIN_SYNC_STATE_FILE: stateFile,
+    ...(lockFile ? { BRAIN_SYNC_LOCK_FILE: lockFile } : {}),
     BRAIN_SYNC_HEALTH_FILE: healthFile,
-    BRAIN_SYNC_LAUNCHD_LABEL: syncLaunchdLabel,
+    BRAIN_SYNC_SUPERVISOR: "menubar",
+    BRAIN_MONITOR_STACK_FILE: stackStatusFile,
     PATH: runtimePath,
   },
 };
@@ -148,6 +229,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @interface BrainMenuAppDelegate : NSObject <NSApplicationDelegate>
 @property (strong) NSStatusItem *statusItem;
 @property (strong) NSDictionary *config;
+@property (strong) NSMutableDictionary *managedTasks;
+@property (strong) NSMutableSet *intentionalStops;
+@property (strong) NSTimer *stackHeartbeatTimer;
 @property (copy) NSString *lastAction;
 @end
 
@@ -157,10 +241,20 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   (void)notification;
   [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
   self.config = [self loadConfig];
+  self.managedTasks = [NSMutableDictionary dictionary];
+  self.intentionalStops = [NSMutableSet set];
   self.lastAction = @"Ready";
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   self.statusItem.button.title = @"Brain";
+  [self startManagedProcesses];
+  [self scheduleStackHeartbeat];
   [self rebuildMenu:nil];
+}
+
+- (void)applicationWillTerminate:(NSNotification *)notification {
+  (void)notification;
+  [self.stackHeartbeatTimer invalidate];
+  [self stopManagedProcesses:nil];
 }
 
 - (NSDictionary *)loadConfig {
@@ -206,6 +300,14 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return fallback;
 }
 
+- (NSDictionary *)dictionaryConfig:(NSString *)key {
+  id value = self.config[key];
+  if ([value isKindOfClass:[NSDictionary class]]) {
+    return (NSDictionary *)value;
+  }
+  return nil;
+}
+
 - (NSString *)stringFromValue:(id)value fallback:(NSString *)fallback {
   if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
     return (NSString *)value;
@@ -245,6 +347,178 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
   item.enabled = NO;
   [menu addItem:item];
+}
+
+- (BOOL)isTaskRunningNamed:(NSString *)name {
+  NSTask *task = self.managedTasks[name];
+  return task && task.isRunning;
+}
+
+- (NSDictionary *)statusForManagedTask:(NSString *)name {
+  NSTask *task = self.managedTasks[name];
+  BOOL running = task && task.isRunning;
+  return @{
+    @"state": running ? @"running" : @"stopped",
+    @"pid": running ? @(task.processIdentifier) : [NSNull null]
+  };
+}
+
+- (void)writeStackStatus {
+  NSString *path = [self stringConfig:@"stackStatusFile" fallback:@""];
+  if (path.length == 0) {
+    return;
+  }
+
+  NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+  NSDictionary *status = @{
+    @"supervisor": @"menubar",
+    @"checkedAt": [formatter stringFromDate:[NSDate date]],
+    @"sync": [self statusForManagedTask:@"sync"],
+    @"cockpit": [self statusForManagedTask:@"cockpit"]
+  };
+  NSData *data = [NSJSONSerialization dataWithJSONObject:status options:NSJSONWritingPrettyPrinted error:nil];
+  if (!data) {
+    return;
+  }
+
+  [self ensureParentDirectoryForPath:path];
+  [data writeToFile:path atomically:YES];
+}
+
+- (void)heartbeatStackStatus:(NSTimer *)timer {
+  (void)timer;
+  [self writeStackStatus];
+}
+
+- (void)scheduleStackHeartbeat {
+  [self.stackHeartbeatTimer invalidate];
+  self.stackHeartbeatTimer = [NSTimer timerWithTimeInterval:30.0
+                                                     target:self
+                                                   selector:@selector(heartbeatStackStatus:)
+                                                   userInfo:nil
+                                                    repeats:YES];
+  [[NSRunLoop mainRunLoop] addTimer:self.stackHeartbeatTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)startManagedProcesses {
+  [self.intentionalStops removeAllObjects];
+  [self startManagedProcess:@"sync" configKey:@"syncProcess"];
+  [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
+  [self writeStackStatus];
+}
+
+- (void)startManagedProcess:(NSString *)name configKey:(NSString *)configKey {
+  if ([self isTaskRunningNamed:name]) {
+    return;
+  }
+
+  NSDictionary *processConfig = [self dictionaryConfig:configKey];
+  if (!processConfig) {
+    return;
+  }
+  NSString *launchPath = [self stringFromValue:processConfig[@"launchPath"] fallback:@""];
+  NSArray *arguments = [processConfig[@"arguments"] isKindOfClass:[NSArray class]]
+    ? processConfig[@"arguments"]
+    : @[];
+  NSString *currentDirectoryPath = [self stringFromValue:processConfig[@"currentDirectoryPath"] fallback:@""];
+  NSString *stdoutPath = [self stringFromValue:processConfig[@"stdoutPath"] fallback:@""];
+  NSString *stderrPath = [self stringFromValue:processConfig[@"stderrPath"] fallback:@""];
+  if (launchPath.length == 0 || stdoutPath.length == 0 || stderrPath.length == 0) {
+    self.lastAction = [NSString stringWithFormat:@"%@ config missing", name];
+    [self writeStackStatus];
+    return;
+  }
+
+  [self ensureParentDirectoryForPath:stdoutPath];
+  [self ensureParentDirectoryForPath:stderrPath];
+  [[NSFileManager defaultManager] createFileAtPath:stdoutPath contents:nil attributes:nil];
+  [[NSFileManager defaultManager] createFileAtPath:stderrPath contents:nil attributes:nil];
+  NSFileHandle *stdoutHandle = [NSFileHandle fileHandleForWritingAtPath:stdoutPath];
+  NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:stderrPath];
+  if (!stdoutHandle || !stderrHandle) {
+    self.lastAction = [NSString stringWithFormat:@"%@ log open failed", name];
+    [self writeStackStatus];
+    return;
+  }
+  [stdoutHandle seekToEndOfFile];
+  [stderrHandle seekToEndOfFile];
+
+  NSTask *task = [[NSTask alloc] init];
+  task.launchPath = launchPath;
+  task.arguments = arguments;
+  if (currentDirectoryPath.length > 0) {
+    task.currentDirectoryPath = currentDirectoryPath;
+  }
+  NSMutableDictionary *environment = [[[NSProcessInfo processInfo] environment] mutableCopy];
+  NSDictionary *configuredEnv = processConfig[@"env"];
+  if ([configuredEnv isKindOfClass:[NSDictionary class]]) {
+    for (NSString *key in configuredEnv) {
+      id value = configuredEnv[key];
+      if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+        environment[key] = value;
+      }
+    }
+  }
+  task.environment = environment;
+  task.standardOutput = stdoutHandle;
+  task.standardError = stderrHandle;
+
+  __weak typeof(self) weakSelf = self;
+  task.terminationHandler = ^(NSTask *finishedTask) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [weakSelf.managedTasks removeObjectForKey:name];
+      [weakSelf writeStackStatus];
+      if (![weakSelf.intentionalStops containsObject:name]) {
+        weakSelf.lastAction = [NSString stringWithFormat:@"%@ exited %d; restarting", name, finishedTask.terminationStatus];
+        [weakSelf performSelector:@selector(restartManagedProcessNamed:) withObject:name afterDelay:3.0];
+      }
+      [weakSelf rebuildMenu:nil];
+    });
+  };
+
+  @try {
+    [task launch];
+    self.managedTasks[name] = task;
+    self.lastAction = [NSString stringWithFormat:@"%@ running", name];
+  } @catch (NSException *exception) {
+    self.lastAction = [NSString stringWithFormat:@"%@ failed: %@", name, exception.name];
+  }
+  [self writeStackStatus];
+}
+
+- (void)restartManagedProcessNamed:(NSString *)name {
+  if ([name isEqualToString:@"sync"]) {
+    [self startManagedProcess:@"sync" configKey:@"syncProcess"];
+  } else if ([name isEqualToString:@"cockpit"]) {
+    [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
+  }
+  [self rebuildMenu:nil];
+}
+
+- (void)stopManagedProcesses:(id)sender {
+  (void)sender;
+  [self.intentionalStops addObjectsFromArray:@[@"sync", @"cockpit"]];
+  for (NSString *name in [self.managedTasks allKeys]) {
+    NSTask *task = self.managedTasks[name];
+    if (task.isRunning) {
+      [task terminate];
+    }
+  }
+  self.lastAction = @"Local stack stopping";
+  [self writeStackStatus];
+}
+
+- (void)restartLocalStack:(id)sender {
+  (void)sender;
+  [self stopManagedProcesses:nil];
+  [self performSelector:@selector(startLocalStackAfterStop:) withObject:nil afterDelay:2.0];
+}
+
+- (void)startLocalStackAfterStop:(id)sender {
+  (void)sender;
+  [self startManagedProcesses];
+  self.lastAction = @"Local stack restarted";
+  [self rebuildMenu:nil];
 }
 
 - (void)rebuildMenu:(id)sender {
@@ -288,6 +562,8 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *pushed = [self stringFromValue:report[@"pushed"] fallback:@"not reported"];
   NSString *pulled = [self stringFromValue:report[@"pulled"] fallback:@"not reported"];
   NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
+  NSString *syncState = [self isTaskRunningNamed:@"sync"] ? @"running" : @"stopped";
+  NSString *cockpitState = [self isTaskRunningNamed:@"cockpit"] ? @"running" : @"stopped";
 
   self.statusItem.button.title = [self statusTitleForHealth:health];
 
@@ -299,6 +575,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
   [menu addItem:[NSMenuItem separatorItem]];
 
@@ -318,7 +595,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   logs.target = self;
   [menu addItem:logs];
 
-  NSMenuItem *restart = [[NSMenuItem alloc] initWithTitle:@"Restart Sync Helper" action:@selector(restartSyncHelper:) keyEquivalent:@""];
+  NSMenuItem *restart = [[NSMenuItem alloc] initWithTitle:@"Restart Local Stack" action:@selector(restartLocalStack:) keyEquivalent:@""];
   restart.target = self;
   [menu addItem:restart];
 
@@ -332,9 +609,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (void)openCockpit:(id)sender {
   (void)sender;
-  NSString *label = [self stringConfig:@"cockpitLaunchdLabel" fallback:@""];
-  [self bootstrapLaunchdLabelIfNeeded:label];
-  [self kickstartLaunchdLabel:label kill:NO];
+  [self startManagedProcess:@"cockpit" configKey:@"cockpitProcess"];
   NSString *urlString = [self stringConfig:@"cockpitUrl" fallback:@"http://127.0.0.1:8787/"];
   NSURL *url = [NSURL URLWithString:urlString];
   if (url) {
@@ -355,15 +630,6 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   } else {
     self.lastAction = @"No log directory configured";
   }
-  [self rebuildMenu:nil];
-}
-
-- (void)restartSyncHelper:(id)sender {
-  (void)sender;
-  NSString *label = [self stringConfig:@"syncLaunchdLabel" fallback:@""];
-  [self bootstrapLaunchdLabelIfNeeded:label];
-  [self kickstartLaunchdLabel:label kill:YES];
-  self.lastAction = label.length > 0 ? @"Restarted sync helper" : @"No sync label configured";
   [self rebuildMenu:nil];
 }
 
@@ -432,50 +698,6 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   }
 }
 
-- (void)bootstrapLaunchdLabelIfNeeded:(NSString *)label {
-  if (label.length == 0) {
-    return;
-  }
-  NSString *domain = [NSString stringWithFormat:@"gui/%d", getuid()];
-  NSString *domainLabel = [NSString stringWithFormat:@"%@/%@", domain, label];
-  int printed = [self runTask:@"/bin/launchctl" arguments:@[@"print", domainLabel] wait:YES];
-  if (printed == 0) {
-    return;
-  }
-  NSString *plistPath = [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Library/LaunchAgents/%@.plist", label]];
-  if ([[NSFileManager defaultManager] fileExistsAtPath:plistPath]) {
-    [self runTask:@"/bin/launchctl" arguments:@[@"bootstrap", domain, plistPath] wait:YES];
-  }
-}
-
-- (void)kickstartLaunchdLabel:(NSString *)label kill:(BOOL)kill {
-  if (label.length == 0) {
-    return;
-  }
-  NSString *domainLabel = [NSString stringWithFormat:@"gui/%d/%@", getuid(), label];
-  NSArray *arguments = kill ? @[@"kickstart", @"-k", domainLabel] : @[@"kickstart", domainLabel];
-  [self runTask:@"/bin/launchctl" arguments:arguments wait:NO];
-}
-
-- (int)runTask:(NSString *)launchPath arguments:(NSArray *)arguments wait:(BOOL)wait {
-  NSTask *task = [[NSTask alloc] init];
-  task.launchPath = launchPath;
-  task.arguments = arguments;
-  task.standardOutput = [NSPipe pipe];
-  task.standardError = [NSPipe pipe];
-  @try {
-    [task launch];
-    if (wait) {
-      [task waitUntilExit];
-      return task.terminationStatus;
-    }
-    return 0;
-  } @catch (NSException *exception) {
-    (void)exception;
-    return 127;
-  }
-}
-
 - (void)ensureParentDirectoryForPath:(NSString *)filePath {
   NSString *dir = [filePath stringByDeletingLastPathComponent];
   if (dir.length > 0) {
@@ -541,7 +763,7 @@ console.log(
       doctorOutputPath,
       doctorErrorPath,
       note:
-        "Launch the app to show Brain status in the macOS menu bar. It opens/kicks cockpit, restarts the sync helper, opens logs, and refreshes hosted doctor output.",
+        "Launch the app to show Brain status in the macOS menu bar. It supervises the local sync watcher and cockpit server, opens logs, restarts the local stack, and refreshes hosted doctor output.",
     },
     null,
     2

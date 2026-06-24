@@ -74,6 +74,10 @@ const authStaleGraceMinutes = Math.max(
   1,
   Number(process.env.BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES || 10)
 );
+const supervisor = process.env.BRAIN_SYNC_SUPERVISOR || "launchd";
+const monitorStackFile =
+  process.env.BRAIN_MONITOR_STACK_FILE ||
+  path.join(path.dirname(healthFile), "brain-monitor-stack.json");
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
@@ -833,7 +837,54 @@ function parseLaunchdOutput(stdout) {
   return { state, activeCount, lastExitCode };
 }
 
+async function checkMenuBarSupervisor() {
+  try {
+    const stack = await readJson(monitorStackFile);
+    const sync = stack.sync || {};
+    const cockpit = stack.cockpit || {};
+    const syncPid = Number(sync.pid);
+    const cockpitPid = Number(cockpit.pid);
+    const syncPidAlive =
+      Number.isInteger(syncPid) && syncPid > 0 ? isProcessAlive(syncPid) : false;
+    const cockpitPidAlive =
+      Number.isInteger(cockpitPid) && cockpitPid > 0
+        ? isProcessAlive(cockpitPid)
+        : false;
+    const checkedAt = stack.checkedAt || null;
+    const parsedCheckedAt = checkedAt ? Date.parse(checkedAt) : NaN;
+    const ageMs = Number.isNaN(parsedCheckedAt) ? null : Date.now() - parsedCheckedAt;
+    const ok =
+      stack.supervisor === "menubar" &&
+      sync.state === "running" &&
+      syncPidAlive;
+
+    addCheck("launchd", ok ? "pass" : "warn", {
+      supervisor: "menubar",
+      stackStatusFile: monitorStackFile,
+      checkedAt,
+      ageMs,
+      syncState: sync.state || null,
+      syncPid: Number.isInteger(syncPid) ? syncPid : null,
+      syncPidAlive,
+      cockpitState: cockpit.state || null,
+      cockpitPid: Number.isInteger(cockpitPid) ? cockpitPid : null,
+      cockpitPidAlive,
+    });
+  } catch (error) {
+    addCheck("launchd", "warn", {
+      supervisor: "menubar",
+      stackStatusFile: monitorStackFile,
+      error: error.message,
+    });
+  }
+}
+
 async function checkLaunchd() {
+  if (supervisor === "menubar") {
+    await checkMenuBarSupervisor();
+    return;
+  }
+
   if (process.platform !== "darwin") {
     addCheck("launchd", "warn", {
       label: launchdLabel,
