@@ -17,6 +17,24 @@ export function registerInboxTools(server: McpServer): void {
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        if (
+          ctx.brain.storage_backend !== "filesystem" ||
+          !ctx.brain.storage_config.brain_dir
+        ) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: [
+                  `Server-side inbox scanning is unavailable for Postgres-backed Brain ${ctx.brainId}.`,
+                  "The hosted MCP server has no Fly-local inbox directory for this Brain.",
+                  "Use the local cockpit/doctor or the local sync mirror to inspect pending local inbox files.",
+                ].join("\n"),
+              },
+            ],
+          };
+        }
+
         const files = await scanInbox(ctx.brainId);
 
         if (files.length === 0) {

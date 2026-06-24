@@ -123,7 +123,7 @@ function memoryState() {
   };
 }
 
-async function setupHarness(name) {
+async function setupHarness(name, brainConfig = {}) {
   const root = path.join(tmpRoot, name);
   const brainDir = path.join(root, "brain");
   const registryFile = path.join(root, "registry.json");
@@ -140,8 +140,8 @@ async function setupHarness(name) {
           type: "personal",
           template_used: "personal",
           integration_mode: "vertical",
-          storage_backend: "filesystem",
-          storage_config: { brain_dir: brainDir },
+          storage_backend: brainConfig.storage_backend || "filesystem",
+          storage_config: brainConfig.storage_config || { brain_dir: brainDir },
         },
       ],
       principals: [
@@ -323,6 +323,17 @@ test("HTTP MCP source read reports missing source metadata without provider", as
     scope: "sources",
   });
   assert.match(result, /Revision store has no source metadata provider/);
+});
+
+test("HTTP MCP hosted inbox scan does not require a server brain_dir", async () => {
+  const harness = await setupHarness("hosted-inbox-no-brain-dir", {
+    storage_backend: "postgres",
+    storage_config: {},
+  });
+
+  const result = await callTool(harness, "brain_scan_inbox");
+  assert.match(result, /Server-side inbox/);
+  assert.match(result, /Postgres-backed Brain/);
 });
 
 test("HTTP MCP lint reads and logs through revision store harness", async () => {

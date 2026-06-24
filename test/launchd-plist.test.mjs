@@ -59,6 +59,59 @@ test("launchd plist runs the sync CLI with an absolute Node path", async () => {
   assert.match(plist, new RegExp(`<string>${path.join(brainRoot, "brain")}</string>`));
 });
 
+test("sync launchd plist pins the explicit brain_id for multi-Brain safety", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.ers-brain-sync.plist");
+  const brainRoot = path.join(tmpRoot, "ers-brain");
+
+  const { stdout } = await exec(process.execPath, [scriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_SYNC_LAUNCHD_LABEL: "com.example.ers-brain-sync",
+      BRAIN_SYNC_LAUNCHD_PLIST: outputPath,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.brainId, "ers-brain");
+  assert.match(plist, /<key>BRAIN_ID<\/key>\s*<string>ers-brain<\/string>/);
+  assert.match(
+    plist,
+    new RegExp(`<key>BRAIN_DIR</key>\\s*<string>${path.join(brainRoot, "brain")}</string>`)
+  );
+});
+
+test("sync launchd plist supports external state and log paths", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.cloud-brain-sync.plist");
+  const brainRoot = path.join(tmpRoot, "cloud-brain");
+  const stateFile = path.join(tmpRoot, "state", "cloud-brain", "state.json");
+  const logDir = path.join(tmpRoot, "logs", "cloud-brain");
+
+  const { stdout } = await exec(process.execPath, [scriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
+      BRAIN_SYNC_LAUNCHD_LABEL: "com.example.cloud-brain-sync",
+      BRAIN_SYNC_LAUNCHD_PLIST: outputPath,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.stateFile, stateFile);
+  assert.equal(result.logDir, logDir);
+  assert.match(plist, new RegExp(`<key>BRAIN_SYNC_STATE_FILE</key>\\s*<string>${stateFile}</string>`));
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "launchd.out.log")}</string>`));
+  assert.match(plist, new RegExp(`<string>${path.join(logDir, "launchd.err.log")}</string>`));
+});
+
 test("cockpit launchd plist runs local cockpit with a stable loopback URL", async () => {
   const outputPath = path.join(tmpRoot, "com.example.brain-cockpit.plist");
   const brainRoot = path.join(tmpRoot, "ai-brain");
@@ -96,6 +149,56 @@ test("cockpit launchd plist runs local cockpit with a stable loopback URL", asyn
   assert.doesNotMatch(plist, /<string>\/usr\/bin\/env<\/string>/);
   assert.doesNotMatch(plist, /<string>npm<\/string>/);
   assert.doesNotMatch(plist, /<string>run<\/string>/);
+});
+
+test("cockpit launchd plist pins the explicit brain_id for per-Brain doctor views", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.ers-brain-cockpit.plist");
+  const brainRoot = path.join(tmpRoot, "ers-brain");
+
+  const { stdout } = await exec(process.execPath, [cockpitScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_COCKPIT_LAUNCHD_LABEL: "com.example.ers-brain-cockpit",
+      BRAIN_COCKPIT_LAUNCHD_PLIST: outputPath,
+      BRAIN_COCKPIT_PORT: "8798",
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.brainId, "ers-brain");
+  assert.match(plist, /<key>BRAIN_ID<\/key>\s*<string>ers-brain<\/string>/);
+});
+
+test("cockpit launchd plist passes per-Brain sync state through to doctor", async () => {
+  const outputPath = path.join(tmpRoot, "com.example.cloud-brain-cockpit.plist");
+  const brainRoot = path.join(tmpRoot, "cloud-brain");
+  const stateFile = path.join(tmpRoot, "state", "cloud-brain", "state.json");
+  const syncLabel = "com.example.cloud-brain-sync";
+
+  const { stdout } = await exec(process.execPath, [cockpitScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_ID: "ers-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+      BRAIN_SYNC_STATE_FILE: stateFile,
+      BRAIN_SYNC_LAUNCHD_LABEL: syncLabel,
+      BRAIN_COCKPIT_LAUNCHD_LABEL: "com.example.cloud-brain-cockpit",
+      BRAIN_COCKPIT_LAUNCHD_PLIST: outputPath,
+      BRAIN_COCKPIT_PORT: "8798",
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const plist = await fs.readFile(outputPath, "utf-8");
+
+  assert.equal(result.syncStateFile, stateFile);
+  assert.equal(result.syncLaunchdLabel, syncLabel);
+  assert.match(plist, new RegExp(`<key>BRAIN_SYNC_STATE_FILE</key>\\s*<string>${stateFile}</string>`));
+  assert.match(plist, new RegExp(`<key>BRAIN_SYNC_LAUNCHD_LABEL</key>\\s*<string>${syncLabel}</string>`));
 });
 
 test("desktop launcher app opens cockpit and kickstarts launchd service", async () => {

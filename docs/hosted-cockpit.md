@@ -31,6 +31,7 @@ npm run hosted:cockpit:launchd:plist
 Default assumptions:
 
 - Brain checkout: `~/Projects/ai-brain-jem`;
+- Brain id: `ai-brain-jem`;
 - cockpit launchd label: `com.jem.brain-cockpit`;
 - cockpit URL: `http://127.0.0.1:8787/`;
 - Node runtime: the `node` executable running the generator.
@@ -39,10 +40,20 @@ For another local Brain checkout or label, set environment variables before gene
 
 ```bash
 BRAIN_REPO_ROOT="$HOME/Projects/<brain-repo>" \
+BRAIN_ID="<brain-id>" \
 BRAIN_COCKPIT_LAUNCHD_LABEL="com.example.brain-cockpit" \
 BRAIN_COCKPIT_PORT=8787 \
 npm run hosted:cockpit:launchd:plist
 ```
+
+The generated plist pins both `BRAIN_ID` and `BRAIN_DIR`, so the doctor checks, local sync health, and logs align with the selected Brain. For the ERS Brain pilot, use a distinct label and port, for example `BRAIN_ID=ers-brain`, `BRAIN_COCKPIT_LAUNCHD_LABEL=com.jem.ers-brain-cockpit`, and `BRAIN_COCKPIT_PORT=8788`.
+
+If the Brain checkout lives under SharePoint/OneDrive CloudStorage, prefer a
+daemon-local checkout for launchd plus explicit sync state paths, for example
+`BRAIN_REPO_ROOT="$HOME/Library/Application Support/Brain MCP/<brain>-checkout"`
+and `BRAIN_SYNC_STATE_FILE="$HOME/Library/Application Support/Brain MCP/<brain>-sync/state.json"`.
+This avoids macOS privacy/cloud-file access failures in background Node
+processes while keeping the human-facing cloud checkout available.
 
 This writes a reviewable plist to:
 

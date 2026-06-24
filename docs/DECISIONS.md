@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-24 — Use the personal hosted MCP for John-only ERS Brain pilot before ERS production fork
+
+**Decision:** Add `ers-brain` to the existing hosted Brain MCP as a John-only multi-Brain pilot, using the same Fly app and pilot Supabase project for routing, revision sync, source metadata, and private artifact storage. Keep the local ERS Brain checkout as the canonical local-first mirror and fallback. This is not ERS team access and not ERS production; the ERS-owned Supabase/project fork remains required before team or production rollout.
+
+**Why:** The next technical risk is Brain selection and isolation, not organizational tenancy. Proving `brain_id` routing, per-Brain sync state, source manifests, artifact paths, and client ergonomics with John as the sole user is lower risk than combining those concerns with ERS-owned infrastructure, onboarding/offboarding, and multi-user authorization. The ERS Brain remains an ERS content asset; the personal hosted MCP remains a pilot substrate until Phase 1.
+
+**Alternatives rejected:** Forking a dedicated ERS MCP before the multi-Brain contract is proven (too much tenancy machinery before routing risk is retired); keeping ERS on local-only/GitHub-only access until the full ERS production migration (slows the exact hosted-path proof we need); treating the personal pilot Supabase as final ERS infrastructure (explicitly rejected).
+
+**Related:** `config/brain-platform.john-ers-pilot.json`; `db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql`; `docs/ers-brain-hosted-pilot.md`; `docs/OWNERSHIP_AND_LIFECYCLE.md`; `docs/ROADMAP.md`; `docs/hosted-client-cutover.md`.
+
+---
+
 ## 2026-06-24 — Record non-secret client identity on auth telemetry; classify stale-connector loops separately
 
 **Decision:** Hosted auth-failure telemetry (`brain.sync_events`, `event_type = 'hosted_mcp_auth'`) now records two **non-secret** OAuth identifiers in `metadata` when derivable: the raw `clientId` and the `grantType`. The cockpit auth summary (`authFailureSummaryFromSyncEventRows`) exposes per-`clientId` and per-`grantType` breakdowns and derives a `connectorState`. A **conservative** `stale_connector` verdict — a single *unregistered* `clientId` looping `unknown_client_id` on a `refresh_token` grant, sustained past a grace window — is downgraded from `fail` to `warn` by both the `hosted_mcp_auth_failures` doctor check (via `effectiveStatus`) and the spec-004 Slack alerter (via `computeStaleConnector` + `decideAuthAlert`), so a benign post-migration zombie connector no longer pages at full severity. Any ambiguity (multi-client, multi-reason, unknown registered set, short burst) keeps full severity. Grace window: `BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES` (default 10), shared by doctor and alerter.

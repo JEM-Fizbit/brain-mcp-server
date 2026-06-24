@@ -16,25 +16,41 @@ if (!databaseUrl) {
 }
 
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
+const expectedSourceCount = Number(process.env.BRAIN_EXPECTED_SOURCE_COUNT || 70);
+const expectedCategoryCounts = Object.fromEntries(
+  (process.env.BRAIN_EXPECTED_CATEGORY_COUNTS ?? "assessments=8,photos=12")
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [category, count] = pair.split("=");
+      return [category.trim(), Number(count)];
+    })
+    .filter(([category, count]) => category && Number.isFinite(count))
+);
 const revisionStore = new PostgresRevisionStore(databaseUrl);
 const sourceStore = new PostgresSourceMetadataStore(databaseUrl);
 const store = new RevisionBrainStore(revisionStore, sourceStore);
 
 try {
   const all = await store.listSources(brainId);
-  const assessments = await store.listSources(brainId, "assessments");
-  const photos = await store.listSources(brainId, "photos");
+  const categoryCounts = {};
+  for (const category of Object.keys(expectedCategoryCounts)) {
+    categoryCounts[category] = (await store.listSources(brainId, category)).length;
+  }
 
-  assert.equal(all.length, 70);
-  assert.equal(assessments.length, 8);
-  assert.equal(photos.length, 12);
+  assert.equal(all.length, expectedSourceCount);
+  for (const [category, expectedCount] of Object.entries(expectedCategoryCounts)) {
+    assert.equal(categoryCounts[category], expectedCount, `${category} source count`);
+  }
 
   console.log(
     JSON.stringify(
       {
+        brainId,
         allSources: all.length,
-        assessments: assessments.length,
-        photos: photos.length,
+        expectedSourceCount,
+        categoryCounts,
         sample: all.slice(0, 5),
       },
       null,
