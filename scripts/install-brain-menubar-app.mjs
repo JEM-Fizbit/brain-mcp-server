@@ -923,7 +923,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if (sawOffline) {
     return @"Brain Offline";
   }
-  if (sawChecking && !sawAction && !sawWarn) {
+  if (sawChecking && !sawAction && !sawWarn && !sawKnown) {
     return @"Brain Check";
   }
   if (sawAction) {
@@ -996,9 +996,19 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.lastActionAt = [NSDate date];
 }
 
-- (NSString *)lastActionSummary {
+- (NSString *)lastActionTimestampSummary {
   NSDate *date = self.lastActionAt ?: [NSDate date];
-  return [NSString stringWithFormat:@"%@ - %@", [self displayTimestampForDate:date], self.lastAction ?: @"Ready"];
+  return [self displayTimestampForDate:date];
+}
+
+- (NSString *)lastActionTextSummary {
+  return self.lastAction ?: @"Ready";
+}
+
+- (void)addLastMonitorActionItems:(NSMenu *)menu {
+  [self addDisabledItem:menu title:@"Last monitor action:"];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"  %@", [self lastActionTimestampSummary]]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"  %@", [self truncatedMenuText:[self lastActionTextSummary] maxLength:52]]];
 }
 
 - (NSDictionary *)topLevelCockpitProfile {
@@ -1137,7 +1147,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Status: %@", statusTitle]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last monitor action: %@", [self lastActionSummary]]];
+  [self addLastMonitorActionItems:menu];
   [menu addItem:[NSMenuItem separatorItem]];
 
   [self addActionItem:menu title:@"Open Cockpit" action:@selector(openCockpit:) profile:[self topLevelCockpitProfile]];

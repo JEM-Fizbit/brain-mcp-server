@@ -24,9 +24,9 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
 - the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, keeps the top-level dropdown compact, and nests each Brain's `Overview`, `Actions`, `Controls`, and `Diagnostics` under that Brain's submenu;
 - the top-level menu includes `Open Cockpit` for the default/first configured Brain so the operator can reach the browser cockpit immediately, then switch profiles from the cockpit selector if needed;
-- the top-level `Last monitor action` is app-wide across the consolidated Brain Monitor process, not per-Brain and not doctor-only; it includes the timestamp of the latest monitor-recorded action from either configured Brain;
+- the top-level `Last monitor action` is app-wide across the consolidated Brain Monitor process, not per-Brain and not doctor-only; it includes the timestamp and latest monitor-recorded action from either configured Brain on separate indented rows so the dropdown stays narrow;
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
-- the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or checking states, and red for `Brain Fail`;
+- the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 

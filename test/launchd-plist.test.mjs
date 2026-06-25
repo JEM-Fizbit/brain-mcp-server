@@ -475,9 +475,13 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /displayTimestamp:/);
   assert.match(source, /UTC%\@%02ld:%02ld/);
   assert.match(source, /Last monitor action:/);
+  assert.match(source, /addLastMonitorActionItems:/);
+  assert.match(source, /lastActionTimestampSummary/);
+  assert.match(source, /@"  %\@"/);
   assert.match(source, /lastActionAt/);
   assert.match(source, /recordLastAction:/);
   assert.doesNotMatch(source, /Last action: %@/);
+  assert.doesNotMatch(source, /Last monitor action: %@/);
   assert.match(source, /addProfileMenuForProfile/);
   assert.match(source, /NSMenu \*profileMenu/);
   assert.match(source, /\[profileItem setSubmenu:profileMenu\]/);
@@ -489,6 +493,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /readDoctorReportForProfile/);
   assert.match(source, /actionItemsForDoctorReport/);
   assert.match(source, /Brain Action/);
+  assert.match(source, /sawChecking && !sawAction && !sawWarn && !sawKnown/);
+  assert.doesNotMatch(source, /sawChecking && !sawAction && !sawWarn\)/);
   assert.match(source, /Action required/);
   assert.match(source, /Open Cockpit for details/);
   assert.match(source, /displayName/);
