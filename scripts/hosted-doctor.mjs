@@ -288,6 +288,37 @@ async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf-8"));
 }
 
+function hostedHealthFailureDetails(error) {
+  const cause = error?.cause || {};
+  const code = cause.code || error?.code || "";
+  const causeMessage = cause.message || "";
+  const combined = [error?.message, causeMessage, code].filter(Boolean).join(" ");
+  const localConnectivity = /fetch failed|network|offline|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT|ECONNRESET|ECONNREFUSED/i.test(
+    combined
+  );
+  const details = {
+    baseUrl,
+    error: error?.message || "hosted health request failed",
+    ...(causeMessage ? { cause: causeMessage } : {}),
+    ...(code ? { code } : {}),
+    connectivity: "unreachable",
+  };
+  if (localConnectivity) {
+    return {
+      ...details,
+      faultDomain: "local_connectivity",
+      diagnosis:
+        "The local device could not reach the hosted Brain endpoint. Check Wi-Fi, VPN, DNS, or local network access before treating this as a Brain MCP stack fault.",
+    };
+  }
+  return {
+    ...details,
+    faultDomain: "hosted_stack",
+    diagnosis:
+      "The hosted Brain endpoint did not return health. Treat as a hosted stack fault if local network access is otherwise working.",
+  };
+}
+
 async function checkHostedHealth() {
   try {
     const response = await fetch(`${baseUrl}/health`, {
@@ -313,9 +344,16 @@ async function checkHostedHealth() {
       artifactByteAccess: runtime.artifactByteAccess,
       gitHotPath: runtime.gitHotPath,
       autoSyncEnabled: runtime.autoSyncEnabled,
+      connectivity: "reachable",
+      faultDomain: ok ? "none" : "hosted_stack",
     });
   } catch (error) {
-    addCheck("hosted_health", "fail", { baseUrl, error: error.message });
+    const details = hostedHealthFailureDetails(error);
+    addCheck(
+      "hosted_health",
+      details.faultDomain === "local_connectivity" ? "warn" : "fail",
+      details
+    );
   }
 }
 
@@ -1221,6 +1259,17 @@ function buildOperatorActions(status) {
     });
   }
 
+  const hostedHealth = checkByName("hosted_health");
+  if (hostedHealth?.details?.faultDomain === "local_connectivity") {
+    actions.push({
+      level: hostedHealth.status,
+      reason: "local_connectivity",
+      title: "Local device cannot reach hosted Brain.",
+      detail:
+        "Check Wi-Fi, VPN, DNS, or local network access. Brain Monitor will auto-refresh doctor output when connectivity returns.",
+    });
+  }
+
   const authFailures = checkByName("hosted_mcp_auth_failures");
   if (authFailures?.status === "warn" || authFailures?.status === "fail") {
     const count = authFailures.details?.failureCount || 0;
@@ -1277,6 +1326,9 @@ function buildOperatorActions(status) {
     "hosted_mcp_auth_failures",
   ]);
   if (latencyFinding) handledWarnings.add("user_operation_latency");
+  if (hostedHealth?.details?.faultDomain === "local_connectivity") {
+    handledWarnings.add("hosted_health");
+  }
   for (const check of checks.filter((check) => check.status === "warn")) {
     if (handledWarnings.has(check.name)) continue;
     actions.push({

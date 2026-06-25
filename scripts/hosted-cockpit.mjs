@@ -143,6 +143,12 @@ const page = String.raw`<!doctype html>
         min-width: 0;
       }
 
+      .header-main {
+        display: grid;
+        gap: 12px;
+        flex: 1 1 auto;
+      }
+
       h1 {
         margin: 0 0 4px;
         font-size: 24px;
@@ -198,9 +204,36 @@ const page = String.raw`<!doctype html>
         white-space: nowrap;
       }
 
+      .active-brain-panel {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .active-brain-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .active-brain-title {
+        font-size: 32px;
+        line-height: 1.05;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+
+      .active-brain-subtitle {
+        color: var(--muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
       .status-band {
         display: grid;
-        grid-template-columns: minmax(220px, 0.9fr) minmax(0, 2fr);
+        grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 0.9fr) minmax(0, 2fr);
         gap: 14px;
         margin-bottom: 14px;
       }
@@ -494,6 +527,54 @@ const page = String.raw`<!doctype html>
         flex: 1 1 180px;
         min-width: 0;
         overflow-wrap: anywhere;
+      }
+
+      .action-summary-panel {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .section-heading h2 {
+        margin: 0;
+      }
+
+      .action-count {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .action-count.pass {
+        color: var(--pass);
+        border-color: #add8bf;
+      }
+
+      .action-count.warn {
+        color: var(--warn);
+        border-color: #e9c98c;
+      }
+
+      .action-count.fail {
+        color: var(--fail);
+        border-color: #eab5af;
+      }
+
+      .action-summary-list {
+        display: grid;
+        gap: 8px;
       }
 
       .activity-list {
@@ -887,9 +968,14 @@ const page = String.raw`<!doctype html>
   <body>
     <main>
       <header>
-        <div>
+        <div class="header-main">
           <h1>Brain Cockpit</h1>
           <div class="muted">Local operator view for hosted Brain, sync, conflicts, and daemon health.</div>
+          <div class="active-brain-panel">
+            <span class="active-brain-label">Active Brain</span>
+            <span class="active-brain-title" id="active-brain-title">-</span>
+            <span class="active-brain-subtitle" id="active-brain-subtitle">Checking profile.</span>
+          </div>
         </div>
         <div class="toolbar">
           <span class="profile-badge" id="current-profile-badge" title="Active Brain profile">Brain: -</span>
@@ -929,6 +1015,13 @@ const page = String.raw`<!doctype html>
               <span id="profile-scope">-</span>
             </div>
           </div>
+        </section>
+        <section class="action-summary-panel" aria-labelledby="action-summary-heading">
+          <div class="section-heading">
+            <h2 id="action-summary-heading">Needs Action</h2>
+            <span class="action-count" id="action-summary-count">Checking</span>
+          </div>
+          <div class="action-summary-list" id="action-summary-list"></div>
         </section>
         <div class="metrics">
           <div class="metric">
@@ -1474,6 +1567,37 @@ const page = String.raw`<!doctype html>
               ? "<div class=\"details\">Next: " + escapeHtml(nextAction) + "</div>"
               : "";
             return "<div class=\"action-item\"><div class=\"action-heading\"><span class=\"pill " + escapeHtml(status) + "\">" + escapeHtml(status) + "</span><span class=\"event-title\">" + escapeHtml(action.title || "Review doctor action") + "</span></div><div class=\"event-meta\">" + escapeHtml(meta) + "</div>" + next + "</div>";
+          })
+          .join("");
+      }
+
+      function renderActionSummary(payload) {
+        const items = actionItems(payload);
+        const actionable = items.filter((action) => {
+          const status = (action.status || action.level || "").toLowerCase();
+          return status !== "pass" && action.reason !== "none";
+        });
+        const visible = actionable.length > 0 ? actionable.slice(0, 3) : items.slice(0, 1);
+        const worstStatus = actionable.some((action) => (action.status || action.level) === "fail")
+          ? "fail"
+          : actionable.length > 0
+            ? "warn"
+            : "pass";
+        const count = document.getElementById("action-summary-count");
+        count.className = "action-count " + worstStatus;
+        count.textContent = actionable.length > 0
+          ? String(actionable.length) + " open"
+          : "None";
+        document.getElementById("action-summary-list").innerHTML = visible
+          .map((action) => {
+            const status = action.status || "warn";
+            const urgency = action.urgency || "soon";
+            const reason = action.reason || "check_review";
+            const nextAction = action.next_action || "";
+            const next = nextAction
+              ? "<div class=\"details\">Next: " + escapeHtml(nextAction) + "</div>"
+              : "";
+            return "<div class=\"action-item\"><div class=\"action-heading\"><span class=\"pill " + escapeHtml(status) + "\">" + escapeHtml(status) + "</span><span class=\"event-title\">" + escapeHtml(action.title || "Review doctor action") + "</span></div><div class=\"event-meta\">" + escapeHtml(reason + " - urgency " + urgency) + "</div>" + next + "</div>";
           })
           .join("");
       }
@@ -2272,6 +2396,10 @@ const page = String.raw`<!doctype html>
         const profileBadge = document.getElementById("current-profile-badge");
         profileBadge.textContent = profile.profileLabel ? "Brain: " + profile.profileLabel : "Brain: -";
         profileBadge.title = "Active Brain profile: " + (profile.profileLabel || "-");
+        document.getElementById("active-brain-title").textContent = profile.profileLabel || profile.brainId || "-";
+        document.getElementById("active-brain-subtitle").textContent =
+          (profile.isMultiProfile ? String(profile.profileCount) + " configured profiles. " : "") +
+          "Profile " + (profile.profileName || "-") + " on " + (profile.supervisor || "unknown supervisor") + ".";
         document.getElementById("profile-current-label").textContent = profile.profileLabel || "-";
         document.getElementById("profile-brain-id").textContent = profile.brainId || "-";
         document.getElementById("profile-name").textContent = profile.profileName || "-";
@@ -2314,6 +2442,7 @@ const page = String.raw`<!doctype html>
           })
           .join("");
 
+        renderActionSummary(payload);
         document.getElementById("actions").innerHTML = renderActionItems(payload);
 
         renderActivity(payload);
