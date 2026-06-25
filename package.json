@@ -36,7 +36,8 @@
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
     "smoke:brain-runtime-role": "node scripts/smoke-brain-runtime-role.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "test": "npm run build && node --test"
+    "test": "npm run build && node --test",
+    "test:cockpit:e2e": "env -u NO_COLOR playwright test --config=playwright.config.mjs"
   },
   "keywords": [
     "mcp",
@@ -54,6 +55,7 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/node": "^22.15.3",
     "@types/pg": "^8.20.0",
     "typescript": "^5.8.3"

@@ -7,6 +7,9 @@ import { fileURLToPath } from "node:url";
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
+const doctorScriptPath =
+  process.env.BRAIN_COCKPIT_DOCTOR_SCRIPT ||
+  path.join(repoRoot, "scripts", "hosted-doctor.mjs");
 const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
@@ -38,7 +41,7 @@ async function runDoctor() {
   try {
     const { stdout } = await exec(
       process.execPath,
-      [path.join(repoRoot, "scripts", "hosted-doctor.mjs")],
+      [doctorScriptPath],
       {
         cwd: repoRoot,
         timeout: 45000,
