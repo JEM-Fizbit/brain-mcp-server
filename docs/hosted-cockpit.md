@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-06-24
+**Last updated:** 2026-06-25
 
 Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
 
@@ -21,6 +21,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - hosted MCP auth failures show current-window counts, prior-window trend, safe reason/target metadata, and recent metadata-only events in a dedicated Activity > Auth subpanel;
 - the cockpit header shows the active `brain_id`, local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector that links to each configured local cockpit URL;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
+- the menu-bar app reads each profile's latest hosted doctor output and surfaces user-action-required items directly in the menu with bounded titles/details plus an `Open Cockpit for details` action;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
@@ -230,11 +231,11 @@ BRAIN_MENUBAR_PROFILES_JSON='[
 npm run sync:menubar:install
 ```
 
-Launch the generated app once to put `Brain OK`, `Brain Warn`, or `Brain Fail`
-in the macOS menu bar. The app is config-driven and per-Brain. For CloudStorage
-Brains, grant the monitor app Full Disk Access; the sync watcher runs as the
-monitor's child process and uses that app identity. Broad signed/notarized
-installer packaging remains separate backlog work.
+Launch the generated app once to put `Brain OK`, `Brain Action`, `Brain Warn`,
+or `Brain Fail` in the macOS menu bar. The app is config-driven and per-Brain.
+For CloudStorage Brains, grant the monitor app Full Disk Access; the sync
+watcher runs as the monitor's child process and uses that app identity. Broad
+signed/notarized installer packaging remains separate backlog work.
 
 To start the menu-bar app automatically at login:
 
@@ -262,6 +263,11 @@ ERS local loopback views without relying on separate ambiguous browser tabs.
 ## Operator Contract
 
 Green means hosted Brain is ready for normal use.
+
+Action means the latest hosted doctor output contains one or more non-pass
+operator actions that need human judgement. The menu shows `Action required`,
+up to three bounded action titles/details, and an `Open Cockpit for details`
+shortcut for the relevant profile.
 
 Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 

@@ -460,6 +460,11 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /writeStackStatus/);
   assert.match(source, /scheduleStackHeartbeat/);
   assert.match(source, /NSTimer/);
+  assert.match(source, /readDoctorReportForProfile/);
+  assert.match(source, /actionItemsForDoctorReport/);
+  assert.match(source, /Brain Action/);
+  assert.match(source, /Action required/);
+  assert.match(source, /Open Cockpit for details/);
   assert.match(source, /displayName/);
   assert.match(source, /cockpitUrl/);
   assert.match(source, /Open Cockpit/);
