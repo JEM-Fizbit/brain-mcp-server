@@ -1,7 +1,9 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-06-24
+**Last updated:** 2026-06-25
+
+> **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
