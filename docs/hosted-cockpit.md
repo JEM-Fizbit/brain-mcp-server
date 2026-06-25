@@ -338,4 +338,4 @@ Refresh remains read-only. The additional usage and operation-log views use boun
 ## Next Hardening
 
 - Expand source-ingestion nudges beyond pending inbox count.
-- Add a recovery/reseed guide from local Markdown to hosted Postgres.
+- Rehearse recovery/reseed from local Markdown and a restored Supabase project using `docs/hosted-brain-recovery-and-git-export.md`.

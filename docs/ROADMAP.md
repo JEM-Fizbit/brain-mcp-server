@@ -15,7 +15,7 @@ The core product direction is local-first hosted Brain:
 - hosted MCP provides remote access, OAuth identity, revision history, source metadata, and automation;
 - Supabase Postgres stores Markdown revisions, sync cursors, conflicts, metadata, extracted source text, and future semantic chunks;
 - Supabase Storage stores original binary/source artifacts in private immutable paths;
-- git remains backup/export/history, not the live hosted sync hot path.
+- git remains emergency backup/export/history only, not the live hosted sync hot path; routine Brain operations do not require manual Git commit/push/merge.
 - maintenance is automation-first: routine linting, sync health, hosted health, inbox/source-ingestion state, and conflict detection should be checked by tools and surfaced proactively, leaving users to make judgement calls rather than babysit infrastructure.
 
 ## Current Position
@@ -38,6 +38,8 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
+- normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
+- the recovery/export runbook records the current backup baseline: Supabase physical backups visible, PITR not enabled, Storage objects outside database backups, and restore/export rehearsal still required before deleting Git as emergency history;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
 
 ## Cutover Principle
@@ -73,7 +75,7 @@ Hosted MCP has moved from pilot/shadow path to normal remote path for JEM Brain.
 - local sync daemon exposes a clear last-success signal and does not wedge on stale locks;
 - open conflicts are visible, understandable, and resolvable without database spelunking;
 - sync, lint, and hosted-health issues are proactively flagged with the next required action;
-- there is a short recovery playbook for reseeding hosted from local Markdown;
+- there is a short recovery playbook for reseeding hosted from local Markdown and separating Supabase backup/restore from async Git export;
 - source artifact metadata and private retention behavior are verified;
 - OAuth client setup works smoothly enough for Codex, ChatGPT, and Claude;
 - local Brain MCP remains available as fallback.
@@ -201,7 +203,7 @@ Recommended order:
 
 1. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI. First slice: local LaunchAgent + stable loopback URL; hosted persistent admin website deferred until multi-user auth and local-first sync visibility are redesigned.
 2. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
-3. Document and rehearse hosted recovery/reseed from local Markdown.
+3. Rehearse hosted recovery/reseed from local Markdown and a restored Supabase project; decide whether PITR is worth enabling for the pilot before removing Git as emergency history.
 4. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.
 5. Complete the ERS hosted client smoke and ERS sync LaunchAgent install/rehearsal, then keep local ERS stdio/filesystem access as fallback only.
 

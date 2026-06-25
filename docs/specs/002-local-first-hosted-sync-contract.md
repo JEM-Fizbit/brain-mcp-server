@@ -84,7 +84,7 @@ Potential roles:
 - Good fit: durable history, diff, rollback, backup/export, human-auditable commits.
 - Weak fit: low-latency live sync, conflict-free concurrent editing, multi-surface state propagation, SharePoint bridging.
 
-Open decision: should git remain in the hot path, or be demoted to an async backup/export layer behind a different canonical store?
+Resolved decision: git is demoted out of the hot path. It remains emergency async export/history only behind the hosted revision store; see `docs/specs/003-hosted-brain-sync-architecture.md` and `docs/hosted-brain-recovery-and-git-export.md`.
 
 ## Candidate Architectures
 
@@ -173,7 +173,7 @@ Cons: not available yet; uptime, security, remote HTTPS, backups, and mobile acc
 
 ## Acceptance Criteria For The Next Build
 
-- A selected architecture explicitly says whether git is hot path, backup/export, or removed.
+- A selected architecture explicitly says whether git is hot path, backup/export, or removed. Current answer: emergency async export/history only; no routine Brain commit/push/merge.
 - JEM local Markdown edits propagate to hosted MCP automatically in a measured, bounded time.
 - Hosted MCP edits propagate to JEM local Markdown automatically in a measured, bounded time.
 - Dirty local files block or queue sync visibly; they are not overwritten.

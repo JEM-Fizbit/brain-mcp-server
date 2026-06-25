@@ -2,7 +2,7 @@
 
 **Status:** draft
 **Source:** 2026-06-14 hosted Brain rebuild after the Fly/git pilot was reverted from Codex.
-**Related:** `docs/specs/001-brain-platform-phase-1-2.md`; `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/DECISIONS.md`; `docs/deploy-fly.md`
+**Related:** `docs/specs/001-brain-platform-phase-1-2.md`; `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/hosted-brain-recovery-and-git-export.md`; `docs/DECISIONS.md`; `docs/deploy-fly.md`
 
 ## Problem
 
@@ -77,21 +77,24 @@ The local agent records:
 
 ### Git Export
 
-Git is backup, audit, rollback, and optional human review history. It is not live sync.
+Git is emergency backup, audit, rollback, and optional human review history. It is not live sync and is not a routine Brain operation.
 
 Allowed git roles:
 
-- commit clean local snapshots after successful sync;
-- push/pull as a backup/export mechanism;
+- async operator checkpoints after major cutovers or before destructive changes;
+- backup/export snapshots that are explicitly separate from hosted MCP writes and local sync;
 - provide human-readable diffs and rollback;
 - preserve history for the private Brain repo.
 
 Rejected git roles:
 
+- manual commit/push/merge during routine Brain reads, writes, ingest, lint, doctor, cockpit, or sync checks;
 - required transport between local and hosted;
 - pull-before-read on hosted MCP requests;
 - push-before-local-visibility on hosted writes;
 - conflict resolver of first resort for remote/local edits.
+
+As of 2026-06-25, `docs/hosted-brain-recovery-and-git-export.md` is the canonical runbook. Supabase physical backups are visible for the pilot, PITR is not currently enabled, and Supabase Storage objects require separate recovery coverage because database backups do not include object bytes. Restore-to-new-project, Storage-object recovery, and local Markdown reseed rehearsal remain gates before Git can be deleted as emergency history.
 
 ## Core Sync Protocol
 
@@ -446,7 +449,7 @@ Current coverage in this branch:
 | Dirty local block | Covered in harness | Dirty local Markdown creates an explicit conflict instead of being overwritten. |
 | Dirty hosted block | Covered in harness | Stale local writes create conflict records instead of overwriting newer hosted heads. |
 | No git hot path | Covered in harness | Revision-store read/write/sync tests pass without git; hosted runtime disables git hot path in health/status. |
-| Git export recovery | Deferred | Git export is intentionally not in the hot path yet. |
+| Git export recovery | Policy covered; restore rehearsal pending | `docs/hosted-brain-recovery-and-git-export.md` removes Git from routine Brain operations, keeps it as emergency async export/history, and records the remaining Supabase restore/PITR/Storage recovery gates. |
 | Latency budget | Partial | Sync phase timings are recorded; optional hosted HTTP MCP timing logs are available with `BRAIN_HTTP_TIMING_LOGS=1`; `npm run bench:http:postgres` now records repeatable read-path benchmarks. |
 | Surface parity plan | Partial | HTTP MCP smoke covers authenticated remote tool calls; Claude/Codex connector re-enablement remains controlled follow-up. |
 | ERS path accounted for | Partial | Supabase project portability and SharePoint/OneDrive risks are documented; direct ERS adapter is not implemented. |
@@ -460,7 +463,7 @@ Current coverage in this branch:
 5. Add an interim polling `watch` command so the one-shot agent can run continuously before the final daemonization choice.
 6. Add latency instrumentation to the sync and hosted MCP paths.
 7. Wire hosted HTTP tools to `RevisionStore` for read/update paths.
-8. Add optional async git export after clean sync.
+8. Keep optional async git export separate from clean sync; do not make it a normal write prerequisite.
 9. Run parity tests against the local stdio baseline.
 10. Only then re-enable `brain-hosted` as a controlled test connector.
 11. Promote hosted only after the full local-first contract passes.
@@ -471,5 +474,5 @@ Current coverage in this branch:
 - Should local sync run as a long-lived daemon, launchd service, MCP-adjacent subprocess, or manual one-shot command before daemonization?
 - How should conflict resolution be exposed to remote-only mobile clients without encouraging blind overwrites?
 - What is the exact latency target for sync propagation on JEM: seconds, low tens of seconds, or task-dependent?
-- Should git export happen from the local agent, hosted hub, or both?
+- What automation, if any, should create async Git export checkpoints without putting Git back into the normal write path?
 - What is the first ERS-specific sync adapter: OneDrive local agent root or direct SharePoint/Graph?
