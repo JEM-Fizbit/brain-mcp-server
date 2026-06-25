@@ -231,6 +231,40 @@ test("hosted doctor supports monitor-owned sync supervision", async () => {
   assert.match(script, /Confirm Brain Monitor is supervising this Brain/);
 });
 
+test("hosted doctor emits normalized user-action indicators", async () => {
+  const doctor = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+  const cockpit = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-cockpit.mjs"),
+    "utf-8"
+  );
+  const menuBar = await fs.readFile(
+    path.join(repoRoot, "scripts", "install-brain-menubar-app.mjs"),
+    "utf-8"
+  );
+
+  assert.match(doctor, /function operatorAction/);
+  assert.match(doctor, /brain_id:/);
+  assert.match(doctor, /brainId/);
+  assert.match(doctor, /status:/);
+  assert.match(doctor, /reason:/);
+  assert.match(doctor, /next_action:/);
+  assert.match(doctor, /urgency:/);
+  assert.match(doctor, /reason: "open_conflicts"/);
+  assert.match(doctor, /reason: "sync_health_failed"/);
+  assert.match(doctor, /reason: "pending_inbox"/);
+  assert.match(doctor, /reason: "hosted_auth_failures"/);
+  assert.match(cockpit, /renderActionItems/);
+  assert.match(cockpit, /action\.next_action/);
+  assert.match(cockpit, /action\.brain_id/);
+  assert.match(cockpit, /action\.urgency/);
+  assert.match(menuBar, /action\[@"next_action"\]/);
+  assert.match(menuBar, /action\[@"reason"\]/);
+  assert.match(menuBar, /action\[@"urgency"\]/);
+});
+
 test("source list verifier supports non-JEM expected counts", async () => {
   const script = await fs.readFile(
     path.join(repoRoot, "scripts", "verify-postgres-source-list.mjs"),

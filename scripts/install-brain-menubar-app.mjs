@@ -553,7 +553,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       continue;
     }
     NSDictionary *action = (NSDictionary *)rawAction;
-    NSString *level = [[self stringFromValue:action[@"level"] fallback:@"warn"] lowercaseString];
+    NSString *level = [[self stringFromValue:action[@"status"] fallback:[self stringFromValue:action[@"level"] fallback:@"warn"]] lowercaseString];
     NSString *title = [self stringFromValue:action[@"title"] fallback:@""];
     if (title.length == 0 || [level isEqualToString:@"pass"]) {
       continue;
@@ -908,12 +908,15 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       [self addDisabledItem:menu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
       NSUInteger shown = 0;
       for (NSDictionary *action in doctorActions) {
-        NSString *level = [[self stringFromValue:action[@"level"] fallback:@"warn"] uppercaseString];
+        NSString *level = [[self stringFromValue:action[@"status"] fallback:[self stringFromValue:action[@"level"] fallback:@"warn"]] uppercaseString];
+        NSString *reason = [self stringFromValue:action[@"reason"] fallback:@"check_review"];
+        NSString *urgency = [self stringFromValue:action[@"urgency"] fallback:@"soon"];
         NSString *title = [self truncatedMenuText:[self stringFromValue:action[@"title"] fallback:@"Review doctor action"] maxLength:96];
-        NSString *detail = [self truncatedMenuText:[self stringFromValue:action[@"detail"] fallback:@""] maxLength:120];
-        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", level, title]];
-        if (detail.length > 0) {
-          [self addDisabledItem:menu title:[NSString stringWithFormat:@"Next: %@", detail]];
+        NSString *nextAction = [self truncatedMenuText:[self stringFromValue:action[@"next_action"] fallback:[self stringFromValue:action[@"detail"] fallback:@""]] maxLength:120];
+        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@/%@: %@", level, urgency, title]];
+        [self addDisabledItem:menu title:[NSString stringWithFormat:@"Reason: %@", reason]];
+        if (nextAction.length > 0) {
+          [self addDisabledItem:menu title:[NSString stringWithFormat:@"Next: %@", nextAction]];
         }
         shown += 1;
         if (shown >= 3) {

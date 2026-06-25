@@ -265,9 +265,11 @@ ERS local loopback views without relying on separate ambiguous browser tabs.
 Green means hosted Brain is ready for normal use.
 
 Action means the latest hosted doctor output contains one or more non-pass
-operator actions that need human judgement. The menu shows `Action required`,
-up to three bounded action titles/details, and an `Open Cockpit for details`
-shortcut for the relevant profile.
+operator actions that need human judgement. Each doctor action is normalized
+with `status`, `brain_id`, `reason`, `next_action`, and `urgency`, while keeping
+the legacy `level`, `title`, and `detail` fields for older menu readers. The
+menu shows `Action required`, up to three bounded action titles/reasons/next
+steps, and an `Open Cockpit for details` shortcut for the relevant profile.
 
 Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 
