@@ -379,6 +379,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSTimer *stackHeartbeatTimer;
 @property (strong) NSTimer *doctorPollTimer;
 @property (copy) NSString *lastAction;
+@property (strong) NSDate *lastActionAt;
 @end
 
 @implementation BrainMenuAppDelegate
@@ -391,7 +392,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.managedProcessConfigs = [NSMutableDictionary dictionary];
   self.intentionalStops = [NSMutableSet set];
   self.runningDoctorProfiles = [NSMutableSet set];
-  self.lastAction = @"Ready";
+  [self recordLastAction:@"Ready"];
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   [self setStatusTitle:@"Brain"];
   [self startManagedProcesses];
@@ -759,7 +760,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *stdoutPath = [self stringFromValue:processConfig[@"stdoutPath"] fallback:@""];
   NSString *stderrPath = [self stringFromValue:processConfig[@"stderrPath"] fallback:@""];
   if (launchPath.length == 0 || stdoutPath.length == 0 || stderrPath.length == 0) {
-    self.lastAction = [NSString stringWithFormat:@"%@ config missing", name];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ config missing", name]];
     [self writeStackStatus];
     return;
   }
@@ -771,7 +772,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSFileHandle *stdoutHandle = [NSFileHandle fileHandleForWritingAtPath:stdoutPath];
   NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:stderrPath];
   if (!stdoutHandle || !stderrHandle) {
-    self.lastAction = [NSString stringWithFormat:@"%@ log open failed", name];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ log open failed", name]];
     [self writeStackStatus];
     return;
   }
@@ -804,7 +805,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       [weakSelf.managedTasks removeObjectForKey:name];
       [weakSelf writeStackStatus];
       if (![weakSelf.intentionalStops containsObject:name]) {
-        weakSelf.lastAction = [NSString stringWithFormat:@"%@ exited %d; restarting", name, finishedTask.terminationStatus];
+        [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ exited %d; restarting", name, finishedTask.terminationStatus]];
         [weakSelf performSelector:@selector(restartManagedProcessNamed:) withObject:name afterDelay:3.0];
       }
       [weakSelf rebuildMenu:nil];
@@ -814,9 +815,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   @try {
     [task launch];
     self.managedTasks[name] = task;
-    self.lastAction = [NSString stringWithFormat:@"%@ running", name];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ running", name]];
   } @catch (NSException *exception) {
-    self.lastAction = [NSString stringWithFormat:@"%@ failed: %@", name, exception.name];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ failed: %@", name, exception.name]];
   }
   [self writeStackStatus];
 }
@@ -838,7 +839,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       [task terminate];
     }
   }
-  self.lastAction = @"Local stack stopping";
+  [self recordLastAction:@"Local stack stopping"];
   [self writeStackStatus];
 }
 
@@ -872,10 +873,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     [self.intentionalStops removeObject:[self syncTaskNameForProfile:profile]];
     [self.intentionalStops removeObject:[self cockpitTaskNameForProfile:profile]];
     [self startManagedProcessesForProfile:profile];
-    self.lastAction = [NSString stringWithFormat:@"%@ stack restarted", [self displayNameForProfile:profile]];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ stack restarted", [self displayNameForProfile:profile]]];
   } else {
     [self startManagedProcesses];
-    self.lastAction = @"All local stacks restarted";
+    [self recordLastAction:@"All local stacks restarted"];
   }
   [self rebuildMenu:nil];
 }
@@ -960,6 +961,50 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.statusItem.button.attributedTitle = [[NSAttributedString alloc] initWithString:safeTitle attributes:attributes];
 }
 
+- (NSString *)displayTimestampForDate:(NSDate *)date {
+  if (!date) {
+    return @"not reported";
+  }
+  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+  formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+  formatter.dateFormat = @"yyyy-MMM-dd; HH:mm:ss";
+  NSString *base = [formatter stringFromDate:date];
+  NSInteger offsetSeconds = [[NSTimeZone localTimeZone] secondsFromGMTForDate:date];
+  NSString *sign = offsetSeconds >= 0 ? @"+" : @"-";
+  NSInteger absoluteOffset = offsetSeconds >= 0 ? offsetSeconds : -offsetSeconds;
+  NSInteger hours = absoluteOffset / 3600;
+  NSInteger minutes = (absoluteOffset % 3600) / 60;
+  return [NSString stringWithFormat:@"%@ UTC%@%02ld:%02ld", base, sign, (long)hours, (long)minutes];
+}
+
+- (NSString *)displayTimestamp:(NSString *)timestamp {
+  if (timestamp.length == 0 || [timestamp isEqualToString:@"not reported"]) {
+    return @"not reported";
+  }
+  NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+  formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+  NSDate *date = [formatter dateFromString:timestamp];
+  if (!date) {
+    formatter.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+    date = [formatter dateFromString:timestamp];
+  }
+  return date ? [self displayTimestampForDate:date] : timestamp;
+}
+
+- (void)recordLastAction:(NSString *)action {
+  self.lastAction = action.length > 0 ? action : @"Ready";
+  self.lastActionAt = [NSDate date];
+}
+
+- (NSString *)lastActionSummary {
+  NSDate *date = self.lastActionAt ?: [NSDate date];
+  return [NSString stringWithFormat:@"%@ - %@", [self displayTimestampForDate:date], self.lastAction ?: @"Ready"];
+}
+
+- (NSDictionary *)topLevelCockpitProfile {
+  return [self firstBrainProfile];
+}
+
 - (void)addActionItem:(NSMenu *)menu title:(NSString *)title action:(SEL)action profile:(NSDictionary *)profile {
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   item.target = self;
@@ -985,6 +1030,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if (checkedAt.length == 0) {
     checkedAt = [self stringFromValue:health[@"updatedAt"] fallback:@"not reported"];
   }
+  NSString *checkedAtDisplay = [self displayTimestamp:checkedAt];
   NSString *lastSyncAt = [self stringFromValue:health[@"lastSyncAt"] fallback:nil];
   if (lastSyncAt.length == 0) {
     lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
@@ -992,6 +1038,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if (lastSyncAt.length == 0) {
     lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
   }
+  NSString *lastSyncAtDisplay = [self displayTimestamp:lastSyncAt];
   NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
   if (conflicts.length == 0) {
     conflicts = [self stringFromValue:health[@"conflicts"] fallback:nil];
@@ -1014,6 +1061,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSArray *doctorActions = [self actionItemsForDoctorReport:doctorReport];
   NSString *doctorStatus = [self stringFromValue:doctorReport[@"status"] fallback:@"not reported"];
   NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
+  NSString *doctorCheckedAtDisplay = [self displayTimestamp:doctorCheckedAt];
   NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
 
   NSString *profileTitle = [NSString stringWithFormat:@"%@: %@", displayName, status];
@@ -1024,10 +1072,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
   [self addDisabledItem:profileMenu title:@"Overview"];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Status: %@", status]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAt]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAtDisplay]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAt]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAtDisplay]];
   if ([connectivityState isEqualToString:@"local_offline"]) {
     [self addDisabledItem:profileMenu title:@"Connectivity: local device cannot reach hosted Brain"];
   } else if ([connectivityState isEqualToString:@"hosted_stack"]) {
@@ -1074,7 +1122,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
   [profileMenu addItem:[NSMenuItem separatorItem]];
   [self addDisabledItem:profileMenu title:@"Diagnostics"];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last check: %@", checkedAtDisplay]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
 }
@@ -1089,7 +1137,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Status: %@", statusTitle]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last monitor action: %@", [self lastActionSummary]]];
+  [menu addItem:[NSMenuItem separatorItem]];
+
+  [self addActionItem:menu title:@"Open Cockpit" action:@selector(openCockpit:) profile:[self topLevelCockpitProfile]];
   [menu addItem:[NSMenuItem separatorItem]];
 
   for (NSDictionary *profile in profiles) {
@@ -1123,9 +1174,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSURL *url = [NSURL URLWithString:urlString];
   if (url) {
     [[NSWorkspace sharedWorkspace] openURL:url];
-    self.lastAction = [NSString stringWithFormat:@"Opened %@ cockpit", [self displayNameForProfile:profile]];
+    [self recordLastAction:[NSString stringWithFormat:@"Opened %@ cockpit", [self displayNameForProfile:profile]]];
   } else {
-    self.lastAction = @"Invalid cockpit URL";
+    [self recordLastAction:@"Invalid cockpit URL"];
   }
   [self rebuildMenu:nil];
 }
@@ -1135,9 +1186,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *logDir = [self stringFromValue:profile[@"logDir"] fallback:@""];
   if (logDir.length > 0) {
     [[NSWorkspace sharedWorkspace] openURL:[NSURL fileURLWithPath:logDir isDirectory:YES]];
-    self.lastAction = [NSString stringWithFormat:@"Opened %@ logs", [self displayNameForProfile:profile]];
+    [self recordLastAction:[NSString stringWithFormat:@"Opened %@ logs", [self displayNameForProfile:profile]]];
   } else {
-    self.lastAction = @"No log directory configured";
+    [self recordLastAction:@"No log directory configured"];
   }
   [self rebuildMenu:nil];
 }
@@ -1167,7 +1218,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *errorPath = [self stringFromValue:profile[@"doctorErrorPath"] fallback:@""];
   if (nodePath.length == 0 || profileDoctorScriptPath.length == 0 || outputPath.length == 0 || errorPath.length == 0) {
     if (!automatic) {
-      self.lastAction = @"Doctor config missing";
+      [self recordLastAction:@"Doctor config missing"];
     }
     return;
   }
@@ -1180,7 +1231,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:errorPath];
   if (!stdoutHandle || !stderrHandle) {
     if (!automatic) {
-      self.lastAction = @"Doctor log open failed";
+      [self recordLastAction:@"Doctor log open failed"];
     }
     return;
   }
@@ -1213,7 +1264,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     dispatch_async(dispatch_get_main_queue(), ^{
       [weakSelf.runningDoctorProfiles removeObject:brainId];
       if (!automatic || finishedTask.terminationStatus != 0) {
-        weakSelf.lastAction = [NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus];
+        [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus]];
       }
       [weakSelf rebuildMenu:nil];
     });
@@ -1222,11 +1273,11 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   @try {
     [task launch];
     if (!automatic) {
-      self.lastAction = [NSString stringWithFormat:@"%@ doctor running", displayName];
+      [self recordLastAction:[NSString stringWithFormat:@"%@ doctor running", displayName]];
     }
   } @catch (NSException *exception) {
     [self.runningDoctorProfiles removeObject:brainId];
-    self.lastAction = [NSString stringWithFormat:@"Doctor failed: %@", exception.name];
+    [self recordLastAction:[NSString stringWithFormat:@"Doctor failed: %@", exception.name]];
   }
 }
 

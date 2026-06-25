@@ -305,8 +305,14 @@ test("cockpit surfaces active Brain identity and action queue above the fold", a
   assert.match(cockpit, /action-summary-count/);
   assert.match(cockpit, /action-summary-list/);
   assert.match(cockpit, /function renderActionSummary/);
+  assert.match(cockpit, /function displayTimestamp/);
+  assert.match(cockpit, /function timeZoneOffsetLabel/);
+  assert.match(cockpit, /UTC/);
+  assert.match(cockpit, /timestamp-metric/);
+  assert.match(cockpit, /timestamp-value/);
   assert.match(cockpit, /document\.getElementById\("active-brain-title"\)/);
   assert.match(cockpit, /renderActionSummary\(payload\)/);
+  assert.match(cockpit, /document\.getElementById\("last-sync"\)\.textContent = sync\.checkedAt \? displayTimestamp\(sync\.checkedAt\) : "-"/);
   assert.doesNotMatch(cockpit, /current-profile-badge/);
   assert.doesNotMatch(cockpit, /profile-badge/);
 });
