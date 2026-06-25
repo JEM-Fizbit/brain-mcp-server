@@ -284,7 +284,6 @@ test("cockpit labels the active multi-Brain profile explicitly", async () => {
   assert.match(doctor, /switcherLabel/);
   assert.match(doctor, /profileCount/);
   assert.match(doctor, /isMultiProfile/);
-  assert.match(cockpit, /current-profile-badge/);
   assert.match(cockpit, /profile-current-label/);
   assert.match(cockpit, /function profileOptionLabel/);
   assert.match(cockpit, /profile\.profileLabel/);
@@ -308,6 +307,8 @@ test("cockpit surfaces active Brain identity and action queue above the fold", a
   assert.match(cockpit, /function renderActionSummary/);
   assert.match(cockpit, /document\.getElementById\("active-brain-title"\)/);
   assert.match(cockpit, /renderActionSummary\(payload\)/);
+  assert.doesNotMatch(cockpit, /current-profile-badge/);
+  assert.doesNotMatch(cockpit, /profile-badge/);
 });
 
 test("hosted doctor distinguishes local connectivity from stack faults", async () => {

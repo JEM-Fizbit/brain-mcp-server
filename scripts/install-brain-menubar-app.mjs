@@ -393,7 +393,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.runningDoctorProfiles = [NSMutableSet set];
   self.lastAction = @"Ready";
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-  self.statusItem.button.title = @"Brain";
+  [self setStatusTitle:@"Brain"];
   [self startManagedProcesses];
   [self scheduleStackHeartbeat];
   [self scheduleDoctorPolling];
@@ -934,6 +934,32 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return sawKnown ? @"Brain OK" : @"Brain";
 }
 
+- (NSColor *)statusColorForTitle:(NSString *)title {
+  if ([title isEqualToString:@"Brain OK"]) {
+    return [NSColor systemGreenColor];
+  }
+  if ([title isEqualToString:@"Brain Fail"]) {
+    return [NSColor systemRedColor];
+  }
+  if ([title isEqualToString:@"Brain Action"] ||
+      [title isEqualToString:@"Brain Warn"] ||
+      [title isEqualToString:@"Brain Offline"]) {
+    return [NSColor systemOrangeColor];
+  }
+  if ([title isEqualToString:@"Brain Check"]) {
+    return [NSColor systemYellowColor];
+  }
+  return [NSColor labelColor];
+}
+
+- (void)setStatusTitle:(NSString *)title {
+  NSString *safeTitle = title.length > 0 ? title : @"Brain";
+  NSDictionary *attributes = @{
+    NSForegroundColorAttributeName: [self statusColorForTitle:safeTitle]
+  };
+  self.statusItem.button.attributedTitle = [[NSAttributedString alloc] initWithString:safeTitle attributes:attributes];
+}
+
 - (void)addActionItem:(NSMenu *)menu title:(NSString *)title action:(SEL)action profile:(NSDictionary *)profile {
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   item.target = self;
@@ -941,129 +967,136 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [menu addItem:item];
 }
 
+- (void)addProfileMenuForProfile:(NSDictionary *)profile toMenu:(NSMenu *)menu allProfiles:(NSArray *)profiles {
+  NSString *displayName = profiles.count > 1
+    ? [self displayNameWithBrainIdForProfile:profile]
+    : [self displayNameForProfile:profile];
+  NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+  NSDictionary *report = nil;
+  id reportValue = health[@"report"];
+  if ([reportValue isKindOfClass:[NSDictionary class]]) {
+    report = (NSDictionary *)reportValue;
+  }
+  NSString *status = [self healthStatusFrom:health];
+  NSString *checkedAt = [self stringFromValue:health[@"checkedAt"] fallback:nil];
+  if (checkedAt.length == 0) {
+    checkedAt = [self stringFromValue:health[@"lastCheckedAt"] fallback:nil];
+  }
+  if (checkedAt.length == 0) {
+    checkedAt = [self stringFromValue:health[@"updatedAt"] fallback:@"not reported"];
+  }
+  NSString *lastSyncAt = [self stringFromValue:health[@"lastSyncAt"] fallback:nil];
+  if (lastSyncAt.length == 0) {
+    lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
+  }
+  if (lastSyncAt.length == 0) {
+    lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
+  }
+  NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
+  if (conflicts.length == 0) {
+    conflicts = [self stringFromValue:health[@"conflicts"] fallback:nil];
+  }
+  if (conflicts.length == 0) {
+    conflicts = [self stringFromValue:report[@"conflicts"] fallback:nil];
+  }
+  if (conflicts.length == 0) {
+    conflicts = [self stringFromValue:health[@"openConflictCount"] fallback:@"not reported"];
+  }
+  NSString *cycle = [self stringFromValue:health[@"cycle"] fallback:@"not reported"];
+  NSString *durationMs = [self stringFromValue:report[@"totalMs"] fallback:nil];
+  NSString *duration = durationMs.length > 0 ? [NSString stringWithFormat:@"%@ms", durationMs] : @"not reported";
+  NSString *pushed = [self stringFromValue:report[@"pushed"] fallback:@"not reported"];
+  NSString *pulled = [self stringFromValue:report[@"pulled"] fallback:@"not reported"];
+  NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
+  NSString *syncState = [self isTaskRunningNamed:[self syncTaskNameForProfile:profile]] ? @"running" : @"stopped";
+  NSString *cockpitState = [self isTaskRunningNamed:[self cockpitTaskNameForProfile:profile]] ? @"running" : @"stopped";
+  NSDictionary *doctorReport = [self readDoctorReportForProfile:profile];
+  NSArray *doctorActions = [self actionItemsForDoctorReport:doctorReport];
+  NSString *doctorStatus = [self stringFromValue:doctorReport[@"status"] fallback:@"not reported"];
+  NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
+  NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
+
+  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@", displayName, status];
+  NSMenuItem *profileItem = [[NSMenuItem alloc] initWithTitle:profileTitle action:nil keyEquivalent:@""];
+  NSMenu *profileMenu = [[NSMenu alloc] initWithTitle:displayName];
+  [profileItem setSubmenu:profileMenu];
+  [menu addItem:profileItem];
+
+  [self addDisabledItem:profileMenu title:@"Overview"];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Status: %@", status]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAt]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAt]];
+  if ([connectivityState isEqualToString:@"local_offline"]) {
+    [self addDisabledItem:profileMenu title:@"Connectivity: local device cannot reach hosted Brain"];
+  } else if ([connectivityState isEqualToString:@"hosted_stack"]) {
+    [self addDisabledItem:profileMenu title:@"Connectivity: hosted stack responded unhealthy"];
+  }
+
+  [profileMenu addItem:[NSMenuItem separatorItem]];
+  [self addDisabledItem:profileMenu title:@"Actions"];
+  if (doctorActions.count > 0) {
+    [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
+    NSUInteger shown = 0;
+    for (NSDictionary *action in doctorActions) {
+      NSString *level = [[self stringFromValue:action[@"status"] fallback:[self stringFromValue:action[@"level"] fallback:@"warn"]] uppercaseString];
+      NSString *urgency = [self stringFromValue:action[@"urgency"] fallback:@"soon"];
+      NSString *reason = [self truncatedMenuText:[self stringFromValue:action[@"reason"] fallback:@"check_review"] maxLength:72];
+      NSString *title = [self truncatedMenuText:[self stringFromValue:action[@"title"] fallback:@"Review doctor action"] maxLength:84];
+      NSString *nextAction = [self truncatedMenuText:[self stringFromValue:action[@"next_action"] fallback:[self stringFromValue:action[@"detail"] fallback:@""]] maxLength:96];
+      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"%@/%@: %@", level, urgency, title]];
+      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Reason: %@", reason]];
+      if (nextAction.length > 0) {
+        [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Next: %@", nextAction]];
+      }
+      shown += 1;
+      if (shown >= 2) {
+        break;
+      }
+    }
+    if (doctorActions.count > shown) {
+      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"%lu more actions in cockpit", (unsigned long)(doctorActions.count - shown)]];
+    }
+    [self addActionItem:profileMenu title:@"Open Cockpit for details" action:@selector(openCockpit:) profile:profile];
+  } else if (doctorReport) {
+    [self addDisabledItem:profileMenu title:@"Action required: none"];
+  } else {
+    [self addDisabledItem:profileMenu title:@"Action required: run Refresh Doctor"];
+  }
+
+  [profileMenu addItem:[NSMenuItem separatorItem]];
+  [self addDisabledItem:profileMenu title:@"Controls"];
+  [self addActionItem:profileMenu title:@"Open Cockpit" action:@selector(openCockpit:) profile:profile];
+  [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
+  [self addActionItem:profileMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
+  [self addActionItem:profileMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];
+
+  [profileMenu addItem:[NSMenuItem separatorItem]];
+  [self addDisabledItem:profileMenu title:@"Diagnostics"];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
+}
+
 - (void)rebuildMenu:(id)sender {
   (void)sender;
   NSArray *profiles = [self brainProfiles];
-  self.statusItem.button.title = [self statusTitleForProfiles];
+  NSString *statusTitle = [self statusTitleForProfiles];
+  [self setStatusTitle:statusTitle];
 
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Brain Monitor"];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Status: %@", statusTitle]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
   [menu addItem:[NSMenuItem separatorItem]];
 
-  for (NSDictionary *profile in [self brainProfiles]) {
-    NSString *displayName = profiles.count > 1
-      ? [self displayNameWithBrainIdForProfile:profile]
-      : [self displayNameForProfile:profile];
-    NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
-    NSDictionary *report = nil;
-    id reportValue = health[@"report"];
-    if ([reportValue isKindOfClass:[NSDictionary class]]) {
-      report = (NSDictionary *)reportValue;
-    }
-    NSString *status = [self healthStatusFrom:health];
-    NSString *checkedAt = [self stringFromValue:health[@"checkedAt"] fallback:nil];
-    if (checkedAt.length == 0) {
-      checkedAt = [self stringFromValue:health[@"lastCheckedAt"] fallback:nil];
-    }
-    if (checkedAt.length == 0) {
-      checkedAt = [self stringFromValue:health[@"updatedAt"] fallback:@"not reported"];
-    }
-    NSString *lastSyncAt = [self stringFromValue:health[@"lastSyncAt"] fallback:nil];
-    if (lastSyncAt.length == 0) {
-      lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
-    }
-    if (lastSyncAt.length == 0) {
-      lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
-    }
-    NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
-    if (conflicts.length == 0) {
-      conflicts = [self stringFromValue:health[@"conflicts"] fallback:nil];
-    }
-    if (conflicts.length == 0) {
-      conflicts = [self stringFromValue:report[@"conflicts"] fallback:nil];
-    }
-    if (conflicts.length == 0) {
-      conflicts = [self stringFromValue:health[@"openConflictCount"] fallback:@"not reported"];
-    }
-    NSString *cycle = [self stringFromValue:health[@"cycle"] fallback:@"not reported"];
-    NSString *durationMs = [self stringFromValue:report[@"totalMs"] fallback:nil];
-    NSString *duration = durationMs.length > 0 ? [NSString stringWithFormat:@"%@ms", durationMs] : @"not reported";
-    NSString *pushed = [self stringFromValue:report[@"pushed"] fallback:@"not reported"];
-    NSString *pulled = [self stringFromValue:report[@"pulled"] fallback:@"not reported"];
-    NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
-    NSString *syncState = [self isTaskRunningNamed:[self syncTaskNameForProfile:profile]] ? @"running" : @"stopped";
-    NSString *cockpitState = [self isTaskRunningNamed:[self cockpitTaskNameForProfile:profile]] ? @"running" : @"stopped";
-    NSDictionary *doctorReport = [self readDoctorReportForProfile:profile];
-    NSArray *doctorActions = [self actionItemsForDoctorReport:doctorReport];
-    NSString *doctorStatus = [self stringFromValue:doctorReport[@"status"] fallback:@"not reported"];
-    NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
-    NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
-
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", displayName, status]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAt]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
-    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAt]];
-    if ([connectivityState isEqualToString:@"local_offline"]) {
-      [self addDisabledItem:menu title:@"Connectivity: local device cannot reach hosted Brain"];
-    } else if ([connectivityState isEqualToString:@"hosted_stack"]) {
-      [self addDisabledItem:menu title:@"Connectivity: hosted stack responded unhealthy"];
-    }
-    if (doctorActions.count > 0) {
-      [self addDisabledItem:menu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
-      NSUInteger shown = 0;
-      for (NSDictionary *action in doctorActions) {
-        NSString *level = [[self stringFromValue:action[@"status"] fallback:[self stringFromValue:action[@"level"] fallback:@"warn"]] uppercaseString];
-        NSString *reason = [self stringFromValue:action[@"reason"] fallback:@"check_review"];
-        NSString *urgency = [self stringFromValue:action[@"urgency"] fallback:@"soon"];
-        NSString *title = [self truncatedMenuText:[self stringFromValue:action[@"title"] fallback:@"Review doctor action"] maxLength:96];
-        NSString *nextAction = [self truncatedMenuText:[self stringFromValue:action[@"next_action"] fallback:[self stringFromValue:action[@"detail"] fallback:@""]] maxLength:120];
-        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@/%@: %@", level, urgency, title]];
-        [self addDisabledItem:menu title:[NSString stringWithFormat:@"Reason: %@", reason]];
-        if (nextAction.length > 0) {
-          [self addDisabledItem:menu title:[NSString stringWithFormat:@"Next: %@", nextAction]];
-        }
-        shown += 1;
-        if (shown >= 3) {
-          break;
-        }
-      }
-      if (doctorActions.count > shown) {
-        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%lu more actions in cockpit", (unsigned long)(doctorActions.count - shown)]];
-      }
-      [self addActionItem:menu
-                    title:[self actionTitle:@"Open Cockpit for details" multiFormat:@"Open %@ Cockpit for details" profile:profile]
-                   action:@selector(openCockpit:)
-                  profile:profile];
-    } else if (doctorReport) {
-      [self addDisabledItem:menu title:@"Action required: none reported"];
-    } else {
-      [self addDisabledItem:menu title:@"Action required: run Refresh Doctor"];
-    }
-
-    [self addActionItem:menu
-                  title:[self actionTitle:@"Refresh Doctor" multiFormat:@"Refresh %@ Doctor" profile:profile]
-                 action:@selector(refreshDoctor:)
-                profile:profile];
-    [self addActionItem:menu
-                  title:[self actionTitle:@"Open Cockpit" multiFormat:@"Open %@ Cockpit" profile:profile]
-                 action:@selector(openCockpit:)
-                profile:profile];
-    [self addActionItem:menu
-                  title:[self actionTitle:@"Open Sync Logs" multiFormat:@"Open %@ Sync Logs" profile:profile]
-                 action:@selector(openLogs:)
-                profile:profile];
-    [self addActionItem:menu
-                  title:[self actionTitle:@"Restart Local Stack" multiFormat:@"Restart %@ Local Stack" profile:profile]
-                 action:@selector(restartLocalStack:)
-                profile:profile];
-    [menu addItem:[NSMenuItem separatorItem]];
+  for (NSDictionary *profile in profiles) {
+    [self addProfileMenuForProfile:profile toMenu:menu allProfiles:profiles];
   }
+
+  [menu addItem:[NSMenuItem separatorItem]];
 
   NSMenuItem *refresh = [[NSMenuItem alloc] initWithTitle:@"Refresh Status" action:@selector(rebuildMenu:) keyEquivalent:@""];
   refresh.target = self;

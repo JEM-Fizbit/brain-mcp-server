@@ -468,6 +468,17 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /refreshAllDoctors/);
   assert.match(source, /connectivityStateForDoctorReport/);
   assert.match(source, /Brain Offline/);
+  assert.match(source, /setStatusTitle/);
+  assert.match(source, /statusColorForTitle/);
+  assert.match(source, /NSForegroundColorAttributeName/);
+  assert.match(source, /attributedTitle/);
+  assert.match(source, /addProfileMenuForProfile/);
+  assert.match(source, /NSMenu \*profileMenu/);
+  assert.match(source, /\[profileItem setSubmenu:profileMenu\]/);
+  assert.match(source, /Overview/);
+  assert.match(source, /Actions/);
+  assert.match(source, /Controls/);
+  assert.match(source, /Diagnostics/);
   assert.match(source, /NSTimer/);
   assert.match(source, /readDoctorReportForProfile/);
   assert.match(source, /actionItemsForDoctorReport/);
@@ -567,10 +578,11 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       ["ers-brain", "ERS", "http://127.0.0.1:8788/"],
     ]
   );
-  assert.match(source, /for \(NSDictionary \*profile in \[self brainProfiles\]\)/);
+  assert.match(source, /for \(NSDictionary \*profile in profiles\)/);
+  assert.match(source, /addProfileMenuForProfile:profile toMenu:menu allProfiles:profiles/);
   assert.match(source, /syncTaskNameForProfile/);
   assert.match(source, /cockpitTaskNameForProfile/);
-  assert.match(source, /Open %@ Cockpit/);
+  assert.match(source, /title:@"Open Cockpit" action:@selector\(openCockpit:\) profile:profile/);
   assert.match(source, /Restart All Local Stacks/);
 });
 

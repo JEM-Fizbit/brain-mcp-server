@@ -22,7 +22,8 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the cockpit header shows the active profile label as `<display name> (<brain_id>)` in the first-screen identity block, plus the local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector using the same unambiguous labels and links to each configured local cockpit URL;
 - the cockpit first screen includes a dedicated `Needs Action` panel above the tabbed sections; the Overview tab keeps the fuller `Next Actions` list for the same doctor actions;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
-- the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, and surfaces user-action-required items directly in the menu with bounded titles/details plus an `Open Cockpit for details` action;
+- the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, keeps the top-level dropdown compact, and nests each Brain's `Overview`, `Actions`, `Controls`, and `Diagnostics` under that Brain's submenu;
+- the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or checking states, and red for `Brain Fail`;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
@@ -234,7 +235,9 @@ npm run sync:menubar:install
 ```
 
 Launch the generated app once to put `Brain OK`, `Brain Action`, `Brain Warn`,
-or `Brain Fail` in the macOS menu bar. The app is config-driven and per-Brain.
+or `Brain Fail` in the macOS menu bar. The status text is colored by severity,
+and each configured Brain gets a nested menu with Overview, Actions, Controls,
+and Diagnostics sections. The app is config-driven and per-Brain.
 For CloudStorage Brains, grant the monitor app Full Disk Access; the sync
 watcher runs as the monitor's child process and uses that app identity. Broad
 signed/notarized installer packaging remains separate backlog work.
@@ -278,9 +281,9 @@ Action means the latest hosted doctor output contains one or more non-pass
 operator actions that need human judgement. Each doctor action is normalized
 with `status`, `brain_id`, `reason`, `next_action`, and `urgency`, while keeping
 the legacy `level`, `title`, and `detail` fields for older menu readers. The
-cockpit first screen shows `Needs Action`; the menu shows `Action required`, up
-to three bounded action titles/reasons/next steps, and an `Open Cockpit for
-details` shortcut for the relevant profile.
+cockpit first screen shows `Needs Action`; each Brain's menu shows `Action
+required`, up to two bounded action titles/reasons/next steps, and an `Open
+Cockpit for details` shortcut for the relevant profile.
 
 Offline means the local Mac could not reach the hosted Brain health endpoint.
 This is reported separately from a Brain MCP stack fault: check Wi-Fi, VPN,
