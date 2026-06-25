@@ -536,6 +536,50 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return @"Brain";
 }
 
+- (NSDictionary *)readDoctorReportForProfile:(NSDictionary *)profile {
+  NSString *path = [self stringFromValue:profile[@"doctorOutputPath"] fallback:@""];
+  return [self readJsonAtPath:path];
+}
+
+- (NSArray *)actionItemsForDoctorReport:(NSDictionary *)doctorReport {
+  id rawActions = doctorReport[@"actions"];
+  if (![rawActions isKindOfClass:[NSArray class]]) {
+    return @[];
+  }
+
+  NSMutableArray *actions = [NSMutableArray array];
+  for (id rawAction in (NSArray *)rawActions) {
+    if (![rawAction isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+    NSDictionary *action = (NSDictionary *)rawAction;
+    NSString *level = [[self stringFromValue:action[@"level"] fallback:@"warn"] lowercaseString];
+    NSString *title = [self stringFromValue:action[@"title"] fallback:@""];
+    if (title.length == 0 || [level isEqualToString:@"pass"]) {
+      continue;
+    }
+    [actions addObject:action];
+  }
+  return actions;
+}
+
+- (BOOL)actionsContainFail:(NSArray *)actions {
+  for (NSDictionary *action in actions) {
+    NSString *level = [[self stringFromValue:action[@"level"] fallback:@"warn"] lowercaseString];
+    if ([level isEqualToString:@"fail"] || [level isEqualToString:@"error"]) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
+- (NSString *)truncatedMenuText:(NSString *)text maxLength:(NSUInteger)maxLength {
+  if (text.length <= maxLength || maxLength <= 3) {
+    return text;
+  }
+  return [[text substringToIndex:maxLength - 3] stringByAppendingString:@"..."];
+}
+
 - (void)addDisabledItem:(NSMenu *)menu title:(NSString *)title {
   NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
   item.enabled = NO;
@@ -752,10 +796,23 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (NSString *)statusTitleForProfiles {
+  BOOL sawAction = NO;
   BOOL sawWarn = NO;
   BOOL sawKnown = NO;
   for (NSDictionary *profile in [self brainProfiles]) {
     NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+    NSDictionary *doctor = [self readDoctorReportForProfile:profile];
+    NSArray *actions = [self actionItemsForDoctorReport:doctor];
+    NSString *doctorStatus = [[self stringFromValue:doctor[@"status"] fallback:@""] lowercaseString];
+    if ([self actionsContainFail:actions] || [doctorStatus isEqualToString:@"fail"] || [doctorStatus isEqualToString:@"error"]) {
+      return @"Brain Fail";
+    }
+    if (actions.count > 0) {
+      sawAction = YES;
+    }
+    if ([doctorStatus isEqualToString:@"warn"] || [doctorStatus isEqualToString:@"warning"]) {
+      sawWarn = YES;
+    }
     NSString *status = [self healthStatusFrom:health];
     if ([status isEqualToString:@"fail"] || [status isEqualToString:@"error"]) {
       return @"Brain Fail";
@@ -766,6 +823,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     if ([status isEqualToString:@"ok"] || [status isEqualToString:@"pass"]) {
       sawKnown = YES;
     }
+  }
+  if (sawAction) {
+    return @"Brain Action";
   }
   if (sawWarn) {
     return @"Brain Warn";
@@ -831,6 +891,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     NSString *unchanged = [self stringFromValue:report[@"unchanged"] fallback:@"not reported"];
     NSString *syncState = [self isTaskRunningNamed:[self syncTaskNameForProfile:profile]] ? @"running" : @"stopped";
     NSString *cockpitState = [self isTaskRunningNamed:[self cockpitTaskNameForProfile:profile]] ? @"running" : @"stopped";
+    NSDictionary *doctorReport = [self readDoctorReportForProfile:profile];
+    NSArray *doctorActions = [self actionItemsForDoctorReport:doctorReport];
+    NSString *doctorStatus = [self stringFromValue:doctorReport[@"status"] fallback:@"not reported"];
+    NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
 
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", displayName, status]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
@@ -839,6 +903,35 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
+    [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAt]];
+    if (doctorActions.count > 0) {
+      [self addDisabledItem:menu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
+      NSUInteger shown = 0;
+      for (NSDictionary *action in doctorActions) {
+        NSString *level = [[self stringFromValue:action[@"level"] fallback:@"warn"] uppercaseString];
+        NSString *title = [self truncatedMenuText:[self stringFromValue:action[@"title"] fallback:@"Review doctor action"] maxLength:96];
+        NSString *detail = [self truncatedMenuText:[self stringFromValue:action[@"detail"] fallback:@""] maxLength:120];
+        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", level, title]];
+        if (detail.length > 0) {
+          [self addDisabledItem:menu title:[NSString stringWithFormat:@"Next: %@", detail]];
+        }
+        shown += 1;
+        if (shown >= 3) {
+          break;
+        }
+      }
+      if (doctorActions.count > shown) {
+        [self addDisabledItem:menu title:[NSString stringWithFormat:@"%lu more actions in cockpit", (unsigned long)(doctorActions.count - shown)]];
+      }
+      [self addActionItem:menu
+                    title:[self actionTitle:@"Open Cockpit for details" multiFormat:@"Open %@ Cockpit for details" profile:profile]
+                   action:@selector(openCockpit:)
+                  profile:profile];
+    } else if (doctorReport) {
+      [self addDisabledItem:menu title:@"Action required: none reported"];
+    } else {
+      [self addDisabledItem:menu title:@"Action required: run Refresh Doctor"];
+    }
 
     [self addActionItem:menu
                   title:[self actionTitle:@"Refresh Doctor" multiFormat:@"Refresh %@ Doctor" profile:profile]
