@@ -14,6 +14,7 @@
 
 <!-- backlog items below; newest first -->
 
+- Send OpenAI product feedback on ChatGPT Business custom MCP UX: desktop app does not expose management clearly; browser-only flow is buried under Workspace settings -> Apps; stale OAuth recovery requires disable + delete + recreate plus a separate individual account connection step; request a visible connector manager, explicit reconnect vs reset controls, better stale-credential error messaging, and parity with Claude's simpler connector flow.
 - Expand the Brain monitor/menu-bar app to surface visible user-action-required indicators and guided resolution flows for operational issues such as stale Capture / Triage Queue items, unresolved link/reference errors, sync conflicts, auth reconnects, and other doctor/lint findings that need human judgement.
 - Explore whether ERS colleagues need raw Markdown/Obsidian editing at all. If not, prefer a hosted browser Brain UI with Markdown as the backend/interchange format, and narrow SharePoint/Graph to source ingestion/export instead of bidirectional raw-file sync.
 - Design a cloud-run Brain health/inbox operations service to replace fragile Claude scheduled Routines where appropriate. Scope: hosted lint/QA monitoring, per-Brain health checks, alerting/escalation, and periodic inbox sweep/ingest processing; preserve the local laptop inbox as a first-class drop folder and decide how local inbox state syncs or is mirrored before moving any processor to cloud execution.

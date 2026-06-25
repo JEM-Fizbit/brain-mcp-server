@@ -1,7 +1,7 @@
 # Hosted Client Cutover Runbook
 
 **Status:** active operator guide
-**Last updated:** 2026-06-17
+**Last updated:** 2026-06-24
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 
@@ -78,6 +78,29 @@ Use ChatGPT Settings -> Connectors -> Create. After creation, start a new ChatGP
 ChatGPT generates connector-specific OAuth callbacks under `https://chatgpt.com/connector/oauth/<id>`. The hosted Brain OAuth server accepts that documented ChatGPT callback path automatically, along with loopback redirects, the built-in Claude callback, and ChatGPT's legacy `https://chatgpt.com/connector_platform_oauth_redirect` callback. Use `MCP_OAUTH_ALLOWED_REDIRECT_URIS` only for other exact non-loopback client callbacks.
 
 If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, tool-surface change, or redeploy that invalidates dynamic client registrations, check the cockpit Operation Log for `oauth_token` failures such as `unknown_client_id` or `invalid_client`. For ChatGPT, **do not rely on disconnect/reconnect**: it can preserve the stale connector registration and repeat the authorization failure. Fully delete/remove the old Brain connector from the affected ChatGPT account or workspace, then create it again from scratch so ChatGPT performs fresh dynamic client registration and receives a new `client_id`.
+
+### ChatGPT Business / ERS workspace recovery
+
+ChatGPT Business custom MCP apps are not reliably manageable from the desktop app. Use the browser client. For the ERS Business workspace, the app is managed under **Workspace settings -> Apps**, not only under the individual user's connector settings.
+
+When a ChatGPT Business Brain connector is stale after a hosted MCP update, OAuth-state reset, or tool-surface change:
+
+1. Open ChatGPT in a browser and switch to the ERS Business workspace.
+2. Go to **Workspace settings -> Apps**.
+3. Find the old Brain custom MCP app.
+4. Disable it.
+5. Delete/remove it from the workspace.
+6. Create a new custom app with the hosted MCP URL: `https://jem-brain-mcp.fly.dev/mcp`.
+7. Complete GitHub OAuth as `JEM-Fizbit`.
+8. After the workspace app exists, complete the separate final connection step in the individual ERS ChatGPT account in the browser. This step is not surfaced clearly in the desktop app.
+9. Start a fresh ChatGPT conversation and verify both Brains explicitly:
+
+```text
+brain_sync_status({ "brain_id": "ai-brain-jem" })
+brain_sync_status({ "brain_id": "ers-brain" })
+```
+
+This browser/workspace delete-and-recreate flow restored ChatGPT Business ERS on 2026-06-24 after reconnect attempts failed with `Authorization failed`. By contrast, Claude account reconnects were straightforward and did not require deleting the connector.
 
 OpenAI account cutover verification passed on 2026-06-16 for both ERS and personal ChatGPT accounts:
 
