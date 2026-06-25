@@ -201,6 +201,10 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /README\.md/);
   assert.match(script, /buildOperatorActions/);
   assert.match(script, /actions: buildOperatorActions/);
+  assert.match(script, /buildProfileSummary/);
+  assert.match(script, /BRAIN_COCKPIT_PROFILES_JSON/);
+  assert.match(script, /BRAIN_PROFILE_NAME/);
+  assert.match(script, /profile: buildProfileSummary/);
   assert.match(script, /local_sync_state/);
   assert.match(script, /sync_health/);
   assert.match(script, /sync_lock/);
@@ -219,8 +223,12 @@ test("hosted doctor supports monitor-owned sync supervision", async () => {
 
   assert.match(script, /BRAIN_SYNC_SUPERVISOR/);
   assert.match(script, /BRAIN_MONITOR_STACK_FILE/);
+  assert.match(script, /BRAIN_MONITOR_STACK_MAX_AGE_MS/);
   assert.match(script, /supervisor === "menubar"/);
   assert.match(script, /brain-monitor-stack\.json/);
+  assert.match(script, /cockpitPidAlive/);
+  assert.match(script, /brainIdMatches/);
+  assert.match(script, /Confirm Brain Monitor is supervising this Brain/);
 });
 
 test("source list verifier supports non-JEM expected counts", async () => {
@@ -343,6 +351,13 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /panel-latency/);
   assert.match(script, /panel-checks/);
   assert.match(script, /panel-raw/);
+  assert.match(script, /profile-switcher/);
+  assert.match(script, /profile-brain-id/);
+  assert.match(script, /profile-state-file/);
+  assert.match(script, /profile-cockpit-url/);
+  assert.match(script, /profileFromPayload/);
+  assert.match(script, /renderProfileSwitcher/);
+  assert.match(script, /availableProfiles/);
   assert.match(script, /activateTab/);
   assert.match(script, /User-Facing Operations/);
   assert.match(script, /Operation Log/);
