@@ -14,6 +14,8 @@
 
 <!-- backlog items below; newest first -->
 
+- Make the cockpit/doctor local-supervisor check understand the consolidated Brain Monitor app instead of warning on the retired raw `com.jem.brain-sync` LaunchAgent. It should report the active menu-bar supervisor and per-profile sync watcher/cockpit children, while keeping legacy LaunchAgent labels only as rollback/debug targets.
+- Make the Brain cockpit explicit about which Brain/profile it is reporting. Show the active `brain_id`, local profile, sync state path, cockpit URL, and whether each metric is per-Brain or global/auth-level; add a cockpit control to switch views across configured Brains such as `ai-brain-jem` and `ers-brain` rather than requiring separate unclear browser surfaces.
 - Send OpenAI product feedback on ChatGPT Business custom MCP UX: desktop app does not expose management clearly; browser-only flow is buried under Workspace settings -> Apps; stale OAuth recovery requires disable + delete + recreate plus a separate individual account connection step; request a visible connector manager, explicit reconnect vs reset controls, better stale-credential error messaging, and parity with Claude's simpler connector flow.
 - Expand the Brain monitor/menu-bar app to surface visible user-action-required indicators and guided resolution flows for operational issues such as stale Capture / Triage Queue items, unresolved link/reference errors, sync conflicts, auth reconnects, and other doctor/lint findings that need human judgement.
 - Explore whether ERS colleagues need raw Markdown/Obsidian editing at all. If not, prefer a hosted browser Brain UI with Markdown as the backend/interchange format, and narrow SharePoint/Graph to source ingestion/export instead of bidirectional raw-file sync.
