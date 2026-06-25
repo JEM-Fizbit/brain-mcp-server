@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-06-25 — Remove Git from routine Brain operations, retain it only as emergency export/history
+
+**Decision:** Routine Brain operations no longer include manual Git commit/push/merge or GitHub repo backup checks. Hosted MCP, Supabase Postgres, Supabase Storage, local sync, doctor/cockpit, and conflict records are the normal operator surfaces. Git is retained only as an async export, human-readable history, and emergency recovery lane until a later restore rehearsal supports removing it entirely.
+
+**Why:** Hosted Brain now uses the Supabase revision store for both `ai-brain-jem` and the John-only `ers-brain` pilot, with 0 open hosted conflicts in the live connector check. Supabase backup metadata is visible through the CLI, but PITR is not currently enabled and Storage objects are not included in database backups, so Git should leave the daily workflow now without being deleted as emergency fallback.
+
+**Alternatives rejected:** Continuing to require Brain operators to commit/push/merge during normal writes or ingests (reintroduces the old hot-path drift problem); deleting Git backup/history immediately (premature until restore-to-new-project, Storage-object recovery, and local Markdown reseed are rehearsed); treating PITR as active before the project actually reports it enabled.
+
+**Related:** `docs/hosted-brain-recovery-and-git-export.md`; `docs/specs/003-hosted-brain-sync-architecture.md`; `docs/specs/006-brain-sync-architecture-simplification.md`; `docs/ROADMAP.md`.
+
+---
+
 ## 2026-06-24 — Use the personal hosted MCP for John-only ERS Brain pilot before ERS production fork
 
 **Decision:** Add `ers-brain` to the existing hosted Brain MCP as a John-only multi-Brain pilot, using the same Fly app and pilot Supabase project for routing, revision sync, source metadata, and private artifact storage. Keep the local ERS Brain checkout as the canonical local-first mirror and fallback. This is not ERS team access and not ERS production; the ERS-owned Supabase/project fork remains required before team or production rollout.

@@ -88,7 +88,7 @@ NEVER pass large text as source_content — it will timeout the MCP transport.`,
           "1. Use `brain_read_file` and `brain_update_file` to update Brain files",
           "2. Call `brain_ingest_complete` with the source details and list of Brain files touched",
           autoSyncEnabled()
-            ? "3. Hosted auto-sync is enabled; each successful write reports its commit/push status."
+            ? "3. Hosted auto-sync is enabled; each successful write reports its sync status."
             : "3. Call `brain_commit` to commit all changes",
         ].join("\n");
 

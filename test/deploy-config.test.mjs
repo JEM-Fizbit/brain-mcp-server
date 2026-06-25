@@ -463,3 +463,44 @@ test("Postgres integration test requires an explicit test database URL", async (
     /const databaseUrl = process\.env\.BRAIN_REVISION_DATABASE_URL;/
   );
 });
+
+test("Brain recovery runbook keeps Git out of routine operations", async () => {
+  const runbookPath = path.join(
+    repoRoot,
+    "docs",
+    "hosted-brain-recovery-and-git-export.md"
+  );
+  const runbookExists = await fs
+    .access(runbookPath)
+    .then(() => true)
+    .catch(() => false);
+
+  assert.equal(
+    runbookExists,
+    true,
+    "docs/hosted-brain-recovery-and-git-export.md should document recovery/export policy"
+  );
+  if (!runbookExists) return;
+
+  const runbook = await fs.readFile(runbookPath, "utf-8");
+  const backlog = await fs.readFile(path.join(repoRoot, "BACKLOG.md"), "utf-8");
+  const roadmap = await fs.readFile(path.join(repoRoot, "docs", "ROADMAP.md"), "utf-8");
+  const ingestTool = await fs.readFile(
+    path.join(repoRoot, "src", "tools", "ingest.ts"),
+    "utf-8"
+  );
+
+  assert.match(runbook, /Git is not a routine Brain operation/);
+  assert.match(runbook, /no manual commit\/push\/merge/);
+  assert.match(runbook, /Supabase physical backups are visible/);
+  assert.match(runbook, /PITR is not currently enabled/);
+  assert.match(runbook, /Supabase Storage objects are not included in database backups/);
+  assert.match(runbook, /Async Git export cadence/);
+  assert.match(runbook, /Restore rehearsal gate/);
+  assert.match(roadmap, /routine Brain operations do not require manual Git commit\/push\/merge/);
+  assert.doesNotMatch(
+    backlog,
+    /Deprecate GitHub repo backup from normal Brain operator workflows/
+  );
+  assert.doesNotMatch(ingestTool, /commit\/push status/);
+});

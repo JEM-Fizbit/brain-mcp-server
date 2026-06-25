@@ -5,7 +5,7 @@
 **Source:** BACKLOG.md line "Urgent: design a Brain Sync menu-bar app, but first complete an architecture simplification review..."
 **Roadmap link:** Milestone 2 / Milestone 3 / Milestone 4
 **Decisions impact:** recommends new decisions on ERS sync authority, local-helper productization, Git backup/export, and local MCP fallback scope.
-**Related:** `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/specs/003-hosted-brain-sync-architecture.md`; `docs/ers-brain-hosted-pilot.md`; `docs/OWNERSHIP_AND_LIFECYCLE.md`; `docs/ROADMAP.md`; `docs/DECISIONS.md`
+**Related:** `docs/specs/002-local-first-hosted-sync-contract.md`; `docs/specs/003-hosted-brain-sync-architecture.md`; `docs/hosted-brain-recovery-and-git-export.md`; `docs/ers-brain-hosted-pilot.md`; `docs/OWNERSHIP_AND_LIFECYCLE.md`; `docs/ROADMAP.md`; `docs/DECISIONS.md`
 
 ## Problem
 
@@ -196,7 +196,7 @@ Supabase-backed hosted Brain is the operational source for MCP and human UI. Hum
 | macOS sync helper | John-only bridge to OneDrive | Consolidated John/operator tool; optional fallback for others | Build menu-bar app for John, not colleague default |
 | Helper LaunchAgent | Auto-start implementation detail | Hide inside packaged app or retire | Not user-facing |
 | Cockpit/doctor | Local operator dashboard | Move toward central/cloud operator dashboard | Local cockpit remains pilot fallback |
-| GitHub repo backup | Backup/version layer | Async export/recovery only | Define export cadence and recovery authority |
+| GitHub repo backup | Backup/version layer | Async export/recovery only | Routine-ops deprecation active; restore rehearsal gates removal as emergency history |
 | Local stdio MCP | Trusted fallback | Developer/operator fallback only | Do not require for colleagues |
 | Daemon-local mirror | Temporary workaround | Retire | Keep only as emergency recovery pattern |
 | Claude scheduled routines | Fragile scheduled QA | Replace with cloud ops service | Preserve until cloud service exists |
@@ -218,7 +218,17 @@ Not recommended:
 - Git conflicts as the primary user-facing conflict model;
 - requiring colleagues to understand or run Git.
 
-Deprecation condition: once Supabase backup/restore, SharePoint versioning, and async export/recovery are documented and tested, Git can be removed from normal ERS operator runbooks and kept as an implementation backup.
+Routine-ops deprecation is active as of 2026-06-25. Brain operators should not run Git commit/push/merge as part of normal hosted reads, writes, ingest, lint, doctor, cockpit, or sync checks.
+
+Current recovery baseline:
+
+- hosted sync status is clean for both `ai-brain-jem` and the John-only `ers-brain` pilot;
+- Supabase physical backup metadata is visible;
+- PITR is not currently enabled;
+- Supabase Storage objects are not included in database backups and need separate recovery coverage;
+- logical export and restore-to-new-project rehearsal remain gates before Git is removed as emergency history.
+
+Canonical runbook: `docs/hosted-brain-recovery-and-git-export.md`.
 
 ## Local MCP Position
 
@@ -383,7 +393,7 @@ Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP,
 
 - Architecture review explicitly chooses one target path for ERS colleague rollout.
 - Colleague human surface is classified as raw Markdown/Obsidian, browser UI, or both.
-- Git backup/export is classified as hot path, backup/export, or deprecated.
+- Git backup/export is classified as emergency async export/history only, with routine Brain operations deprecated.
 - Local stdio MCP is classified as normal user surface, developer fallback, or deprecated.
 - macOS helper/menu-bar scope is classified as John/operator-only or colleague product.
 - Windows support is addressed before any colleague-facing local helper plan is approved.
@@ -451,7 +461,7 @@ node scripts/hosted-doctor.mjs
 - John remains the only user during the current pilot.
 - ERS production requires ERS-owned Supabase and a dedicated ERS MCP deployment before team rollout.
 - Local helper apps are acceptable for John/operator use but undesirable as a colleague prerequisite.
-- Git backup remains valuable, but not as live sync fabric.
+- Git backup remains valuable only as emergency async export/history, not as live sync fabric or a routine operator step.
 - Local MCP remains valuable as fallback/developer tooling, but not as normal ERS colleague setup.
 
 ## Required User Decisions
@@ -459,5 +469,5 @@ node scripts/hosted-doctor.mjs
 1. Should the next implementation slice be the consolidated John/operator menu-bar app? Answered: yes; initial operator app shipped 2026-06-24.
 2. For ERS colleagues, is raw Markdown/Obsidian editing required, optional/advanced, or unnecessary?
 3. If raw Markdown editing is unnecessary for colleagues, should the next architecture spike be a hosted browser Brain UI instead of a bidirectional SharePoint/Graph sync adapter?
-4. Should Git remain a required ERS backup/export layer after Supabase and SharePoint versioning are verified?
+4. Should Git remain a required ERS emergency export/history layer after Supabase restore-to-new-project, Storage-object recovery, and any PITR decision are rehearsed?
 5. Should local MCP stay documented only for John/developers once hosted MCP and Graph sync are proven?

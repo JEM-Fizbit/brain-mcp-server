@@ -1,6 +1,6 @@
 # Fly Deployment
 
-> Current status: the old Fly volume + git working-copy pilot is retired for the hosted Brain rebuild. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. The local stdio `brain` MCP remains the baseline/default until hosted passes the local-first parity contract in `docs/specs/002-local-first-hosted-sync-contract.md`.
+> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback.
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
@@ -20,7 +20,7 @@ This is the hosted target for remote MCP clients that need a public HTTPS URL. F
 
 The hosted MCP server needs a public HTTPS endpoint, a Node runtime, and OAuth callback handling. Fly is acceptable for that compute layer.
 
-Fly should not provide the live Brain working copy. The previous deployment used a persistent volume and git checkout as the hosted write path. That path is retired because it allowed hosted state and local Markdown state to drift. Git may return later only as async export/history after sync succeeds.
+Fly should not provide the live Brain working copy. The previous deployment used a persistent volume and git checkout as the hosted write path. That path is retired because it allowed hosted state and local Markdown state to drift. Git is emergency async export/history only and must not return to routine Brain operations; see `docs/hosted-brain-recovery-and-git-export.md`.
 
 The committed `fly.toml`, `Dockerfile`, and Fly entrypoint intentionally enforce this: no deploy key mount, no `BRAIN_AUTO_SYNC`, no `BRAIN_AUTO_PUSH`, and no SSH setup in the runtime image. Keep Supabase database URLs, OAuth secrets, and any service-role keys in Fly secrets, not in `fly.toml`.
 
