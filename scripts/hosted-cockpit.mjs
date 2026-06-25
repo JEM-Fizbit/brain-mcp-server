@@ -181,6 +181,23 @@ const page = String.raw`<!doctype html>
         max-width: min(300px, 100%);
       }
 
+      .profile-badge {
+        display: inline-flex;
+        align-items: center;
+        min-width: 0;
+        max-width: min(360px, 100%);
+        border: 1px solid var(--line);
+        background: #f0f1ee;
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 650;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .status-band {
         display: grid;
         grid-template-columns: minmax(220px, 0.9fr) minmax(0, 2fr);
@@ -806,6 +823,11 @@ const page = String.raw`<!doctype html>
           justify-content: flex-start;
         }
 
+        .profile-badge,
+        .profile-switcher {
+          max-width: 100%;
+        }
+
         .operation-log-table {
           min-width: 900px;
         }
@@ -870,6 +892,7 @@ const page = String.raw`<!doctype html>
           <div class="muted">Local operator view for hosted Brain, sync, conflicts, and daemon health.</div>
         </div>
         <div class="toolbar">
+          <span class="profile-badge" id="current-profile-badge" title="Active Brain profile">Brain: -</span>
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
           <button id="refresh" type="button" title="Refresh status">Refresh</button>
@@ -881,6 +904,10 @@ const page = String.raw`<!doctype html>
           <div class="summary-state"><span id="state-dot" class="dot"></span><span id="state-text">Checking</span></div>
           <div id="state-copy" class="muted">Running the hosted doctor.</div>
           <div class="profile-meta">
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">Active</span>
+              <span id="profile-current-label">-</span>
+            </div>
             <div class="profile-meta-row">
               <span class="profile-meta-label">Brain</span>
               <code id="profile-brain-id">-</code>
@@ -1260,20 +1287,50 @@ const page = String.raw`<!doctype html>
 
       function profileFromPayload(payload) {
         const profile = payload.profile || {};
+        const currentProfile = profile.currentProfile || {};
         const postgres = byName(payload, "postgres_summary")?.details || {};
         const local = byName(payload, "local_sync_state")?.details || {};
         const sync = byName(payload, "sync_health")?.details || {};
         const supervisor = byName(payload, "launchd")?.details || {};
+        const profileBrainId =
+          profile.brainId || currentProfile.brainId || postgres.brainId || supervisor.brainId || "-";
+        const profileName =
+          profile.profileName || currentProfile.profileName || supervisor.profileName || profileBrainId;
+        const profileLabel =
+          profile.profileLabel ||
+          currentProfile.profileLabel ||
+          (profileName && profileName !== profileBrainId
+            ? profileName + " (" + profileBrainId + ")"
+            : profileBrainId);
+        const availableProfiles = Array.isArray(profile.availableProfiles) ? profile.availableProfiles : [];
+        const profileCount =
+          Number(profile.profileCount || availableProfiles.length || (profileBrainId === "-" ? 0 : 1));
         return {
-          brainId: profile.brainId || postgres.brainId || supervisor.brainId || "-",
-          profileName: profile.profileName || supervisor.profileName || profile.brainId || "-",
+          brainId: profileBrainId,
+          profileName,
+          profileLabel,
+          switcherLabel: profile.switcherLabel || currentProfile.switcherLabel || profileLabel,
+          profileCount,
+          isMultiProfile: Boolean(profile.isMultiProfile || profileCount > 1),
+          currentProfile,
           stateFile: profile.stateFile || local.stateFile || sync.healthFile || "-",
           healthFile: profile.healthFile || sync.healthFile || "-",
           logDir: profile.logDir || "-",
           cockpitUrl: profile.cockpitUrl || supervisor.cockpitUrl || window.location.href,
           supervisor: profile.supervisor || supervisor.supervisor || "-",
-          availableProfiles: Array.isArray(profile.availableProfiles) ? profile.availableProfiles : [],
+          availableProfiles,
         };
+      }
+
+      function profileOptionLabel(item) {
+        if (item.switcherLabel) return item.switcherLabel;
+        if (item.profileLabel) return item.profileLabel;
+        const itemBrainId = item.brainId || item.id || "";
+        const itemName = item.profileName || item.displayName || item.name || itemBrainId;
+        if (itemName && itemBrainId && itemName !== itemBrainId) {
+          return itemName + " (" + itemBrainId + ")";
+        }
+        return itemBrainId || item.cockpitUrl || "Unknown Brain";
       }
 
       function renderProfileSwitcher(profile) {
@@ -1286,9 +1343,10 @@ const page = String.raw`<!doctype html>
         }
 
         select.hidden = false;
+        select.title = profile.isMultiProfile ? "Switch Brain profile" : "Brain profile";
         select.innerHTML = profiles.map((item) => {
           const selected = item.brainId === profile.brainId ? " selected" : "";
-          const label = (item.profileName || item.brainId || item.cockpitUrl) + " - " + item.brainId;
+          const label = profileOptionLabel(item);
           return "<option value=\"" + escapeHtml(item.cockpitUrl) + "\"" + selected + ">" + escapeHtml(label) + "</option>";
         }).join("");
         select.onchange = () => {
@@ -2211,6 +2269,10 @@ const page = String.raw`<!doctype html>
         const usage7d = usageWindow(userOps, "7d");
         const profile = profileFromPayload(payload);
 
+        const profileBadge = document.getElementById("current-profile-badge");
+        profileBadge.textContent = profile.profileLabel ? "Brain: " + profile.profileLabel : "Brain: -";
+        profileBadge.title = "Active Brain profile: " + (profile.profileLabel || "-");
+        document.getElementById("profile-current-label").textContent = profile.profileLabel || "-";
         document.getElementById("profile-brain-id").textContent = profile.brainId || "-";
         document.getElementById("profile-name").textContent = profile.profileName || "-";
         document.getElementById("profile-state-file").textContent = profile.stateFile || "-";

@@ -152,6 +152,17 @@ function readConfiguredProfiles() {
   }
 }
 
+function profileDisplayLabel(profile) {
+  const id = profile.brainId || brainId;
+  const name = profile.profileName || profile.displayName || profile.name || id;
+  return name && name !== id ? `${name} (${id})` : id;
+}
+
+function profileSwitcherLabel(profile) {
+  const label = profile.profileLabel || profileDisplayLabel(profile);
+  return profile.isCurrent ? `${label} - current` : label;
+}
+
 function buildProfileSummary() {
   const configuredProfiles = readConfiguredProfiles();
   const availableProfiles = configuredProfiles.length
@@ -166,10 +177,49 @@ function buildProfileSummary() {
           cockpitUrl,
         },
       ];
+  let enrichedProfiles = availableProfiles.map((profile) => {
+    const enrichedProfile = {
+      ...profile,
+      profileName: profile.profileName || profile.brainId,
+      isCurrent: profile.brainId === brainId,
+    };
+    const profileLabel = profileDisplayLabel(enrichedProfile);
+    return {
+      ...enrichedProfile,
+      profileLabel,
+      switcherLabel: profileSwitcherLabel({ ...enrichedProfile, profileLabel }),
+    };
+  });
+  let currentProfile = enrichedProfiles.find((profile) => profile.isCurrent);
+  if (!currentProfile) {
+    const profileLabel = profileDisplayLabel({ brainId, profileName });
+    currentProfile = {
+      brainId,
+      profileName,
+      stateFile,
+      healthFile,
+      logDir: syncLogDir,
+      cockpitUrl,
+      isCurrent: true,
+      profileLabel,
+      switcherLabel: profileSwitcherLabel({
+        brainId,
+        profileName,
+        isCurrent: true,
+        profileLabel,
+      }),
+    };
+    enrichedProfiles = [currentProfile, ...enrichedProfiles];
+  }
 
   return {
     brainId,
     profileName,
+    profileLabel: currentProfile.profileLabel,
+    switcherLabel: currentProfile.switcherLabel,
+    profileCount: enrichedProfiles.length,
+    isMultiProfile: enrichedProfiles.length > 1,
+    currentProfile,
     brainDir,
     inboxDir,
     stateFile,
@@ -184,10 +234,7 @@ function buildProfileSummary() {
       brainScoped: ["hosted files", "local files", "conflicts", "sync health"],
       hostedScoped: ["auth failures", "operation usage", "latency"],
     },
-    availableProfiles: availableProfiles.map((profile) => ({
-      ...profile,
-      isCurrent: profile.brainId === brainId,
-    })),
+    availableProfiles: enrichedProfiles,
   };
 }
 

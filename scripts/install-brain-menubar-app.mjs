@@ -467,6 +467,15 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return displayName.length > 0 ? displayName : [self brainIdForProfile:profile];
 }
 
+- (NSString *)displayNameWithBrainIdForProfile:(NSDictionary *)profile {
+  NSString *brainId = [self brainIdForProfile:profile];
+  NSString *displayName = [self displayNameForProfile:profile];
+  if ([displayName isEqualToString:brainId]) {
+    return brainId;
+  }
+  return [NSString stringWithFormat:@"%@ (%@)", displayName, brainId];
+}
+
 - (NSString *)syncTaskNameForProfile:(NSDictionary *)profile {
   return [NSString stringWithFormat:@"sync:%@", [self brainIdForProfile:profile]];
 }
@@ -498,7 +507,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if ([self brainProfiles].count <= 1) {
     return singleTitle;
   }
-  return [NSString stringWithFormat:multiFormat, [self displayNameForProfile:profile]];
+  return [NSString stringWithFormat:multiFormat, [self displayNameWithBrainIdForProfile:profile]];
 }
 
 - (NSString *)stringFromValue:(id)value fallback:(NSString *)fallback {
@@ -846,12 +855,14 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.statusItem.button.title = [self statusTitleForProfiles];
 
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Brain Monitor"];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu", (unsigned long)profiles.count]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
   [menu addItem:[NSMenuItem separatorItem]];
 
   for (NSDictionary *profile in [self brainProfiles]) {
-    NSString *displayName = [self displayNameForProfile:profile];
+    NSString *displayName = profiles.count > 1
+      ? [self displayNameWithBrainIdForProfile:profile]
+      : [self displayNameForProfile:profile];
     NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
     NSDictionary *report = nil;
     id reportValue = health[@"report"];
