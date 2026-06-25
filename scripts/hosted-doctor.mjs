@@ -1118,6 +1118,7 @@ function buildOperatorActions(status) {
   if (openConflicts > 0) {
     actions.push({
       level: "fail",
+      reason: "open_conflicts",
       title: "Resolve open sync conflicts before hosted writes.",
       detail: "Follow docs/conflict-resolution.md and resolve with reviewed Markdown content.",
     });
@@ -1126,12 +1127,14 @@ function buildOperatorActions(status) {
   if (sync?.status === "fail") {
     actions.push({
       level: "fail",
+      reason: "sync_health_failed",
       title: "Fix failing local sync health.",
       detail: "Run npm run sync -- summary, inspect the reported error, then rerun hosted:doctor.",
     });
   } else if (sync?.status === "warn") {
     actions.push({
       level: "warn",
+      reason: "sync_health_stale",
       title: "Refresh stale or incomplete sync health.",
       detail: "Check the local launchd loop and recent sync logs before relying on hosted state.",
     });
@@ -1141,6 +1144,7 @@ function buildOperatorActions(status) {
     const supervisorKind = launchd.details?.supervisor || supervisor;
     actions.push({
       level: "warn",
+      reason: supervisorKind === "menubar" ? "monitor_supervisor" : "sync_launchagent",
       title:
         supervisorKind === "menubar"
           ? "Confirm Brain Monitor is supervising this Brain."
@@ -1155,6 +1159,7 @@ function buildOperatorActions(status) {
   if (lint?.status === "warn") {
     actions.push({
       level: "warn",
+      reason: "stale_lint",
       title: "Run brain_lint before accuracy-sensitive Brain work.",
       detail: "The last lint pass is missing, stale, or unreadable from the local Brain log.",
     });
@@ -1163,6 +1168,7 @@ function buildOperatorActions(status) {
   if ((inbox?.details?.pendingFiles || 0) > 0) {
     actions.push({
       level: "warn",
+      reason: "pending_inbox",
       title: "Review pending Brain inbox files.",
       detail: "Run brain_scan_inbox and process or intentionally defer the pending source files.",
     });
@@ -1187,6 +1193,7 @@ function buildOperatorActions(status) {
       const staleClientId = authFailures.details?.staleClientId;
       actions.push({
         level: authFailures.status,
+        reason: "stale_connector",
         title: `Stale connector looping: ${count} unknown_client_id auth failures in the last ${windowMinutes}m (${trend}).`,
         detail:
           `A single unregistered client${staleClientId ? ` (${staleClientId})` : ""} is retrying a refresh-token grant the server purged. This is expected post-migration noise, not an incident, and is downgraded to warn. Fix it at the client: fully REMOVE the connector (a re-auth reuses the dead client id) — likely a frozen/half-deleted connector on the provider side. It stops on its own when the provider tears down the connector or its cached refresh token expires.`,
@@ -1194,6 +1201,7 @@ function buildOperatorActions(status) {
     } else {
       actions.push({
         level: authFailures.status,
+        reason: "hosted_auth_failures",
         title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m (${trend}).`,
         detail:
           `${activityState === "active" ? "Failures are still recent" : "Failures appear stale"} (${lastFailureLabel}). Check the cockpit Auth panel and brain.sync_events hosted_mcp_auth rows. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.`,
@@ -1208,6 +1216,7 @@ function buildOperatorActions(status) {
   if (latencyFinding) {
     actions.push({
       level: latencyFinding.level,
+      reason: "latency_slo",
       title: "Investigate hosted Brain latency.",
       detail: `${latencyFinding.title}. ${latencyFinding.detail}`,
     });
@@ -1225,6 +1234,7 @@ function buildOperatorActions(status) {
     if (handledWarnings.has(check.name)) continue;
     actions.push({
       level: "warn",
+      reason: "check_warning",
       title: `${check.name} needs review.`,
       detail: "Inspect hosted:doctor details; this warning does not block hosted use unless it affects the current operation.",
     });
@@ -1236,6 +1246,7 @@ function buildOperatorActions(status) {
     if (check.name === "user_operation_latency" && latencyFinding) continue;
     actions.push({
       level: "fail",
+      reason: "check_failed",
       title: `${check.name} failed.`,
       detail: "Inspect hosted:doctor details and fix this before relying on hosted Brain.",
     });
@@ -1244,12 +1255,34 @@ function buildOperatorActions(status) {
   if (actions.length === 0 && status === "pass") {
     actions.push({
       level: "pass",
+      reason: "none",
       title: "No operator action required.",
       detail: "Hosted health, local sync, conflicts, lint freshness, inbox, daemon, and Fly checks are currently acceptable.",
     });
   }
 
-  return actions;
+  return actions.map(operatorAction);
+}
+
+function operatorAction(action) {
+  const actionStatus = action.status || action.level || "warn";
+  const nextAction = action.next_action || action.nextAction || action.detail || action.title;
+  return {
+    level: actionStatus,
+    status: actionStatus,
+    brain_id: action.brain_id || brainId,
+    reason: action.reason || "check_review",
+    title: action.title,
+    detail: action.detail || nextAction,
+    next_action: nextAction,
+    urgency: action.urgency || urgencyForActionStatus(actionStatus),
+  };
+}
+
+function urgencyForActionStatus(actionStatus) {
+  if (actionStatus === "fail") return "now";
+  if (actionStatus === "warn") return "soon";
+  return "none";
 }
 
 async function checkPoolerConfig() {

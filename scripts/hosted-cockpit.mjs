@@ -139,6 +139,10 @@ const page = String.raw`<!doctype html>
         margin-bottom: 18px;
       }
 
+      header > div {
+        min-width: 0;
+      }
+
       h1 {
         margin: 0 0 4px;
         font-size: 24px;
@@ -156,6 +160,7 @@ const page = String.raw`<!doctype html>
 
       .muted {
         color: var(--muted);
+        overflow-wrap: anywhere;
       }
 
       .toolbar {
@@ -224,6 +229,7 @@ const page = String.raw`<!doctype html>
         grid-template-columns: 72px minmax(0, 1fr);
         gap: 8px;
         align-items: baseline;
+        min-width: 0;
       }
 
       .profile-meta-label {
@@ -234,8 +240,12 @@ const page = String.raw`<!doctype html>
       }
 
       .profile-meta code,
-      .profile-meta a {
+      .profile-meta a,
+      .profile-meta-row > :last-child {
+        display: block;
+        min-width: 0;
         overflow-wrap: anywhere;
+        word-break: break-word;
       }
 
       .metrics {
@@ -441,6 +451,32 @@ const page = String.raw`<!doctype html>
       .next-actions {
         display: grid;
         gap: 8px;
+      }
+
+      .action-item {
+        border-top: 1px solid var(--line);
+        padding: 9px 0;
+        overflow-wrap: anywhere;
+      }
+
+      .action-item:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .action-heading {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .action-heading .event-title {
+        display: block;
+        flex: 1 1 180px;
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .activity-list {
@@ -1265,9 +1301,14 @@ const page = String.raw`<!doctype html>
 
       function actionItems(payload) {
         if (Array.isArray(payload.actions) && payload.actions.length > 0) {
-          return payload.actions.map((action) =>
-            action.title + (action.detail ? " " + action.detail : "")
-          );
+          return payload.actions.map((action) => ({
+            status: action.status || action.level || "warn",
+            brain_id: action.brain_id || payload.profile?.brainId || "",
+            reason: action.reason || "check_review",
+            urgency: action.urgency || "soon",
+            title: action.title || "Review doctor action",
+            next_action: action.next_action || action.detail || "",
+          }));
         }
 
         const items = [];
@@ -1277,41 +1318,106 @@ const page = String.raw`<!doctype html>
         const launchd = byName(payload, "launchd");
 
         if (payload.status === "pass") {
-          items.push("No operator action needed right now. This is the state we want before a real hosted test drive.");
+          items.push({
+            status: "pass",
+            brain_id: payload.profile?.brainId || "",
+            reason: "none",
+            urgency: "none",
+            title: "No operator action needed right now.",
+            next_action: "This is the state we want before a real hosted test drive.",
+          });
         }
 
         if (openConflicts > 0) {
-          items.push("Review open conflicts and resolve through the documented conflict workflow before asking clients to trust hosted state.");
+          items.push({
+            status: "fail",
+            brain_id: payload.profile?.brainId || "",
+            reason: "open_conflicts",
+            urgency: "now",
+            title: "Review open conflicts.",
+            next_action: "Resolve through the documented conflict workflow before asking clients to trust hosted state.",
+          });
         }
 
         if (syncHealth?.status === "warn") {
           const supervisor = launchd?.details?.supervisor;
-          items.push(
-            supervisor === "menubar"
-              ? "Sync health is stale or incomplete. Check Brain Monitor and recent sync logs."
-              : "Sync health is stale or incomplete. Check the local launchd loop and recent sync logs."
-          );
+          items.push({
+            status: "warn",
+            brain_id: payload.profile?.brainId || "",
+            reason: "sync_health_stale",
+            urgency: "soon",
+            title: "Sync health is stale or incomplete.",
+            next_action:
+              supervisor === "menubar"
+                ? "Check Brain Monitor and recent sync logs."
+                : "Check the local launchd loop and recent sync logs.",
+          });
         }
 
         if (syncHealth?.status === "fail") {
-          items.push("Sync health is failing. Run npm run sync -- summary, then inspect the reported conflict or error.");
+          items.push({
+            status: "fail",
+            brain_id: payload.profile?.brainId || "",
+            reason: "sync_health_failed",
+            urgency: "now",
+            title: "Sync health is failing.",
+            next_action: "Run npm run sync -- summary, then inspect the reported conflict or error.",
+          });
         }
 
         if (launchd?.status === "warn") {
-          items.push(
-            launchd.details?.supervisor === "menubar"
-              ? "Brain Monitor is not confidently supervising this Brain. Restart this local stack before a test drive."
-              : "Launchd is not confidently running. Restart the local sync agent before a test drive."
-          );
+          const menubar = launchd.details?.supervisor === "menubar";
+          items.push({
+            status: "warn",
+            brain_id: payload.profile?.brainId || "",
+            reason: menubar ? "monitor_supervisor" : "sync_launchagent",
+            urgency: "soon",
+            title: menubar
+              ? "Brain Monitor is not confidently supervising this Brain."
+              : "Launchd is not confidently running.",
+            next_action: menubar
+              ? "Restart this local stack before a test drive."
+              : "Restart the local sync agent before a test drive.",
+          });
         }
 
         for (const check of checks.filter((check) => check.status === "fail")) {
           if (check.name !== "sync_health") {
-            items.push(check.name + " failed. Inspect the details in the checks table and raw doctor output.");
+            items.push({
+              status: "fail",
+              brain_id: payload.profile?.brainId || "",
+              reason: "check_failed",
+              urgency: "now",
+              title: check.name + " failed.",
+              next_action: "Inspect the details in the checks table and raw doctor output.",
+            });
           }
         }
 
-        return [...new Set(items)];
+        const seen = new Set();
+        return items.filter((item) => {
+          const key = [item.status, item.reason, item.title, item.next_action].join("|");
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function renderActionItems(payload) {
+        return actionItems(payload)
+          .map((action) => {
+            const status = action.status || "warn";
+            const brainId = action.brain_id || payload.profile?.brainId || "";
+            const urgency = action.urgency || "soon";
+            const reason = action.reason || "check_review";
+            const nextAction = action.next_action || "";
+            const meta = [brainId, reason, "urgency " + urgency].filter(Boolean).join(" - ");
+            const next = nextAction
+              ? "<div class=\"details\">Next: " + escapeHtml(nextAction) + "</div>"
+              : "";
+            return "<div class=\"action-item\"><div class=\"action-heading\"><span class=\"pill " + escapeHtml(status) + "\">" + escapeHtml(status) + "</span><span class=\"event-title\">" + escapeHtml(action.title || "Review doctor action") + "</span></div><div class=\"event-meta\">" + escapeHtml(meta) + "</div>" + next + "</div>";
+          })
+          .join("");
       }
 
       function currentSnapshot(payload) {
@@ -2146,9 +2252,7 @@ const page = String.raw`<!doctype html>
           })
           .join("");
 
-        document.getElementById("actions").innerHTML = actionItems(payload)
-          .map((item) => "<div class=\"event\">" + escapeHtml(item) + "</div>")
-          .join("");
+        document.getElementById("actions").innerHTML = renderActionItems(payload);
 
         renderActivity(payload);
         renderOperationUsage(payload);
