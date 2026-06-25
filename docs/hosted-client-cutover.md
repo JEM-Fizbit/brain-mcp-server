@@ -79,6 +79,8 @@ ChatGPT generates connector-specific OAuth callbacks under `https://chatgpt.com/
 
 If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, tool-surface change, or redeploy that invalidates dynamic client registrations, check the cockpit Operation Log for `oauth_token` failures such as `unknown_client_id` or `invalid_client`. For ChatGPT, **do not rely on disconnect/reconnect**: it can preserve the stale connector registration and repeat the authorization failure. Fully delete/remove the old Brain connector from the affected ChatGPT account or workspace, then create it again from scratch so ChatGPT performs fresh dynamic client registration and receives a new `client_id`.
 
+For OpenAI surfaces, refresh ChatGPT/app-connector state first and Codex last. Codex can see the hosted Brain through the same OpenAI app connector backend, and existing Codex threads can retain a stale tool manifest even after the server has been redeployed. After deleting/recreating the ChatGPT custom MCP app and completing OAuth, start a fresh Codex chat/session and verify tool discovery there; avoid treating Codex as the first recovery surface unless the failure is limited to Codex's local `~/.codex/config.toml` MCP entry.
+
 ### ChatGPT Business / ERS workspace recovery
 
 ChatGPT Business custom MCP apps are not reliably manageable from the desktop app. Use the browser client. For the ERS Business workspace, the app is managed under **Workspace settings -> Apps**, not only under the individual user's connector settings.
@@ -100,7 +102,9 @@ brain_sync_status({ "brain_id": "ai-brain-jem" })
 brain_sync_status({ "brain_id": "ers-brain" })
 ```
 
-This browser/workspace delete-and-recreate flow restored ChatGPT Business ERS on 2026-06-24 after reconnect attempts failed with `Authorization failed`. By contrast, Claude account reconnects were straightforward and did not require deleting the connector.
+10. Start a fresh Codex chat/session last and verify the hosted Brain tool list is current there too. Do not use an already-open Codex thread as the source of truth for post-reinstall tool discovery.
+
+This browser/workspace delete-and-recreate flow restored ChatGPT Business ERS on 2026-06-24 after reconnect attempts failed with `Authorization failed`; a later fresh Codex session then saw the full hosted Brain tool surface. By contrast, Claude account reconnects were straightforward and did not require deleting the connector.
 
 OpenAI account cutover verification passed on 2026-06-16 for both ERS and personal ChatGPT accounts:
 
