@@ -65,6 +65,52 @@ args = ["/Users/johnemilad/Projects/brain-mcp-server/dist/index.js"]
 BRAIN_DIR = "/Users/johnemilad/Projects/ai-brain-jem/brain"
 ```
 
+### Codex terminal / CLI recovery
+
+The Codex terminal / CLI environment has its own local MCP entry in `~/.codex/config.toml`, plus OpenAI app-connector authorization and per-tool approval state. Verify both layers when the hosted Brain is updated, redeployed, or reinstalled.
+
+First confirm the local MCP entry still points at hosted:
+
+```bash
+codex mcp list --json
+codex mcp get brain --json
+codex login status
+codex doctor
+```
+
+Expected Brain entry:
+
+```text
+name: brain
+type: streamable_http
+url: https://jem-brain-mcp.fly.dev/mcp
+auth_status: o_auth
+```
+
+If the CLI shows stale OAuth symptoms such as `invalid_grant`, `invalid_client`, `unknown_client_id`, or `OAuth authorization required`, reset only the hosted Brain CLI credentials:
+
+```bash
+/Applications/Codex.app/Contents/Resources/codex mcp logout brain
+/Applications/Codex.app/Contents/Resources/codex mcp login brain
+```
+
+After OAuth succeeds, run one interactive terminal Codex session and approve the read-only `brain.brain_sync_status` call with **Always allow**. This is required because non-interactive `codex exec` runs without an approval surface; without a persisted approval, read-only hosted Brain checks can fail as `user cancelled MCP tool call` even when OAuth is healthy.
+
+Then verify both permitted Brains from the CLI without using `brain-local`:
+
+```bash
+/Applications/Codex.app/Contents/Resources/codex exec --ephemeral --sandbox read-only -C /Users/johnemilad/Projects/brain-mcp-server "Verification only. Use the hosted Brain MCP server named brain. Do not use brain-local and do not edit files. Call brain_sync_status for brain_id ai-brain-jem and brain_id ers-brain. Report only provider, hosted file count, open conflicts, and latest cursor for each Brain. Do not print Brain file contents."
+```
+
+Verification passed on 2026-06-25 UTC:
+
+| Brain | Provider | Hosted files | Open conflicts | Latest cursor |
+| --- | --- | ---: | ---: | --- |
+| `ai-brain-jem` | `revision` | 52 | 0 | `2026-06-24T23:45:23.762Z` |
+| `ers-brain` | `revision` | 40 | 0 | `2026-06-24T18:58:19.307Z` |
+
+Unrelated MCP OAuth warnings for other connectors, such as `supabase` or `slack-claude-jembot`, are not Brain failures. Reauth them separately if those CLI connectors are needed.
+
 ChatGPT connectors are configured through ChatGPT settings rather than a local `~/.codex` file. Create the hosted Brain connector in ChatGPT with:
 
 ```text
