@@ -7,3 +7,5 @@ dist/
 tmp/
 *.tsbuildinfo
 .claude/worktrees/
+test-results/
+playwright-report/

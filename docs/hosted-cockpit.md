@@ -32,6 +32,21 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
 
+## Optional Cockpit E2E Check
+
+Run the Playwright cockpit check after cockpit layout or hydration changes:
+
+```bash
+npx playwright install chromium
+npm run test:cockpit:e2e
+```
+
+This is intentionally separate from `npm test`. It launches the real local
+cockpit server on an ephemeral loopback port, uses a deterministic stub doctor
+payload through `BRAIN_COCKPIT_DOCTOR_SCRIPT`, and verifies the first screen on
+desktop and narrow viewports. Keep it optional until the browser dependency and
+timing are proven stable enough for the default test path.
+
 ## Legacy Standalone Cockpit LaunchAgent
 
 The standalone cockpit LaunchAgent remains available as a rollback/debugging
