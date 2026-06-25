@@ -374,8 +374,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSDictionary *config;
 @property (strong) NSMutableDictionary *managedTasks;
 @property (strong) NSMutableDictionary *managedProcessConfigs;
+@property (strong) NSMutableDictionary *cockpitScriptFingerprints;
 @property (strong) NSMutableSet *intentionalStops;
 @property (strong) NSMutableSet *runningDoctorProfiles;
+@property (strong) NSMutableSet *pendingCockpitOpens;
 @property (strong) NSTimer *stackHeartbeatTimer;
 @property (strong) NSTimer *doctorPollTimer;
 @property (copy) NSString *lastAction;
@@ -390,8 +392,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.config = [self loadConfig];
   self.managedTasks = [NSMutableDictionary dictionary];
   self.managedProcessConfigs = [NSMutableDictionary dictionary];
+  self.cockpitScriptFingerprints = [NSMutableDictionary dictionary];
   self.intentionalStops = [NSMutableSet set];
   self.runningDoctorProfiles = [NSMutableSet set];
+  self.pendingCockpitOpens = [NSMutableSet set];
   [self recordLastAction:@"Ready"];
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   [self setStatusTitle:@"Brain"];
@@ -663,13 +667,145 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return task && task.isRunning;
 }
 
+- (BOOL)isCockpitTaskName:(NSString *)name {
+  return [name hasPrefix:@"cockpit:"];
+}
+
+- (NSString *)scriptPathForProcessConfig:(NSDictionary *)processConfig {
+  NSArray *arguments = [processConfig[@"arguments"] isKindOfClass:[NSArray class]]
+    ? processConfig[@"arguments"]
+    : @[];
+  id firstArgument = arguments.count > 0 ? arguments[0] : nil;
+  return [firstArgument isKindOfClass:[NSString class]] ? (NSString *)firstArgument : @"";
+}
+
+- (NSString *)scriptFingerprintForPath:(NSString *)path {
+  if (path.length == 0) {
+    return nil;
+  }
+  NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+  NSDate *modifiedAt = attributes[NSFileModificationDate];
+  NSNumber *size = attributes[NSFileSize];
+  if (!modifiedAt) {
+    return nil;
+  }
+  return [NSString stringWithFormat:@"%.6f:%@", [modifiedAt timeIntervalSince1970], size ?: @0];
+}
+
+- (NSString *)cockpitFingerprintForProcessConfig:(NSDictionary *)processConfig {
+  return [self scriptFingerprintForPath:[self scriptPathForProcessConfig:processConfig]];
+}
+
+- (void)rememberCockpitFingerprintForTaskName:(NSString *)name processConfig:(NSDictionary *)processConfig {
+  if (![self isCockpitTaskName:name]) {
+    return;
+  }
+  NSString *fingerprint = [self cockpitFingerprintForProcessConfig:processConfig];
+  if (fingerprint.length > 0) {
+    self.cockpitScriptFingerprints[name] = fingerprint;
+  }
+}
+
 - (NSDictionary *)statusForManagedTask:(NSString *)name {
   NSTask *task = self.managedTasks[name];
   BOOL running = task && task.isRunning;
-  return @{
+  NSMutableDictionary *status = [@{
     @"state": running ? @"running" : @"stopped",
     @"pid": running ? @(task.processIdentifier) : [NSNull null]
-  };
+  } mutableCopy];
+  NSString *fingerprint = self.cockpitScriptFingerprints[name];
+  if (fingerprint.length > 0) {
+    status[@"scriptFingerprint"] = fingerprint;
+  }
+  return status;
+}
+
+- (void)openCockpitUrlForProfile:(NSDictionary *)profile {
+  NSString *urlString = [self stringFromValue:profile[@"cockpitUrl"] fallback:@"http://127.0.0.1:8787/"];
+  NSURL *url = [NSURL URLWithString:urlString];
+  if (url) {
+    [[NSWorkspace sharedWorkspace] openURL:url];
+    [self recordLastAction:[NSString stringWithFormat:@"Opened %@ cockpit", [self displayNameForProfile:profile]]];
+  } else {
+    [self recordLastAction:@"Invalid cockpit URL"];
+  }
+}
+
+- (void)restartCockpitForProfile:(NSDictionary *)profile reason:(NSString *)reason {
+  NSString *name = [self cockpitTaskNameForProfile:profile];
+  if ([self.intentionalStops containsObject:name]) {
+    return;
+  }
+  [self.intentionalStops addObject:name];
+  NSTask *task = self.managedTasks[name];
+  NSString *message = reason.length > 0 ? reason : @"refresh required";
+  [self recordLastAction:[NSString stringWithFormat:@"%@ cockpit %@; restarting", [self displayNameForProfile:profile], message]];
+  if (task && task.isRunning) {
+    [task terminate];
+  } else {
+    [self.managedTasks removeObjectForKey:name];
+  }
+  [self performSelector:@selector(startCockpitAfterSourceRefresh:) withObject:[self brainIdForProfile:profile] afterDelay:2.0];
+  [self writeStackStatus];
+}
+
+- (BOOL)ensureCockpitRuntimeFreshForProfile:(NSDictionary *)profile openAfterRestart:(BOOL)openAfterRestart {
+  NSString *name = [self cockpitTaskNameForProfile:profile];
+  NSDictionary *processConfig = profile[@"cockpitProcess"];
+  if (![processConfig isKindOfClass:[NSDictionary class]]) {
+    return NO;
+  }
+  NSString *currentFingerprint = [self cockpitFingerprintForProcessConfig:processConfig];
+  NSString *knownFingerprint = self.cockpitScriptFingerprints[name];
+  if (currentFingerprint.length == 0) {
+    if (![self isTaskRunningNamed:name]) {
+      [self startManagedProcess:name processConfig:processConfig];
+    }
+    return NO;
+  }
+  if (knownFingerprint.length == 0) {
+    self.cockpitScriptFingerprints[name] = currentFingerprint;
+    if (![self isTaskRunningNamed:name]) {
+      [self startManagedProcess:name processConfig:processConfig];
+    }
+    return NO;
+  }
+  if (![knownFingerprint isEqualToString:currentFingerprint]) {
+    if (openAfterRestart) {
+      [self.pendingCockpitOpens addObject:[self brainIdForProfile:profile]];
+    }
+    [self restartCockpitForProfile:profile reason:@"source changed"];
+    return YES;
+  }
+  if (![self isTaskRunningNamed:name]) {
+    [self startManagedProcess:name processConfig:processConfig];
+  }
+  return NO;
+}
+
+- (void)ensureCockpitRuntimesFresh:(BOOL)openAfterRestart {
+  for (NSDictionary *profile in [self brainProfiles]) {
+    [self ensureCockpitRuntimeFreshForProfile:profile openAfterRestart:openAfterRestart];
+  }
+}
+
+- (void)startCockpitAfterSourceRefresh:(id)sender {
+  if (![sender isKindOfClass:[NSString class]]) {
+    return;
+  }
+  NSDictionary *profile = [self profileForBrainId:(NSString *)sender];
+  NSString *name = [self cockpitTaskNameForProfile:profile];
+  if ([self isTaskRunningNamed:name]) {
+    [self performSelector:@selector(startCockpitAfterSourceRefresh:) withObject:sender afterDelay:1.0];
+    return;
+  }
+  [self.intentionalStops removeObject:name];
+  [self startManagedProcess:name processConfig:profile[@"cockpitProcess"]];
+  if ([self.pendingCockpitOpens containsObject:sender]) {
+    [self.pendingCockpitOpens removeObject:sender];
+    [self openCockpitUrlForProfile:profile];
+  }
+  [self rebuildMenu:nil];
 }
 
 - (void)writeStackStatus {
@@ -703,6 +839,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (void)heartbeatStackStatus:(NSTimer *)timer {
   (void)timer;
+  [self ensureCockpitRuntimesFresh:NO];
   [self writeStackStatus];
 }
 
@@ -815,6 +952,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   @try {
     [task launch];
     self.managedTasks[name] = task;
+    [self rememberCockpitFingerprintForTaskName:name processConfig:processConfig];
     [self recordLastAction:[NSString stringWithFormat:@"%@ running", name]];
   } @catch (NSException *exception) {
     [self recordLastAction:[NSString stringWithFormat:@"%@ failed: %@", name, exception.name]];
@@ -1179,15 +1317,12 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (void)openCockpit:(id)sender {
   NSDictionary *profile = [self profileForSender:sender];
-  [self startManagedProcess:[self cockpitTaskNameForProfile:profile] processConfig:profile[@"cockpitProcess"]];
-  NSString *urlString = [self stringFromValue:profile[@"cockpitUrl"] fallback:@"http://127.0.0.1:8787/"];
-  NSURL *url = [NSURL URLWithString:urlString];
-  if (url) {
-    [[NSWorkspace sharedWorkspace] openURL:url];
-    [self recordLastAction:[NSString stringWithFormat:@"Opened %@ cockpit", [self displayNameForProfile:profile]]];
-  } else {
-    [self recordLastAction:@"Invalid cockpit URL"];
+  if ([self ensureCockpitRuntimeFreshForProfile:profile openAfterRestart:YES]) {
+    [self rebuildMenu:nil];
+    return;
   }
+  [self startManagedProcess:[self cockpitTaskNameForProfile:profile] processConfig:profile[@"cockpitProcess"]];
+  [self openCockpitUrlForProfile:profile];
   [self rebuildMenu:nil];
 }
 

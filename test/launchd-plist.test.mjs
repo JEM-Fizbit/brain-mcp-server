@@ -466,6 +466,13 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /doctorInitialDelayMs/);
   assert.match(source, /performSelector:@selector\(refreshAllDoctors:\)/);
   assert.match(source, /refreshAllDoctors/);
+  assert.match(source, /cockpitScriptFingerprints/);
+  assert.match(source, /pendingCockpitOpens/);
+  assert.match(source, /ensureCockpitRuntimeFreshForProfile:[\s\S]*openAfterRestart:/);
+  assert.match(source, /ensureCockpitRuntimesFresh:/);
+  assert.match(source, /startCockpitAfterSourceRefresh:/);
+  assert.match(source, /heartbeatStackStatus:[\s\S]*ensureCockpitRuntimesFresh:NO/);
+  assert.match(source, /openCockpit:[\s\S]*ensureCockpitRuntimeFreshForProfile:profile openAfterRestart:YES/);
   assert.match(source, /connectivityStateForDoctorReport/);
   assert.match(source, /Brain Offline/);
   assert.match(source, /setStatusTitle/);
