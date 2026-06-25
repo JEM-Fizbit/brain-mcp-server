@@ -197,6 +197,8 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /lastLintAt/);
   assert.match(script, /inbox/);
   assert.match(script, /pendingFiles/);
+  assert.match(script, /ignoredInboxFilenames/);
+  assert.match(script, /README\.md/);
   assert.match(script, /buildOperatorActions/);
   assert.match(script, /actions: buildOperatorActions/);
   assert.match(script, /local_sync_state/);
