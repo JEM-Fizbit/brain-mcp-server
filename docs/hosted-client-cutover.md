@@ -81,6 +81,14 @@ If ChatGPT shows `Authorization failed` after a hosted OAuth-state migration, to
 
 For OpenAI surfaces, refresh ChatGPT/app-connector state first and Codex last. Codex can see the hosted Brain through the same OpenAI app connector backend, and existing Codex threads can retain a stale tool manifest even after the server has been redeployed. After deleting/recreating the ChatGPT custom MCP app and completing OAuth, start a fresh Codex chat/session and verify tool discovery there; avoid treating Codex as the first recovery surface unless the failure is limited to Codex's local `~/.codex/config.toml` MCP entry.
 
+External corroboration checked 2026-06-24:
+
+- OpenAI's ChatGPT app-auth docs state that, on the DCR path, ChatGPT calls the server's registration endpoint once for the connector instance, receives a generated `client_id`, and reuses that client for the instance. This matches the stale-connector failure mode after server-side OAuth-state resets. Source: <https://developers.openai.com/apps-sdk/build/auth>.
+- OpenAI's developer-mode docs say OAuth app creation scans tools, completes authorization, and then creates the app under Workspace Settings -> Apps / Settings -> Apps; the same page advises recreating the app when refresh-token/OAuth metadata needs to be refetched. Source: <https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt>.
+- OpenAI's app-maintenance docs say deploying server changes does not update the app snapshot; changed tools or metadata require a new scan/version flow. For this private custom-app workflow, delete/recreate is the practical reset when the UI does not expose a clean rescan/reauth path. Source: <https://developers.openai.com/apps-sdk/deploy/submission>.
+- OpenAI's Codex plugin docs say bundled apps can remain installed and must be managed in ChatGPT, which supports the observed cross-surface ChatGPT/Codex connector-state coupling. Source: <https://developers.openai.com/codex/plugins>.
+- OpenAI Developer Community reports show similar OAuth/action-refresh failure modes where users could not retrigger auth or refresh actions cleanly without disconnecting/reconnecting or deleting/recreating the connector. Representative thread: <https://community.openai.com/t/cannot-refresh-actions-after-oauth-authentication/1368841>.
+
 ### ChatGPT Business / ERS workspace recovery
 
 ChatGPT Business custom MCP apps are not reliably manageable from the desktop app. Use the browser client. For the ERS Business workspace, the app is managed under **Workspace settings -> Apps**, not only under the individual user's connector settings.
