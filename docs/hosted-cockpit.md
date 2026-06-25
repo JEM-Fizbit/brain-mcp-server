@@ -19,9 +19,11 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
 - user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - hosted MCP auth failures show current-window counts, prior-window trend, safe reason/target metadata, and recent metadata-only events in a dedicated Activity > Auth subpanel;
-- the cockpit header shows the active profile label as `<display name> (<brain_id>)`, plus the local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector using the same unambiguous labels and links to each configured local cockpit URL;
+- the cockpit header shows the active profile label as `<display name> (<brain_id>)` in the first-screen identity block, plus the local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector using the same unambiguous labels and links to each configured local cockpit URL;
+- the cockpit first screen includes a dedicated `Needs Action` panel above the tabbed sections; the Overview tab keeps the fuller `Next Actions` list for the same doctor actions;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
-- the menu-bar app reads each profile's latest hosted doctor output and surfaces user-action-required items directly in the menu with bounded titles/details plus an `Open Cockpit for details` action;
+- the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, and surfaces user-action-required items directly in the menu with bounded titles/details plus an `Open Cockpit for details` action;
+- the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
 - no Brain writes or conflict resolutions are exposed from the cockpit.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
@@ -262,6 +264,12 @@ processes. The hosted doctor enriches that profile block with `profileLabel`,
 bar can show `JEM (ai-brain-jem)` / `ERS (ers-brain)`-style labels instead of
 relying on ambiguous browser tabs or display names alone.
 
+The monitor also runs `scripts/hosted-doctor.mjs` automatically for each
+configured profile. Override the polling interval with
+`BRAIN_MENUBAR_DOCTOR_INTERVAL_MS`; values below 60000 are clamped to 60
+seconds so the local menu does not create avoidable hosted-check churn. Manual
+`Refresh Doctor` remains available for immediate operator checks.
+
 ## Operator Contract
 
 Green means hosted Brain is ready for normal use.
@@ -270,8 +278,14 @@ Action means the latest hosted doctor output contains one or more non-pass
 operator actions that need human judgement. Each doctor action is normalized
 with `status`, `brain_id`, `reason`, `next_action`, and `urgency`, while keeping
 the legacy `level`, `title`, and `detail` fields for older menu readers. The
-menu shows `Action required`, up to three bounded action titles/reasons/next
-steps, and an `Open Cockpit for details` shortcut for the relevant profile.
+cockpit first screen shows `Needs Action`; the menu shows `Action required`, up
+to three bounded action titles/reasons/next steps, and an `Open Cockpit for
+details` shortcut for the relevant profile.
+
+Offline means the local Mac could not reach the hosted Brain health endpoint.
+This is reported separately from a Brain MCP stack fault: check Wi-Fi, VPN,
+DNS, or local network access first, then let Brain Monitor's next automatic
+doctor refresh clear the status.
 
 Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 

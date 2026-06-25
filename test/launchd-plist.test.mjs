@@ -426,6 +426,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.doctorScriptPath, doctorScriptPath);
   assert.equal(config.doctorOutputPath, path.join(logDir, "hosted-doctor.out.json"));
   assert.equal(config.doctorErrorPath, path.join(logDir, "hosted-doctor.err.log"));
+  assert.equal(config.doctorIntervalMs, 60000);
+  assert.equal(config.doctorInitialDelayMs, 10000);
   assert.equal(config.stackStatusFile, path.join(logDir, "brain-monitor-stack.json"));
   assert.equal(config.env.BRAIN_SYNC_SUPERVISOR, "menubar");
   assert.equal(config.env.BRAIN_PROFILE_NAME, "ers-brain");
@@ -459,6 +461,13 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /cockpitTaskNameForProfile/);
   assert.match(source, /writeStackStatus/);
   assert.match(source, /scheduleStackHeartbeat/);
+  assert.match(source, /scheduleDoctorPolling/);
+  assert.match(source, /doctorPollTimer/);
+  assert.match(source, /doctorInitialDelayMs/);
+  assert.match(source, /performSelector:@selector\(refreshAllDoctors:\)/);
+  assert.match(source, /refreshAllDoctors/);
+  assert.match(source, /connectivityStateForDoctorReport/);
+  assert.match(source, /Brain Offline/);
   assert.match(source, /NSTimer/);
   assert.match(source, /readDoctorReportForProfile/);
   assert.match(source, /actionItemsForDoctorReport/);

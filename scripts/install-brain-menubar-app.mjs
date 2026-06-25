@@ -69,6 +69,14 @@ const doctorOutputPath =
 const doctorErrorPath =
   process.env.BRAIN_MENUBAR_DOCTOR_ERROR ||
   path.join(logDir, "hosted-doctor.err.log");
+const doctorIntervalMs = Math.max(
+  60_000,
+  Number(process.env.BRAIN_MENUBAR_DOCTOR_INTERVAL_MS || 60_000)
+);
+const doctorInitialDelayMs = Math.max(
+  5_000,
+  Number(process.env.BRAIN_MENUBAR_DOCTOR_INITIAL_DELAY_MS || 10_000)
+);
 const stackStatusFile =
   process.env.BRAIN_MONITOR_STACK_FILE ||
   path.join(logDir, "brain-monitor-stack.json");
@@ -349,6 +357,8 @@ const config = {
   cockpitScriptPath,
   doctorOutputPath: primaryProfile.doctorOutputPath,
   doctorErrorPath: primaryProfile.doctorErrorPath,
+  doctorIntervalMs,
+  doctorInitialDelayMs,
   stackStatusFile: primaryProfile.stackStatusFile,
   syncProcess: primaryProfile.syncProcess,
   cockpitProcess: primaryProfile.cockpitProcess,
@@ -365,7 +375,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSMutableDictionary *managedTasks;
 @property (strong) NSMutableDictionary *managedProcessConfigs;
 @property (strong) NSMutableSet *intentionalStops;
+@property (strong) NSMutableSet *runningDoctorProfiles;
 @property (strong) NSTimer *stackHeartbeatTimer;
+@property (strong) NSTimer *doctorPollTimer;
 @property (copy) NSString *lastAction;
 @end
 
@@ -378,17 +390,23 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.managedTasks = [NSMutableDictionary dictionary];
   self.managedProcessConfigs = [NSMutableDictionary dictionary];
   self.intentionalStops = [NSMutableSet set];
+  self.runningDoctorProfiles = [NSMutableSet set];
   self.lastAction = @"Ready";
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   self.statusItem.button.title = @"Brain";
   [self startManagedProcesses];
   [self scheduleStackHeartbeat];
+  [self scheduleDoctorPolling];
+  [self performSelector:@selector(refreshAllDoctors:)
+             withObject:nil
+             afterDelay:[self numberConfig:@"doctorInitialDelayMs" fallback:10000.0] / 1000.0];
   [self rebuildMenu:nil];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
   (void)notification;
   [self.stackHeartbeatTimer invalidate];
+  [self.doctorPollTimer invalidate];
   [self stopManagedProcesses:nil];
 }
 
@@ -441,6 +459,15 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     return (NSDictionary *)value;
   }
   return nil;
+}
+
+- (double)numberConfig:(NSString *)key fallback:(double)fallback {
+  id value = self.config[key];
+  if ([value respondsToSelector:@selector(doubleValue)]) {
+    double numeric = [value doubleValue];
+    return numeric > 0 ? numeric : fallback;
+  }
+  return fallback;
 }
 
 - (NSArray *)brainProfiles {
@@ -550,6 +577,41 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return [self readJsonAtPath:path];
 }
 
+- (NSDictionary *)doctorCheckNamed:(NSString *)name report:(NSDictionary *)doctorReport {
+  id rawChecks = doctorReport[@"checks"];
+  if (![rawChecks isKindOfClass:[NSArray class]]) {
+    return nil;
+  }
+  for (id rawCheck in (NSArray *)rawChecks) {
+    if (![rawCheck isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+    NSDictionary *check = (NSDictionary *)rawCheck;
+    NSString *checkName = [self stringFromValue:check[@"name"] fallback:@""];
+    if ([checkName isEqualToString:name]) {
+      return check;
+    }
+  }
+  return nil;
+}
+
+- (NSString *)connectivityStateForDoctorReport:(NSDictionary *)doctorReport {
+  NSDictionary *hostedHealth = [self doctorCheckNamed:@"hosted_health" report:doctorReport];
+  id detailsValue = hostedHealth[@"details"];
+  if (![detailsValue isKindOfClass:[NSDictionary class]]) {
+    return @"unknown";
+  }
+  NSDictionary *details = (NSDictionary *)detailsValue;
+  NSString *faultDomain = [self stringFromValue:details[@"faultDomain"] fallback:@""];
+  if ([faultDomain isEqualToString:@"local_connectivity"]) {
+    return @"local_offline";
+  }
+  if ([faultDomain isEqualToString:@"hosted_stack"]) {
+    return @"hosted_stack";
+  }
+  return @"reachable";
+}
+
 - (NSArray *)actionItemsForDoctorReport:(NSDictionary *)doctorReport {
   id rawActions = doctorReport[@"actions"];
   if (![rawActions isKindOfClass:[NSArray class]]) {
@@ -651,6 +713,20 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
                                                    userInfo:nil
                                                     repeats:YES];
   [[NSRunLoop mainRunLoop] addTimer:self.stackHeartbeatTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)scheduleDoctorPolling {
+  [self.doctorPollTimer invalidate];
+  double intervalSeconds = [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0;
+  if (intervalSeconds < 60.0) {
+    intervalSeconds = 60.0;
+  }
+  self.doctorPollTimer = [NSTimer timerWithTimeInterval:intervalSeconds
+                                                 target:self
+                                               selector:@selector(refreshAllDoctors:)
+                                               userInfo:nil
+                                                repeats:YES];
+  [[NSRunLoop mainRunLoop] addTimer:self.doctorPollTimer forMode:NSRunLoopCommonModes];
 }
 
 - (void)startManagedProcesses {
@@ -805,14 +881,24 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (NSString *)statusTitleForProfiles {
+  BOOL sawOffline = NO;
   BOOL sawAction = NO;
   BOOL sawWarn = NO;
   BOOL sawKnown = NO;
+  BOOL sawChecking = NO;
   for (NSDictionary *profile in [self brainProfiles]) {
     NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
     NSDictionary *doctor = [self readDoctorReportForProfile:profile];
     NSArray *actions = [self actionItemsForDoctorReport:doctor];
     NSString *doctorStatus = [[self stringFromValue:doctor[@"status"] fallback:@""] lowercaseString];
+    NSString *connectivityState = [self connectivityStateForDoctorReport:doctor];
+    if ([self.runningDoctorProfiles containsObject:[self brainIdForProfile:profile]]) {
+      sawChecking = YES;
+    }
+    if ([connectivityState isEqualToString:@"local_offline"]) {
+      sawOffline = YES;
+      continue;
+    }
     if ([self actionsContainFail:actions] || [doctorStatus isEqualToString:@"fail"] || [doctorStatus isEqualToString:@"error"]) {
       return @"Brain Fail";
     }
@@ -832,6 +918,12 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     if ([status isEqualToString:@"ok"] || [status isEqualToString:@"pass"]) {
       sawKnown = YES;
     }
+  }
+  if (sawOffline) {
+    return @"Brain Offline";
+  }
+  if (sawChecking && !sawAction && !sawWarn) {
+    return @"Brain Check";
   }
   if (sawAction) {
     return @"Brain Action";
@@ -856,6 +948,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Brain Monitor"];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
+  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last action: %@", self.lastAction ?: @"Ready"]];
   [menu addItem:[NSMenuItem separatorItem]];
 
@@ -906,6 +999,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     NSArray *doctorActions = [self actionItemsForDoctorReport:doctorReport];
     NSString *doctorStatus = [self stringFromValue:doctorReport[@"status"] fallback:@"not reported"];
     NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
+    NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
 
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"%@: %@", displayName, status]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Last check: %@", checkedAt]];
@@ -915,6 +1009,11 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
     [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAt]];
+    if ([connectivityState isEqualToString:@"local_offline"]) {
+      [self addDisabledItem:menu title:@"Connectivity: local device cannot reach hosted Brain"];
+    } else if ([connectivityState isEqualToString:@"hosted_stack"]) {
+      [self addDisabledItem:menu title:@"Connectivity: hosted stack responded unhealthy"];
+    }
     if (doctorActions.count > 0) {
       [self addDisabledItem:menu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
       NSUInteger shown = 0;
@@ -1011,18 +1110,32 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 }
 
 - (void)refreshDoctor:(id)sender {
-  [self runDoctorTaskForProfile:[self profileForSender:sender]];
+  [self runDoctorTaskForProfile:[self profileForSender:sender] automatic:NO];
   [self rebuildMenu:nil];
 }
 
-- (void)runDoctorTaskForProfile:(NSDictionary *)profile {
+- (void)refreshAllDoctors:(id)sender {
+  (void)sender;
+  for (NSDictionary *profile in [self brainProfiles]) {
+    [self runDoctorTaskForProfile:profile automatic:YES];
+  }
+  [self rebuildMenu:nil];
+}
+
+- (void)runDoctorTaskForProfile:(NSDictionary *)profile automatic:(BOOL)automatic {
+  NSString *brainId = [self brainIdForProfile:profile];
+  if ([self.runningDoctorProfiles containsObject:brainId]) {
+    return;
+  }
   NSString *nodePath = [self stringFromValue:profile[@"nodePath"] fallback:[self stringConfig:@"nodePath" fallback:@""]];
   NSString *profileDoctorScriptPath = [self stringFromValue:profile[@"doctorScriptPath"] fallback:[self stringConfig:@"doctorScriptPath" fallback:@""]];
   NSString *repoRoot = [self stringConfig:@"repoRoot" fallback:@""];
   NSString *outputPath = [self stringFromValue:profile[@"doctorOutputPath"] fallback:@""];
   NSString *errorPath = [self stringFromValue:profile[@"doctorErrorPath"] fallback:@""];
   if (nodePath.length == 0 || profileDoctorScriptPath.length == 0 || outputPath.length == 0 || errorPath.length == 0) {
-    self.lastAction = @"Doctor config missing";
+    if (!automatic) {
+      self.lastAction = @"Doctor config missing";
+    }
     return;
   }
 
@@ -1033,7 +1146,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSFileHandle *stdoutHandle = [NSFileHandle fileHandleForWritingAtPath:outputPath];
   NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:errorPath];
   if (!stdoutHandle || !stderrHandle) {
-    self.lastAction = @"Doctor log open failed";
+    if (!automatic) {
+      self.lastAction = @"Doctor log open failed";
+    }
     return;
   }
   [stdoutHandle truncateFileAtOffset:0];
@@ -1060,17 +1175,24 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   task.standardError = stderrHandle;
   __weak typeof(self) weakSelf = self;
   NSString *displayName = [self displayNameForProfile:profile];
+  [self.runningDoctorProfiles addObject:brainId];
   task.terminationHandler = ^(NSTask *finishedTask) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      weakSelf.lastAction = [NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus];
+      [weakSelf.runningDoctorProfiles removeObject:brainId];
+      if (!automatic || finishedTask.terminationStatus != 0) {
+        weakSelf.lastAction = [NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus];
+      }
       [weakSelf rebuildMenu:nil];
     });
   };
 
   @try {
     [task launch];
-    self.lastAction = [NSString stringWithFormat:@"%@ doctor running", displayName];
+    if (!automatic) {
+      self.lastAction = [NSString stringWithFormat:@"%@ doctor running", displayName];
+    }
   } @catch (NSException *exception) {
+    [self.runningDoctorProfiles removeObject:brainId];
     self.lastAction = [NSString stringWithFormat:@"Doctor failed: %@", exception.name];
   }
 }

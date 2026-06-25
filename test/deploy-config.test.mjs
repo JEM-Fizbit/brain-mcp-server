@@ -293,6 +293,36 @@ test("cockpit labels the active multi-Brain profile explicitly", async () => {
   assert.match(menuBar, /Brains: %lu profiles/);
 });
 
+test("cockpit surfaces active Brain identity and action queue above the fold", async () => {
+  const cockpit = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-cockpit.mjs"),
+    "utf-8"
+  );
+
+  assert.match(cockpit, /active-brain-panel/);
+  assert.match(cockpit, /active-brain-title/);
+  assert.match(cockpit, /active-brain-subtitle/);
+  assert.match(cockpit, /action-summary-panel/);
+  assert.match(cockpit, /action-summary-count/);
+  assert.match(cockpit, /action-summary-list/);
+  assert.match(cockpit, /function renderActionSummary/);
+  assert.match(cockpit, /document\.getElementById\("active-brain-title"\)/);
+  assert.match(cockpit, /renderActionSummary\(payload\)/);
+});
+
+test("hosted doctor distinguishes local connectivity from stack faults", async () => {
+  const doctor = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+
+  assert.match(doctor, /function hostedHealthFailureDetails/);
+  assert.match(doctor, /faultDomain: "local_connectivity"/);
+  assert.match(doctor, /faultDomain: "hosted_stack"/);
+  assert.match(doctor, /connectivity: "unreachable"/);
+  assert.match(doctor, /reason: "local_connectivity"/);
+});
+
 test("source list verifier supports non-JEM expected counts", async () => {
   const script = await fs.readFile(
     path.join(repoRoot, "scripts", "verify-postgres-source-list.mjs"),
