@@ -162,12 +162,15 @@ function normalizeProfile(rawProfile, index) {
   const cockpitStderr = path.join(profileLogDir, "monitor-cockpit.err.log");
   const baseEnv = {
     BRAIN_ID: profileBrainId,
+    BRAIN_PROFILE_NAME: raw.displayName || raw.name || profileBrainId,
     BRAIN_DIR: profileBrainDir,
     BRAIN_SYNC_STATE_FILE: profileStateFile,
     ...(profileLockFile ? { BRAIN_SYNC_LOCK_FILE: profileLockFile } : {}),
     BRAIN_SYNC_HEALTH_FILE: profileHealthFile,
+    BRAIN_SYNC_LOG_DIR: profileLogDir,
     BRAIN_SYNC_SUPERVISOR: "menubar",
     BRAIN_MONITOR_STACK_FILE: profileStackStatusFile,
+    BRAIN_COCKPIT_URL: resolvedCockpitUrl,
     PATH: runtimePath,
   };
 
@@ -235,6 +238,27 @@ function readProfiles() {
 
 const brainProfiles = readProfiles();
 const primaryProfile = brainProfiles[0];
+
+const cockpitProfilesJson = JSON.stringify(
+  brainProfiles.map((profile) => ({
+    brainId: profile.brainId,
+    profileName: profile.displayName,
+    stateFile: profile.stateFile,
+    healthFile: profile.healthFile,
+    logDir: profile.logDir,
+    cockpitUrl: profile.cockpitUrl,
+  }))
+);
+
+for (const profile of brainProfiles) {
+  for (const env of [
+    profile.env,
+    profile.syncProcess?.env,
+    profile.cockpitProcess?.env,
+  ]) {
+    if (env) env.BRAIN_COCKPIT_PROFILES_JSON = cockpitProfilesJson;
+  }
+}
 
 for (const [name, value] of [
   ["BRAIN_MENUBAR_APP", appPath],
@@ -542,6 +566,11 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     NSDictionary *status = @{
       @"supervisor": @"menubar",
       @"brainId": [self brainIdForProfile:profile],
+      @"displayName": [self displayNameForProfile:profile],
+      @"cockpitUrl": [self stringFromValue:profile[@"cockpitUrl"] fallback:@""],
+      @"stateFile": [self stringFromValue:profile[@"stateFile"] fallback:@""],
+      @"healthFile": [self stringFromValue:profile[@"healthFile"] fallback:@""],
+      @"logDir": [self stringFromValue:profile[@"logDir"] fallback:@""],
       @"checkedAt": [formatter stringFromDate:[NSDate date]],
       @"sync": [self statusForManagedTask:[self syncTaskNameForProfile:profile]],
       @"cockpit": [self statusForManagedTask:[self cockpitTaskNameForProfile:profile]]

@@ -428,7 +428,20 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.doctorErrorPath, path.join(logDir, "hosted-doctor.err.log"));
   assert.equal(config.stackStatusFile, path.join(logDir, "brain-monitor-stack.json"));
   assert.equal(config.env.BRAIN_SYNC_SUPERVISOR, "menubar");
+  assert.equal(config.env.BRAIN_PROFILE_NAME, "ers-brain");
+  assert.equal(config.env.BRAIN_COCKPIT_URL, "http://127.0.0.1:8798/");
+  assert.equal(config.env.BRAIN_SYNC_LOG_DIR, logDir);
   assert.equal(config.env.BRAIN_MONITOR_STACK_FILE, path.join(logDir, "brain-monitor-stack.json"));
+  assert.deepEqual(JSON.parse(config.env.BRAIN_COCKPIT_PROFILES_JSON), [
+    {
+      brainId: "ers-brain",
+      profileName: "ers-brain",
+      stateFile,
+      healthFile,
+      logDir,
+      cockpitUrl: "http://127.0.0.1:8798/",
+    },
+  ]);
   assert.equal(config.syncProcess.launchPath, nodePath);
   assert.deepEqual(config.syncProcess.arguments, [syncCliPath, "watch"]);
   assert.equal(config.syncProcess.stdoutPath, path.join(logDir, "monitor-sync.out.log"));
@@ -447,6 +460,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /writeStackStatus/);
   assert.match(source, /scheduleStackHeartbeat/);
   assert.match(source, /NSTimer/);
+  assert.match(source, /displayName/);
+  assert.match(source, /cockpitUrl/);
   assert.match(source, /Open Cockpit/);
   assert.match(source, /Refresh Doctor/);
   assert.match(source, /Restart Local Stack/);
@@ -520,11 +535,24 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
   assert.equal(config.brains[0].brainDir, path.join(jemRoot, "brain"));
   assert.equal(config.brains[0].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8787");
   assert.equal(config.brains[0].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "jem", "brain-monitor-stack.json"));
+  assert.equal(config.brains[0].env.BRAIN_PROFILE_NAME, "JEM");
+  assert.equal(config.brains[0].env.BRAIN_COCKPIT_URL, "http://127.0.0.1:8787/");
   assert.equal(config.brains[1].brainId, "ers-brain");
   assert.equal(config.brains[1].displayName, "ERS");
   assert.equal(config.brains[1].brainDir, path.join(ersRoot, "brain"));
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8788");
   assert.equal(config.brains[1].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "ers", "brain-monitor-stack.json"));
+  assert.deepEqual(
+    JSON.parse(config.brains[1].env.BRAIN_COCKPIT_PROFILES_JSON).map((profile) => [
+      profile.brainId,
+      profile.profileName,
+      profile.cockpitUrl,
+    ]),
+    [
+      ["ai-brain-jem", "JEM", "http://127.0.0.1:8787/"],
+      ["ers-brain", "ERS", "http://127.0.0.1:8788/"],
+    ]
+  );
   assert.match(source, /for \(NSDictionary \*profile in \[self brainProfiles\]\)/);
   assert.match(source, /syncTaskNameForProfile/);
   assert.match(source, /cockpitTaskNameForProfile/);

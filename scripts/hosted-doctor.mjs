@@ -43,6 +43,16 @@ const stateFile =
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE || `${stateFile}.lock`;
 const healthFile =
   process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
+const syncLogDir =
+  process.env.BRAIN_SYNC_LOG_DIR ||
+  process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR ||
+  path.dirname(healthFile);
+const cockpitHost = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
+const cockpitPort = Number(process.env.BRAIN_COCKPIT_PORT || 8787);
+const cockpitUrl =
+  process.env.BRAIN_COCKPIT_URL || `http://${cockpitHost}:${cockpitPort}/`;
+const profileName =
+  process.env.BRAIN_PROFILE_NAME || process.env.BRAIN_DISPLAY_NAME || brainId;
 const userOperationLatencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(brainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
@@ -79,6 +89,9 @@ const supervisor = process.env.BRAIN_SYNC_SUPERVISOR || "launchd";
 const monitorStackFile =
   process.env.BRAIN_MONITOR_STACK_FILE ||
   path.join(path.dirname(healthFile), "brain-monitor-stack.json");
+const monitorStackMaxAgeMs = Number(
+  process.env.BRAIN_MONITOR_STACK_MAX_AGE_MS || 2 * 60 * 1000
+);
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
@@ -116,6 +129,66 @@ function numericEnv(name) {
   if (process.env[name] === undefined || process.env[name] === "") return undefined;
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function readConfiguredProfiles() {
+  if (!process.env.BRAIN_COCKPIT_PROFILES_JSON) return [];
+  try {
+    const profiles = JSON.parse(process.env.BRAIN_COCKPIT_PROFILES_JSON);
+    if (!Array.isArray(profiles)) return [];
+    return profiles
+      .map((profile) => ({
+        brainId: profile.brainId || profile.id || null,
+        profileName:
+          profile.profileName || profile.displayName || profile.name || profile.brainId || null,
+        stateFile: profile.stateFile || profile.syncStateFile || null,
+        healthFile: profile.healthFile || profile.syncHealthFile || null,
+        logDir: profile.logDir || null,
+        cockpitUrl: profile.cockpitUrl || null,
+      }))
+      .filter((profile) => profile.brainId);
+  } catch {
+    return [];
+  }
+}
+
+function buildProfileSummary() {
+  const configuredProfiles = readConfiguredProfiles();
+  const availableProfiles = configuredProfiles.length
+    ? configuredProfiles
+    : [
+        {
+          brainId,
+          profileName,
+          stateFile,
+          healthFile,
+          logDir: syncLogDir,
+          cockpitUrl,
+        },
+      ];
+
+  return {
+    brainId,
+    profileName,
+    brainDir,
+    inboxDir,
+    stateFile,
+    lockFile,
+    healthFile,
+    logDir: syncLogDir,
+    cockpitUrl,
+    supervisor,
+    monitorStackFile,
+    hostedBaseUrl: baseUrl,
+    metricScopes: {
+      brainScoped: ["hosted files", "local files", "conflicts", "sync health"],
+      hostedScoped: ["auth failures", "operation usage", "latency"],
+    },
+    availableProfiles: availableProfiles.map((profile) => ({
+      ...profile,
+      isCurrent: profile.brainId === brainId,
+    })),
+  };
 }
 
 function isIgnoredInboxEntry(name) {
@@ -858,16 +931,30 @@ async function checkMenuBarSupervisor() {
     const checkedAt = stack.checkedAt || null;
     const parsedCheckedAt = checkedAt ? Date.parse(checkedAt) : NaN;
     const ageMs = Number.isNaN(parsedCheckedAt) ? null : Date.now() - parsedCheckedAt;
+    const stale = ageMs === null || ageMs > monitorStackMaxAgeMs;
+    const stackBrainId = stack.brainId || null;
+    const brainIdMatches = !stackBrainId || stackBrainId === brainId;
     const ok =
       stack.supervisor === "menubar" &&
+      brainIdMatches &&
+      !stale &&
       sync.state === "running" &&
-      syncPidAlive;
+      syncPidAlive &&
+      cockpit.state === "running" &&
+      cockpitPidAlive;
 
     addCheck("launchd", ok ? "pass" : "warn", {
       supervisor: "menubar",
+      brainId,
+      profileName,
+      stackBrainId,
+      brainIdMatches,
       stackStatusFile: monitorStackFile,
+      cockpitUrl,
       checkedAt,
       ageMs,
+      maxAgeMs: monitorStackMaxAgeMs,
+      state: stale ? "stale" : ok ? "running" : "incomplete",
       syncState: sync.state || null,
       syncPid: Number.isInteger(syncPid) ? syncPid : null,
       syncPidAlive,
@@ -1051,10 +1138,17 @@ function buildOperatorActions(status) {
   }
 
   if (launchd?.status === "warn") {
+    const supervisorKind = launchd.details?.supervisor || supervisor;
     actions.push({
       level: "warn",
-      title: "Confirm the local sync LaunchAgent is running.",
-      detail: "Restart the local sync agent if the state is stale, missing, or not confidently active.",
+      title:
+        supervisorKind === "menubar"
+          ? "Confirm Brain Monitor is supervising this Brain."
+          : "Confirm the local sync LaunchAgent is running.",
+      detail:
+        supervisorKind === "menubar"
+          ? "Open Brain Monitor, restart this Brain's local stack, then rerun hosted:doctor."
+          : "Restart the local sync agent if the state is stale, missing, or not confidently active.",
     });
   }
 
@@ -1236,6 +1330,7 @@ const summary = {
   status,
   checkedAt: new Date().toISOString(),
   latencyMs: Date.now() - doctorStartedAt,
+  profile: buildProfileSummary(),
   checks,
   actions: buildOperatorActions(status),
 };

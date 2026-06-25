@@ -166,6 +166,16 @@ const page = String.raw`<!doctype html>
         justify-content: flex-end;
       }
 
+      .profile-switcher {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font: inherit;
+        max-width: min(300px, 100%);
+      }
+
       .status-band {
         display: grid;
         grid-template-columns: minmax(220px, 0.9fr) minmax(0, 2fr);
@@ -201,6 +211,32 @@ const page = String.raw`<!doctype html>
       .dot.pass { background: var(--pass); }
       .dot.warn { background: var(--warn); }
       .dot.fail { background: var(--fail); }
+
+      .profile-meta {
+        display: grid;
+        gap: 6px;
+        margin-top: 14px;
+        font-size: 12px;
+      }
+
+      .profile-meta-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 8px;
+        align-items: baseline;
+      }
+
+      .profile-meta-label {
+        color: var(--muted);
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .profile-meta code,
+      .profile-meta a {
+        overflow-wrap: anywhere;
+      }
 
       .metrics {
         display: grid;
@@ -799,6 +835,7 @@ const page = String.raw`<!doctype html>
         </div>
         <div class="toolbar">
           <span class="muted" id="last-updated">Checking...</span>
+          <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
           <button id="refresh" type="button" title="Refresh status">Refresh</button>
         </div>
       </header>
@@ -807,6 +844,28 @@ const page = String.raw`<!doctype html>
         <section class="summary">
           <div class="summary-state"><span id="state-dot" class="dot"></span><span id="state-text">Checking</span></div>
           <div id="state-copy" class="muted">Running the hosted doctor.</div>
+          <div class="profile-meta">
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">Brain</span>
+              <code id="profile-brain-id">-</code>
+            </div>
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">Profile</span>
+              <span id="profile-name">-</span>
+            </div>
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">State</span>
+              <code id="profile-state-file">-</code>
+            </div>
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">Cockpit</span>
+              <a id="profile-cockpit-url" href="#">-</a>
+            </div>
+            <div class="profile-meta-row">
+              <span class="profile-meta-label">Scope</span>
+              <span id="profile-scope">-</span>
+            </div>
+          </div>
         </section>
         <div class="metrics">
           <div class="metric">
@@ -1004,6 +1063,10 @@ const page = String.raw`<!doctype html>
       const usefulDetailKeys = [
         "baseUrl",
         "brainId",
+        "profileName",
+        "supervisor",
+        "stackBrainId",
+        "brainIdMatches",
         "source",
         "telemetrySource",
         "postgresState",
@@ -1037,6 +1100,14 @@ const page = String.raw`<!doctype html>
         "label",
         "activeCount",
         "lastExitCode",
+        "stackStatusFile",
+        "syncState",
+        "syncPid",
+        "syncPidAlive",
+        "cockpitState",
+        "cockpitPid",
+        "cockpitPidAlive",
+        "cockpitUrl",
         "app",
         "error",
         "postgresError",
@@ -1151,6 +1222,47 @@ const page = String.raw`<!doctype html>
           .join("<br>");
       }
 
+      function profileFromPayload(payload) {
+        const profile = payload.profile || {};
+        const postgres = byName(payload, "postgres_summary")?.details || {};
+        const local = byName(payload, "local_sync_state")?.details || {};
+        const sync = byName(payload, "sync_health")?.details || {};
+        const supervisor = byName(payload, "launchd")?.details || {};
+        return {
+          brainId: profile.brainId || postgres.brainId || supervisor.brainId || "-",
+          profileName: profile.profileName || supervisor.profileName || profile.brainId || "-",
+          stateFile: profile.stateFile || local.stateFile || sync.healthFile || "-",
+          healthFile: profile.healthFile || sync.healthFile || "-",
+          logDir: profile.logDir || "-",
+          cockpitUrl: profile.cockpitUrl || supervisor.cockpitUrl || window.location.href,
+          supervisor: profile.supervisor || supervisor.supervisor || "-",
+          availableProfiles: Array.isArray(profile.availableProfiles) ? profile.availableProfiles : [],
+        };
+      }
+
+      function renderProfileSwitcher(profile) {
+        const select = document.getElementById("profile-switcher");
+        const profiles = profile.availableProfiles.filter((item) => item.cockpitUrl);
+        if (profiles.length <= 1) {
+          select.hidden = true;
+          select.innerHTML = "";
+          return;
+        }
+
+        select.hidden = false;
+        select.innerHTML = profiles.map((item) => {
+          const selected = item.brainId === profile.brainId ? " selected" : "";
+          const label = (item.profileName || item.brainId || item.cockpitUrl) + " - " + item.brainId;
+          return "<option value=\"" + escapeHtml(item.cockpitUrl) + "\"" + selected + ">" + escapeHtml(label) + "</option>";
+        }).join("");
+        select.onchange = () => {
+          const nextUrl = select.value;
+          if (nextUrl && nextUrl !== window.location.href) {
+            window.location.href = nextUrl;
+          }
+        };
+      }
+
       function actionItems(payload) {
         if (Array.isArray(payload.actions) && payload.actions.length > 0) {
           return payload.actions.map((action) =>
@@ -1173,7 +1285,12 @@ const page = String.raw`<!doctype html>
         }
 
         if (syncHealth?.status === "warn") {
-          items.push("Sync health is stale or incomplete. Check the local launchd loop and recent sync logs.");
+          const supervisor = launchd?.details?.supervisor;
+          items.push(
+            supervisor === "menubar"
+              ? "Sync health is stale or incomplete. Check Brain Monitor and recent sync logs."
+              : "Sync health is stale or incomplete. Check the local launchd loop and recent sync logs."
+          );
         }
 
         if (syncHealth?.status === "fail") {
@@ -1181,7 +1298,11 @@ const page = String.raw`<!doctype html>
         }
 
         if (launchd?.status === "warn") {
-          items.push("Launchd is not confidently running. Restart the local sync agent before a test drive.");
+          items.push(
+            launchd.details?.supervisor === "menubar"
+              ? "Brain Monitor is not confidently supervising this Brain. Restart this local stack before a test drive."
+              : "Launchd is not confidently running. Restart the local sync agent before a test drive."
+          );
         }
 
         for (const check of checks.filter((check) => check.status === "fail")) {
@@ -1982,6 +2103,17 @@ const page = String.raw`<!doctype html>
         const userOps = byName(payload, "user_operation_latency")?.details || {};
         const usage24h = usageWindow(userOps, "24h");
         const usage7d = usageWindow(userOps, "7d");
+        const profile = profileFromPayload(payload);
+
+        document.getElementById("profile-brain-id").textContent = profile.brainId || "-";
+        document.getElementById("profile-name").textContent = profile.profileName || "-";
+        document.getElementById("profile-state-file").textContent = profile.stateFile || "-";
+        const cockpitLink = document.getElementById("profile-cockpit-url");
+        cockpitLink.textContent = profile.cockpitUrl || "-";
+        cockpitLink.href = profile.cockpitUrl || "#";
+        document.getElementById("profile-scope").textContent =
+          "Per-Brain: hosted/local/sync/conflicts. Hosted-level: auth/usage/latency.";
+        renderProfileSwitcher(profile);
 
         document.getElementById("hosted-files").textContent = postgres.hostedFiles ?? "-";
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
