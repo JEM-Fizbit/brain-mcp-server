@@ -187,23 +187,6 @@ const page = String.raw`<!doctype html>
         max-width: min(300px, 100%);
       }
 
-      .profile-badge {
-        display: inline-flex;
-        align-items: center;
-        min-width: 0;
-        max-width: min(360px, 100%);
-        border: 1px solid var(--line);
-        background: #f0f1ee;
-        color: var(--ink);
-        border-radius: 999px;
-        padding: 7px 10px;
-        font-size: 12px;
-        font-weight: 650;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
       .active-brain-panel {
         display: grid;
         gap: 3px;
@@ -904,7 +887,6 @@ const page = String.raw`<!doctype html>
           justify-content: flex-start;
         }
 
-        .profile-badge,
         .profile-switcher {
           max-width: 100%;
         }
@@ -978,7 +960,6 @@ const page = String.raw`<!doctype html>
           </div>
         </div>
         <div class="toolbar">
-          <span class="profile-badge" id="current-profile-badge" title="Active Brain profile">Brain: -</span>
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
           <button id="refresh" type="button" title="Refresh status">Refresh</button>
@@ -2393,9 +2374,6 @@ const page = String.raw`<!doctype html>
         const usage7d = usageWindow(userOps, "7d");
         const profile = profileFromPayload(payload);
 
-        const profileBadge = document.getElementById("current-profile-badge");
-        profileBadge.textContent = profile.profileLabel ? "Brain: " + profile.profileLabel : "Brain: -";
-        profileBadge.title = "Active Brain profile: " + (profile.profileLabel || "-");
         document.getElementById("active-brain-title").textContent = profile.profileLabel || profile.brainId || "-";
         document.getElementById("active-brain-subtitle").textContent =
           (profile.isMultiProfile ? String(profile.profileCount) + " configured profiles. " : "") +
