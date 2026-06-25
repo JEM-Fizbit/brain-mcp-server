@@ -309,6 +309,15 @@ const page = String.raw`<!doctype html>
         overflow-wrap: anywhere;
       }
 
+      .timestamp-metric {
+        grid-column: span 2;
+      }
+
+      .timestamp-value {
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
       .grid {
         display: grid;
         grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -891,6 +900,10 @@ const page = String.raw`<!doctype html>
           max-width: 100%;
         }
 
+        .timestamp-metric {
+          grid-column: 1 / -1;
+        }
+
         .operation-log-table {
           min-width: 900px;
         }
@@ -1017,9 +1030,9 @@ const page = String.raw`<!doctype html>
             <div class="metric-label">Open conflicts</div>
             <div class="metric-value" id="open-conflicts">-</div>
           </div>
-          <div class="metric">
+          <div class="metric timestamp-metric">
             <div class="metric-label">Last sync</div>
-            <div class="metric-value" id="last-sync">-</div>
+            <div class="metric-value timestamp-value" id="last-sync">-</div>
           </div>
           <div class="metric">
             <div class="metric-label">Ops 24H</div>
@@ -1274,31 +1287,34 @@ const page = String.raw`<!doctype html>
         return hours + "h ago";
       }
 
-      function localTime(iso) {
+      function timeZoneOffsetLabel(date) {
+        const offsetMinutes = -date.getTimezoneOffset();
+        const sign = offsetMinutes >= 0 ? "+" : "-";
+        const absoluteOffset = Math.abs(offsetMinutes);
+        const hours = String(Math.floor(absoluteOffset / 60)).padStart(2, "0");
+        const minutes = String(absoluteOffset % 60).padStart(2, "0");
+        return "UTC" + sign + hours + ":" + minutes;
+      }
+
+      function displayTimestamp(iso) {
         if (!iso) return "-";
         const date = new Date(iso);
         if (Number.isNaN(date.getTime())) return "-";
-        return new Intl.DateTimeFormat(undefined, {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZoneName: "short",
-        }).format(date);
+        const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][date.getMonth()];
+        const year = String(date.getFullYear()).padStart(4, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const seconds = String(date.getSeconds()).padStart(2, "0");
+        return year + "-" + month + "-" + day + "; " + hours + ":" + minutes + ":" + seconds + " " + timeZoneOffsetLabel(date);
+      }
+
+      function localTime(iso) {
+        return displayTimestamp(iso);
       }
 
       function localDateTime(iso) {
-        if (!iso) return "-";
-        const date = new Date(iso);
-        if (Number.isNaN(date.getTime())) return "-";
-        return new Intl.DateTimeFormat(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZoneName: "short",
-        }).format(date);
+        return displayTimestamp(iso);
       }
 
       function compactHash(value) {
@@ -2364,7 +2380,7 @@ const page = String.raw`<!doctype html>
         document.getElementById("state-dot").className = "dot " + state;
         document.getElementById("state-text").textContent = title;
         document.getElementById("state-copy").textContent = copy;
-        document.getElementById("last-updated").textContent = payload.checkedAt ? "Checked " + ageLabel(payload.checkedAt) + " (" + localTime(payload.checkedAt) + ")" : "Checked just now";
+        document.getElementById("last-updated").textContent = payload.checkedAt ? "Checked " + ageLabel(payload.checkedAt) + " (" + displayTimestamp(payload.checkedAt) + ")" : "Checked just now";
 
         const postgres = byName(payload, "postgres_summary")?.details || {};
         const local = byName(payload, "local_sync_state")?.details || {};
@@ -2392,7 +2408,7 @@ const page = String.raw`<!doctype html>
         document.getElementById("hosted-files").textContent = postgres.hostedFiles ?? "-";
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
         document.getElementById("open-conflicts").textContent = postgres.openConflicts ?? "-";
-        document.getElementById("last-sync").textContent = sync.checkedAt ? ageLabel(sync.checkedAt) : "-";
+        document.getElementById("last-sync").textContent = sync.checkedAt ? displayTimestamp(sync.checkedAt) : "-";
         document.getElementById("ops-24h").textContent = formatCount(usage24h?.totalCount);
         document.getElementById("ops-7d").textContent = formatCount(usage7d?.totalCount);
         document.getElementById("ops-total").textContent = formatCount(userOps.usageStats?.allTime?.totalCount);

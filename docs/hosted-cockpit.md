@@ -23,6 +23,9 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the cockpit first screen includes a dedicated `Needs Action` panel above the tabbed sections; the Overview tab keeps the fuller `Next Actions` list for the same doctor actions;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
 - the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, keeps the top-level dropdown compact, and nests each Brain's `Overview`, `Actions`, `Controls`, and `Diagnostics` under that Brain's submenu;
+- the top-level menu includes `Open Cockpit` for the default/first configured Brain so the operator can reach the browser cockpit immediately, then switch profiles from the cockpit selector if needed;
+- the top-level `Last monitor action` is app-wide across the consolidated Brain Monitor process, not per-Brain and not doctor-only; it includes the timestamp of the latest monitor-recorded action from either configured Brain;
+- operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or checking states, and red for `Brain Fail`;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
 - no Brain writes or conflict resolutions are exposed from the cockpit.
@@ -237,7 +240,9 @@ npm run sync:menubar:install
 Launch the generated app once to put `Brain OK`, `Brain Action`, `Brain Warn`,
 or `Brain Fail` in the macOS menu bar. The status text is colored by severity,
 and each configured Brain gets a nested menu with Overview, Actions, Controls,
-and Diagnostics sections. The app is config-driven and per-Brain.
+and Diagnostics sections. `Open Cockpit` also appears at the top level and opens
+the default/first configured Brain cockpit; use the cockpit selector to switch
+to another Brain. The app is config-driven and per-Brain.
 For CloudStorage Brains, grant the monitor app Full Disk Access; the sync
 watcher runs as the monitor's child process and uses that app identity. Broad
 signed/notarized installer packaging remains separate backlog work.

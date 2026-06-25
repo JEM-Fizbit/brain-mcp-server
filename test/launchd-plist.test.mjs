@@ -472,6 +472,12 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /statusColorForTitle/);
   assert.match(source, /NSForegroundColorAttributeName/);
   assert.match(source, /attributedTitle/);
+  assert.match(source, /displayTimestamp:/);
+  assert.match(source, /UTC%\@%02ld:%02ld/);
+  assert.match(source, /Last monitor action:/);
+  assert.match(source, /lastActionAt/);
+  assert.match(source, /recordLastAction:/);
+  assert.doesNotMatch(source, /Last action: %@/);
   assert.match(source, /addProfileMenuForProfile/);
   assert.match(source, /NSMenu \*profileMenu/);
   assert.match(source, /\[profileItem setSubmenu:profileMenu\]/);
@@ -487,6 +493,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /Open Cockpit for details/);
   assert.match(source, /displayName/);
   assert.match(source, /cockpitUrl/);
+  assert.match(source, /title:@"Open Cockpit" action:@selector\(openCockpit:\) profile:\[self topLevelCockpitProfile\]/);
+  assert.match(source, /topLevelCockpitProfile/);
   assert.match(source, /Open Cockpit/);
   assert.match(source, /Refresh Doctor/);
   assert.match(source, /Restart Local Stack/);
