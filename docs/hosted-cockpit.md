@@ -19,7 +19,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
 - user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - hosted MCP auth failures show current-window counts, prior-window trend, safe reason/target metadata, and recent metadata-only events in a dedicated Activity > Auth subpanel;
-- the cockpit header shows the active `brain_id`, local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector that links to each configured local cockpit URL;
+- the cockpit header shows the active profile label as `<display name> (<brain_id>)`, plus the local profile name, sync state path, cockpit URL, and metric scope; when the consolidated Brain Monitor app is installed with multiple profiles, the cockpit also exposes a profile selector using the same unambiguous labels and links to each configured local cockpit URL;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
 - the menu-bar app reads each profile's latest hosted doctor output and surfaces user-action-required items directly in the menu with bounded titles/details plus an `Open Cockpit for details` action;
 - no Brain writes or conflict resolutions are exposed from the cockpit.
@@ -254,11 +254,13 @@ When this consolidated monitor is active, do not also run the legacy sync-helper
 LaunchAgent, standalone sync LaunchAgent, or standalone cockpit LaunchAgent for
 the same Brain.
 
-The generated monitor config passes each profile's display name, cockpit URL,
-sync state path, health path, log directory, stack status file, and a sanitized
-list of available profiles into the per-Brain doctor/cockpit processes. That is
-what lets each cockpit identify the active Brain and switch between the JEM and
-ERS local loopback views without relying on separate ambiguous browser tabs.
+The generated monitor config passes each profile's display name, Brain id,
+cockpit URL, sync state path, health path, log directory, stack status file,
+and a sanitized list of available profiles into the per-Brain doctor/cockpit
+processes. The hosted doctor enriches that profile block with `profileLabel`,
+`switcherLabel`, `profileCount`, and `isMultiProfile` so the cockpit and menu
+bar can show `JEM (ai-brain-jem)` / `ERS (ers-brain)`-style labels instead of
+relying on ambiguous browser tabs or display names alone.
 
 ## Operator Contract
 

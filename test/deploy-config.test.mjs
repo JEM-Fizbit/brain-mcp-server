@@ -265,6 +265,34 @@ test("hosted doctor emits normalized user-action indicators", async () => {
   assert.match(menuBar, /action\[@"urgency"\]/);
 });
 
+test("cockpit labels the active multi-Brain profile explicitly", async () => {
+  const doctor = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+  const cockpit = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-cockpit.mjs"),
+    "utf-8"
+  );
+  const menuBar = await fs.readFile(
+    path.join(repoRoot, "scripts", "install-brain-menubar-app.mjs"),
+    "utf-8"
+  );
+
+  assert.match(doctor, /function profileDisplayLabel/);
+  assert.match(doctor, /profileLabel/);
+  assert.match(doctor, /switcherLabel/);
+  assert.match(doctor, /profileCount/);
+  assert.match(doctor, /isMultiProfile/);
+  assert.match(cockpit, /current-profile-badge/);
+  assert.match(cockpit, /profile-current-label/);
+  assert.match(cockpit, /function profileOptionLabel/);
+  assert.match(cockpit, /profile\.profileLabel/);
+  assert.match(cockpit, /item\.switcherLabel/);
+  assert.match(menuBar, /displayNameWithBrainIdForProfile/);
+  assert.match(menuBar, /Brains: %lu profiles/);
+});
+
 test("source list verifier supports non-JEM expected counts", async () => {
   const script = await fs.readFile(
     path.join(repoRoot, "scripts", "verify-postgres-source-list.mjs"),
