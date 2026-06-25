@@ -58,6 +58,7 @@ const userOperationEventLogWindowDays = Math.max(
   1,
   Number(process.env.BRAIN_HOSTED_MCP_EVENT_LOG_DAYS || 30)
 );
+const ignoredInboxFilenames = new Set([".gitkeep", "README.md"]);
 const authFailureEventLimit = Math.max(
   100,
   Number(process.env.BRAIN_HOSTED_MCP_AUTH_EVENT_LIMIT || 1000)
@@ -115,6 +116,10 @@ function numericEnv(name) {
   if (process.env[name] === undefined || process.env[name] === "") return undefined;
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+function isIgnoredInboxEntry(name) {
+  return name.startsWith(".") || ignoredInboxFilenames.has(name);
 }
 
 function combineCheckStatuses(...statuses) {
@@ -799,7 +804,7 @@ async function checkInbox() {
     const files = [];
     for (const entry of entries) {
       if (entry.isDirectory()) continue;
-      if (entry.name.startsWith(".") || entry.name === ".gitkeep") continue;
+      if (isIgnoredInboxEntry(entry.name)) continue;
       const stat = await fs.stat(path.join(inboxDir, entry.name));
       files.push({
         name: entry.name,

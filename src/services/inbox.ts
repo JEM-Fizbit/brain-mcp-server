@@ -8,6 +8,12 @@ export interface InboxFile {
   modified: Date;
 }
 
+const IGNORED_INBOX_FILENAMES = new Set([".gitkeep", "README.md"]);
+
+export function isIgnoredInboxEntry(name: string): boolean {
+  return name.startsWith(".") || IGNORED_INBOX_FILENAMES.has(name);
+}
+
 /**
  * Resolve the inbox directory path (sibling to brain/, like sources/).
  */
@@ -19,7 +25,7 @@ async function getInboxPath(brainId?: string): Promise<string> {
 /**
  * Scan the Brain inbox for pending files.
  * Creates the inbox directory if it doesn't exist.
- * Filters out hidden files, .gitkeep, and directories.
+ * Filters out hidden files, standard documentation placeholders, and directories.
  * Returns files sorted by modified date (newest first).
  */
 export async function scanInbox(brainId?: string): Promise<InboxFile[]> {
@@ -32,10 +38,9 @@ export async function scanInbox(brainId?: string): Promise<InboxFile[]> {
 
   const files: InboxFile[] = [];
   for (const entry of entries) {
-    // Skip directories, hidden files, and .gitkeep
+    // Skip directories and non-actionable placeholder files.
     if (entry.isDirectory()) continue;
-    if (entry.name.startsWith(".")) continue;
-    if (entry.name === ".gitkeep") continue;
+    if (isIgnoredInboxEntry(entry.name)) continue;
 
     const filePath = path.join(inboxPath, entry.name);
     const stat = await fs.stat(filePath);
