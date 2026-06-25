@@ -46,6 +46,8 @@ For remote-only Claude/Codex usage, prefer hosted `brain-hosted`. For local file
 
 ## OpenAI Client Cutover
 
+Provider-level ChatGPT/Codex connector recovery is canonicalized in `~/Projects/ai-knowledge/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`. Use that protocol after hosted MCP OAuth-state, Dynamic Client Registration, callback, or tool-surface changes; this page keeps the Brain-specific connector URL, account notes, and verification commands.
+
 Codex has been fully cut over so the default `brain` MCP connector points at hosted:
 
 ```toml
