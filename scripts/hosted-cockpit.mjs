@@ -219,26 +219,28 @@ const page = String.raw`<!doctype html>
 
       .status-band {
         display: grid;
-        grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 0.9fr) minmax(0, 2fr);
-        gap: 14px;
-        margin-bottom: 14px;
+        grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+        gap: 16px;
+        align-items: stretch;
+        margin-bottom: 22px;
       }
 
       .summary {
         background: var(--panel);
-        border: 1px solid var(--line);
+        border: 1px solid #c9cec8;
         border-radius: 8px;
-        padding: 18px;
-        min-height: 142px;
+        box-shadow: 0 1px 3px rgba(29, 31, 33, 0.08);
+        padding: 22px;
+        min-height: 220px;
       }
 
       .summary-state {
         display: flex;
         align-items: center;
         gap: 10px;
-        font-size: 22px;
+        font-size: 26px;
         font-weight: 650;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
       }
 
       .dot {
@@ -286,8 +288,8 @@ const page = String.raw`<!doctype html>
 
       .metrics {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
       }
 
       .metric {
@@ -295,7 +297,7 @@ const page = String.raw`<!doctype html>
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 14px;
-        min-height: 72px;
+        min-height: 82px;
       }
 
       .metric-label {
@@ -528,6 +530,10 @@ const page = String.raw`<!doctype html>
         display: grid;
         align-content: start;
         gap: 10px;
+        border-color: #c9cec8;
+        box-shadow: 0 1px 3px rgba(29, 31, 33, 0.08);
+        min-height: 220px;
+        padding: 22px;
       }
 
       .section-heading {
@@ -540,6 +546,20 @@ const page = String.raw`<!doctype html>
 
       .section-heading h2 {
         margin: 0;
+      }
+
+      .metric-section {
+        background: transparent;
+        border: 0;
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        margin-bottom: 18px;
+        padding: 18px 0 0;
+      }
+
+      .metric-section-heading {
+        align-items: flex-end;
+        margin-bottom: 12px;
       }
 
       .action-count {
@@ -1020,6 +1040,15 @@ const page = String.raw`<!doctype html>
           </div>
           <div class="action-summary-list" id="action-summary-list"></div>
         </section>
+      </div>
+
+      <section class="metric-section" aria-labelledby="metric-section-heading">
+        <div class="section-heading metric-section-heading">
+          <div>
+            <h2 id="metric-section-heading">Operational Signals</h2>
+            <div class="section-note">Hosted/local state, activity volume, and latency for the selected Brain.</div>
+          </div>
+        </div>
         <div class="metrics">
           <div class="metric">
             <div class="metric-label">Hosted files</div>
@@ -1078,7 +1107,7 @@ const page = String.raw`<!doctype html>
             <div class="metric-value" id="doctor-latency">-</div>
           </div>
         </div>
-      </div>
+      </section>
 
       <div class="tabs">
         <div class="tab-list" role="tablist" aria-label="Cockpit sections">

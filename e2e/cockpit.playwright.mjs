@@ -213,16 +213,48 @@ async function expectCockpitReady(page) {
   expect(hasHorizontalOverflow).toBe(false);
 }
 
+async function expectCockpitDashboardHierarchy(page) {
+  await expect(page.locator(".status-band > .summary")).toBeVisible();
+  await expect(page.locator(".status-band > .action-summary-panel")).toBeVisible();
+  await expect(page.locator(".status-band > .metrics")).toHaveCount(0);
+  await expect(page.locator(".metric-section")).toBeVisible();
+  await expect(page.locator("#metric-section-heading")).toHaveText("Operational Signals");
+  await expect(page.locator(".metric-section .metrics .metric")).toHaveCount(14);
+
+  const layout = await page.evaluate(() => {
+    const summary = document.querySelector(".summary")?.getBoundingClientRect();
+    const actions = document.querySelector(".action-summary-panel")?.getBoundingClientRect();
+    const metricSection = document.querySelector(".metric-section")?.getBoundingClientRect();
+    const firstMetric = document.querySelector(".metric-section .metric")?.getBoundingClientRect();
+    const statusBand = document.querySelector(".status-band");
+    return {
+      statusBandChildren: statusBand ? Array.from(statusBand.children).map((child) => child.className) : [],
+      metricsBelowPriority:
+        Boolean(summary && actions && metricSection) &&
+        metricSection.top >= Math.max(summary.bottom, actions.bottom) + 8,
+      priorityPanelsTallerThanMetrics:
+        Boolean(summary && actions && firstMetric) &&
+        Math.min(summary.height, actions.height) > firstMetric.height,
+    };
+  });
+
+  expect(layout.statusBandChildren).toEqual(["summary", "action-summary-panel"]);
+  expect(layout.metricsBelowPriority).toBe(true);
+  expect(layout.priorityPanelsTallerThanMetrics).toBe(true);
+}
+
 test("cockpit renders deterministic status on desktop and narrow viewports", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo);
   try {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(url);
     await expectCockpitReady(page);
+    await expectCockpitDashboardHierarchy(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expectCockpitReady(page);
+    await expectCockpitDashboardHierarchy(page);
   } finally {
     await stopCockpit(child);
   }
