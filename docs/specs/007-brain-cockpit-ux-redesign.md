@@ -60,6 +60,7 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 
 ### Later slices
 
+- Redesign the tab and sub-tab navigation so primary tabs, selected tab state, and nested panel choices have clearer hierarchy than the current flat text rows.
 - Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
 - Refine metric grouping if operator use shows any cluster still buries key signals.
 - Decide whether action-required state should also drive a persistent top-level banner.
