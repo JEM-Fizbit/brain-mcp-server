@@ -758,7 +758,7 @@ const page = String.raw`<!doctype html>
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        min-width: 980px;
+        min-width: 1080px;
       }
 
       .operation-log-table th,
@@ -782,12 +782,70 @@ const page = String.raw`<!doctype html>
       }
 
       .operation-log-table .tool-col {
+        width: 18%;
         font-weight: 650;
       }
 
       .operation-log-table .duration-col {
+        width: 7%;
         font-weight: 650;
         text-align: right;
+      }
+
+      .operation-log-table .kind-col {
+        width: 7%;
+      }
+
+      .operation-log-table .timing-col {
+        width: 9%;
+      }
+
+      .operation-log-table .status-col {
+        width: 7%;
+      }
+
+      .operation-log-table .target-col {
+        width: 14%;
+      }
+
+      .operation-log-table .source-col {
+        width: 8%;
+      }
+
+      .operation-log-table .db-col {
+        width: 14%;
+      }
+
+      .operation-log-table .operation-time-col {
+        width: 16%;
+      }
+
+      .operation-log-table td.tool-col,
+      .operation-log-table td.target-col,
+      .operation-log-table td.db-col,
+      .operation-log-table td.operation-time-col {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+      }
+
+      .timestamp-stack {
+        display: inline-grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .timestamp-date {
+        color: var(--ink);
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .timestamp-time {
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
       }
 
       .operation-log-table .status-pass {
@@ -1567,6 +1625,27 @@ const page = String.raw`<!doctype html>
         return displayTimestamp(iso);
       }
 
+      function timestampParts(iso) {
+        const timestamp = displayTimestamp(iso);
+        if (timestamp === "-") return { date: "-", time: "" };
+        const [date, time] = timestamp.split("; ");
+        return {
+          date: date || timestamp,
+          time: time || "",
+        };
+      }
+
+      function renderTimestampStack(iso) {
+        const parts = timestampParts(iso);
+        const time = parts.time
+          ? "<span class=\"timestamp-time\">" + escapeHtml(parts.time) + "</span>"
+          : "";
+        return "<span class=\"timestamp-stack\">" +
+          "<span class=\"timestamp-date\">" + escapeHtml(parts.date) + "</span>" +
+          time +
+        "</span>";
+      }
+
       function compactHash(value) {
         return value ? String(value).slice(0, 10) : "-";
       }
@@ -1980,15 +2059,15 @@ const page = String.raw`<!doctype html>
         return "<div class=\"operation-table-wrap\">" +
           "<table class=\"operation-log-table\">" +
             "<thead><tr>" +
-              "<th style=\"width: 18%\">Tool</th>" +
-              "<th style=\"width: 8%\">Latency</th>" +
-              "<th style=\"width: 8%\">Type</th>" +
-              "<th style=\"width: 10%\">Timing</th>" +
-              "<th style=\"width: 8%\">Status</th>" +
-              "<th style=\"width: 14%\">Target</th>" +
-              "<th style=\"width: 10%\">Source</th>" +
-              "<th style=\"width: 14%\">DB</th>" +
-              "<th style=\"width: 10%\">When</th>" +
+              "<th class=\"tool-col\">Tool</th>" +
+              "<th class=\"duration-col\">Latency</th>" +
+              "<th class=\"kind-col\">Type</th>" +
+              "<th class=\"timing-col\">Timing</th>" +
+              "<th class=\"status-col\">Status</th>" +
+              "<th class=\"target-col\">Target</th>" +
+              "<th class=\"source-col\">Source</th>" +
+              "<th class=\"db-col\">DB</th>" +
+              "<th class=\"operation-time-col\">When</th>" +
             "</tr></thead>" +
             "<tbody>" +
               events.map((event) => renderOperationEventRows(event, details)).join("") +
@@ -2006,16 +2085,16 @@ const page = String.raw`<!doctype html>
         const sourceDisplay = sourceLabel(source);
         const errorTitle = event.error ? " - " + event.error : "";
 
-        return "<tr>" +
+        return "<tr class=\"operation-event-row\">" +
           "<td class=\"tool-col\" title=\"" + escapeHtml(tool) + "\">" + escapeHtml(tool) + "</td>" +
           "<td class=\"duration-col\" title=\"" + escapeHtml(formatDuration(event.latencyMs)) + "\">" + escapeHtml(formatDuration(event.latencyMs)) + "</td>" +
-          "<td title=\"" + escapeHtml(operationKindLabel(event.kind)) + "\">" + escapeHtml(operationKindLabel(event.kind)) + "</td>" +
-          "<td title=\"" + escapeHtml(timingLayerLabel(event.timingLayer)) + "\">" + escapeHtml(timingLayerLabel(event.timingLayer)) + "</td>" +
-          "<td class=\"" + statusClass + "\" title=\"" + escapeHtml(status + errorTitle) + "\">" + escapeHtml(status) + "</td>" +
-          "<td title=\"" + escapeHtml(target) + "\">" + escapeHtml(target) + "</td>" +
-          "<td title=\"" + escapeHtml(source) + "\">" + escapeHtml(sourceDisplay) + "</td>" +
-          "<td title=\"" + escapeHtml(dbSummaryLabel(event.db) || "-") + "\">" + escapeHtml(dbSummaryCompact(event.db) || "-") + "</td>" +
-          "<td title=\"" + escapeHtml(localDateTime(event.at)) + "\">" + escapeHtml(localTime(event.at)) + "</td>" +
+          "<td class=\"kind-col\" title=\"" + escapeHtml(operationKindLabel(event.kind)) + "\">" + escapeHtml(operationKindLabel(event.kind)) + "</td>" +
+          "<td class=\"timing-col\" title=\"" + escapeHtml(timingLayerLabel(event.timingLayer)) + "\">" + escapeHtml(timingLayerLabel(event.timingLayer)) + "</td>" +
+          "<td class=\"status-col " + statusClass + "\" title=\"" + escapeHtml(status + errorTitle) + "\">" + escapeHtml(status) + "</td>" +
+          "<td class=\"target-col\" title=\"" + escapeHtml(target) + "\">" + escapeHtml(target) + "</td>" +
+          "<td class=\"source-col\" title=\"" + escapeHtml(source) + "\">" + escapeHtml(sourceDisplay) + "</td>" +
+          "<td class=\"db-col\" title=\"" + escapeHtml(dbSummaryLabel(event.db) || "-") + "\">" + escapeHtml(dbSummaryCompact(event.db) || "-") + "</td>" +
+          "<td class=\"operation-time-col\" title=\"" + escapeHtml(localDateTime(event.at)) + "\">" + renderTimestampStack(event.at) + "</td>" +
         "</tr>" +
         renderOperationDbDetailRow(event.db);
       }

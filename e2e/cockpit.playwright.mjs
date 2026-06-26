@@ -130,6 +130,26 @@ async function writeDoctorStub(testInfo) {
             ],
             allTime: { label: "All time", totalCount: 0, failedCount: 0, byKind: [] },
           },
+          eventLog: [
+            {
+              name: "brain_read_file",
+              kind: "read",
+              timingLayer: "server_tool",
+              ok: true,
+              target: "09_tools_stack.md",
+              source: "hosted_mcp_server",
+              latencyMs: 3,
+              at: "2026-06-25T21:30:55.000Z",
+              db: {
+                queryCount: 1,
+                totalMs: 2,
+                maxMs: 2,
+                averageMs: 2,
+                rowCount: 1,
+                failedCount: 0,
+              },
+            },
+          ],
         },
       },
     ],
@@ -374,6 +394,59 @@ async function expectCockpitNavigationHierarchy(page, { desktop }) {
   await expect(page.locator("#activity-view-auth")).toBeVisible();
 }
 
+async function expectOperationLogTablePolish(page) {
+  await page.locator("#tab-activity").click();
+  await page.getByRole("tab", { name: "Operation Log" }).click();
+  const firstRow = page.locator(".operation-log-table tbody tr.operation-event-row").first();
+  await expect(firstRow).toBeVisible();
+  await expect(firstRow.locator(".operation-time-col .timestamp-date")).toHaveText(
+    /^\d{4}-[A-Z][a-z]{2}-\d{2}$/
+  );
+  await expect(firstRow.locator(".operation-time-col .timestamp-time")).toHaveText(
+    /^\d{2}:\d{2}:\d{2} UTC[+-]\d{2}:\d{2}$/
+  );
+
+  const tableLayout = await page.evaluate(() => {
+    const table = document.querySelector(".operation-log-table");
+    const row = document.querySelector(".operation-log-table tbody tr.operation-event-row");
+    const timeCell = row?.querySelector(".operation-time-col");
+    const targetCell = row?.querySelector(".target-col");
+    const timestampStack = timeCell?.querySelector(".timestamp-stack");
+    const timeStyle = timeCell ? getComputedStyle(timeCell) : null;
+    const targetStyle = targetCell ? getComputedStyle(targetCell) : null;
+    const timeRect = timeCell?.getBoundingClientRect();
+    const targetRect = targetCell?.getBoundingClientRect();
+    return {
+      hasReadableMinWidth: Boolean(timeRect) && timeRect.width >= 140,
+      timestampStacksVertically: Boolean(timestampStack) && timestampStack.children.length === 2,
+      timeAllowsFullContent:
+        Boolean(timeStyle) &&
+        timeStyle.whiteSpace !== "nowrap" &&
+        timeStyle.overflow !== "hidden" &&
+        timeStyle.textOverflow !== "ellipsis",
+      targetCanWrap:
+        Boolean(targetStyle) &&
+        targetStyle.whiteSpace !== "nowrap" &&
+        targetStyle.overflow !== "hidden",
+      whenColumnWiderThanTarget:
+        Boolean(timeRect && targetRect) &&
+        timeRect.width >= targetRect.width * 0.85,
+      noPageOverflow:
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      tableKeepsHorizontalScroll:
+        Boolean(table) &&
+        table.scrollWidth >= table.clientWidth,
+    };
+  });
+
+  expect(tableLayout.hasReadableMinWidth).toBe(true);
+  expect(tableLayout.timestampStacksVertically).toBe(true);
+  expect(tableLayout.timeAllowsFullContent).toBe(true);
+  expect(tableLayout.targetCanWrap).toBe(true);
+  expect(tableLayout.whenColumnWiderThanTarget).toBe(true);
+  expect(tableLayout.noPageOverflow).toBe(true);
+}
+
 test("cockpit renders deterministic status on desktop and narrow viewports", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo);
   try {
@@ -383,6 +456,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: true });
     await expectCockpitNavigationHierarchy(page, { desktop: true });
+    await expectOperationLogTablePolish(page);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();

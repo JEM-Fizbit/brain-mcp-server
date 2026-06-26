@@ -74,6 +74,13 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 - Preserve existing refresh IDs and tab keyboard behavior.
 - Add Playwright checks that full dashboard blocks are descendants of `#panel-overview`, hidden on non-overview tabs, and replaced there by compact context.
 
+### Slice 5 - Activity table readability
+
+- Rebalance the Activity > Operation Log table columns so high-scan columns get deliberate width instead of equal truncation pressure.
+- Render operation timestamps as two-line cells: date on the first row, time plus timezone on the second row.
+- Allow tool, target, DB summary, and timestamp cells to wrap where useful while keeping latency, status, and source compact.
+- Add Playwright checks for operation-log row structure, two-line timestamp cells, readable timestamp column width, and no page overflow.
+
 ### Later slices
 
 - Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
