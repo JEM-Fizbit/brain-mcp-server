@@ -243,6 +243,58 @@ async function expectCockpitDashboardHierarchy(page) {
   expect(layout.priorityPanelsTallerThanMetrics).toBe(true);
 }
 
+async function expectCockpitLandingRedesign(page, { desktop }) {
+  await expect(page.locator("#health-summary-heading")).toHaveText("Current Status");
+  await expect(page.locator(".profile-diagnostics summary")).toHaveText("Local Diagnostics");
+  const diagnosticsOpen = await page.locator(".profile-diagnostics").evaluate((element) => element.open);
+  expect(diagnosticsOpen).toBe(false);
+
+  await expect(page.locator(".metric-group")).toHaveCount(4);
+  await expect(page.locator(".metric-group-title")).toHaveText([
+    "Content State",
+    "Activity",
+    "Latency",
+    "Runtime",
+  ]);
+  await expect(page.locator("#overview-actions-heading")).toHaveText("Operator Queue");
+  await expect(page.locator("#overview-usage-heading")).toHaveText("Usage Snapshot");
+
+  const layout = await page.evaluate(() => {
+    const summary = document.querySelector(".summary")?.getBoundingClientRect();
+    const actions = document.querySelector(".action-summary-panel")?.getBoundingClientRect();
+    const firstMetricGroup = document.querySelector(".metric-group")?.getBoundingClientRect();
+    const overviewPrimary = document.querySelector(".overview-primary")?.getBoundingClientRect();
+    const overviewSide = document.querySelector(".overview-side")?.getBoundingClientRect();
+    return {
+      statusPanelsShareRow:
+        Boolean(summary && actions) &&
+        Math.abs(summary.top - actions.top) < 4 &&
+        Math.abs(summary.height - actions.height) < 36,
+      statusPanelsStackOnNarrow:
+        Boolean(summary && actions) &&
+        actions.top >= summary.bottom + 8,
+      metricGroupsStartBelowPriority:
+        Boolean(summary && actions && firstMetricGroup) &&
+        firstMetricGroup.top >= Math.max(summary.bottom, actions.bottom) + 16,
+      overviewPrimaryWider:
+        Boolean(overviewPrimary && overviewSide) &&
+        overviewPrimary.width > overviewSide.width,
+      overviewStacksOnNarrow:
+        Boolean(overviewPrimary && overviewSide) &&
+        overviewSide.top >= overviewPrimary.bottom + 8,
+    };
+  });
+
+  expect(layout.metricGroupsStartBelowPriority).toBe(true);
+  if (desktop) {
+    expect(layout.statusPanelsShareRow).toBe(true);
+    expect(layout.overviewPrimaryWider).toBe(true);
+  } else {
+    expect(layout.statusPanelsStackOnNarrow).toBe(true);
+    expect(layout.overviewStacksOnNarrow).toBe(true);
+  }
+}
+
 test("cockpit renders deterministic status on desktop and narrow viewports", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo);
   try {
@@ -250,11 +302,13 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await page.goto(url);
     await expectCockpitReady(page);
     await expectCockpitDashboardHierarchy(page);
+    await expectCockpitLandingRedesign(page, { desktop: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expectCockpitReady(page);
     await expectCockpitDashboardHierarchy(page);
+    await expectCockpitLandingRedesign(page, { desktop: false });
   } finally {
     await stopCockpit(child);
   }

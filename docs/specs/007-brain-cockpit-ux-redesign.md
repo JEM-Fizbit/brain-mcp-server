@@ -50,10 +50,18 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 - Update CSS so the priority row has two prominent panels, while metric cards are organized as a lower grid.
 - Verify desktop and narrow layouts through `npm run test:cockpit:e2e`.
 
+### Slice 2 - Landing-page scan order
+
+- Collapse long local path and cockpit URL details under `Local Diagnostics` so the first status card answers readiness before implementation detail.
+- Group operational metric cards into `Content State`, `Activity`, `Latency`, and `Runtime` clusters.
+- Rename the Overview tab's primary work area to `Operator Queue` and make it visually dominant over the secondary usage snapshot.
+- Add Playwright checks for grouped signals, collapsed diagnostics, desktop primary-column width, and narrow viewport stacking.
+- Verify desktop and narrow layouts through `npm run test:cockpit:e2e`.
+
 ### Later slices
 
-- Audit overview, activity, latency, checks, and raw-output tabs for density and scan order.
-- Group metrics into stronger semantic clusters if operator use shows the single metric grid still buries key signals.
+- Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
+- Refine metric grouping if operator use shows any cluster still buries key signals.
 - Decide whether action-required state should also drive a persistent top-level banner.
 - Review color, typography, spacing, and empty/error states across all cockpit panels.
 
