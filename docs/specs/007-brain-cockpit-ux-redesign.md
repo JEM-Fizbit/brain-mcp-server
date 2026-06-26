@@ -58,9 +58,16 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 - Add Playwright checks for grouped signals, collapsed diagnostics, desktop primary-column width, and narrow viewport stacking.
 - Verify desktop and narrow layouts through `npm run test:cockpit:e2e`.
 
+### Slice 3 - Navigation hierarchy
+
+- Redesign the top-level tab bar as a contained primary navigation strip with a filled active state.
+- Contain Activity and Latency nested navigation inside each tab panel as compact secondary controls, rather than a second flat underline row.
+- Preserve existing tab roles, IDs, keyboard behavior, and panel visibility semantics.
+- Add Playwright checks for primary/secondary nav levels, active-state hierarchy, nested panel activation, and no horizontal overflow.
+- Verify desktop and narrow layouts through `npm run test:cockpit:e2e`.
+
 ### Later slices
 
-- Redesign the tab and sub-tab navigation so primary tabs, selected tab state, and nested panel choices have clearer hierarchy than the current flat text rows.
 - Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
 - Refine metric grouping if operator use shows any cluster still buries key signals.
 - Decide whether action-required state should also drive a persistent top-level banner.
