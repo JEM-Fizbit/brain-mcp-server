@@ -214,10 +214,12 @@ async function expectCockpitReady(page) {
 }
 
 async function expectCockpitDashboardHierarchy(page) {
-  await expect(page.locator(".status-band > .summary")).toBeVisible();
-  await expect(page.locator(".status-band > .action-summary-panel")).toBeVisible();
-  await expect(page.locator(".status-band > .metrics")).toHaveCount(0);
-  await expect(page.locator(".metric-section")).toBeVisible();
+  await expect(page.locator("#panel-overview > .status-band > .summary")).toBeVisible();
+  await expect(page.locator("#panel-overview > .status-band > .action-summary-panel")).toBeVisible();
+  await expect(page.locator("#panel-overview > .status-band > .metrics")).toHaveCount(0);
+  await expect(page.locator("#panel-overview > .metric-section")).toBeVisible();
+  await expect(page.locator("main > .status-band")).toHaveCount(0);
+  await expect(page.locator("main > .metric-section")).toHaveCount(0);
   await expect(page.locator("#metric-section-heading")).toHaveText("Operational Signals");
   await expect(page.locator(".metric-section .metrics .metric")).toHaveCount(14);
 
@@ -301,6 +303,14 @@ async function expectCockpitNavigationHierarchy(page, { desktop }) {
 
   await page.getByRole("tab", { name: "Activity" }).click();
   await expect(page.locator("#panel-activity")).toBeVisible();
+  await expect(page.locator("#panel-overview")).toBeHidden();
+  await expect(page.locator("#tab-context-strip")).toBeVisible();
+  await expect(page.locator("#tab-context-brain")).toHaveText("JEM (ai-brain-jem)");
+  await expect(page.locator("#tab-context-state")).toHaveText("Safe to use hosted");
+  await expect(page.locator("#tab-context-actions")).toHaveText("Actions: none");
+  await expect(page.locator("#tab-context-sync")).toContainText("Last sync");
+  await expect(page.locator(".status-band")).toBeHidden();
+  await expect(page.locator(".metric-section")).toBeHidden();
   await expect(page.locator("#panel-activity .subtab-list")).toHaveAttribute("data-nav-level", "secondary");
   await expect(page.locator("#activity-subtab-operations")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#activity-view-operations")).toBeVisible();

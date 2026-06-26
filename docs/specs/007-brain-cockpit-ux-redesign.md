@@ -66,6 +66,14 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 - Add Playwright checks for primary/secondary nav levels, active-state hierarchy, nested panel activation, and no horizontal overflow.
 - Verify desktop and narrow layouts through `npm run test:cockpit:e2e`.
 
+### Slice 4 - Tab-specific framing
+
+- Make the Overview tab own the full dashboard context: current status, needs-action panel, operational signals, operator queue, and usage snapshot.
+- Remove the full overview dashboard from the top of Activity, Latency, Checks, and Raw Output.
+- Add a compact non-overview context strip with Brain, status, action count, last sync, and last doctor check.
+- Preserve existing refresh IDs and tab keyboard behavior.
+- Add Playwright checks that full dashboard blocks are descendants of `#panel-overview`, hidden on non-overview tabs, and replaced there by compact context.
+
 ### Later slices
 
 - Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
