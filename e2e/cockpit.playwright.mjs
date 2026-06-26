@@ -295,6 +295,75 @@ async function expectCockpitLandingRedesign(page, { desktop }) {
   }
 }
 
+async function expectCockpitNavigationHierarchy(page, { desktop }) {
+  await expect(page.locator(".tab-list")).toHaveAttribute("data-nav-level", "primary");
+  await expect(page.locator(".tab-button[aria-selected='true']")).toHaveText("Overview");
+
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await expect(page.locator("#panel-activity")).toBeVisible();
+  await expect(page.locator("#panel-activity .subtab-list")).toHaveAttribute("data-nav-level", "secondary");
+  await expect(page.locator("#activity-subtab-operations")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#activity-view-operations")).toBeVisible();
+
+  const hierarchy = await page.evaluate(() => {
+    const primaryNav = document.querySelector(".tab-list");
+    const activePrimary = document.querySelector(".tab-button[aria-selected='true']");
+    const activityPanel = document.querySelector("#panel-activity");
+    const secondaryNav = document.querySelector("#panel-activity .subtab-list");
+    const activeSecondary = document.querySelector("#panel-activity .subtab-button[aria-selected='true']");
+    const primaryRect = activePrimary?.getBoundingClientRect();
+    const secondaryRect = activeSecondary?.getBoundingClientRect();
+    const panelRect = activityPanel?.getBoundingClientRect();
+    const secondaryNavRect = secondaryNav?.getBoundingClientRect();
+    const primaryStyle = activePrimary ? getComputedStyle(activePrimary) : null;
+    const secondaryStyle = activeSecondary ? getComputedStyle(activeSecondary) : null;
+    const primaryNavStyle = primaryNav ? getComputedStyle(primaryNav) : null;
+    return {
+      primaryNavHasContainer:
+        Boolean(primaryNavStyle) &&
+        primaryNavStyle.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+        parseFloat(primaryNavStyle.borderTopWidth) >= 1,
+      activePrimaryHasFilledState:
+        Boolean(primaryStyle) &&
+        primaryStyle.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+        parseFloat(primaryStyle.borderTopWidth) >= 1,
+      secondaryContainedInPanel:
+        Boolean(panelRect && secondaryNavRect) &&
+        secondaryNavRect.left >= panelRect.left + 12 &&
+        secondaryNavRect.right <= panelRect.right - 12,
+      primaryVisuallyDominant:
+        Boolean(primaryRect && secondaryRect && primaryStyle && secondaryStyle) &&
+        primaryRect.height > secondaryRect.height &&
+        parseFloat(primaryStyle.fontSize) >= parseFloat(secondaryStyle.fontSize),
+      navsDoNotShareOneRow:
+        Boolean(primaryRect && secondaryRect) &&
+        secondaryRect.top >= primaryRect.bottom + 12,
+      primaryTabsFitViewport:
+        Array.from(document.querySelectorAll(".tab-button")).every((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1;
+        }),
+      bodyHasNoOverflow:
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    };
+  });
+
+  expect(hierarchy.primaryNavHasContainer).toBe(true);
+  expect(hierarchy.activePrimaryHasFilledState).toBe(true);
+  expect(hierarchy.primaryVisuallyDominant).toBe(true);
+  expect(hierarchy.navsDoNotShareOneRow).toBe(true);
+  expect(hierarchy.bodyHasNoOverflow).toBe(true);
+  if (desktop) {
+    expect(hierarchy.secondaryContainedInPanel).toBe(true);
+  } else {
+    expect(hierarchy.primaryTabsFitViewport).toBe(true);
+  }
+
+  await page.getByRole("tab", { name: "Auth" }).click();
+  await expect(page.locator("#activity-subtab-auth")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#activity-view-auth")).toBeVisible();
+}
+
 test("cockpit renders deterministic status on desktop and narrow viewports", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo);
   try {
@@ -303,12 +372,14 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitReady(page);
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: true });
+    await expectCockpitNavigationHierarchy(page, { desktop: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expectCockpitReady(page);
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: false });
+    await expectCockpitNavigationHierarchy(page, { desktop: false });
   } finally {
     await stopCockpit(child);
   }

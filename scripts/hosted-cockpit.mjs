@@ -399,29 +399,35 @@ const page = String.raw`<!doctype html>
 
       .tabs {
         display: grid;
-        gap: 14px;
+        gap: 16px;
       }
 
       .tab-list {
         display: flex;
         gap: 6px;
         overflow-x: auto;
-        border-bottom: 1px solid var(--line);
+        align-items: center;
+        background: #ecefeb;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px;
       }
 
       .tab-button {
-        border: 0;
-        border-bottom: 3px solid transparent;
-        border-radius: 0;
+        border: 1px solid transparent;
+        border-radius: 6px;
         background: transparent;
         color: var(--muted);
-        padding: 10px 12px 9px;
+        padding: 10px 14px;
         white-space: nowrap;
+        font-weight: 600;
       }
 
       .tab-button[aria-selected="true"] {
+        background: var(--panel);
         color: var(--ink);
-        border-bottom-color: var(--pass);
+        border-color: #9fcdb7;
+        box-shadow: inset 0 0 0 1px rgba(20, 125, 79, 0.18), 0 1px 2px rgba(29, 31, 33, 0.08);
         font-weight: 650;
       }
 
@@ -430,27 +436,37 @@ const page = String.raw`<!doctype html>
         outline-offset: -2px;
       }
 
+      .subtab-shell {
+        background: #fafbf9;
+        border: 1px solid var(--line);
+        border-left: 4px solid #9fcdb7;
+        border-radius: 8px;
+        margin-bottom: 14px;
+        padding: 10px 12px;
+      }
+
       .subtab-list {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid var(--line);
+        gap: 8px;
+        margin: 0;
       }
 
       .subtab-button {
-        border: 0;
-        border-bottom: 3px solid transparent;
-        border-radius: 0;
-        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
         color: var(--muted);
-        padding: 8px 10px 7px;
+        padding: 6px 10px;
         white-space: nowrap;
+        font-size: 13px;
+        font-weight: 600;
       }
 
       .subtab-button[aria-selected="true"] {
+        background: #eaf5ef;
         color: var(--ink);
-        border-bottom-color: var(--pass);
+        border-color: #9fcdb7;
         font-weight: 650;
       }
 
@@ -1004,6 +1020,15 @@ const page = String.raw`<!doctype html>
           max-width: 100%;
         }
 
+        .tab-list {
+          flex-wrap: wrap;
+          overflow-x: visible;
+        }
+
+        .tab-button {
+          flex: 1 1 118px;
+        }
+
         .timestamp-metric {
           grid-column: 1 / -1;
         }
@@ -1225,7 +1250,7 @@ const page = String.raw`<!doctype html>
       </section>
 
       <div class="tabs">
-        <div class="tab-list" role="tablist" aria-label="Cockpit sections">
+        <div class="tab-list" data-nav-level="primary" role="tablist" aria-label="Cockpit sections">
           <button class="tab-button" id="tab-overview" type="button" role="tab" aria-controls="panel-overview" aria-selected="true">Overview</button>
           <button class="tab-button" id="tab-activity" type="button" role="tab" aria-controls="panel-activity" aria-selected="false">Activity</button>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
@@ -1255,11 +1280,13 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
-          <div class="subtab-list" role="tablist" aria-label="Activity sections">
-            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
-            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-auth" type="button" role="tab" aria-controls="activity-view-auth" aria-selected="false">Auth</button>
-            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
-            <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
+          <div class="subtab-shell">
+            <div class="subtab-list" data-nav-level="secondary" role="tablist" aria-label="Activity sections">
+              <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-operations" type="button" role="tab" aria-controls="activity-view-operations" aria-selected="true">Operation Log</button>
+              <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-auth" type="button" role="tab" aria-controls="activity-view-auth" aria-selected="false">Auth</button>
+              <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-brain" type="button" role="tab" aria-controls="activity-view-brain" aria-selected="false">Recent Brain Activity</button>
+              <button class="subtab-button" data-subtab-scope="activity" id="activity-subtab-watch" type="button" role="tab" aria-controls="activity-view-watch" aria-selected="false">Cockpit Watch</button>
+            </div>
           </div>
 
           <section class="subtab-panel activity-view" data-subtab-scope="activity" id="activity-view-operations" role="tabpanel" aria-labelledby="activity-subtab-operations">
@@ -1291,12 +1318,14 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-latency" role="tabpanel" aria-labelledby="tab-latency" hidden>
-          <div class="subtab-list" role="tablist" aria-label="Latency sections">
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slo" type="button" role="tab" aria-controls="latency-view-slo" aria-selected="true">SLOs & Findings</button>
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-trends" type="button" role="tab" aria-controls="latency-view-trends" aria-selected="false">Operation Trends</button>
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slowest" type="button" role="tab" aria-controls="latency-view-slowest" aria-selected="false">Slowest Operations</button>
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-samples" type="button" role="tab" aria-controls="latency-view-samples" aria-selected="false">Recent Samples</button>
-            <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-infra" type="button" role="tab" aria-controls="latency-view-infra" aria-selected="false">Infrastructure Checks</button>
+          <div class="subtab-shell">
+            <div class="subtab-list" data-nav-level="secondary" role="tablist" aria-label="Latency sections">
+              <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slo" type="button" role="tab" aria-controls="latency-view-slo" aria-selected="true">SLOs & Findings</button>
+              <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-trends" type="button" role="tab" aria-controls="latency-view-trends" aria-selected="false">Operation Trends</button>
+              <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-slowest" type="button" role="tab" aria-controls="latency-view-slowest" aria-selected="false">Slowest Operations</button>
+              <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-samples" type="button" role="tab" aria-controls="latency-view-samples" aria-selected="false">Recent Samples</button>
+              <button class="subtab-button" data-subtab-scope="latency" id="latency-subtab-infra" type="button" role="tab" aria-controls="latency-view-infra" aria-selected="false">Infrastructure Checks</button>
+            </div>
           </div>
 
           <section class="subtab-panel latency-view" data-subtab-scope="latency" id="latency-view-slo" role="tabpanel" aria-labelledby="latency-subtab-slo">
