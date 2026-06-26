@@ -219,7 +219,7 @@ const page = String.raw`<!doctype html>
 
       .status-band {
         display: grid;
-        grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+        grid-template-columns: minmax(360px, 1.05fr) minmax(340px, 0.95fr);
         gap: 16px;
         align-items: stretch;
         margin-bottom: 22px;
@@ -232,6 +232,10 @@ const page = String.raw`<!doctype html>
         box-shadow: 0 1px 3px rgba(29, 31, 33, 0.08);
         padding: 22px;
         min-height: 220px;
+      }
+
+      .summary-heading {
+        margin-bottom: 14px;
       }
 
       .summary-state {
@@ -262,6 +266,20 @@ const page = String.raw`<!doctype html>
         font-size: 12px;
       }
 
+      .profile-meta-primary {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .profile-meta-primary .profile-meta-row {
+        display: block;
+      }
+
+      .profile-meta-primary .profile-meta-label {
+        display: block;
+        margin-bottom: 2px;
+      }
+
       .profile-meta-row {
         display: grid;
         grid-template-columns: 72px minmax(0, 1fr);
@@ -284,6 +302,25 @@ const page = String.raw`<!doctype html>
         min-width: 0;
         overflow-wrap: anywhere;
         word-break: break-word;
+      }
+
+      .profile-diagnostics {
+        margin-top: 14px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+
+      .profile-diagnostics summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .profile-diagnostics[open] summary {
+        margin-bottom: 8px;
       }
 
       .metrics {
@@ -331,8 +368,19 @@ const page = String.raw`<!doctype html>
 
       .overview-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.75fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .overview-primary {
+        min-height: 210px;
+      }
+
+      .overview-side {
+        display: grid;
         gap: 14px;
+        min-width: 0;
       }
 
       .activity-grid {
@@ -560,6 +608,33 @@ const page = String.raw`<!doctype html>
       .metric-section-heading {
         align-items: flex-end;
         margin-bottom: 12px;
+      }
+
+      .metric-groups {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .metric-group {
+        display: grid;
+        align-content: start;
+        gap: 9px;
+        min-width: 0;
+      }
+
+      .metric-group-title {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .metric-group .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
       }
 
       .action-count {
@@ -907,7 +982,13 @@ const page = String.raw`<!doctype html>
         .overview-grid,
         .activity-grid,
         .grid,
+        .metric-groups,
         .metrics {
+          grid-template-columns: 1fr;
+        }
+
+        .profile-meta-primary,
+        .metric-group .metrics {
           grid-template-columns: 1fr;
         }
 
@@ -1003,10 +1084,16 @@ const page = String.raw`<!doctype html>
       </header>
 
       <div class="status-band">
-        <section class="summary">
+        <section class="summary" aria-labelledby="health-summary-heading">
+          <div class="section-heading summary-heading">
+            <div>
+              <h2 id="health-summary-heading">Current Status</h2>
+              <div class="section-note">Selected Brain readiness and local supervision state.</div>
+            </div>
+          </div>
           <div class="summary-state"><span id="state-dot" class="dot"></span><span id="state-text">Checking</span></div>
           <div id="state-copy" class="muted">Running the hosted doctor.</div>
-          <div class="profile-meta">
+          <div class="profile-meta profile-meta-primary">
             <div class="profile-meta-row">
               <span class="profile-meta-label">Active</span>
               <span id="profile-current-label">-</span>
@@ -1019,6 +1106,14 @@ const page = String.raw`<!doctype html>
               <span class="profile-meta-label">Profile</span>
               <span id="profile-name">-</span>
             </div>
+          </div>
+          <details class="profile-diagnostics">
+            <summary>Local Diagnostics</summary>
+            <div class="profile-meta">
+              <div class="profile-meta-row">
+                <span class="profile-meta-label">Scope</span>
+                <span id="profile-scope">-</span>
+              </div>
             <div class="profile-meta-row">
               <span class="profile-meta-label">State</span>
               <code id="profile-state-file">-</code>
@@ -1027,15 +1122,15 @@ const page = String.raw`<!doctype html>
               <span class="profile-meta-label">Cockpit</span>
               <a id="profile-cockpit-url" href="#">-</a>
             </div>
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">Scope</span>
-              <span id="profile-scope">-</span>
             </div>
-          </div>
+          </details>
         </section>
         <section class="action-summary-panel" aria-labelledby="action-summary-heading">
           <div class="section-heading">
-            <h2 id="action-summary-heading">Needs Action</h2>
+            <div>
+              <h2 id="action-summary-heading">Needs Action</h2>
+              <div class="section-note">Doctor actions requiring operator judgement.</div>
+            </div>
             <span class="action-count" id="action-summary-count">Checking</span>
           </div>
           <div class="action-summary-list" id="action-summary-list"></div>
@@ -1049,62 +1144,82 @@ const page = String.raw`<!doctype html>
             <div class="section-note">Hosted/local state, activity volume, and latency for the selected Brain.</div>
           </div>
         </div>
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-label">Hosted files</div>
-            <div class="metric-value" id="hosted-files">-</div>
+        <div class="metric-groups">
+          <div class="metric-group">
+            <h3 class="metric-group-title">Content State</h3>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-label">Hosted files</div>
+                <div class="metric-value" id="hosted-files">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Local files</div>
+                <div class="metric-value" id="local-files">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Open conflicts</div>
+                <div class="metric-value" id="open-conflicts">-</div>
+              </div>
+              <div class="metric timestamp-metric">
+                <div class="metric-label">Last sync</div>
+                <div class="metric-value timestamp-value" id="last-sync">-</div>
+              </div>
+            </div>
           </div>
-          <div class="metric">
-            <div class="metric-label">Local files</div>
-            <div class="metric-value" id="local-files">-</div>
+          <div class="metric-group">
+            <h3 class="metric-group-title">Activity</h3>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-label">Ops 24H</div>
+                <div class="metric-value" id="ops-24h">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Ops 7D</div>
+                <div class="metric-value" id="ops-7d">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Ops total</div>
+                <div class="metric-value" id="ops-total">-</div>
+              </div>
+            </div>
           </div>
-          <div class="metric">
-            <div class="metric-label">Open conflicts</div>
-            <div class="metric-value" id="open-conflicts">-</div>
+          <div class="metric-group">
+            <h3 class="metric-group-title">Latency</h3>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-label">Read op</div>
+                <div class="metric-value" id="read-op-latency">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Write op</div>
+                <div class="metric-value" id="write-op-latency">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Sync wait</div>
+                <div class="metric-value" id="sync-wait-latency">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Hosted HTTP</div>
+                <div class="metric-value" id="hosted-latency">-</div>
+              </div>
+            </div>
           </div>
-          <div class="metric timestamp-metric">
-            <div class="metric-label">Last sync</div>
-            <div class="metric-value timestamp-value" id="last-sync">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Ops 24H</div>
-            <div class="metric-value" id="ops-24h">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Ops 7D</div>
-            <div class="metric-value" id="ops-7d">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Ops total</div>
-            <div class="metric-value" id="ops-total">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Read op</div>
-            <div class="metric-value" id="read-op-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Write op</div>
-            <div class="metric-value" id="write-op-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Sync wait</div>
-            <div class="metric-value" id="sync-wait-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Hosted HTTP</div>
-            <div class="metric-value" id="hosted-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Postgres</div>
-            <div class="metric-value" id="postgres-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Sync cycle</div>
-            <div class="metric-value" id="sync-latency">-</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Doctor run</div>
-            <div class="metric-value" id="doctor-latency">-</div>
+          <div class="metric-group">
+            <h3 class="metric-group-title">Runtime</h3>
+            <div class="metrics">
+              <div class="metric">
+                <div class="metric-label">Postgres</div>
+                <div class="metric-value" id="postgres-latency">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Sync cycle</div>
+                <div class="metric-value" id="sync-latency">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Doctor run</div>
+                <div class="metric-value" id="doctor-latency">-</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1120,15 +1235,22 @@ const page = String.raw`<!doctype html>
 
         <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
           <div class="overview-grid">
-            <section>
-              <h2>Next Actions</h2>
+            <section class="overview-primary" aria-labelledby="overview-actions-heading">
+              <div class="section-heading">
+                <div>
+                  <h2 id="overview-actions-heading">Operator Queue</h2>
+                  <div class="section-note">Actionable doctor findings for the selected Brain.</div>
+                </div>
+              </div>
               <div class="next-actions" id="actions"></div>
             </section>
 
-            <section>
-              <h2>Usage</h2>
-              <div class="activity-list" id="operation-usage"></div>
-            </section>
+            <div class="overview-side">
+              <section aria-labelledby="overview-usage-heading">
+                <h2 id="overview-usage-heading">Usage Snapshot</h2>
+                <div class="activity-list" id="operation-usage"></div>
+              </section>
+            </div>
           </div>
         </div>
 
