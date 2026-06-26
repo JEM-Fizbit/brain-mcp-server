@@ -436,6 +436,46 @@ const page = String.raw`<!doctype html>
         outline-offset: -2px;
       }
 
+      .tab-context-strip {
+        display: grid;
+        grid-template-columns: minmax(180px, 1.25fr) repeat(4, minmax(120px, 1fr));
+        gap: 10px;
+        align-items: center;
+        background: #fafbf9;
+        border: 1px solid var(--line);
+        border-left: 4px solid #9fcdb7;
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+
+      .tab-context-strip[hidden] {
+        display: none;
+      }
+
+      .tab-context-item {
+        min-width: 0;
+      }
+
+      .tab-context-label {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-transform: uppercase;
+        letter-spacing: 0;
+      }
+
+      .tab-context-value {
+        display: block;
+        color: var(--ink);
+        font-size: 13px;
+        font-weight: 650;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .subtab-shell {
         background: #fafbf9;
         border: 1px solid var(--line);
@@ -1029,6 +1069,10 @@ const page = String.raw`<!doctype html>
           flex: 1 1 118px;
         }
 
+        .tab-context-strip {
+          grid-template-columns: 1fr;
+        }
+
         .timestamp-metric {
           grid-column: 1 / -1;
         }
@@ -1108,147 +1152,6 @@ const page = String.raw`<!doctype html>
         </div>
       </header>
 
-      <div class="status-band">
-        <section class="summary" aria-labelledby="health-summary-heading">
-          <div class="section-heading summary-heading">
-            <div>
-              <h2 id="health-summary-heading">Current Status</h2>
-              <div class="section-note">Selected Brain readiness and local supervision state.</div>
-            </div>
-          </div>
-          <div class="summary-state"><span id="state-dot" class="dot"></span><span id="state-text">Checking</span></div>
-          <div id="state-copy" class="muted">Running the hosted doctor.</div>
-          <div class="profile-meta profile-meta-primary">
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">Active</span>
-              <span id="profile-current-label">-</span>
-            </div>
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">Brain</span>
-              <code id="profile-brain-id">-</code>
-            </div>
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">Profile</span>
-              <span id="profile-name">-</span>
-            </div>
-          </div>
-          <details class="profile-diagnostics">
-            <summary>Local Diagnostics</summary>
-            <div class="profile-meta">
-              <div class="profile-meta-row">
-                <span class="profile-meta-label">Scope</span>
-                <span id="profile-scope">-</span>
-              </div>
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">State</span>
-              <code id="profile-state-file">-</code>
-            </div>
-            <div class="profile-meta-row">
-              <span class="profile-meta-label">Cockpit</span>
-              <a id="profile-cockpit-url" href="#">-</a>
-            </div>
-            </div>
-          </details>
-        </section>
-        <section class="action-summary-panel" aria-labelledby="action-summary-heading">
-          <div class="section-heading">
-            <div>
-              <h2 id="action-summary-heading">Needs Action</h2>
-              <div class="section-note">Doctor actions requiring operator judgement.</div>
-            </div>
-            <span class="action-count" id="action-summary-count">Checking</span>
-          </div>
-          <div class="action-summary-list" id="action-summary-list"></div>
-        </section>
-      </div>
-
-      <section class="metric-section" aria-labelledby="metric-section-heading">
-        <div class="section-heading metric-section-heading">
-          <div>
-            <h2 id="metric-section-heading">Operational Signals</h2>
-            <div class="section-note">Hosted/local state, activity volume, and latency for the selected Brain.</div>
-          </div>
-        </div>
-        <div class="metric-groups">
-          <div class="metric-group">
-            <h3 class="metric-group-title">Content State</h3>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-label">Hosted files</div>
-                <div class="metric-value" id="hosted-files">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Local files</div>
-                <div class="metric-value" id="local-files">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Open conflicts</div>
-                <div class="metric-value" id="open-conflicts">-</div>
-              </div>
-              <div class="metric timestamp-metric">
-                <div class="metric-label">Last sync</div>
-                <div class="metric-value timestamp-value" id="last-sync">-</div>
-              </div>
-            </div>
-          </div>
-          <div class="metric-group">
-            <h3 class="metric-group-title">Activity</h3>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-label">Ops 24H</div>
-                <div class="metric-value" id="ops-24h">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Ops 7D</div>
-                <div class="metric-value" id="ops-7d">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Ops total</div>
-                <div class="metric-value" id="ops-total">-</div>
-              </div>
-            </div>
-          </div>
-          <div class="metric-group">
-            <h3 class="metric-group-title">Latency</h3>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-label">Read op</div>
-                <div class="metric-value" id="read-op-latency">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Write op</div>
-                <div class="metric-value" id="write-op-latency">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Sync wait</div>
-                <div class="metric-value" id="sync-wait-latency">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Hosted HTTP</div>
-                <div class="metric-value" id="hosted-latency">-</div>
-              </div>
-            </div>
-          </div>
-          <div class="metric-group">
-            <h3 class="metric-group-title">Runtime</h3>
-            <div class="metrics">
-              <div class="metric">
-                <div class="metric-label">Postgres</div>
-                <div class="metric-value" id="postgres-latency">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Sync cycle</div>
-                <div class="metric-value" id="sync-latency">-</div>
-              </div>
-              <div class="metric">
-                <div class="metric-label">Doctor run</div>
-                <div class="metric-value" id="doctor-latency">-</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <div class="tabs">
         <div class="tab-list" data-nav-level="primary" role="tablist" aria-label="Cockpit sections">
           <button class="tab-button" id="tab-overview" type="button" role="tab" aria-controls="panel-overview" aria-selected="true">Overview</button>
@@ -1258,7 +1161,171 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
         </div>
 
+        <div class="tab-context-strip" id="tab-context-strip" hidden>
+          <div class="tab-context-item">
+            <span class="tab-context-label">Brain</span>
+            <span class="tab-context-value" id="tab-context-brain">-</span>
+          </div>
+          <div class="tab-context-item">
+            <span class="tab-context-label">Status</span>
+            <span class="tab-context-value" id="tab-context-state">Checking</span>
+          </div>
+          <div class="tab-context-item">
+            <span class="tab-context-label">Action Queue</span>
+            <span class="tab-context-value" id="tab-context-actions">Actions: checking</span>
+          </div>
+          <div class="tab-context-item">
+            <span class="tab-context-label">Sync</span>
+            <span class="tab-context-value" id="tab-context-sync">Last sync: -</span>
+          </div>
+          <div class="tab-context-item">
+            <span class="tab-context-label">Doctor</span>
+            <span class="tab-context-value" id="tab-context-checked">Checked: -</span>
+          </div>
+        </div>
+
         <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+          <div class="status-band">
+            <section class="summary" aria-labelledby="health-summary-heading">
+              <div class="section-heading summary-heading">
+                <div>
+                  <h2 id="health-summary-heading">Current Status</h2>
+                  <div class="section-note">Selected Brain readiness and local supervision state.</div>
+                </div>
+              </div>
+              <div class="summary-state"><span id="state-dot" class="dot"></span><span id="state-text">Checking</span></div>
+              <div id="state-copy" class="muted">Running the hosted doctor.</div>
+              <div class="profile-meta profile-meta-primary">
+                <div class="profile-meta-row">
+                  <span class="profile-meta-label">Active</span>
+                  <span id="profile-current-label">-</span>
+                </div>
+                <div class="profile-meta-row">
+                  <span class="profile-meta-label">Brain</span>
+                  <code id="profile-brain-id">-</code>
+                </div>
+                <div class="profile-meta-row">
+                  <span class="profile-meta-label">Profile</span>
+                  <span id="profile-name">-</span>
+                </div>
+              </div>
+              <details class="profile-diagnostics">
+                <summary>Local Diagnostics</summary>
+                <div class="profile-meta">
+                  <div class="profile-meta-row">
+                    <span class="profile-meta-label">Scope</span>
+                    <span id="profile-scope">-</span>
+                  </div>
+                  <div class="profile-meta-row">
+                    <span class="profile-meta-label">State</span>
+                    <code id="profile-state-file">-</code>
+                  </div>
+                  <div class="profile-meta-row">
+                    <span class="profile-meta-label">Cockpit</span>
+                    <a id="profile-cockpit-url" href="#">-</a>
+                  </div>
+                </div>
+              </details>
+            </section>
+            <section class="action-summary-panel" aria-labelledby="action-summary-heading">
+              <div class="section-heading">
+                <div>
+                  <h2 id="action-summary-heading">Needs Action</h2>
+                  <div class="section-note">Doctor actions requiring operator judgement.</div>
+                </div>
+                <span class="action-count" id="action-summary-count">Checking</span>
+              </div>
+              <div class="action-summary-list" id="action-summary-list"></div>
+            </section>
+          </div>
+
+          <section class="metric-section" aria-labelledby="metric-section-heading">
+            <div class="section-heading metric-section-heading">
+              <div>
+                <h2 id="metric-section-heading">Operational Signals</h2>
+                <div class="section-note">Hosted/local state, activity volume, and latency for the selected Brain.</div>
+              </div>
+            </div>
+            <div class="metric-groups">
+              <div class="metric-group">
+                <h3 class="metric-group-title">Content State</h3>
+                <div class="metrics">
+                  <div class="metric">
+                    <div class="metric-label">Hosted files</div>
+                    <div class="metric-value" id="hosted-files">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Local files</div>
+                    <div class="metric-value" id="local-files">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Open conflicts</div>
+                    <div class="metric-value" id="open-conflicts">-</div>
+                  </div>
+                  <div class="metric timestamp-metric">
+                    <div class="metric-label">Last sync</div>
+                    <div class="metric-value timestamp-value" id="last-sync">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="metric-group">
+                <h3 class="metric-group-title">Activity</h3>
+                <div class="metrics">
+                  <div class="metric">
+                    <div class="metric-label">Ops 24H</div>
+                    <div class="metric-value" id="ops-24h">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Ops 7D</div>
+                    <div class="metric-value" id="ops-7d">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Ops total</div>
+                    <div class="metric-value" id="ops-total">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="metric-group">
+                <h3 class="metric-group-title">Latency</h3>
+                <div class="metrics">
+                  <div class="metric">
+                    <div class="metric-label">Read op</div>
+                    <div class="metric-value" id="read-op-latency">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Write op</div>
+                    <div class="metric-value" id="write-op-latency">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Sync wait</div>
+                    <div class="metric-value" id="sync-wait-latency">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Hosted HTTP</div>
+                    <div class="metric-value" id="hosted-latency">-</div>
+                  </div>
+                </div>
+              </div>
+              <div class="metric-group">
+                <h3 class="metric-group-title">Runtime</h3>
+                <div class="metrics">
+                  <div class="metric">
+                    <div class="metric-label">Postgres</div>
+                    <div class="metric-value" id="postgres-latency">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Sync cycle</div>
+                    <div class="metric-value" id="sync-latency">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Doctor run</div>
+                    <div class="metric-value" id="doctor-latency">-</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <div class="overview-grid">
             <section class="overview-primary" aria-labelledby="overview-actions-heading">
               <div class="section-heading">
@@ -1753,10 +1820,7 @@ const page = String.raw`<!doctype html>
 
       function renderActionSummary(payload) {
         const items = actionItems(payload);
-        const actionable = items.filter((action) => {
-          const status = (action.status || action.level || "").toLowerCase();
-          return status !== "pass" && action.reason !== "none";
-        });
+        const actionable = actionableItems(payload);
         const visible = actionable.length > 0 ? actionable.slice(0, 3) : items.slice(0, 1);
         const worstStatus = actionable.some((action) => (action.status || action.level) === "fail")
           ? "fail"
@@ -1780,6 +1844,26 @@ const page = String.raw`<!doctype html>
             return "<div class=\"action-item\"><div class=\"action-heading\"><span class=\"pill " + escapeHtml(status) + "\">" + escapeHtml(status) + "</span><span class=\"event-title\">" + escapeHtml(action.title || "Review doctor action") + "</span></div><div class=\"event-meta\">" + escapeHtml(reason + " - urgency " + urgency) + "</div>" + next + "</div>";
           })
           .join("");
+      }
+
+      function actionableItems(payload) {
+        return actionItems(payload).filter((action) => {
+          const status = (action.status || action.level || "").toLowerCase();
+          return status !== "pass" && action.reason !== "none";
+        });
+      }
+
+      function renderTabContext(payload, profile, statusTitle, sync) {
+        const actionable = actionableItems(payload);
+        document.getElementById("tab-context-brain").textContent = profile.profileLabel || profile.brainId || "-";
+        document.getElementById("tab-context-state").textContent = statusTitle;
+        document.getElementById("tab-context-actions").textContent = actionable.length > 0
+          ? "Actions: " + String(actionable.length) + " open"
+          : "Actions: none";
+        document.getElementById("tab-context-sync").textContent = "Last sync: " + (sync.checkedAt ? displayTimestamp(sync.checkedAt) : "-");
+        document.getElementById("tab-context-checked").textContent = payload.checkedAt
+          ? "Checked: " + ageLabel(payload.checkedAt)
+          : "Checked: just now";
       }
 
       function currentSnapshot(payload) {
@@ -2587,6 +2671,7 @@ const page = String.raw`<!doctype html>
         document.getElementById("profile-scope").textContent =
           "Per-Brain: hosted/local/sync/conflicts. Hosted-level: auth/usage/latency.";
         renderProfileSwitcher(profile);
+        renderTabContext(payload, profile, title, sync);
 
         document.getElementById("hosted-files").textContent = postgres.hostedFiles ?? "-";
         document.getElementById("local-files").textContent = local.trackedFiles ?? "-";
@@ -2658,6 +2743,7 @@ const page = String.raw`<!doctype html>
           button.setAttribute("aria-selected", String(selected));
           document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
         }
+        document.getElementById("tab-context-strip").hidden = tabId === "tab-overview";
       }
 
       function setupTabs() {
