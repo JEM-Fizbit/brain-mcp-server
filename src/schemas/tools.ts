@@ -65,7 +65,9 @@ export const CommitSchema = BrainIdSchema.extend({
 export const SearchSchema = BrainIdSchema.extend({
   query: z
     .string()
-    .describe("Search term (case-insensitive substring match)."),
+    .describe(
+      "Search term. Exact case-insensitive matches are preferred; normalized fallback handles common spacing, punctuation, camel-case, and lookup-phrase variants."
+    ),
   scope: z
     .enum(["brain", "sources", "all"])
     .default("brain")

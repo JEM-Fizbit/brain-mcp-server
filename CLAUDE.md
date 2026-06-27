@@ -150,7 +150,7 @@ brain-mcp-server/
 - `brain_commit` — Git commit (optionally push)
 - `brain_list_files` — List all Brain vault files with staleness metadata
 - `brain_list_sources` — List files in the source archive, optionally filtered by category
-- `brain_search` — Search across files. Accepts `scope`: "brain" (default), "sources", or "all".
+- `brain_search` — Search across files. Exact keyword matches are preferred; normalized fallback handles spacing, punctuation, camel-case, and common lookup wording. Accepts `scope`: "brain" (default), "sources", or "all".
 
 **Operations:**
 - `brain_log` — Append an entry to the Brain change log (LOG.md)

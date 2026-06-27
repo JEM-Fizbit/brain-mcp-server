@@ -1,5 +1,6 @@
 import pg from "pg";
 import { contentHash } from "./hash.js";
+import { lineMatchesSearchQuery } from "../search-match.js";
 import type {
   ChangePage,
   ChangeRecord,
@@ -243,7 +244,6 @@ export class PostgresRevisionStore implements RevisionStore {
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
     const maxResults = Math.max(1, Math.min(options.maxResults || 50, 500));
-    const lowerQuery = query.toLowerCase();
     const files = await this.pool.query<RevisionRow>(
       `
         select r.*
@@ -258,7 +258,7 @@ export class PostgresRevisionStore implements RevisionStore {
     for (const row of files.rows) {
       const lines = row.content.split("\n");
       for (let index = 0; index < lines.length; index += 1) {
-        if (!lines[index].toLowerCase().includes(lowerQuery)) continue;
+        if (!lineMatchesSearchQuery(lines[index], query)) continue;
         results.push({
           filename: row.filename,
           lineNumber: index + 1,

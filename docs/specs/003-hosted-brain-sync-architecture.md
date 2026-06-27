@@ -280,7 +280,7 @@ For JEM, original source artifacts can live in a private Supabase Storage bucket
 
 Hosted `brain_read_file` with `scope="sources"` returns a source artifact metadata manifest at this stage. It does not stream original binary bytes or create signed URLs until a separate artifact download/access policy is designed and approved.
 
-Hosted `brain_search` with `scope="sources"` or `scope="all"` searches extracted source text from Postgres when `brain.source_artifact_text` rows exist, then falls back to source path/manifest metadata. Search results return source paths, line numbers, and snippets only; they do not expose Storage object bytes or create signed URLs.
+Hosted `brain_search` with `scope="sources"` or `scope="all"` searches extracted source text from Postgres when `brain.source_artifact_text` rows exist, using exact-first normalized keyword matching for spacing, punctuation, camel-case, and lookup-phrase variants, then falls back to source path/manifest metadata. Search results return source paths, line numbers, and snippets only; they do not expose Storage object bytes or create signed URLs.
 
 ## Runtime Configuration
 

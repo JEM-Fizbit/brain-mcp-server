@@ -1,4 +1,5 @@
 import { contentHash } from "./hash.js";
+import { lineMatchesSearchQuery } from "../search-match.js";
 import type {
   ChangePage,
   ChangeRecord,
@@ -105,7 +106,6 @@ export class MemoryRevisionStore implements RevisionStore {
     query: string,
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
-    const lowerQuery = query.toLowerCase();
     const maxResults = Math.max(1, Math.min(options.maxResults || 50, 500));
     const results: SearchResult[] = [];
 
@@ -115,7 +115,7 @@ export class MemoryRevisionStore implements RevisionStore {
       if (head.brainId !== brainId) continue;
       const lines = head.content.split("\n");
       for (let index = 0; index < lines.length; index += 1) {
-        if (!lines[index].toLowerCase().includes(lowerQuery)) continue;
+        if (!lineMatchesSearchQuery(lines[index], query)) continue;
         results.push({
           filename: head.filename,
           lineNumber: index + 1,

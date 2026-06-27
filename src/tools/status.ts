@@ -53,7 +53,7 @@ export function registerStatusTools(server: McpServer): void {
 
   server.tool(
     "brain_search",
-    'Search for a keyword or pattern (case-insensitive). By default searches Brain files only (fast, summarised knowledge). Pass scope="sources" to search the sources/ archive (original ingested documents), or scope="all" to search both. Escalate scope when the query concerns specific documents, correspondence, or when a brain-only search returns no matches on something expected to exist. Default max_results is 50 (ceiling 500); raise when the truncation footer indicates more matches exist. Per-line length is capped at 5000 chars (edge-case safety net; truncated lines end with … and the footer notes how many were trimmed).',
+    'Search for a keyword or lookup phrase. Exact case-insensitive matches are preferred; normalized fallback handles common spacing, punctuation, camel-case, and lookup-phrase variants. By default searches Brain files only (fast, summarised knowledge). Pass scope="sources" to search the sources/ archive (original ingested documents), or scope="all" to search both. Escalate scope when the query concerns specific documents, correspondence, or when a brain-only search returns no matches on something expected to exist. Default max_results is 50 (ceiling 500); raise when the truncation footer indicates more matches exist. Per-line length is capped at 5000 chars (edge-case safety net; truncated lines end with … and the footer notes how many were trimmed).',
     SearchSchema.shape,
     async ({ brain_id, query, scope, max_results }, extra) => {
       try {
