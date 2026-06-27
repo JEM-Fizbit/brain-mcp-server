@@ -38,7 +38,7 @@ ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_f
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work
 
 Reading source archives:
-- brain_read_file and brain_search accept a `scope` parameter: "brain" (default, vault only), "sources" (source archives only), or "all" (both; search only).
+- brain_read_file and brain_search accept a `scope` parameter: "brain" (default, vault only), "sources" (source archives only), or "all" (both; search only). brain_search prefers exact keyword matches, then uses normalized fallback for spacing, punctuation, camel-case, and common lookup wording.
 - Use scope="sources" or "all" when the brain vault pointer references a source file, or when you need the full original document (bio variants, CVs, meeting notes, etc.).
 - Use brain_list_sources to enumerate available source files by category.
 

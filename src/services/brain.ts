@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { lineMatchesSearchQuery } from "../search-match.js";
 import {
   LOADER_FILE,
   NOW_FILE,
@@ -309,7 +310,6 @@ export async function search(
   brainId?: string
 ): Promise<string> {
   const { brainDir, sourcesRoot } = await getBrainPaths(brainId);
-  const lowerQuery = query.toLowerCase();
   const matches: string[] = [];
   const cap = Math.min(
     Math.max(1, Math.floor(maxResults)),
@@ -344,7 +344,7 @@ export async function search(
       for (let i = 0; i < lines.length; i++) {
         if (matches.length >= cap) break outer;
         const line = lines[i];
-        if (!line.toLowerCase().includes(lowerQuery)) continue;
+        if (!lineMatchesSearchQuery(line, query)) continue;
         let trimmed = line.trim();
         if (trimmed.length > SEARCH_LINE_CHAR_LIMIT) {
           trimmed = trimmed.slice(0, SEARCH_LINE_CHAR_LIMIT) + "…";

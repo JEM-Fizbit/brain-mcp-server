@@ -16,7 +16,7 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_commit` | Git commit changes, optionally push |
 | `brain_list_files` | List all Brain files with staleness metadata |
 | `brain_list_sources` | List files in the sources/ archive, with optional category filter |
-| `brain_search` | Search for keywords. Accepts `scope` = `brain` (default), `sources`, or `all` |
+| `brain_search` | Search for keywords or lookup phrases. Exact matches are preferred; normalized fallback handles spacing, punctuation, camel-case, and common lookup wording. Accepts `scope` = `brain` (default), `sources`, or `all` |
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
 | `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references) |
@@ -24,7 +24,7 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
 
-The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). Claude escalates scope automatically when a query implicates original material rather than a Brain summary.
+The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). Claude escalates scope automatically when a query implicates original material rather than a Brain summary. `brain_search` remains keyword-first, but normalized fallback makes queries like `cnet id` match `CNetID` and longer lookup phrases match lines containing the meaningful terms.
 
 ## Requirements
 
@@ -176,7 +176,7 @@ Load sequence (when loading):
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work.
 
 Reading source archives:
-- brain_read_file and brain_search accept scope = "brain" (default, vault only), "sources", or "all" (search only). Escalate scope automatically when a query implicates original ingested material rather than a Brain summary.
+- brain_read_file and brain_search accept scope = "brain" (default, vault only), "sources", or "all" (search only). brain_search prefers exact keyword matches, then uses normalized fallback for spacing, punctuation, camel-case, and common lookup wording. Escalate scope automatically when a query implicates original ingested material rather than a Brain summary.
 - Use brain_list_sources (optional category filter) to discover source files.
 
 Inbox: files dropped into the inbox/ folder are pending sources. Use brain_scan_inbox when asked, then process each using the ingestion protocol in the loader. The inbox_file parameter on brain_ingest_complete handles cleanup.

@@ -209,7 +209,7 @@ Recommended Phase 2 semantic-search tool:
 
 - `brain_semantic_search(brain_id?, query, top_k?, scope="sources")`
 
-Keep `brain_search` keyword behavior unchanged by default. A separate semantic tool has a clearer result shape and avoids surprising callers that expect substring search.
+Keep `brain_search` keyword-first by default: exact case-insensitive matches are preferred, with normalized fallback for common spacing, punctuation, camel-case, and lookup-phrase variants. A separate semantic tool has a clearer result shape and avoids surprising callers that expect keyword search.
 
 ## Registry Schema
 
@@ -463,6 +463,6 @@ For doc-only drafting, these commands are not required, but they must be cited i
 - Phase 2 is single-Brain hosted for `ai-brain-jem`; multi-Brain filesystem hosting remains Phase 2.5 unless it falls out naturally from the registry work.
 - GitHub OAuth is used only for identity federation, not for runtime repository access.
 - The server uses an SSH deploy key or equivalent host secret for filesystem git operations.
-- `brain_semantic_search` as a separate tool is acceptable; if John prefers extending `brain_search` instead, update this spec before implementation.
+- `brain_semantic_search` remains a separate tool; `brain_search` may use exact-first normalized keyword fallback, but should not silently become semantic search.
 - Embedding provider/model selection remains open until implementation sign-off. The code should expose an interface and test with deterministic fake embeddings.
 - ChatGPT Developer Mode access may not be available during automated verification; if not, the test plan should record that specific gap.

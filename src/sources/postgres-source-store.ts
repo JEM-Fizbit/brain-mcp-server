@@ -1,4 +1,8 @@
 import pg from "pg";
+import {
+  lineMatchesSearchQuery,
+  sourceCandidateSearchTerms,
+} from "../search-match.js";
 import { contentHash } from "../sync/hash.js";
 import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
 import type {
@@ -129,11 +133,10 @@ function matchingLines(
   query: string,
   maxResults: number
 ): Array<{ lineNumber: number; line: string }> {
-  const lowerQuery = query.toLowerCase();
   const results: Array<{ lineNumber: number; line: string }> = [];
   const lines = content.split("\n");
   for (const [index, line] of lines.entries()) {
-    if (!line.toLowerCase().includes(lowerQuery)) continue;
+    if (!lineMatchesSearchQuery(line, query)) continue;
     results.push({ lineNumber: index + 1, line });
     if (results.length >= maxResults) break;
   }
@@ -396,6 +399,12 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
   ): Promise<SourceTextSearchResult[]> {
     const trimmed = query.trim();
     if (!trimmed || maxResults <= 0) return [];
+    const candidateTerms = sourceCandidateSearchTerms(trimmed);
+    if (candidateTerms.length === 0) return [];
+    const contentClauses = candidateTerms
+      .map((_, index) => `t.content ilike $${index + 2} escape '\\'`)
+      .join(" or ");
+    const limitParam = candidateTerms.length + 2;
 
     const result = await this.pool.query<SourceTextSearchRow>(
       `
@@ -416,11 +425,15 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
         join brain.source_artifacts a on a.id = t.artifact_id
         join brain.sources s on s.id = a.source_id
         where s.brain_id = $1
-          and t.content ilike $2 escape '\\'
+          and (${contentClauses})
         order by s.category, s.label, t.created_at desc
-        limit $3
+        limit $${limitParam}
       `,
-      [brainId, `%${escapeLikePattern(trimmed)}%`, Math.max(maxResults * 4, 8)]
+      [
+        brainId,
+        ...candidateTerms.map((term) => `%${escapeLikePattern(term)}%`),
+        Math.max(maxResults * 4, 8),
+      ]
     );
 
     const matches: SourceTextSearchResult[] = [];

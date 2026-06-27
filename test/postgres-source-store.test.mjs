@@ -120,10 +120,58 @@ test("PostgresSourceMetadataStore searches extracted source text with literal qu
       },
     ]
   );
-  assert.ok(queries[0].sql.includes("and t.content ilike $2 escape '\\'"));
+  assert.ok(queries[0].sql.includes("and (t.content ilike $2 escape '\\'"));
+  assert.ok(queries[0].sql.includes("or t.content ilike $3 escape '\\'"));
   assert.deepEqual(queries[0].values, [
     "ai-brain-jem",
     "%50\\%\\_complete%",
+    "%complete%",
+    20,
+  ]);
+});
+
+test("PostgresSourceMetadataStore searches extracted source text with normalized lookup phrases", async () => {
+  const queries = [];
+  const store = new PostgresSourceMetadataStore({
+    async query(sql, values) {
+      queries.push({ sql, values });
+      return {
+        rows: [
+          {
+            source_id: "source-1",
+            source_label: "tools.md",
+            artifact_id: "artifact-1",
+            display_path: "sources/research/tools.md",
+            text_format: "markdown",
+            content: [
+              "Opening paragraph",
+              "UChicago CNetID / Okta SSO: `jmilad@uchicago.edu`.",
+            ].join("\n"),
+          },
+        ],
+      };
+    },
+  });
+
+  assert.deepEqual(
+    await store.searchArtifactText("ai-brain-jem", "my uchicago cnet ID", 5),
+    [
+      {
+        sourceId: "source-1",
+        sourceLabel: "tools.md",
+        artifactId: "artifact-1",
+        path: "research/tools.md",
+        textFormat: "markdown",
+        lineNumber: 2,
+        line: "UChicago CNetID / Okta SSO: `jmilad@uchicago.edu`.",
+      },
+    ]
+  );
+  assert.deepEqual(queries[0].values, [
+    "ai-brain-jem",
+    "%my uchicago cnet ID%",
+    "%uchicago%",
+    "%cnet%",
     20,
   ]);
 });
