@@ -205,6 +205,16 @@ The routing logic lives in the loader (a Markdown file you maintain), not in cod
 
 Brain files use `[[backlinks]]` (Obsidian-style wikilinks) to cross-reference each other. During ingest, the LLM maintains these links across all affected files. The lint process checks for orphan content files (zero inbound backlinks). The Brain directory can be opened as an Obsidian vault for graph view and backlink navigation.
 
+### Brain Routing Evals
+
+The repo includes a read-only deterministic eval lane for loader and routing regressions:
+
+```bash
+npm run eval:brain:routing -- --jem-dir "/path/to/ai-brain-jem/brain" --ers-dir "/path/to/ers-brain/brain"
+```
+
+The golden set lives in [`evals/brain-routing/golden.json`](./evals/brain-routing/golden.json). It checks route files, registry authority metadata, fallback disclosure markers, search tolerance, source escalation, and secret-storage refusal signposts. See [`docs/specs/008-brain-routing-evals.md`](./docs/specs/008-brain-routing-evals.md) for scope and next slices.
+
 ## Recommended Workflow
 
 The MCP server works from any Claude client, but different tasks suit different clients:

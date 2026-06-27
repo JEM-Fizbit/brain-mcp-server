@@ -99,6 +99,14 @@ function parseUrl(value) {
   }
 }
 
+function isExplicitlyFalse(value) {
+  return (
+    value === false ||
+    (typeof value === "string" &&
+      ["0", "false", "no", "off"].includes(value.trim().toLowerCase()))
+  );
+}
+
 function normalizeProfile(rawProfile, index) {
   const raw = rawProfile || {};
   const profileBrainRoot =
@@ -148,6 +156,7 @@ function normalizeProfile(rawProfile, index) {
     raw.doctorOutputPath || path.join(profileLogDir, "hosted-doctor.out.json");
   const profileDoctorErrorPath =
     raw.doctorErrorPath || path.join(profileLogDir, "hosted-doctor.err.log");
+  const profileSyncEnabled = !isExplicitlyFalse(raw.syncEnabled);
 
   if (!Number.isInteger(profileIntervalMs) || profileIntervalMs < 1000) {
     throw new Error(
@@ -185,6 +194,7 @@ function normalizeProfile(rawProfile, index) {
   return {
     brainId: profileBrainId,
     displayName: raw.displayName || raw.name || profileBrainId,
+    syncEnabled: profileSyncEnabled,
     brainDir: profileBrainDir,
     stateFile: profileStateFile,
     ...(profileLockFile ? { lockFile: profileLockFile } : {}),
@@ -199,18 +209,22 @@ function normalizeProfile(rawProfile, index) {
     doctorErrorPath: profileDoctorErrorPath,
     stackStatusFile: profileStackStatusFile,
     env: baseEnv,
-    syncProcess: {
-      name: "sync",
-      launchPath: nodePath,
-      arguments: [syncCliPath, "watch"],
-      currentDirectoryPath: repoRoot,
-      stdoutPath: syncStdout,
-      stderrPath: syncStderr,
-      env: {
-        ...baseEnv,
-        BRAIN_SYNC_INTERVAL_MS: String(profileIntervalMs),
-      },
-    },
+    ...(profileSyncEnabled
+      ? {
+          syncProcess: {
+            name: "sync",
+            launchPath: nodePath,
+            arguments: [syncCliPath, "watch"],
+            currentDirectoryPath: repoRoot,
+            stdoutPath: syncStdout,
+            stderrPath: syncStderr,
+            env: {
+              ...baseEnv,
+              BRAIN_SYNC_INTERVAL_MS: String(profileIntervalMs),
+            },
+          },
+        }
+      : {}),
     cockpitProcess: {
       name: "cockpit",
       launchPath: nodePath,

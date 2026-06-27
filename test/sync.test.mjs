@@ -75,6 +75,42 @@ test("local Markdown edit pushes to hosted revision store", async () => {
   assert.equal(hosted.origin, "local_agent");
 });
 
+test("local sync ignores a nested duplicate Brain vault under a valid Brain root", async () => {
+  const store = new MemoryRevisionStore();
+  const { brainDir, stateFile } = dirs("nested-duplicate-vault");
+  await writeBrainFile(brainDir, "00_loader.md", "Root loader\n");
+  await writeBrainFile(brainDir, "NOW.md", "Root now\n");
+  await writeBrainFile(brainDir, "brain/00_loader.md", "Nested loader\n");
+  await writeBrainFile(brainDir, "brain/NOW.md", "Nested now\n");
+
+  const report = await makeAgent(store, { brainDir, stateFile }).pushLocalChanges();
+
+  assert.deepEqual(report.pushed, ["00_loader.md", "NOW.md"]);
+  assert.equal(report.conflicts.length, 0);
+  await assert.rejects(
+    store.readFile("ai-brain-jem", "brain/00_loader.md"),
+    /File not found/
+  );
+  await assert.rejects(
+    store.readFile("ai-brain-jem", "brain/NOW.md"),
+    /File not found/
+  );
+});
+
+test("local sync rejects a parent container when the Brain root is nested", async () => {
+  const store = new MemoryRevisionStore();
+  const root = path.join(tmpRoot, "container-root");
+  const brainDir = root;
+  const stateFile = path.join(root, ".brain-sync", "state.json");
+  await writeBrainFile(path.join(root, "brain"), "00_loader.md", "Nested loader\n");
+  await writeBrainFile(path.join(root, "brain"), "NOW.md", "Nested now\n");
+
+  await assert.rejects(
+    makeAgent(store, { brainDir, stateFile }).pushLocalChanges(),
+    /BRAIN_DIR.*Brain root/
+  );
+});
+
 test("hosted MCP write pulls to clean local Markdown tree", async () => {
   const store = new MemoryRevisionStore();
   const { brainDir, stateFile } = dirs("hosted-to-local");
@@ -98,6 +134,29 @@ test("hosted MCP write pulls to clean local Markdown tree", async () => {
   assertTiming(report, "pull", "local_write");
   assertTiming(report, "pull", "total");
   assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote first\n");
+});
+
+test("pull restores a tracked hosted file that is missing locally", async () => {
+  const store = new MemoryRevisionStore();
+  const { brainDir, stateFile } = dirs("restore-missing-tracked-local");
+  await accept(
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "NOW.md",
+      baseRevisionId: null,
+      content: "Remote canonical\n",
+      origin: "hosted_mcp",
+    })
+  );
+  const agent = makeAgent(store, { brainDir, stateFile });
+  await agent.pullHostedChanges();
+  await fs.rm(path.join(brainDir, "NOW.md"));
+
+  const report = await agent.pullHostedChanges();
+
+  assert.deepEqual(report.pulled, ["NOW.md"]);
+  assert.equal(report.conflicts.length, 0);
+  assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote canonical\n");
 });
 
 test("hosted write does not overwrite dirty local Markdown", async () => {

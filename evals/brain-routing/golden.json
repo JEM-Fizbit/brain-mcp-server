@@ -1,0 +1,284 @@
+[
+  {
+    "id": "personal-email-address",
+    "prompt": "What is my email address?",
+    "category": "personal_contact",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["01_identity.md"],
+      "loader_must_contain": ["contact details", "01_identity.md", "08_personal.md"],
+      "search": { "query": "my email address", "must_hit_files": ["01_identity.md"] }
+    }
+  },
+  {
+    "id": "personal-phone-number",
+    "prompt": "What is my phone number?",
+    "category": "personal_contact",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["01_identity.md"],
+      "loader_must_contain": ["phone number", "mobile", "01_identity.md"],
+      "search": { "query": "phone number mobile", "must_hit_files": ["01_identity.md"] }
+    }
+  },
+  {
+    "id": "personal-headshot",
+    "prompt": "Find my preferred headshot.",
+    "category": "personal_contact",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["01_identity.md"],
+      "loader_must_contain": ["headshots", "headshot/photo assets"],
+      "search": { "query": "preferred headshot", "must_hit_files": ["01_identity.md"] }
+    }
+  },
+  {
+    "id": "private-home-address",
+    "prompt": "What is my home address?",
+    "category": "private_personal",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["08_personal.md"],
+      "loader_must_contain": ["private home", "family/location context", "08_personal.md"]
+    }
+  },
+  {
+    "id": "uchicago-cnetid",
+    "prompt": "What is my UChicago CNet ID?",
+    "category": "account_identifier",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["09_tools_stack.md"],
+      "allow_store_non_secret_identifier": true,
+      "refuse_secret_storage": true,
+      "loader_must_contain": ["Stable identifiers vs secrets", "service-specific account identifiers/logins"],
+      "search": { "query": "uchicago cnet id", "must_hit_files": ["09_tools_stack.md"] }
+    }
+  },
+  {
+    "id": "uchicago-spaced-cnetid",
+    "prompt": "Look up my c net id for academic access.",
+    "category": "account_identifier",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["09_tools_stack.md"],
+      "search": { "query": "c net id academic access", "must_hit_files": ["09_tools_stack.md"] }
+    }
+  },
+  {
+    "id": "service-login-email",
+    "prompt": "Which email do I use for a service login?",
+    "category": "account_identifier",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["09_tools_stack.md"],
+      "loader_must_contain": ["service-specific account identifiers/logins", "no secrets"]
+    }
+  },
+  {
+    "id": "do-not-store-password",
+    "prompt": "Save this password to my Brain.",
+    "category": "forbidden_secret",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "refuse_secret_storage": true,
+      "loader_must_contain": ["Do not store passwords", "tokens", "MFA secrets", "private keys"]
+    }
+  },
+  {
+    "id": "do-not-store-recovery-code",
+    "prompt": "Remember this recovery code.",
+    "category": "forbidden_secret",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "refuse_secret_storage": true,
+      "loader_must_contain": ["recovery codes", "authenticating secrets"]
+    }
+  },
+  {
+    "id": "ers-company-facts",
+    "prompt": "Give me ERS company facts and positioning.",
+    "category": "cross_brain_authority",
+    "expected": {
+      "brain_id": "ers-brain",
+      "canonical_for": "ers-genomics",
+      "loader_must_contain": ["company facts", "entities/ers_genomics.md"]
+    }
+  },
+  {
+    "id": "ers-company-address",
+    "prompt": "What address should I use for ERS?",
+    "category": "cross_brain_authority",
+    "expected": {
+      "brain_id": "ers-brain",
+      "canonical_for": "ers-genomics",
+      "route_files": ["entities/ers_genomics.md"],
+      "loader_must_contain": ["company facts", "history", "positioning"]
+    }
+  },
+  {
+    "id": "ers-fallback-when-inaccessible",
+    "prompt": "Use my personal Brain for ERS context because the ERS Brain is not available.",
+    "category": "cross_brain_fallback",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["ers_genomics.md"],
+      "fallback_disclosure_required": true,
+      "loader_must_contain": ["accessible canonical ERS Brain", "legacy fallback", "may lag"]
+    }
+  },
+  {
+    "id": "ers-legacy-extract-warning",
+    "prompt": "Read the JEM-side ERS context pack.",
+    "category": "cross_brain_fallback",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["Reference_ERS_Brain_Context/00_load_first.md"],
+      "fallback_disclosure_required": true,
+      "loader_must_contain": ["legacy/prototype ERS context extract", "fallback"]
+    }
+  },
+  {
+    "id": "ers-john-work-contact",
+    "prompt": "What is John's ERS work contact detail?",
+    "category": "work_contact",
+    "expected": {
+      "brain_id": "ers-brain",
+      "route_files": ["entities/john_milad.md"],
+      "loader_must_contain": ["ERS staff/CEO professional contact details", "approved signature block"],
+      "search": { "query": "ERS Work Contact Details email address phone number", "must_hit_files": ["entities/john_milad.md"] }
+    }
+  },
+  {
+    "id": "ers-cillian-email",
+    "prompt": "What is Cillian's email address?",
+    "category": "work_contact",
+    "expected": {
+      "brain_id": "ers-brain",
+      "route_files": ["entities/cillian_mcgorman.md"],
+      "search": { "query": "Cillian email address", "must_hit_files": ["entities/cillian_mcgorman.md"] }
+    }
+  },
+  {
+    "id": "ers-approved-signature",
+    "prompt": "Find the standard ERS email signature template.",
+    "category": "work_contact",
+    "expected": {
+      "brain_id": "ers-brain",
+      "route_files": ["references/templates.md"],
+      "loader_must_contain": ["standard signature/disclosure templates", "references/templates.md"],
+      "search": { "query": "standard email signature block ERS staff", "must_hit_files": ["references/templates.md"] }
+    }
+  },
+  {
+    "id": "kruk-bio-source",
+    "prompt": "What did the KRUK trustee bio say?",
+    "category": "source_escalation",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["SOURCES.md"],
+      "loader_must_contain": ["scope: \"sources\"", "original ingested material", "KRUK bio"],
+      "search": { "query": "KRUK Trustee Bio", "must_hit_files": ["SOURCES.md"] }
+    }
+  },
+  {
+    "id": "hogan-assessment-source",
+    "prompt": "Find the Hogan risk-tolerance detail.",
+    "category": "source_escalation",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["ref_psychometric_assessments.md"],
+      "loader_must_contain": ["Hogan", "sources", "all"],
+      "search": { "query": "Hogan Insight Report MVPI HPI", "must_hit_files": ["ref_psychometric_assessments.md"] }
+    }
+  },
+  {
+    "id": "personal-task-capture",
+    "prompt": "Add a personal follow-up task.",
+    "category": "task_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["TASKS.md"],
+      "loader_must_contain": ["TASKS.md", "personal/professional non-ERS/non-project actions"]
+    }
+  },
+  {
+    "id": "project-backlog-routing",
+    "prompt": "Capture a project implementation task.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["05_projects.md"],
+      "loader_must_contain": ["owning project", "BACKLOG.md", "project work"]
+    }
+  },
+  {
+    "id": "software-ai-project-routing",
+    "prompt": "Work on one of my software or AI projects.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["05_projects.md", "09_tools_stack.md"],
+      "loader_must_contain": ["Working on a software / AI project", "05_projects.md", "09_tools_stack.md"]
+    }
+  },
+  {
+    "id": "working-binary-discovery",
+    "prompt": "Find the PE/VC tracker spreadsheet in my Brain working area.",
+    "category": "working_artifact",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["working/INDEX.md"],
+      "loader_must_contain": ["Working artifact discovery", "working/INDEX.md", "binary working artefacts"]
+    }
+  },
+  {
+    "id": "output-capture-analysis",
+    "prompt": "We produced a substantive strategy memo; save it to the Brain.",
+    "category": "source_escalation",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "loader_must_contain": ["Output capture", "sources/analysis", "substantive original thinking"]
+    }
+  },
+  {
+    "id": "writing-voice-routing",
+    "prompt": "Draft a Substack post in my voice.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["06_writing_voice.md"],
+      "loader_must_contain": ["Writing on John's behalf", "06_writing_voice.md"]
+    }
+  },
+  {
+    "id": "career-application-routing",
+    "prompt": "Help with a CEO application.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["01_identity.md", "02_expertise.md", "04_active_roles.md", "11_next_chapter_framework.md"],
+      "loader_must_contain": ["Career / job search / applications"]
+    }
+  },
+  {
+    "id": "nbgi-context-routing",
+    "prompt": "Summarize my NBGI Ventures track record.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["nbgi.md", "REF_nbgi_track_record.md"],
+      "loader_must_contain": ["NBGI Ventures context", "nbgi.md"]
+    }
+  },
+  {
+    "id": "edge-biotech-routing",
+    "prompt": "Evaluate the Edge Biotech opportunity.",
+    "category": "project_routing",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["edge_biotech.md"],
+      "loader_must_contain": ["Edge Biotech opportunity", "edge_biotech.md"]
+    }
+  }
+]
