@@ -25,6 +25,11 @@ Hosted Brain is the normal remote path for `ai-brain-jem` and the John-only `ers
 - Before running a command, classify it with [`docs/TOOLING.md`](docs/TOOLING.md): safe local check, local-state mutating, hosted/Postgres mutating, or deploy/secret-affecting.
 - Do not run installs, hosted writes, source uploads, Fly deploys, migrations, seed scripts, or LaunchAgent/app installers as routine verification for docs/metadata-only work.
 
+## Protocol Triggers
+
+- OpenAI/ChatGPT/Codex custom MCP connector auth, stale Dynamic Client Registration, `unknown_client_id`, OAuth callback, or tool-surface recovery work: read [`docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md) before planning or editing.
+- Hosted remote MCP server, OAuth 2.1, Dynamic Client Registration, callback allow-list, JWT/session state, or connector-enrollment work: read [`docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md`](docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md) before planning or editing.
+
 ## Brain Access Precedence
 
 For Brain context, status, file reads, searches, lint, log reads, and narrow Brain writes, reach for the hosted Brain MCP first. Treat `brain-local`, direct filesystem reads, and OneDrive/CloudStorage mirrors as fallback paths only.
