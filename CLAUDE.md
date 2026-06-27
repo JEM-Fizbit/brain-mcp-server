@@ -20,6 +20,16 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 
 ---
 
+## Runtime And Tooling
+
+- Node 22.x is the supported local, Docker, and Fly runtime. `Dockerfile` uses `node:22-slim`, `package.json` declares `engines.node`, and TypeScript types are aligned to Node 22. Do not treat a newer host default Node as the supported baseline without revalidating the hosted runtime path.
+- npm is the package manager. `package-lock.json` is the lockfile and `package.json` pins `packageManager` to npm 10.9.8. Use `npm ci` for reproducible installs; use `npm install` only when intentionally changing dependencies or the lockfile.
+- The operational system dependencies are larger than the npm graph: Docker, Fly CLI, Supabase Postgres/Storage access, Playwright chromium, macOS `launchctl`/LaunchServices/Full Disk Access for local operator apps, and Git as fallback/export history.
+- Before running a command, classify it with [`docs/TOOLING.md`](docs/TOOLING.md): safe local check, local-state mutating, hosted/Postgres mutating, or deploy/secret-affecting.
+- Do not run installs, hosted writes, source uploads, Fly deploys, migrations, seed scripts, or LaunchAgent/app installers as routine verification for docs/metadata-only work.
+
+---
+
 ## Brain Access Precedence
 
 For Brain context, status, file reads, searches, lint, log reads, and narrow Brain writes, reach for the hosted Brain MCP first. Treat `brain-local`, direct filesystem reads, and OneDrive/CloudStorage mirrors as fallback paths only.
@@ -49,6 +59,7 @@ Conversationally captured items may be held temporarily in a Brain `TASKS.md` `#
 
 ### Verification commands (cite in every spec)
 
+- `git diff --check` — whitespace sanity for docs/metadata-only changes
 - `npm run build` — TypeScript compile (use for type-only changes)
 - `npm test` — build + Node test runner (use for any logic change)
 

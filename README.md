@@ -28,9 +28,12 @@ The `scope` parameter on `brain_read_file` and `brain_search` separates the Brai
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22.x
+- npm 10.9.8, pinned in `package.json` via `packageManager`
 - A directory of Markdown files (your "Brain") with at least `00_loader.md` and `NOW.md`
 - Git initialised in the Brain directory (for commit/push features)
+
+See [`docs/TOOLING.md`](./docs/TOOLING.md) for the runtime/package-manager contract, system dependencies, hosted/local state boundaries, and script safety taxonomy.
 
 ## Quick Start
 
@@ -38,7 +41,7 @@ The `scope` parameter on `brain_read_file` and `brain_search` separates the Brai
 # 1. Clone and build
 git clone <your-fork-or-clone-url> ~/Projects/brain-mcp-server
 cd ~/Projects/brain-mcp-server
-npm install
+npm ci
 npm run build
 
 # 2. Verify the build produced dist/index.js
