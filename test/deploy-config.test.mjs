@@ -67,6 +67,25 @@ test("Fly image carries the John-only JEM and ERS pilot registry", async () => {
   assert.ok(
     registry.brains.every((brain) => brain.storage_backend === "postgres")
   );
+  const jemBrain = registry.brains.find((brain) => brain.id === "ai-brain-jem");
+  const ersBrain = registry.brains.find((brain) => brain.id === "ers-brain");
+  assert.ok(jemBrain);
+  assert.ok(ersBrain);
+  assert.equal(jemBrain.metadata.owner_scope, "personal");
+  assert.deepEqual(jemBrain.metadata.canonical_for, [
+    "john-milad",
+    "personal-context",
+    "personal-operations",
+  ]);
+  assert.equal(jemBrain.metadata.authority_tier, "canonical");
+  assert.equal(ersBrain.metadata.owner_scope, "company");
+  assert.deepEqual(ersBrain.metadata.canonical_for, [
+    "ers-genomics",
+    "ers-company-context",
+    "ers-work-context",
+  ]);
+  assert.equal(ersBrain.metadata.authority_tier, "canonical");
+  assert.match(ersBrain.metadata.fallback_note, /may lag the canonical company Brain/);
   const john = registry.principals.find((principal) => principal.login === "JEM-Fizbit");
   assert.ok(john);
   assert.equal(john.provider_user_id, "220941196");

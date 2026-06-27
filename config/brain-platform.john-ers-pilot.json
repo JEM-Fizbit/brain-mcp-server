@@ -15,6 +15,15 @@
         "environment": "john-only-pilot",
         "local_first": true,
         "content_owner": "personal",
+        "owner_scope": "personal",
+        "canonical_for": [
+          "john-milad",
+          "personal-context",
+          "personal-operations"
+        ],
+        "authority_tier": "canonical",
+        "access_policy": "personal-owner",
+        "fallback_note": "If this Brain is not accessible, use user-provided context or first-class project documents and avoid inferring private personal facts.",
         "production_cutover_requires_ers_owned_project": false
       }
     },
@@ -31,6 +40,15 @@
         "environment": "john-only-pilot",
         "local_first": true,
         "content_owner": "ers",
+        "owner_scope": "company",
+        "canonical_for": [
+          "ers-genomics",
+          "ers-company-context",
+          "ers-work-context"
+        ],
+        "authority_tier": "canonical",
+        "access_policy": "john-only-pilot; future ERS-controlled team access requires dedicated ERS infrastructure",
+        "fallback_note": "If this Brain is not accessible, use bridge summaries or project documents only as fallback and state that they may lag the canonical company Brain.",
         "canonical_local_checkout": "SharePoint/OneDrive 01_ers-brain",
         "production_cutover_requires_ers_owned_project": true,
         "team_access": false

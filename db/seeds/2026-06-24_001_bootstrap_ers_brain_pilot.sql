@@ -19,6 +19,15 @@ values (
   jsonb_build_object(
     'environment', 'john-only-pilot',
     'content_owner', 'ers',
+    'owner_scope', 'company',
+    'canonical_for', jsonb_build_array(
+      'ers-genomics',
+      'ers-company-context',
+      'ers-work-context'
+    ),
+    'authority_tier', 'canonical',
+    'access_policy', 'john-only-pilot; future ERS-controlled team access requires dedicated ERS infrastructure',
+    'fallback_note', 'If this Brain is not accessible, use bridge summaries or project documents only as fallback and state that they may lag the canonical company Brain.',
     'canonical_local_checkout', 'SharePoint/OneDrive 01_ers-brain',
     'local_first', true,
     'team_access', false,

@@ -63,7 +63,14 @@ export function revisionActor(ctx: ToolBrainContext): RevisionActor | undefined 
 }
 
 export async function listBrainsForExtra(extra?: ToolExtra): Promise<
-  { id: string; type: string; template_used: string; integration_mode: string; role: BrainRole }[]
+  {
+    id: string;
+    type: string;
+    template_used: string;
+    integration_mode: string;
+    role: BrainRole;
+    metadata: Record<string, unknown>;
+  }[]
 > {
   const registry = await loadRegistry();
   const principal = principalFromAuthInfo(extra?.authInfo);
@@ -73,6 +80,7 @@ export async function listBrainsForExtra(extra?: ToolExtra): Promise<
     template_used: brain.template_used,
     integration_mode: brain.integration_mode,
     role,
+    metadata: brain.metadata || {},
   }));
 }
 
