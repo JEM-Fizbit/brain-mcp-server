@@ -17,6 +17,14 @@ Hosted Brain is the normal remote path for `ai-brain-jem` and the John-only `ers
 
 **Ownership & lifecycle:** the hosted MCP is **personal-owned and ERS beta-shared** (John sole user). See [`docs/OWNERSHIP_AND_LIFECYCLE.md`](docs/OWNERSHIP_AND_LIFECYCLE.md) for ownership boundaries and the fork-to-dedicated-ERS-MCP plan at multi-tenant cutover.
 
+## Runtime And Tooling
+
+- Node 22.x is the supported local, Docker, and Fly runtime. `Dockerfile` uses `node:22-slim`, `package.json` declares `engines.node`, and TypeScript types are aligned to Node 22. Do not treat a newer host default Node as the supported baseline without revalidating the hosted runtime path.
+- npm is the package manager. `package-lock.json` is the lockfile and `package.json` pins `packageManager` to npm 10.9.8. Use `npm ci` for reproducible installs; use `npm install` only when intentionally changing dependencies or the lockfile.
+- The operational system dependencies are larger than the npm graph: Docker, Fly CLI, Supabase Postgres/Storage access, Playwright chromium, macOS `launchctl`/LaunchServices/Full Disk Access for local operator apps, and Git as fallback/export history.
+- Before running a command, classify it with [`docs/TOOLING.md`](docs/TOOLING.md): safe local check, local-state mutating, hosted/Postgres mutating, or deploy/secret-affecting.
+- Do not run installs, hosted writes, source uploads, Fly deploys, migrations, seed scripts, or LaunchAgent/app installers as routine verification for docs/metadata-only work.
+
 ## Brain Access Precedence
 
 For Brain context, status, file reads, searches, lint, log reads, and narrow Brain writes, reach for the hosted Brain MCP first. Treat `brain-local`, direct filesystem reads, and OneDrive/CloudStorage mirrors as fallback paths only.
@@ -74,6 +82,7 @@ Conversationally captured items may be held temporarily in a Brain `TASKS.md` `#
 
 Use the smallest meaningful verification for the change, then broaden when shared behaviour is touched.
 
+- Docs/metadata-only changes: JSON parse, targeted markdown scans, and `git diff --check`.
 - Type-only or narrow config/doc checks: `npm run build` or focused `node --test ...`.
 - Logic, schema, sync, hosted doctor, or cockpit changes: `npm run test`.
 - Cockpit UI changes: verify the local browser surface on desktop and a narrow/mobile viewport when layout density changes.
