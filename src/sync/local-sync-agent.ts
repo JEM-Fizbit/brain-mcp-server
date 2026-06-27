@@ -22,6 +22,9 @@ export interface LocalSyncAgentOptions {
   includeFiles?: string[];
 }
 
+const BRAIN_LOADER_FILENAME = "00_loader.md";
+const NESTED_BRAIN_DIRNAME = "brain";
+
 function emptyReport(): LocalSyncReport {
   return {
     pushed: [],
@@ -81,6 +84,16 @@ function toPortablePath(root: string, fullPath: string): string {
   return path.relative(root, fullPath).split(path.sep).join("/");
 }
 
+async function isFile(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(filePath);
+    return stats.isFile();
+  } catch (error: any) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
 async function readFileHash(filePath: string): Promise<string | null> {
   try {
     const content = await fs.readFile(filePath, "utf-8");
@@ -91,8 +104,28 @@ async function readFileHash(filePath: string): Promise<string | null> {
   }
 }
 
+async function scanPolicy(root: string): Promise<{ skipNestedBrainDir: string | null }> {
+  const rootLoaderPath = path.join(root, BRAIN_LOADER_FILENAME);
+  const nestedBrainDir = path.join(root, NESTED_BRAIN_DIRNAME);
+  const nestedLoaderPath = path.join(nestedBrainDir, BRAIN_LOADER_FILENAME);
+  const rootHasLoader = await isFile(rootLoaderPath);
+  const nestedHasLoader = await isFile(nestedLoaderPath);
+
+  if (!rootHasLoader && nestedHasLoader) {
+    throw new Error(
+      `BRAIN_DIR appears to point at a parent container, not the Brain root. ` +
+        `Use ${nestedBrainDir} as BRAIN_DIR.`
+    );
+  }
+
+  return {
+    skipNestedBrainDir: rootHasLoader && nestedHasLoader ? nestedBrainDir : null,
+  };
+}
+
 async function scanMarkdownFiles(root: string): Promise<string[]> {
   const files: string[] = [];
+  const policy = await scanPolicy(root);
 
   async function walk(dir: string): Promise<void> {
     const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
@@ -100,6 +133,7 @@ async function scanMarkdownFiles(root: string): Promise<string[]> {
       if (entry.name.startsWith(".")) continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
+        if (policy.skipNestedBrainDir === fullPath) continue;
         await walk(fullPath);
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
         files.push(toPortablePath(root, fullPath));
@@ -232,6 +266,23 @@ export class LocalSyncAgent {
       );
 
       if (tracked?.revisionId === head.revisionId) {
+        if (localHash === null) {
+          const remote = await timed(report, "pull", "revision_store_read", () =>
+            this.options.store.readFile(this.options.brainId, filename)
+          );
+          await timed(report, "pull", "local_write", async () => {
+            await fs.mkdir(path.dirname(fullPath), { recursive: true });
+            await fs.writeFile(fullPath, remote.content, "utf-8");
+          });
+          state.files[filename] = {
+            revisionId: head.revisionId,
+            contentHash: head.contentHash,
+            localHash: head.contentHash,
+          };
+          report.pulled.push(filename);
+          maxCursor = Math.max(maxCursor, Number(head.cursor));
+          continue;
+        }
         report.unchanged.push(filename);
         maxCursor = Math.max(maxCursor, Number(head.cursor));
         continue;

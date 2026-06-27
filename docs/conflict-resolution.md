@@ -113,6 +113,17 @@ Expected result:
 
 If the local file still differs, wait for the sync loop or run a bounded sync cycle for the file. The local file should converge to the reviewed final content unless it has been edited again.
 
+## Operator Repair For Path Drift
+
+If a bad local root caused hosted heads such as `brain/00_loader.md` or parent-repo paths like `docs/...`, use the dry-run-first operator repair rather than manually editing Supabase:
+
+```bash
+npm run sync:reconcile:duplicate-brain-paths -- --brain-id ai-brain-jem
+npm run sync:reconcile:duplicate-brain-paths -- --brain-id ai-brain-jem --local-brain-dir /absolute/path/to/brain --prune-missing-local
+```
+
+Add `--apply` only after the dry run shows the affected filenames are sync metadata drift, not reviewed Brain content. The repair marks matching open conflicts `superseded`, removes stale hosted heads and sync-state rows, and keeps revision history intact.
+
 ## What Not To Do
 
 Do not:

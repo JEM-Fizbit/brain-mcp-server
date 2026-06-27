@@ -607,6 +607,64 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
   assert.match(source, /Restart All Local Stacks/);
 });
 
+test("menu-bar app can run a cockpit-only profile when sync is disabled", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Brain Monitor Cockpit Only.app");
+  const jemRoot = path.join(tmpRoot, "ai-brain-jem-cockpit-only");
+  const ersRoot = path.join(tmpRoot, "ers-brain-cockpit-only");
+  const nodePath = "/opt/example/bin/node";
+  const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
+  const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
+  const profiles = [
+    {
+      id: "ai-brain-jem",
+      name: "JEM",
+      brainRoot: jemRoot,
+      syncEnabled: false,
+      stateFile: path.join(tmpRoot, "state", "jem-cockpit-only", "state.json"),
+      healthFile: path.join(tmpRoot, "state", "jem-cockpit-only", "state.health.json"),
+      logDir: path.join(tmpRoot, "logs", "jem-cockpit-only"),
+      cockpitUrl: "http://127.0.0.1:8787/",
+    },
+    {
+      id: "ers-brain",
+      name: "ERS",
+      brainRoot: ersRoot,
+      stateFile: path.join(tmpRoot, "state", "ers-cockpit-only", "state.json"),
+      healthFile: path.join(tmpRoot, "state", "ers-cockpit-only", "state.health.json"),
+      logDir: path.join(tmpRoot, "logs", "ers-cockpit-only"),
+      cockpitUrl: "http://127.0.0.1:8788/",
+    },
+  ];
+
+  await exec(process.execPath, [menuBarScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_BUNDLE_ID: "com.example.brain-monitor-cockpit-only",
+      BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
+      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
+      BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
+    },
+  });
+
+  const config = JSON.parse(
+    await fs.readFile(
+      path.join(appPath, "Contents", "Resources", "brain-menubar-config.json"),
+      "utf-8"
+    )
+  );
+
+  assert.equal(config.brains[0].brainId, "ai-brain-jem");
+  assert.equal(config.brains[0].syncEnabled, false);
+  assert.equal(config.brains[0].syncProcess, undefined);
+  assert.equal(config.brains[0].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8787");
+  assert.equal(config.brains[1].brainId, "ers-brain");
+  assert.equal(config.brains[1].syncEnabled, true);
+  assert.equal(config.brains[1].syncProcess.env.BRAIN_ID, "ers-brain");
+  assert.equal(config.syncProcess, undefined);
+});
+
 test("menu-bar LaunchAgent opens the operator app at login", async () => {
   const outputPath = path.join(tmpRoot, "com.example.ers-brain-monitor.plist");
   const appPath = path.join(tmpRoot, "Applications", "ERS Brain Monitor.app");
