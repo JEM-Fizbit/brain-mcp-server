@@ -159,7 +159,22 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (15 total)
+### Tools (22 total — 21 distinct + 1 alias)
+
+Registered in `src/tools/index.ts` across the registry, semantic, sync, context, update, status, log, tasks, lint, ingest, and inbox modules.
+
+**Registry:**
+- `brain_list_brains` — List the Brains the caller can reach, with metadata
+- `brain_describe` — Describe a single Brain (id, type, integration mode, role, metadata)
+
+**Semantic search:**
+- `brain_semantic_index` — Build/refresh the vector index over the source archive
+- `brain_semantic_search` — Vector search across indexed sources
+
+**Sync / conflicts:**
+- `brain_sync_status` — Hosted sync health: provider, hosted file count, open conflicts, latest cursor
+- `brain_list_conflicts` — List open sync conflicts
+- `brain_resolve_conflict` — Resolve a sync conflict (per `docs/conflict-resolution.md`)
 
 **Core:**
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
