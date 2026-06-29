@@ -10,6 +10,14 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 
 | Tool | Description |
 |------|-------------|
+| `brain_list_brains` | List the Brains the caller can reach, with metadata |
+| `brain_describe` | Describe a single Brain (id, type, integration mode, role, metadata) |
+| `brain_semantic_index` | Build/refresh the vector index over the sources/ archive |
+| `brain_semantic_search` | Vector search across indexed sources |
+| `brain_sync_status` | Hosted sync health — provider, hosted file count, open conflicts, latest cursor |
+| `brain_list_conflicts` | List open sync conflicts |
+| `brain_resolve_conflict` | Resolve a sync conflict |
+| `brain_capture_item` | Capture a transient triage item into `TASKS.md` (`brain_report_item` is a compatibility alias) |
 | `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint, issue, and inbox nudges |
 | `brain_read_file` | Read a specific file. Accepts `scope` = `brain` (default) or `sources` to read from the sources/ archive |
 | `brain_update_file` | Update a Brain file (replace, append, or patch) |
@@ -151,7 +159,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-This matches all thirteen Brain tools. You can verify with `/permissions` in Claude Code.
+The `mcp__brain` prefix matches all Brain tools (22 total). You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
