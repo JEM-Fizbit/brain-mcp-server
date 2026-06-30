@@ -88,20 +88,26 @@ export const STALENESS = {
   DEFAULT: 180,
 } as const;
 
-/** Files considered "active" for staleness checks */
+/**
+ * Staleness tiers are matched by SEMANTIC NAME, not number prefix, so any Brain's
+ * numbering works (e.g. the JEM Brain's projects file is 05_projects.md, not 03_;
+ * its roles file is 04_active_roles.md). NOW.md is handled separately by exact name
+ * in getStalenessThreshold. Matching is substring/case-insensitive on the basename.
+ */
+/** "Active" tier — fast-changing content (projects, roles, current focus). */
 export const ACTIVE_PATTERNS = [
-  /^02_/,   // roles
-  /^03_/,   // projects
-  /^NOW\./,
+  /projects?/i,
+  /roles?/i,
+  /active/i,
 ];
 
-/** Files considered "identity" for staleness checks */
+/** "Identity" tier — slow-changing self/credential content. */
 export const IDENTITY_PATTERNS = [
-  /^01_/,   // identity
-  /^04_/,   // credentials
+  /identity/i,
+  /credentials?/i,
 ];
 
-/** Section headers in 03_projects.md indicating inactive/non-priority projects (drift skip) */
+/** Section headers in the projects file indicating inactive/non-priority projects (drift skip) */
 export const INACTIVE_SECTION_PATTERNS = [
   /maintenance/i,
   /archived/i,
@@ -111,7 +117,7 @@ export const INACTIVE_SECTION_PATTERNS = [
 ];
 
 /**
- * Section headers in 03_projects.md indicating active projects that should be
+ * Section headers in the projects file indicating active projects that should be
  * cross-checked against NOW.md. Only projects under matching sections are
  * drift-checked; everything else (Stable, Concept, Infrastructure, Content,
  * Archived, etc.) is exempt by design.

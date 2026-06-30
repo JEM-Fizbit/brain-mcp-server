@@ -123,6 +123,30 @@ test("drift falls back with warning when no Active section is present", async ()
   assert.match(drift, /UnknownProject/, "fallback should use prior behaviour and flag unmentioned projects");
 });
 
+test("drift is number-agnostic: fires for a 05_projects.md projects file (JEM schema)", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n",
+    "NOW.md": "# NOW\n\n- Working on Social-Creator-Claude this week.\n",
+    "05_projects.md": [
+      "# Projects",
+      "",
+      "## Software — Active Development",
+      "",
+      "### Social-Creator-Claude",
+      "Active project mentioned in NOW.md.",
+      "",
+      "### MILADVector-Forgotten",
+      "Active project NOT mentioned in NOW.md — should flag.",
+      "",
+    ].join("\n"),
+  });
+
+  const report = await runLint();
+  const drift = report.drift.join("\n");
+  assert.match(drift, /MILADVector-Forgotten/, "drift must find the projects file regardless of its number prefix");
+  assert.doesNotMatch(drift, /Social-Creator-Claude/, "mentioned active project should not flag");
+});
+
 async function writeBinary(name, bytes) {
   const full = path.join(tmpDir, name);
   await fs.mkdir(path.dirname(full), { recursive: true });
