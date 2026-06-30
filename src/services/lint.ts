@@ -201,6 +201,22 @@ function checkJournalRotation(
   return { lines, bytes, triggeredBy };
 }
 
+/**
+ * Locate the projects file by name, number-agnostically. Brains number their
+ * files differently (the canonical default is PROJECTS_FILE = 03_projects.md; the
+ * JEM Brain deliberately uses 05_projects.md), so drift detection must not hardcode
+ * a single number. Matches `projects.md` or `NN_projects.md`; prefers the configured
+ * PROJECTS_FILE default when present, else the lowest-sorted match. Returns undefined
+ * when the Brain has no projects file (e.g. a Brain that keeps projects in a folder),
+ * which simply skips drift.
+ */
+function resolveProjectsFile(allFiles: string[]): string | undefined {
+  const candidates = allFiles.filter((name) => /(^|_)projects\.md$/i.test(name));
+  if (candidates.length === 0) return undefined;
+  if (candidates.includes(PROJECTS_FILE)) return PROJECTS_FILE;
+  return [...candidates].sort()[0];
+}
+
 export async function runLint(brainId?: string): Promise<LintReport> {
   const resolvedBrainId = await resolveLintBrainId(brainId);
   const store = activeBrainStore();
@@ -262,7 +278,10 @@ export async function runLint(brainId?: string): Promise<LintReport> {
   // Drift detection: check NOW.md mentions against Active project sections
   const drift: string[] = [];
   const nowContent = fileContentMap.get(NOW_FILE);
-  const projectsContent = fileContentMap.get(PROJECTS_FILE);
+  const projectsFileName = resolveProjectsFile(allFiles);
+  const projectsContent = projectsFileName
+    ? fileContentMap.get(projectsFileName)
+    : undefined;
   if (nowContent && projectsContent) {
     const nowLower = nowContent.toLowerCase();
     const lines = projectsContent.split("\n");
