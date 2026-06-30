@@ -13,6 +13,13 @@ export const SOURCES_ROOT =
 export const CHARACTER_LIMIT = 50_000;
 export const LOADER_FILE = "00_loader.md";
 export const NOW_FILE = "NOW.md";
+/**
+ * Canonical projects file. MUST align with ACTIVE_PATTERNS (/^03_/) below so the
+ * lint drift check and the staleness "active" tier reference the same file.
+ * (Prior bug: drift read a hardcoded "03_projects.md" that no NN_ schema produces,
+ * so drift detection was silently dead.)
+ */
+export const PROJECTS_FILE = "03_projects.md";
 export const MAX_SEARCH_RESULTS = 50;
 export const MAX_SEARCH_RESULTS_CEILING = 500;
 export const SEARCH_LINE_CHAR_LIMIT = 5000;
@@ -94,7 +101,7 @@ export const IDENTITY_PATTERNS = [
   /^04_/,   // credentials
 ];
 
-/** Section headers in 05_projects.md indicating inactive/non-priority projects (drift skip) */
+/** Section headers in 03_projects.md indicating inactive/non-priority projects (drift skip) */
 export const INACTIVE_SECTION_PATTERNS = [
   /maintenance/i,
   /archived/i,
@@ -104,12 +111,12 @@ export const INACTIVE_SECTION_PATTERNS = [
 ];
 
 /**
- * Section headers in 05_projects.md indicating active projects that should be
+ * Section headers in 03_projects.md indicating active projects that should be
  * cross-checked against NOW.md. Only projects under matching sections are
  * drift-checked; everything else (Stable, Concept, Infrastructure, Content,
  * Archived, etc.) is exempt by design.
  *
- * If 05_projects.md has no section matching any of these, runLint emits a
+ * If 03_projects.md has no section matching any of these, runLint emits a
  * warning and falls back to INACTIVE_SECTION_PATTERNS filtering.
  */
 export const ACTIVE_SECTION_PATTERNS = [/active/i];

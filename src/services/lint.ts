@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   LOADER_FILE,
   NOW_FILE,
+  PROJECTS_FILE,
   LINE_LIMIT,
   BLOAT_EXEMPT,
   INACTIVE_SECTION_PATTERNS,
@@ -261,7 +262,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
   // Drift detection: check NOW.md mentions against Active project sections
   const drift: string[] = [];
   const nowContent = fileContentMap.get(NOW_FILE);
-  const projectsContent = fileContentMap.get("05_projects.md");
+  const projectsContent = fileContentMap.get(PROJECTS_FILE);
   if (nowContent && projectsContent) {
     const nowLower = nowContent.toLowerCase();
     const lines = projectsContent.split("\n");

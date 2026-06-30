@@ -52,7 +52,7 @@ test("drift check only flags projects under Active section", async () => {
   await writeFixture({
     "00_loader.md": "# Loader\n",
     "NOW.md": "# NOW\n\n- Working on Social-Creator-Claude this week.\n",
-    "05_projects.md": [
+    "03_projects.md": [
       "# Projects",
       "",
       "## Software — Active Development",
@@ -101,7 +101,7 @@ test("drift falls back with warning when no Active section is present", async ()
   await writeFixture({
     "00_loader.md": "# Loader\n",
     "NOW.md": "# NOW\n\n- Working on KnownProject.\n",
-    "05_projects.md": [
+    "03_projects.md": [
       "# Projects",
       "",
       "## Random Heading One",
@@ -293,7 +293,7 @@ test("revision-store lint does not scan BRAIN_DIR", async () => {
       brainId: "ai-brain-jem",
       filename: "00_loader.md",
       baseRevisionId: null,
-      content: "# Loader\n\nReferences: `NOW.md`, `05_projects.md`\n",
+      content: "# Loader\n\nReferences: `NOW.md`, `03_projects.md`\n",
       origin: "hosted_mcp",
     });
     await store.proposeRevision({
@@ -305,7 +305,7 @@ test("revision-store lint does not scan BRAIN_DIR", async () => {
     });
     await store.proposeRevision({
       brainId: "ai-brain-jem",
-      filename: "05_projects.md",
+      filename: "03_projects.md",
       baseRevisionId: null,
       content: [
         "# Projects",

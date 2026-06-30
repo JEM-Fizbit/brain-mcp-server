@@ -309,6 +309,18 @@ export async function getBrainPaths(brainId?: string): Promise<BrainPaths> {
 }
 
 export function pathsForBrain(brain: BrainDefinition): BrainPaths {
+  // S1-guard: host-filesystem path resolution is only valid for filesystem-backed
+  // Brains. On a non-filesystem backend (e.g. the hosted Postgres connector) the
+  // FS-write tools (ingest, source save, log append, git) must refuse cleanly
+  // rather than resolve to a path that does not exist in the container — which
+  // would otherwise silently write to ephemeral disk that no hosted read sees.
+  if (brain.storage_backend !== "filesystem") {
+    throw new Error(
+      `Brain ${brain.id} uses the "${brain.storage_backend}" backend; host filesystem ` +
+        `operations (ingest, source save, log append, git) are unavailable here. Run these ` +
+        `via a local stdio server with a filesystem-backed Brain (set BRAIN_DIR).`
+    );
+  }
   const brainDir = String(brain.storage_config.brain_dir || "");
   const repoPath = String(
     brain.storage_config.repo_path ||
