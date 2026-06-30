@@ -134,3 +134,32 @@ test("GitHub allowed login grants default Brain owner fallback", async () => {
   assert.equal(result.brain.id, "ai-brain-jem");
   assert.equal(result.role, "owner");
 });
+
+test("pathsForBrain refuses a non-filesystem backend (S1-guard)", () => {
+  assert.throws(
+    () =>
+      registry.pathsForBrain({
+        id: "ers-brain",
+        type: "shared",
+        template_used: "ers",
+        integration_mode: "vertical",
+        storage_backend: "postgres",
+        storage_config: { brain_dir: "/app/does-not-exist/brain" },
+      }),
+    /unavailable/i,
+    "filesystem path resolution must be refused on a postgres-backed Brain"
+  );
+});
+
+test("pathsForBrain resolves on a filesystem backend", () => {
+  const paths = registry.pathsForBrain({
+    id: "ai-brain-jem",
+    type: "personal",
+    template_used: "personal",
+    integration_mode: "vertical",
+    storage_backend: "filesystem",
+    storage_config: { brain_dir: brainDir, sources_dir: sourcesDir },
+  });
+  assert.equal(paths.brainDir, brainDir);
+  assert.equal(paths.sourcesRoot, sourcesDir);
+});
