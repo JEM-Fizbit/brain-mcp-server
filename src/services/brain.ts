@@ -226,8 +226,12 @@ export async function updateFile(
   } else if (mode === "append") {
     const existing = await fs.readFile(filePath, "utf-8").catch(() => "");
     const separator = existing.endsWith("\n") ? "" : "\n";
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, existing + separator + content, "utf-8");
   } else {
+    // Ensure the parent directory exists so a new file can be created in a
+    // subdirectory (e.g. archive/tasks-done.md) that does not yet exist.
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content, "utf-8");
   }
 

@@ -29,6 +29,7 @@
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",
     "hosted:doctor": "node scripts/hosted-doctor.mjs",
+    "brain:lint:fix": "node scripts/brain-lint-fix.mjs",
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "eval:brain:routing": "node scripts/eval-brain-routing.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",

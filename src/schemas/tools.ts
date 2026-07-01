@@ -12,7 +12,20 @@ export const BrainIdSchema = z.object({
 
 export const LoadContextSchema = BrainIdSchema;
 export const ListFilesSchema = BrainIdSchema;
-export const LintSchema = BrainIdSchema;
+export const LintSchema = BrainIdSchema.extend({
+  fix: z
+    .boolean()
+    .optional()
+    .describe(
+      "When true, apply the mechanical, non-fabricating fixes after reporting: index orphaned files into the loader, relocate completed [x] tasks into Done (stamped with today's date), archive Done items stamped more than 30 days ago into archive/tasks-done.md, and bump the loader's Last reviewed date. Writes are revision-tracked. Defaults to false (report only)."
+    ),
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe(
+      "Only meaningful with fix=true. When true, compute and return the planned fixes without writing anything. Used by the operator confirm step."
+    ),
+});
 export const ScanInboxSchema = BrainIdSchema;
 export const ListBrainsSchema = z.object({});
 export const DescribeBrainSchema = BrainIdSchema.extend({

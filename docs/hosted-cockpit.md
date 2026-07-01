@@ -334,6 +334,37 @@ stack from Brain Monitor, then rerun `npm run hosted:doctor`.
 
 Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not manually delete database rows to make the cockpit green.
 
+## Applying Brain Lint Fixes (the one operator write action)
+
+The cockpit and Monitor are otherwise read-only. The single exception is a
+confirm-gated **"Apply lint fixes"** action that **delegates** to the governed
+`brain_lint({ fix: true })` logic (via `scripts/brain-lint-fix.mjs` or the hosted
+tool). It never writes Postgres, Storage, or files directly, never resolves
+conflicts, and never performs admin mutations; it stays local-bound. This is a
+deliberate, narrow relaxation of the read-only contract — see
+`docs/DECISIONS.md` (2026-07-01) and `docs/specs/009-brain-lint-apply-mode.md`.
+
+The fixes are mechanical and non-fabricating: index orphaned files into the
+loader, relocate completed `[x]` tasks into Done (stamped `(done YYYY-MM-DD)`),
+archive Done items older than 30 days into `archive/tasks-done.md` (moved, never
+deleted), and bump the loader "Last reviewed" date when a change lands. Dates are
+handled stamp-forward — undated Done items are tagged the first time the tool
+sees them; no history is reconstructed.
+
+Operator usage from the repo (dry run is the default; nothing is written without
+`--apply`):
+
+```bash
+npm run brain:lint:fix                 # preview the planned fixes
+npm run brain:lint:fix -- --apply      # apply them to the local-first Brain
+```
+
+The action must always run a dry run first and require explicit confirmation
+before the apply. The native Brain Monitor menu-item that shells out to this
+delegation target is deferred follow-up work (Objective-C in
+`scripts/install-brain-menubar-app.mjs`); until it lands, the CLI above is the
+supported operator entrypoint.
+
 ## Latency Trend Semantics
 
 The cockpit does not run hidden writes just to refresh charts. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls. The telemetry write is best-effort and non-blocking by default, so recording a sample should not add response latency. Set `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only when deliberately diagnosing the telemetry write path itself.
