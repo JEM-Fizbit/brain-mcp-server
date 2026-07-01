@@ -1,8 +1,11 @@
 import http from "node:http";
 import path from "node:path";
+import crypto from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { planLintFixes, applyLintFixSelection } from "../dist/services/lint-apply.js";
+import { brainDate } from "../dist/services/date.js";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +16,11 @@ const doctorScriptPath =
 const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
+const cockpitBrainId = process.env.BRAIN_ID || "ai-brain-jem";
+// Per-process CSRF nonce: embedded in the served page and required on the write
+// endpoint. A cross-origin page cannot read it (no CORS headers are ever sent),
+// so it cannot forge the POST. Rotates every cockpit restart.
+const cockpitNonce = crypto.randomBytes(18).toString("hex");
 const allowPortFallback =
   process.env.BRAIN_COCKPIT_PORT_FALLBACK === "1" ||
   (!requestedPort && process.env.BRAIN_COCKPIT_PORT_FALLBACK !== "0");
@@ -35,6 +43,26 @@ function sendHtml(response, html) {
     "cache-control": "no-store",
   });
   response.end(html);
+}
+
+// A request's Host must be a loopback literal on our port. This defeats DNS
+// rebinding: a rebound hostname carries its own Host header, which fails here.
+function isLoopbackHost(request) {
+  const hostHeader = String(request.headers.host || "");
+  const hostname = hostHeader.replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+  return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+}
+
+async function readJsonBody(request, limitBytes = 256 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of request) {
+    total += chunk.length;
+    if (total > limitBytes) throw new Error("request body too large");
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) return {};
+  return JSON.parse(Buffer.concat(chunks).toString("utf-8"));
 }
 
 async function runDoctor() {
@@ -1189,6 +1217,37 @@ const page = String.raw`<!doctype html>
           letter-spacing: 0;
         }
       }
+      .fixes-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 0.75rem 0 1rem;
+      }
+      .fixes-toolbar .fixes-apply {
+        font-weight: 600;
+      }
+      .fixes-group {
+        margin-bottom: 1rem;
+      }
+      .fixes-group h3 {
+        margin: 0 0 0.35rem;
+        font-size: 0.9rem;
+      }
+      .fixes-item {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+        padding: 0.3rem 0.5rem;
+        border-radius: 6px;
+      }
+      .fixes-item:hover {
+        background: rgba(127, 127, 127, 0.1);
+      }
+      .fixes-item .fixes-checkbox {
+        margin-top: 0.2rem;
+        flex: 0 0 auto;
+      }
     </style>
   </head>
   <body>
@@ -1216,6 +1275,7 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-activity" type="button" role="tab" aria-controls="panel-activity" aria-selected="false">Activity</button>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
+          <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Fixes</button>
           <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
         </div>
 
@@ -1499,6 +1559,19 @@ const page = String.raw`<!doctype html>
           </section>
         </div>
 
+        <div class="tab-panel" id="panel-fixes" role="tabpanel" aria-labelledby="tab-fixes" hidden>
+          <section>
+            <h2>Mechanical Brain Fixes</h2>
+            <p class="muted">Review each proposed fix and apply only what you approve. Archiving moves items (nothing is deleted); dates are stamped forward. Writes go to this Brain's local-first store and sync to hosted.</p>
+            <div class="fixes-toolbar">
+              <button id="fixes-reload" type="button">Reload plan</button>
+              <button id="fixes-approve-all" type="button">Approve all</button>
+              <button id="fixes-apply" type="button" class="fixes-apply">Apply selected</button>
+              <span id="fixes-status" class="muted"></span>
+            </div>
+            <div id="fixes-list">Loading…</div>
+          </section>
+        </div>
         <div class="tab-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" hidden>
           <section>
             <h2>Raw Doctor Output</h2>
@@ -1509,6 +1582,7 @@ const page = String.raw`<!doctype html>
     </main>
 
     <script>
+      const COCKPIT_NONCE = ${JSON.stringify(cockpitNonce)};
       const operationLog = [];
       let previousSnapshot = null;
 
@@ -2823,6 +2897,118 @@ const page = String.raw`<!doctype html>
           document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
         }
         document.getElementById("tab-context-strip").hidden = tabId === "tab-overview";
+        if (tabId === "tab-fixes" && !fixesLoadedOnce) {
+          loadFixes();
+        }
+      }
+
+      // ---- Fixes tab: per-item mechanical fixes -----------------------------
+      let fixesLoadedOnce = false;
+      const FIX_KIND_LABELS = {
+        orphan_index: "Index orphaned files into the loader",
+        task_relocate: "Move completed tasks into Done",
+        done_stamp: "Stamp undated Done items with today's date",
+        done_archive: "Archive Done items older than 30 days",
+        reviewed_date: "Bump the loader \"Last reviewed\" date",
+      };
+
+      function fixesStatus(text) {
+        document.getElementById("fixes-status").textContent = text || "";
+      }
+
+      function renderFixes(items) {
+        const container = document.getElementById("fixes-list");
+        container.innerHTML = "";
+        if (!items.length) {
+          container.innerHTML = "<p class='muted'>Nothing to fix — the Brain is clean.</p>";
+          return;
+        }
+        const byKind = new Map();
+        for (const item of items) {
+          if (!byKind.has(item.kind)) byKind.set(item.kind, []);
+          byKind.get(item.kind).push(item);
+        }
+        for (const [kind, group] of byKind) {
+          const section = document.createElement("div");
+          section.className = "fixes-group";
+          const heading = document.createElement("h3");
+          heading.textContent = (FIX_KIND_LABELS[kind] || kind) + " (" + group.length + ")";
+          section.appendChild(heading);
+          for (const item of group) {
+            const row = document.createElement("label");
+            row.className = "fixes-item";
+            const box = document.createElement("input");
+            box.type = "checkbox";
+            box.className = "fixes-checkbox";
+            box.checked = true;
+            box.value = item.id;
+            const text = document.createElement("span");
+            text.textContent = item.summary;
+            text.title = item.detail || "";
+            row.appendChild(box);
+            row.appendChild(text);
+            section.appendChild(row);
+          }
+          container.appendChild(section);
+        }
+      }
+
+      async function loadFixes() {
+        fixesLoadedOnce = true;
+        fixesStatus("Loading plan…");
+        try {
+          const response = await fetch("/api/fixes/plan", { cache: "no-store" });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "plan failed");
+          renderFixes(data.items || []);
+          fixesStatus((data.items || []).length + " proposed fix(es).");
+        } catch (error) {
+          document.getElementById("fixes-list").textContent = "Failed to load plan: " + error.message;
+          fixesStatus("");
+        }
+      }
+
+      function setFixesApproveAll(checked) {
+        for (const box of document.querySelectorAll(".fixes-checkbox")) box.checked = checked;
+      }
+
+      async function applyFixes() {
+        const ids = Array.from(document.querySelectorAll(".fixes-checkbox"))
+          .filter((box) => box.checked)
+          .map((box) => box.value);
+        if (!ids.length) {
+          fixesStatus("No items selected.");
+          return;
+        }
+        const button = document.getElementById("fixes-apply");
+        button.disabled = true;
+        fixesStatus("Applying " + ids.length + " fix(es)…");
+        try {
+          const response = await fetch("/api/fixes/apply", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "content-type": "application/json", "x-cockpit-nonce": COCKPIT_NONCE },
+            body: JSON.stringify({ ids }),
+          });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "apply failed");
+          const applied = (data.appliedIds || []).length;
+          const wrote = (data.filesWritten || []).join(", ") || "no files";
+          const stale = (data.staleIds || []).length;
+          fixesStatus("Applied " + applied + " fix(es) → " + wrote + (stale ? " (" + stale + " stale skipped)" : "") + ".");
+          await loadFixes();
+          refresh();
+        } catch (error) {
+          fixesStatus("Apply failed: " + error.message);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function setupFixes() {
+        document.getElementById("fixes-reload").addEventListener("click", loadFixes);
+        document.getElementById("fixes-approve-all").addEventListener("click", () => setFixesApproveAll(true));
+        document.getElementById("fixes-apply").addEventListener("click", applyFixes);
       }
 
       function setupTabs() {
@@ -2881,6 +3067,7 @@ const page = String.raw`<!doctype html>
       document.getElementById("refresh").addEventListener("click", refresh);
       setupTabs();
       setupActivityViews();
+      setupFixes();
       refresh();
       setInterval(refresh, 60000);
     </script>
@@ -2896,6 +3083,46 @@ function createCockpitServer() {
     }
     if (request.method === "GET" && url.pathname === "/api/doctor") {
       sendJson(response, 200, await runDoctor());
+      return;
+    }
+    // Read-only per-item fix plan. Loopback-only, like the write endpoint.
+    if (request.method === "GET" && url.pathname === "/api/fixes/plan") {
+      if (!isLoopbackHost(request)) {
+        sendJson(response, 403, { ok: false, error: "forbidden_host" });
+        return;
+      }
+      try {
+        const plan = await planLintFixes(cockpitBrainId, brainDate());
+        sendJson(response, 200, { ok: true, brainId: cockpitBrainId, items: plan.items });
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error?.message || error) });
+      }
+      return;
+    }
+    // The one write endpoint: apply only the approved item ids. Guarded by
+    // loopback Host + per-process nonce + JSON content-type (no CORS is ever
+    // sent, so a cross-origin page can neither read the nonce nor preflight).
+    if (request.method === "POST" && url.pathname === "/api/fixes/apply") {
+      if (!isLoopbackHost(request)) {
+        sendJson(response, 403, { ok: false, error: "forbidden_host" });
+        return;
+      }
+      if (request.headers["x-cockpit-nonce"] !== cockpitNonce) {
+        sendJson(response, 403, { ok: false, error: "bad_nonce" });
+        return;
+      }
+      if (!/^application\/json/.test(String(request.headers["content-type"] || ""))) {
+        sendJson(response, 415, { ok: false, error: "json_required" });
+        return;
+      }
+      try {
+        const body = await readJsonBody(request);
+        const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === "string") : [];
+        const result = await applyLintFixSelection(cockpitBrainId, brainDate(), ids);
+        sendJson(response, 200, { ok: true, brainId: cockpitBrainId, ...result });
+      } catch (error) {
+        sendJson(response, 400, { ok: false, error: String(error?.message || error) });
+      }
       return;
     }
     sendJson(response, 404, { ok: false, error: "not_found" });

@@ -1,19 +1,34 @@
 /**
- * Mechanical, non-fabricating Brain fixes applied by `brain_lint({ fix: true })`.
+ * Mechanical, non-fabricating Brain fixes applied by `brain_lint({ fix: true })`
+ * and the cockpit Fixes tab.
  *
  * Every function here is a PURE transform over Markdown content — no I/O, no
  * clock, no store. The caller passes `today` (YYYY-MM-DD) so behaviour is
- * deterministic and testable. The tool layer wires these to the revision-backed
- * BrainStore write path; this module never writes.
+ * deterministic and testable.
  *
- * The four fixes (spec docs/specs/009-brain-lint-apply-mode.md):
- *  A. indexOrphans          — add loader entries for unreferenced files
- *  B. archiveOldDoneItems   — move stamped-old Done items to the archive
- *  C. bumpReviewedDate      — bump the loader "Last reviewed" date (gated)
- *  D. relocateCompletedTasks — move `- [x]` lines into the Done section
- * plus the stamp-forward dating that makes B possible:
- *     stampDoneItems        — tag undated Done items with `(done today)`
+ * Each transform enumerates the atomic changes it *could* make as `FixItem`s
+ * (each with a stable `id`) and honours an optional `approved` set: when
+ * `approved` is undefined it applies all candidates (the all-or-nothing default
+ * used by the tool/CLI); when a Set is given it applies only items whose id is
+ * in the set (per-item approval). Passing an empty Set yields the plan — items
+ * listed, content unchanged. The tool layer wires these to the revision-backed
+ * store; this module never writes.
  */
+
+export type FixKind =
+  | "orphan_index"
+  | "task_relocate"
+  | "done_stamp"
+  | "done_archive"
+  | "reviewed_date";
+
+export interface FixItem {
+  id: string;
+  kind: FixKind;
+  file: string;
+  summary: string;
+  detail: string;
+}
 
 const DONE_HEADING = /^##\s+Done\s*$/i;
 const H2 = /^##\s/;
@@ -25,25 +40,37 @@ const DONE_DATE = /\(done\s+(\d{4}-\d{2}-\d{2})/;
 const COMPLETED_TASK = /^\s*[-*]\s+\[x\]\s/i;
 const FENCE = /^\s*(```|~~~)/;
 
-export interface StampResult {
-  content: string;
-  stamped: string[];
+/** Deterministic short hash (djb2) for stable item ids across plan/re-plan. */
+function hashKey(seed: string): string {
+  let hash = 5381;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = ((hash << 5) + hash + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(16);
 }
 
-export interface RelocateResult {
+function makeId(kind: FixKind, seed: string): string {
+  return `${kind}:${hashKey(seed)}`;
+}
+
+function isApproved(approved: Set<string> | undefined, id: string): boolean {
+  return approved === undefined || approved.has(id);
+}
+
+function summarize(line: string, limit = 90): string {
+  const trimmed = line.trim();
+  return trimmed.length <= limit ? trimmed : `${trimmed.slice(0, limit)}…`;
+}
+
+export interface TransformResult {
   content: string;
-  moved: string[];
+  items: FixItem[];
 }
 
 export interface ArchiveResult {
   tasksContent: string;
   archiveContent: string;
-  archived: string[];
-}
-
-export interface IndexOrphansResult {
-  content: string;
-  added: string[];
+  items: FixItem[];
 }
 
 export interface BumpResult {
@@ -68,7 +95,6 @@ export function daysBetween(earlier: string, later: string): number {
 
 /**
  * Walk lines tracking code-fence state and the current `## ` section heading.
- * Yields each line with whether it sits inside a fence and its section title.
  */
 function annotateLines(content: string): {
   line: string;
@@ -80,9 +106,7 @@ function annotateLines(content: string): {
   let section: string | null = null;
   return lines.map((line) => {
     if (FENCE.test(line)) {
-      const wasFence = inFence;
       inFence = !inFence;
-      // The fence delimiter line itself is "inside" the fence for our purposes.
       return { line, inFence: true, section };
     }
     if (!inFence && H2.test(line)) {
@@ -96,38 +120,67 @@ function isDoneSection(section: string | null): boolean {
   return section !== null && /^done$/i.test(section);
 }
 
-/** Stamp every dateless list item in the Done section with `(done <today>)`. */
-export function stampDoneItems(tasksContent: string, today: string): StampResult {
+/** Stamp dateless Done-section list items with `(done <today>)`. */
+export function stampDoneItems(
+  tasksContent: string,
+  today: string,
+  approved?: Set<string>
+): TransformResult {
   const annotated = annotateLines(tasksContent);
-  const stamped: string[] = [];
+  const items: FixItem[] = [];
   const out = annotated.map(({ line, inFence, section }) => {
     if (inFence || !isDoneSection(section)) return line;
     if (!LIST_ITEM.test(line)) return line;
     if (parseDoneDate(line)) return line;
-    stamped.push(line.trim());
-    return `${line} (done ${today})`;
+    const id = makeId("done_stamp", line.trim());
+    items.push({
+      id,
+      kind: "done_stamp",
+      file: "TASKS.md",
+      summary: summarize(line),
+      detail: `Stamp with (done ${today}): ${line.trim()}`,
+    });
+    return isApproved(approved, id) ? `${line} (done ${today})` : line;
   });
-  return { content: out.join("\n"), stamped };
+  return { content: out.join("\n"), items };
 }
 
-/** Move `- [x]` lines out of non-Done sections into the Done section. */
-export function relocateCompletedTasks(tasksContent: string): RelocateResult {
+/**
+ * Move `- [x]` lines out of non-Done sections into the Done section, stamping
+ * each moved line with `(done <today>)` if it lacks a date. Stamping on move
+ * keeps this fix self-contained: `done_stamp` then only ever covers pre-existing
+ * Done lines, so the item sets never depend on each other's approval.
+ */
+export function relocateCompletedTasks(
+  tasksContent: string,
+  today: string,
+  approved?: Set<string>
+): TransformResult {
   const annotated = annotateLines(tasksContent);
+  const items: FixItem[] = [];
   const moved: string[] = [];
   const kept: string[] = [];
 
   for (const { line, inFence, section } of annotated) {
     if (!inFence && COMPLETED_TASK.test(line) && !isDoneSection(section)) {
-      moved.push(line);
-      continue;
+      const id = makeId("task_relocate", line.trim());
+      items.push({
+        id,
+        kind: "task_relocate",
+        file: "TASKS.md",
+        summary: summarize(line),
+        detail: `Move into Done: ${line.trim()}`,
+      });
+      if (isApproved(approved, id)) {
+        moved.push(parseDoneDate(line) ? line : `${line} (done ${today})`);
+        continue;
+      }
     }
     kept.push(line);
   }
 
-  if (moved.length === 0) return { content: tasksContent, moved: [] };
+  if (moved.length === 0) return { content: tasksContent, items };
 
-  // Insert the moved lines just under the `## Done` heading. If there is no
-  // Done section, create one at the end.
   const doneIdx = kept.findIndex((line) => DONE_HEADING.test(line));
   if (doneIdx === -1) {
     const tail = kept.length && kept[kept.length - 1].trim() !== "" ? [""] : [];
@@ -136,7 +189,7 @@ export function relocateCompletedTasks(tasksContent: string): RelocateResult {
     kept.splice(doneIdx + 1, 0, ...moved);
   }
 
-  return { content: kept.join("\n"), moved: moved.map((l) => l.trim()) };
+  return { content: kept.join("\n"), items };
 }
 
 /** Move Done items stamped more than `thresholdDays` ago into the archive. */
@@ -144,9 +197,11 @@ export function archiveOldDoneItems(
   tasksContent: string,
   archiveContent: string,
   today: string,
-  thresholdDays = 30
+  thresholdDays = 30,
+  approved?: Set<string>
 ): ArchiveResult {
   const annotated = annotateLines(tasksContent);
+  const items: FixItem[] = [];
   const archived: string[] = [];
   const kept: string[] = [];
 
@@ -154,24 +209,30 @@ export function archiveOldDoneItems(
     if (!inFence && isDoneSection(section) && LIST_ITEM.test(line)) {
       const done = parseDoneDate(line);
       if (done && daysBetween(done, today) > thresholdDays) {
-        archived.push(line);
-        continue;
+        const id = makeId("done_archive", line.trim());
+        items.push({
+          id,
+          kind: "done_archive",
+          file: "TASKS.md",
+          summary: summarize(line),
+          detail: `Archive (done ${done}, >${thresholdDays}d): ${line.trim()}`,
+        });
+        if (isApproved(approved, id)) {
+          archived.push(line);
+          continue;
+        }
       }
     }
     kept.push(line);
   }
 
   if (archived.length === 0) {
-    return { tasksContent, archiveContent, archived: [] };
+    return { tasksContent, archiveContent, items };
   }
 
   const base = archiveContent.replace(/\s*$/, "");
   const nextArchive = `${base}\n${archived.join("\n")}\n`;
-  return {
-    tasksContent: kept.join("\n"),
-    archiveContent: nextArchive,
-    archived: archived.map((l) => l.trim()),
-  };
+  return { tasksContent: kept.join("\n"), archiveContent: nextArchive, items };
 }
 
 /** Map an orphan filename to its loader "All Files" subheading. */
@@ -187,22 +248,31 @@ function orphanHeading(name: string): string {
 /** Append loader entries for orphaned files under their category heading. */
 export function indexOrphans(
   loaderContent: string,
-  orphans: string[]
-): IndexOrphansResult {
-  if (orphans.length === 0) return { content: loaderContent, added: [] };
+  orphans: string[],
+  approved?: Set<string>
+): TransformResult {
+  const items: FixItem[] = [];
+  if (orphans.length === 0) return { content: loaderContent, items };
 
   const lines = loaderContent.split("\n");
-  const added: string[] = [];
 
   for (const orphan of orphans) {
+    const id = makeId("orphan_index", orphan);
+    items.push({
+      id,
+      kind: "orphan_index",
+      file: "00_loader.md",
+      summary: `Index \`${orphan}\` into the loader`,
+      detail: `Add \`${orphan}\` under "${orphanHeading(orphan)}" as (description pending review).`,
+    });
+    if (!isApproved(approved, id)) continue;
+
     const heading = orphanHeading(orphan);
     const headingIdx = lines.findIndex(
       (line) => /^###\s/.test(line) && line.replace(/^###\s/, "").trim() === heading
     );
     if (headingIdx === -1) continue; // heading absent → skip (never fabricate structure)
 
-    // Insertion point = end of this subsection (before the next heading or EOF),
-    // skipping trailing blank lines so the entry stays inside the section.
     let insertAt = lines.length;
     for (let i = headingIdx + 1; i < lines.length; i += 1) {
       if (HEADING.test(lines[i])) {
@@ -215,18 +285,14 @@ export function indexOrphans(
     }
 
     lines.splice(insertAt, 0, `- \`${orphan}\` — (description pending review)`);
-    added.push(orphan);
   }
 
-  return { content: lines.join("\n"), added };
+  return { content: lines.join("\n"), items };
 }
 
 /** Bump the loader "Last reviewed" line to today. */
 export function bumpReviewedDate(loaderContent: string, today: string): BumpResult {
   const pattern = /(\*\*Last reviewed:\*\*\s*)\d{4}-\d{2}-\d{2}/;
   if (!pattern.test(loaderContent)) return { content: loaderContent, bumped: false };
-  return {
-    content: loaderContent.replace(pattern, `$1${today}`),
-    bumped: true,
-  };
+  return { content: loaderContent.replace(pattern, `$1${today}`), bumped: true };
 }
