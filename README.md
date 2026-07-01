@@ -27,7 +27,7 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_search` | Search for keywords or lookup phrases. Exact matches are preferred; normalized fallback handles spacing, punctuation, camel-case, and common lookup wording. Accepts `scope` = `brain` (default), `sources`, or `all` |
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
-| `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references) |
+| `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references). Pass `fix=true` to apply the mechanical, non-fabricating fixes (index orphans into the loader, relocate completed `[x]` tasks to Done, archive Done items >30d into `archive/tasks-done.md`, bump the loader's Last reviewed date); `dry_run=true` previews without writing. See [Applying Brain lint fixes](#applying-brain-lint-fixes) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
@@ -110,6 +110,16 @@ The current hosted registry is John-only and contains `ai-brain-jem` plus the pi
 For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied. For a user-launchable local operator surface, generate the reviewable macOS LaunchAgent with `npm run hosted:cockpit:launchd:plist`; see [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md).
 
 Hosted deployments can also raise **real-time auth-failure alerts to Slack** (warn → channel, fail → operator DM), gated on `BRAIN_SLACK_BOT_TOKEN` (no-op without it). The cockpit doctor's `hosted_mcp_auth_failures` check surfaces the same condition in the Checks tab. See [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md) for thresholds, routing, and env vars.
+
+### Applying Brain lint fixes
+
+`brain_lint` detects issues; its mechanical, non-fabricating fixes (index orphans into the loader, relocate completed `[x]` tasks to Done, archive Done items older than 30 days into `archive/tasks-done.md`, bump the loader's Last reviewed date) can be applied from three surfaces, all sharing one implementation:
+
+- **Cockpit Fixes tab** (primary) — lists each fix with a checkbox plus "Approve all", applies only what you approve. Backed by a loopback-only write endpoint (Host allowlist + per-process nonce + JSON-only).
+- **Brain Monitor menu-bar app** — Controls → "Apply Lint Fixes..." (confirm-gated dry-run → apply).
+- **CLI** — `npm run brain:lint:fix` (dry run) / `npm run brain:lint:fix -- --apply`.
+
+Archiving moves items (nothing is deleted) and dates are stamped forward. Full operator detail, the security posture, and the design rationale are in [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md) and [`docs/specs/010-cockpit-fixes-tab.md`](./docs/specs/010-cockpit-fixes-tab.md).
 
 ## Client Setup
 
