@@ -386,6 +386,8 @@ const config = {
 
 const nativeSource = `#import <Cocoa/Cocoa.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
 
 @interface BrainMenuAppDelegate : NSObject <NSApplicationDelegate>
 @property (strong) NSStatusItem *statusItem;
@@ -398,6 +400,8 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSMutableSet *pendingCockpitOpens;
 @property (strong) NSTimer *stackHeartbeatTimer;
 @property (strong) NSTimer *doctorPollTimer;
+@property (strong) dispatch_source_t termSignalSource;
+@property (strong) dispatch_source_t intSignalSource;
 @property (copy) NSString *lastAction;
 @property (strong) NSDate *lastActionAt;
 @end
@@ -417,6 +421,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self recordLastAction:@"Ready"];
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   [self setStatusTitle:@"Brain"];
+  [self installTerminationSignalHandlers];
   [self startManagedProcesses];
   [self scheduleStackHeartbeat];
   [self scheduleDoctorPolling];
@@ -431,6 +436,33 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self.stackHeartbeatTimer invalidate];
   [self.doctorPollTimer invalidate];
   [self stopManagedProcesses:nil];
+}
+
+// A raw SIGTERM/SIGINT (launchctl bootout/kickstart, pkill, logout) terminates
+// the process without running the Cocoa termination flow, so
+// applicationWillTerminate never fires and the sync/cockpit children orphan
+// (reparent to launchd and keep holding their ports). Catch those signals with
+// GCD sources so we terminate the children first, then exit. SIGKILL remains
+// uncatchable, but normal supervisor restarts use SIGTERM.
+- (void)installTerminationSignalHandlers {
+  __weak typeof(self) weakSelf = self;
+  int sigs[2] = {SIGTERM, SIGINT};
+  for (int i = 0; i < 2; i++) {
+    int sig = sigs[i];
+    signal(sig, SIG_IGN); // disable the default handler so the source sees it
+    dispatch_source_t source = dispatch_source_create(
+        DISPATCH_SOURCE_TYPE_SIGNAL, sig, 0, dispatch_get_main_queue());
+    dispatch_source_set_event_handler(source, ^{
+      [weakSelf stopManagedProcesses:nil];
+      exit(0);
+    });
+    dispatch_resume(source);
+    if (sig == SIGTERM) {
+      self.termSignalSource = source;
+    } else {
+      self.intSignalSource = source;
+    }
+  }
 }
 
 - (NSDictionary *)loadConfig {
