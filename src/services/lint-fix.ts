@@ -32,7 +32,6 @@ export interface FixItem {
 
 const DONE_HEADING = /^##\s+Done\s*$/i;
 const H2 = /^##\s/;
-const HEADING = /^#{1,6}\s/;
 const LIST_ITEM = /^\s*[-*]\s+/;
 /** Matches the Brain's existing completion convention: `(done YYYY-MM-DD ...)`. */
 const DONE_DATE = /\(done\s+(\d{4}-\d{2}-\d{2})/;
@@ -65,12 +64,15 @@ function summarize(line: string, limit = 90): string {
 export interface TransformResult {
   content: string;
   items: FixItem[];
+  /** Ids of items this call actually applied (content-affecting) — never a no-op. */
+  appliedIds: string[];
 }
 
 export interface ArchiveResult {
   tasksContent: string;
   archiveContent: string;
   items: FixItem[];
+  appliedIds: string[];
 }
 
 export interface BumpResult {
@@ -120,6 +122,32 @@ function isDoneSection(section: string | null): boolean {
   return section !== null && /^done$/i.test(section);
 }
 
+function headingLevel(line: string): number | null {
+  const match = line.match(/^(#{1,6})\s/);
+  return match ? match[1].length : null;
+}
+
+/**
+ * Index at the end of the section that starts at `headingIdx` — i.e. just
+ * before the next heading of the same or higher level (or EOF), skipping
+ * trailing blank lines so the entry stays inside the section.
+ */
+function sectionInsertIndex(lines: string[], headingIdx: number): number {
+  const level = headingLevel(lines[headingIdx]) ?? 6;
+  let insertAt = lines.length;
+  for (let i = headingIdx + 1; i < lines.length; i += 1) {
+    const lvl = headingLevel(lines[i]);
+    if (lvl !== null && lvl <= level) {
+      insertAt = i;
+      break;
+    }
+  }
+  while (insertAt > headingIdx + 1 && lines[insertAt - 1].trim() === "") {
+    insertAt -= 1;
+  }
+  return insertAt;
+}
+
 /** Stamp dateless Done-section list items with `(done <today>)`. */
 export function stampDoneItems(
   tasksContent: string,
@@ -128,6 +156,7 @@ export function stampDoneItems(
 ): TransformResult {
   const annotated = annotateLines(tasksContent);
   const items: FixItem[] = [];
+  const appliedIds: string[] = [];
   const out = annotated.map(({ line, inFence, section }) => {
     if (inFence || !isDoneSection(section)) return line;
     if (!LIST_ITEM.test(line)) return line;
@@ -140,9 +169,13 @@ export function stampDoneItems(
       summary: summarize(line),
       detail: `Stamp with (done ${today}): ${line.trim()}`,
     });
-    return isApproved(approved, id) ? `${line} (done ${today})` : line;
+    if (isApproved(approved, id)) {
+      appliedIds.push(id);
+      return `${line} (done ${today})`;
+    }
+    return line;
   });
-  return { content: out.join("\n"), items };
+  return { content: out.join("\n"), items, appliedIds };
 }
 
 /**
@@ -158,6 +191,7 @@ export function relocateCompletedTasks(
 ): TransformResult {
   const annotated = annotateLines(tasksContent);
   const items: FixItem[] = [];
+  const appliedIds: string[] = [];
   const moved: string[] = [];
   const kept: string[] = [];
 
@@ -173,13 +207,14 @@ export function relocateCompletedTasks(
       });
       if (isApproved(approved, id)) {
         moved.push(parseDoneDate(line) ? line : `${line} (done ${today})`);
+        appliedIds.push(id);
         continue;
       }
     }
     kept.push(line);
   }
 
-  if (moved.length === 0) return { content: tasksContent, items };
+  if (moved.length === 0) return { content: tasksContent, items, appliedIds };
 
   const doneIdx = kept.findIndex((line) => DONE_HEADING.test(line));
   if (doneIdx === -1) {
@@ -189,7 +224,7 @@ export function relocateCompletedTasks(
     kept.splice(doneIdx + 1, 0, ...moved);
   }
 
-  return { content: kept.join("\n"), items };
+  return { content: kept.join("\n"), items, appliedIds };
 }
 
 /** Move Done items stamped more than `thresholdDays` ago into the archive. */
@@ -202,6 +237,7 @@ export function archiveOldDoneItems(
 ): ArchiveResult {
   const annotated = annotateLines(tasksContent);
   const items: FixItem[] = [];
+  const appliedIds: string[] = [];
   const archived: string[] = [];
   const kept: string[] = [];
 
@@ -219,6 +255,7 @@ export function archiveOldDoneItems(
         });
         if (isApproved(approved, id)) {
           archived.push(line);
+          appliedIds.push(id);
           continue;
         }
       }
@@ -227,12 +264,12 @@ export function archiveOldDoneItems(
   }
 
   if (archived.length === 0) {
-    return { tasksContent, archiveContent, items };
+    return { tasksContent, archiveContent, items, appliedIds };
   }
 
   const base = archiveContent.replace(/\s*$/, "");
   const nextArchive = `${base}\n${archived.join("\n")}\n`;
-  return { tasksContent: kept.join("\n"), archiveContent: nextArchive, items };
+  return { tasksContent: kept.join("\n"), archiveContent: nextArchive, items, appliedIds };
 }
 
 /** Map an orphan filename to its loader "All Files" subheading. */
@@ -246,13 +283,30 @@ function orphanHeading(name: string): string {
 }
 
 /** Append loader entries for orphaned files under their category heading. */
+/**
+ * Resolve where an orphan's loader entry should go, portable across loader
+ * structures: prefer the mapped `### <category>` subheading when it exists (JEM
+ * loaders), else fall back to the "## All files" H2 section itself (loaders with
+ * a flat inventory, e.g. the ERS Brain). Returns -1 when neither exists, so the
+ * orphan is left unplaced rather than fabricating structure.
+ */
+function orphanInsertHeadingIndex(lines: string[], orphan: string): number {
+  const category = orphanHeading(orphan);
+  const subIdx = lines.findIndex(
+    (line) => /^###\s/.test(line) && line.replace(/^###\s/, "").trim() === category
+  );
+  if (subIdx !== -1) return subIdx;
+  return lines.findIndex((line) => /^##\s+all files\b/i.test(line));
+}
+
 export function indexOrphans(
   loaderContent: string,
   orphans: string[],
   approved?: Set<string>
 ): TransformResult {
   const items: FixItem[] = [];
-  if (orphans.length === 0) return { content: loaderContent, items };
+  const appliedIds: string[] = [];
+  if (orphans.length === 0) return { content: loaderContent, items, appliedIds };
 
   const lines = loaderContent.split("\n");
 
@@ -263,31 +317,19 @@ export function indexOrphans(
       kind: "orphan_index",
       file: "00_loader.md",
       summary: `Index \`${orphan}\` into the loader`,
-      detail: `Add \`${orphan}\` under "${orphanHeading(orphan)}" as (description pending review).`,
+      detail: `Add \`${orphan}\` to the loader inventory as (description pending review).`,
     });
     if (!isApproved(approved, id)) continue;
 
-    const heading = orphanHeading(orphan);
-    const headingIdx = lines.findIndex(
-      (line) => /^###\s/.test(line) && line.replace(/^###\s/, "").trim() === heading
-    );
-    if (headingIdx === -1) continue; // heading absent → skip (never fabricate structure)
+    const headingIdx = orphanInsertHeadingIndex(lines, orphan);
+    if (headingIdx === -1) continue; // no place to put it → leave unplaced, not applied
 
-    let insertAt = lines.length;
-    for (let i = headingIdx + 1; i < lines.length; i += 1) {
-      if (HEADING.test(lines[i])) {
-        insertAt = i;
-        break;
-      }
-    }
-    while (insertAt > headingIdx + 1 && lines[insertAt - 1].trim() === "") {
-      insertAt -= 1;
-    }
-
+    const insertAt = sectionInsertIndex(lines, headingIdx);
     lines.splice(insertAt, 0, `- \`${orphan}\` — (description pending review)`);
+    appliedIds.push(id);
   }
 
-  return { content: lines.join("\n"), items };
+  return { content: lines.join("\n"), items, appliedIds };
 }
 
 /** Bump the loader "Last reviewed" line to today. */
