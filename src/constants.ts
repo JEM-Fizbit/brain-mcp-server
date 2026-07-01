@@ -44,6 +44,9 @@ export const LOG_OP_TYPES = [
 ] as const;
 export type LogOpType = (typeof LOG_OP_TYPES)[number];
 
+export const TASKS_FILE = "TASKS.md";
+export const TASKS_ARCHIVE_FILE = "archive/tasks-done.md";
+
 export const SOURCES_DIR = "sources";
 export const SOURCES_INDEX = "SOURCES.md";
 export const INBOX_DIR = "inbox";
