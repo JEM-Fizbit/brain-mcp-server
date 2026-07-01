@@ -132,6 +132,38 @@ test("indexOrphans enumerates one item per orphan and indexes selectively", () =
   assert.doesNotMatch(applied.content, /REF_new.md/);
 });
 
+test("indexOrphans places orphans under a flat 'All files' section (no ### subheadings)", () => {
+  // ERS-style loader: differently-named H2, flat list, no ### subheadings.
+  const loader = [
+    "## All files (inventory as of scaffold)",
+    "",
+    "- `00_loader.md` — this file.",
+    "- `governance/guardrails.md` — rules.",
+    "",
+    "## Source categories",
+    "",
+    "- example",
+    "",
+  ].join("\n");
+  const plan = indexOrphans(loader, ["governance/ai_internal.md"], new Set());
+  const id = plan.items[0].id;
+
+  const applied = indexOrphans(loader, ["governance/ai_internal.md"], new Set([id]));
+  assert.ok(applied.appliedIds.includes(id), "placed orphan should be in appliedIds");
+  // Placed inside the All files section, before the next H2.
+  const allFilesBlock = applied.content.split("## Source categories")[0];
+  assert.match(allFilesBlock, /- `governance\/ai_internal.md` — \(description pending review\)/);
+});
+
+test("indexOrphans reports appliedIds only for orphans it could actually place", () => {
+  const loader = "## Something Else\n\n- x\n"; // no All-files section at all
+  const plan = indexOrphans(loader, ["07_x.md"], new Set());
+  const id = plan.items[0].id;
+  const res = indexOrphans(loader, ["07_x.md"], new Set([id]));
+  assert.equal(res.content, loader, "unplaceable orphan leaves content unchanged");
+  assert.deepEqual(res.appliedIds, [], "an orphan it could not place is not reported applied");
+});
+
 test("bumpReviewedDate updates the Last reviewed line to today", () => {
   const loader = "## Maintenance\n\n- **Last reviewed:** 2026-06-17\n";
   const { content, bumped } = bumpReviewedDate(loader, "2026-07-01");

@@ -2993,9 +2993,13 @@ const page = String.raw`<!doctype html>
           const data = await response.json();
           if (!data.ok) throw new Error(data.error || "apply failed");
           const applied = (data.appliedIds || []).length;
-          const wrote = (data.filesWritten || []).join(", ") || "no files";
+          const wrote = (data.filesWritten || []).join(", ");
           const stale = (data.staleIds || []).length;
-          fixesStatus("Applied " + applied + " fix(es) → " + wrote + (stale ? " (" + stale + " stale skipped)" : "") + ".");
+          if (!data.applied || applied === 0) {
+            fixesStatus("No changes applied" + (stale ? " (" + stale + " stale skipped)" : "") + ".");
+          } else {
+            fixesStatus("Applied " + applied + " fix(es) → " + wrote + (stale ? " (" + stale + " stale skipped)" : "") + ".");
+          }
           await loadFixes();
           refresh();
         } catch (error) {

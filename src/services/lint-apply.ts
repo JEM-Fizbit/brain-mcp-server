@@ -103,12 +103,17 @@ function computeFixes(
 ): ComputedFixes {
   const { loader, tasks, archive, orphans } = state;
   const items: FixItem[] = [];
+  // appliedIds are reported by each transform and reflect content-affecting
+  // changes only — an orphan the loader has no place for is enumerated but NOT
+  // counted applied, so the surface never claims a fix that silently no-ops.
+  const appliedIds: string[] = [];
 
   let loaderContent = loader;
   if (loader !== null) {
     const indexed = indexOrphans(loader, orphans, approved);
     loaderContent = indexed.content;
     items.push(...indexed.items);
+    appliedIds.push(...indexed.appliedIds);
   }
 
   let tasksContent = tasks;
@@ -116,8 +121,10 @@ function computeFixes(
   if (tasks !== null) {
     const relocated = relocateCompletedTasks(tasks, today, approved);
     items.push(...relocated.items);
+    appliedIds.push(...relocated.appliedIds);
     const stamped = stampDoneItems(relocated.content, today, approved);
     items.push(...stamped.items);
+    appliedIds.push(...stamped.appliedIds);
     const archived = archiveOldDoneItems(
       stamped.content,
       archive,
@@ -126,13 +133,11 @@ function computeFixes(
       approved
     );
     items.push(...archived.items);
+    appliedIds.push(...archived.appliedIds);
     tasksContent = archived.tasksContent;
     archiveContent = archived.archiveContent;
   }
 
-  const appliedIds = items
-    .filter((item) => approved === undefined || approved.has(item.id))
-    .map((item) => item.id);
   const landedChange = appliedIds.length > 0;
 
   // Reviewed-date is a synthetic, gated item: offered only when other fixes
