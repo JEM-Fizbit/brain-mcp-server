@@ -360,12 +360,24 @@ npm run brain:lint:fix -- --apply      # apply them to the local-first Brain
 ```
 
 The action always runs a dry run first and requires explicit confirmation before
-the apply. In the Brain Monitor menu-bar app this is exposed per profile under
-**Controls → "Apply Lint Fixes..."**: it shells out to `scripts/brain-lint-fix.mjs`
-(Objective-C in `scripts/install-brain-menubar-app.mjs`), shows the planned
-changes in a confirmation dialog, and only writes on confirm — then refreshes the
-doctor so the cockpit reflects the post-fix state. The `npm run brain:lint:fix`
-CLI above is the equivalent terminal entrypoint.
+the apply. There are three surfaces:
+
+- **Cockpit Fixes tab (primary).** The cockpit's **Fixes** tab lists each atomic
+  fix — each orphan, each archived/stamped task, the date bump — with its own
+  checkbox plus an "Approve all" control, and applies only what you approve. It
+  is backed by `GET /api/fixes/plan` (read-only, live per-item plan) and
+  `POST /api/fixes/apply` (the one write endpoint). Apply re-reads current Brain
+  state and only applies still-valid approved ids, then refreshes the doctor.
+- **Menu-bar app (secondary).** Brain Monitor → **Controls → "Apply Lint Fixes..."**
+  shells out to `scripts/brain-lint-fix.mjs`, shows the plan in a confirmation
+  dialog, and applies all-or-nothing on confirm.
+- **CLI.** `npm run brain:lint:fix` (dry run) / `-- --apply`.
+
+The `POST /api/fixes/apply` write endpoint is loopback-only and guarded by a
+Host-header allowlist (defeats DNS rebinding), a per-process nonce embedded in
+the page and required via `X-Cockpit-Nonce` (a cross-origin page cannot read it —
+no CORS is ever sent), and a JSON-only content-type. See `docs/DECISIONS.md`
+(2026-07-01) and `docs/specs/010-cockpit-fixes-tab.md`.
 
 ## Latency Trend Semantics
 
