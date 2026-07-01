@@ -16,7 +16,7 @@ Format: newest entries at the top.
 
 **Alternatives rejected:** Keeping a scheduled routine that re-implements the checks (the drift problem that caused the retirement); a separate `brain_lint_fix` tool (an extra surface where a `fix` flag on the existing detector is enough, and the mutation is still explicit); revision-history/`git log` archaeology to date Done items (cost and store-coupling not justified for a prototype); deleting old Done items (loses referable history); a Monitor button that writes Postgres/files directly (would breach the read-only invariant rather than narrow it).
 
-**Related:** `docs/specs/009-brain-lint-apply-mode.md`; `src/services/lint-fix.ts`; `src/services/lint-apply.ts`; `src/tools/lint.ts`; `scripts/brain-lint-fix.mjs`; `docs/hosted-cockpit.md`; [claude-ops/LOG.md](../../claude-ops/LOG.md) 2026-07-01 CLEANUP (routine retirement). **Follow-up:** the native Brain Monitor menu-item wiring (Objective-C, in `scripts/install-brain-menubar-app.mjs`) that shells out to the delegation target is deferred until the macOS build/test loop is exercised — the tool and CLI delegation target ship first.
+**Related:** `docs/specs/009-brain-lint-apply-mode.md`; `src/services/lint-fix.ts`; `src/services/lint-apply.ts`; `src/tools/lint.ts`; `scripts/brain-lint-fix.mjs`; `scripts/install-brain-menubar-app.mjs` (Brain Monitor Controls → "Apply Lint Fixes...", confirm-gated dry-run → apply); `docs/hosted-cockpit.md`; [claude-ops/LOG.md](../../claude-ops/LOG.md) 2026-07-01 CLEANUP (routine retirement).
 
 ---
 

@@ -1,6 +1,6 @@
 # 009 - Brain Lint Apply Mode (hosted mechanical auto-fix)
 
-**Status:** in-progress — tool + CLI delegation target landed 2026-07-01; native Monitor menu-item wiring is the remaining follow-up
+**Status:** implemented 2026-07-01 — tool + `fix`/`dry_run` flags, CLI delegation target, and the confirm-gated Brain Monitor "Apply Lint Fixes..." menu action all landed
 **Source:** conversation request, 2026-07-01, after retiring the `brain-health-audit` routine ([claude-ops/LOG.md](../../../claude-ops/LOG.md) 2026-07-01 CLEANUP). The routine's mechanical auto-fixes had no hosted equivalent; this brings them into the server as canonical logic so no scheduled routine has to re-implement (and drift from) `src/services/lint.ts`.
 **Roadmap link:** Brain quality hardening; "maintenance is automation-first" (`docs/ROADMAP.md`).
 **Decisions impact:** Relaxes the cockpit/Monitor **read-only invariant** — requires a new `docs/DECISIONS.md` entry (see §6).
@@ -84,7 +84,7 @@ QA tier: **Full** (logic change that mutates Brain content). Gate: `npm test` an
 
 ## Rollout
 
-1. Land `brain_lint` `fix`/`dry_run` flags + the four fixes + stamp-forward dating + archive file + tests.
-2. Add the Monitor confirm-gated action delegating to the tool; update `docs/hosted-cockpit.md`.
-3. Add the `docs/DECISIONS.md` entry (invariant relaxation + stamp-forward/no-archaeology decision).
+1. ✅ `brain_lint` `fix`/`dry_run` flags + the four fixes + stamp-forward dating + archive file + tests (PR #38).
+2. ✅ Brain Monitor confirm-gated `Controls → "Apply Lint Fixes..."` action delegating to `scripts/brain-lint-fix.mjs`; `docs/hosted-cockpit.md` updated.
+3. ✅ `docs/DECISIONS.md` entry (invariant relaxation + stamp-forward/no-archaeology decision).
 4. Optional later: a thin scheduled routine calling `brain_lint(fix:true)` for cadence.

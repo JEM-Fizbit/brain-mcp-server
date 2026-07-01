@@ -21,6 +21,9 @@ const nodePath =
 const doctorScriptPath =
   process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
+const lintFixScriptPath =
+  process.env.BRAIN_MENUBAR_LINT_FIX_SCRIPT ||
+  path.join(repoRoot, "scripts", "brain-lint-fix.mjs");
 const syncCliPath =
   process.env.BRAIN_MENUBAR_SYNC_CLI ||
   process.env.BRAIN_SYNC_HELPER_SYNC_CLI ||
@@ -367,6 +370,7 @@ const config = {
   cockpitUrl: primaryProfile.cockpitUrl,
   nodePath,
   doctorScriptPath,
+  lintFixScriptPath,
   syncCliPath,
   cockpitScriptPath,
   doctorOutputPath: primaryProfile.doctorOutputPath,
@@ -1281,6 +1285,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
   [self addActionItem:profileMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
   [self addActionItem:profileMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];
+  [self addActionItem:profileMenu title:@"Apply Lint Fixes..." action:@selector(applyLintFixes:) profile:profile];
 
   [profileMenu addItem:[NSMenuItem separatorItem]];
   [self addDisabledItem:profileMenu title:@"Diagnostics"];
@@ -1445,6 +1450,153 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if (dir.length > 0) {
     [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
   }
+}
+
+// Run the mechanical brain_lint fixer for one profile, capturing combined
+// stdout/stderr. Dry run (apply=NO) writes nothing; apply=YES writes through the
+// governed store path. Runs synchronously — callers dispatch it off the main
+// thread. Returns @{ @"status": exit code, @"output": captured text }.
+- (NSDictionary *)runLintFixForProfile:(NSDictionary *)profile apply:(BOOL)apply {
+  NSString *nodePath = [self stringFromValue:profile[@"nodePath"] fallback:[self stringConfig:@"nodePath" fallback:@""]];
+  NSString *script = [self stringConfig:@"lintFixScriptPath" fallback:@""];
+  NSString *repoRoot = [self stringConfig:@"repoRoot" fallback:@""];
+  if (nodePath.length == 0 || script.length == 0) {
+    return @{@"status": @(-1), @"output": @"lint fix config missing (nodePath/lintFixScriptPath)"};
+  }
+
+  NSTask *task = [[NSTask alloc] init];
+  task.launchPath = nodePath;
+  task.arguments = apply ? @[script, @"--apply"] : @[script];
+  if (repoRoot.length > 0) {
+    task.currentDirectoryPath = repoRoot;
+  }
+  NSMutableDictionary *environment = [[[NSProcessInfo processInfo] environment] mutableCopy];
+  NSDictionary *configuredEnv = profile[@"env"];
+  if ([configuredEnv isKindOfClass:[NSDictionary class]]) {
+    for (NSString *key in configuredEnv) {
+      id value = configuredEnv[key];
+      if ([key isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+        environment[key] = value;
+      }
+    }
+  }
+  task.environment = environment;
+
+  NSPipe *pipe = [NSPipe pipe];
+  task.standardOutput = pipe;
+  task.standardError = pipe;
+  NSFileHandle *reader = [pipe fileHandleForReading];
+
+  @try {
+    [task launch];
+  } @catch (NSException *exception) {
+    return @{@"status": @(-1), @"output": [NSString stringWithFormat:@"launch failed: %@", exception.reason ?: exception.name]};
+  }
+
+  // Read to EOF before waiting so a full pipe buffer cannot deadlock the child.
+  NSData *data = [reader readDataToEndOfFile];
+  [task waitUntilExit];
+  NSString *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  if (output == nil) {
+    output = @"";
+  }
+  return @{@"status": @(task.terminationStatus), @"output": output};
+}
+
+- (NSString *)truncatedOutput:(NSString *)output {
+  NSString *trimmed = [output stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (trimmed.length == 0) {
+    return @"(no output)";
+  }
+  const NSUInteger limit = 1600;
+  if (trimmed.length <= limit) {
+    return trimmed;
+  }
+  return [[trimmed substringToIndex:limit] stringByAppendingString:@"\\n...(truncated; see terminal for full output)"];
+}
+
+// Menu action: preview the fixes (dry run), then require explicit confirmation
+// before applying. This is the one operator write action; it delegates to the
+// governed fixer rather than mutating Brain state in-process.
+- (void)applyLintFixes:(id)sender {
+  NSDictionary *profile = [self profileForSender:sender];
+  if (!profile) {
+    return;
+  }
+  NSString *displayName = [self displayNameForProfile:profile];
+  [self recordLastAction:[NSString stringWithFormat:@"%@ lint fixes: previewing", displayName]];
+  [self rebuildMenu:nil];
+
+  __weak typeof(self) weakSelf = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    NSDictionary *preview = [weakSelf runLintFixForProfile:profile apply:NO];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [weakSelf presentLintFixPreview:preview forProfile:profile];
+    });
+  });
+}
+
+- (void)presentLintFixPreview:(NSDictionary *)preview forProfile:(NSDictionary *)profile {
+  NSString *displayName = [self displayNameForProfile:profile];
+  int status = [preview[@"status"] intValue];
+  NSString *output = [self truncatedOutput:[self stringFromValue:preview[@"output"] fallback:@""]];
+
+  if (status != 0) {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleWarning;
+    alert.messageText = [NSString stringWithFormat:@"%@ — lint fix preview failed", displayName];
+    alert.informativeText = output;
+    [alert addButtonWithTitle:@"OK"];
+    [alert runModal];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ lint fixes: preview failed", displayName]];
+    [self rebuildMenu:nil];
+    return;
+  }
+
+  NSAlert *alert = [[NSAlert alloc] init];
+  alert.alertStyle = NSAlertStyleInformational;
+  alert.messageText = [NSString stringWithFormat:@"%@ — apply these Brain lint fixes?", displayName];
+  alert.informativeText = output;
+  [alert addButtonWithTitle:@"Apply Fixes"];
+  [alert addButtonWithTitle:@"Cancel"];
+  NSModalResponse response = [alert runModal];
+  if (response != NSAlertFirstButtonReturn) {
+    [self recordLastAction:[NSString stringWithFormat:@"%@ lint fixes: cancelled", displayName]];
+    [self rebuildMenu:nil];
+    return;
+  }
+
+  [self recordLastAction:[NSString stringWithFormat:@"%@ lint fixes: applying", displayName]];
+  [self rebuildMenu:nil];
+  __weak typeof(self) weakSelf = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    NSDictionary *result = [weakSelf runLintFixForProfile:profile apply:YES];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [weakSelf presentLintFixResult:result forProfile:profile];
+    });
+  });
+}
+
+- (void)presentLintFixResult:(NSDictionary *)result forProfile:(NSDictionary *)profile {
+  NSString *displayName = [self displayNameForProfile:profile];
+  int status = [result[@"status"] intValue];
+  NSString *output = [self truncatedOutput:[self stringFromValue:result[@"output"] fallback:@""]];
+
+  NSAlert *alert = [[NSAlert alloc] init];
+  alert.alertStyle = status == 0 ? NSAlertStyleInformational : NSAlertStyleWarning;
+  alert.messageText = status == 0
+    ? [NSString stringWithFormat:@"%@ — lint fixes applied", displayName]
+    : [NSString stringWithFormat:@"%@ — lint fixes failed", displayName];
+  alert.informativeText = output;
+  [alert addButtonWithTitle:@"OK"];
+  [alert runModal];
+
+  [self recordLastAction:status == 0
+    ? [NSString stringWithFormat:@"%@ lint fixes: applied", displayName]
+    : [NSString stringWithFormat:@"%@ lint fixes: failed", displayName]];
+  // Refresh doctor so the cockpit/menu reflect the post-fix state.
+  [self runDoctorTaskForProfile:profile automatic:YES];
+  [self rebuildMenu:nil];
 }
 
 @end
