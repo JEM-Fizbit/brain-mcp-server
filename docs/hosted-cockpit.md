@@ -34,7 +34,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
-- no Brain writes or conflict resolutions are exposed from the cockpit.
+- the cockpit browser surface exposes no Brain writes or conflict resolutions; the menu-bar app's one exception is the confirm-gated **Controls → "Apply Lint Fixes..."** action, which delegates to the governed fixer (see "Applying Brain Lint Fixes" below) and never mutates Postgres/Storage/files directly, resolves conflicts, or performs admin mutations.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
 
@@ -359,11 +359,13 @@ npm run brain:lint:fix                 # preview the planned fixes
 npm run brain:lint:fix -- --apply      # apply them to the local-first Brain
 ```
 
-The action must always run a dry run first and require explicit confirmation
-before the apply. The native Brain Monitor menu-item that shells out to this
-delegation target is deferred follow-up work (Objective-C in
-`scripts/install-brain-menubar-app.mjs`); until it lands, the CLI above is the
-supported operator entrypoint.
+The action always runs a dry run first and requires explicit confirmation before
+the apply. In the Brain Monitor menu-bar app this is exposed per profile under
+**Controls → "Apply Lint Fixes..."**: it shells out to `scripts/brain-lint-fix.mjs`
+(Objective-C in `scripts/install-brain-menubar-app.mjs`), shows the planned
+changes in a confirmation dialog, and only writes on confirm — then refreshes the
+doctor so the cockpit reflects the post-fix state. The `npm run brain:lint:fix`
+CLI above is the equivalent terminal entrypoint.
 
 ## Latency Trend Semantics
 
