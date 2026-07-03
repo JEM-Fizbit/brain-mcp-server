@@ -29,6 +29,7 @@ Hosted Brain is the normal remote path for `ai-brain-jem` and the John-only `ers
 
 - OpenAI/ChatGPT/Codex custom MCP connector auth, stale Dynamic Client Registration, `unknown_client_id`, OAuth callback, or tool-surface recovery work: read [`docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md) before planning or editing.
 - Hosted remote MCP server, OAuth 2.1, Dynamic Client Registration, callback allow-list, JWT/session state, or connector-enrollment work: read [`docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md`](docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md) before planning or editing.
+- Transport switch (`src/index.ts`), storage-backend selection (`activeBrainStore`/`BrainStore`), or local-vs-hosted client-naming/promotion-gate work: read [`docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md`](docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md) before planning or editing.
 
 ## Brain Access Precedence
 

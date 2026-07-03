@@ -444,6 +444,7 @@ When any of these land, bump the protocol with the new evidence folded in.
   - `01_ers-brain/docs/ROADMAP.md` § 5 Decisions log 2026-05-15 entry
 - **Adjacent ai-knowledge protocols:**
   - [`MCP_SERVER_OPERATIONAL_TELEMETRY.md`](MCP_SERVER_OPERATIONAL_TELEMETRY.md) — general-purpose latency/usage telemetry shape (event-type taxonomy, timing layers, sanitization boundary); this protocol's § Auth-failure telemetry is the auth-specific slice of that broader pattern
+  - [`DUAL_TRANSPORT_MCP_SERVER.md`](DUAL_TRANSPORT_MCP_SERVER.md) — for servers that need a local stdio fallback alongside the hosted HTTP server this protocol covers: shared tool registry over both transports, storage-backend abstraction, promoted-default + permanent-fallback client naming, promotion-gate checklist
   - [`SLACK_OPS_NOTIFICATION.md`](SLACK_OPS_NOTIFICATION.md) v2.5 § Roadmap (cross-cutting phase ledger that this protocol's reference implementation lives within)
   - [`SLACK_BOT_PROVISIONING.md`](SLACK_BOT_PROVISIONING.md) (Slack-app-specific setup, prerequisite for the slack-mcp-server reference)
   - [`SLACK_BOT_PERSISTENCE.md`](SLACK_BOT_PERSISTENCE.md) (LaunchAgent + named tunnel pattern, prerequisite for any always-on remote MCP server)

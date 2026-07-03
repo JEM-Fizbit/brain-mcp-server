@@ -20,6 +20,13 @@ const config: Config = {
       overwrite: true,
       outputs: ["docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md"],
     },
+    // Dual-transport (stdio local fallback + hosted HTTP default) pattern — brain-mcp-server is the reference implementation.
+    {
+      plugin: "local",
+      pluginConfig: { path: `${LOCAL_PROTOCOLS_BASE}/DUAL_TRANSPORT_MCP_SERVER.md` },
+      overwrite: true,
+      outputs: ["docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md"],
+    },
   ],
 };
 
