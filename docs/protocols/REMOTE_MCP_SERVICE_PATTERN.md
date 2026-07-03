@@ -2,14 +2,14 @@
 
 > Reusable canonical pattern for building a cloud-hosted MCP server with full MCP-spec OAuth 2.1 authorization. Extracted 2026-05-15 from the [slack-mcp-server](https://github.com/JEM-Fizbit/slack-mcp-server) reference implementation (v0.4.1, ~13-15 hours operator+LLM build time across 2026-05-08 to 2026-05-15). Designed so the next MCP server build (planned ERS Brain MCP, JEM Brain Platform, any future service) lifts the auth + transport + attribution layers wholesale rather than re-deriving from spec.
 
-**Last Updated:** 2026-06-25
-**Version:** 1.6
-**Status:** v1.6 — adds the OpenAI operator-facing recovery companion protocol for ChatGPT/Codex connector state after hosted MCP updates. Architecture rules remain here; step-by-step OpenAI surface recovery lives in `OPENAI_MCP_CONNECTOR_RECOVERY.md`. (v1.5 added brokered-DCR recovery lessons from ChatGPT hosted Brain enrollment.)
+**Last Updated:** 2026-07-03
+**Version:** 1.7
+**Status:** v1.7 — folds in the stale-connector-downgrade classification pattern proven on brain-mcp-server (conservative benign-case downgrade shared between health check and alerter); corrects the slack-mcp-server reference implementation description (ported to Cloudflare Workers at v0.5.0, now v0.8.5+, file inventory below is v0.4.1-era); points to the new `MCP_SERVER_OPERATIONAL_TELEMETRY.md` protocol for the general (non-auth) telemetry shape; retires a stale forward-pointer to a superseded roadmap doc. (v1.6 added the OpenAI operator-facing recovery companion protocol for ChatGPT/Codex connector state after hosted MCP updates. v1.5 added brokered-DCR recovery lessons from ChatGPT hosted Brain enrollment.)
 
 **Reference implementations:**
-- [`~/Projects/slack-mcp-server/`](https://github.com/JEM-Fizbit/slack-mcp-server) v0.4.1+ — standalone always-on Node process behind a Cloudflare tunnel; production at `https://slack.ersgenomics.online/`.
+- [`~/Projects/slack-mcp-server/`](https://github.com/JEM-Fizbit/slack-mcp-server) — originally a standalone always-on Node process behind a Cloudflare tunnel (v0.4.1, the version this protocol was extracted from); **ported to Cloudflare Workers at v0.5.0** (2026-05-15, LaunchAgent + named tunnel decommissioned) and now at **v0.8.5+**. Production at `https://slack.ersgenomics.online/`. Treat the file-inventory and effort estimates below as v0.4.1-era; re-derive from the Workers-era layout before reusing verbatim.
 - `~/Projects/Social-Creator-Claude/` (2026-06-10) — **embedded in an existing Next.js app on Vercel**; production at `https://social-creator-claude.vercel.app/api/mcp`. See § Serverless/embedded variant. Spec doc: `Social-Creator-Claude/docs/specs/008-remote-mcp-server.md`.
-- `~/Projects/brain-mcp-server/` (2026-06-23) — **hosted Brain MCP on Fly.io** with GitHub OAuth, Supabase Postgres for Brain data + operational telemetry + durable OAuth state + real-time auth-failure alerting; production at `https://jem-brain-mcp.fly.dev/mcp`.
+- `~/Projects/brain-mcp-server/` (2026-06-23, tool surface current as of 2026-07-03) — **hosted Brain MCP on Fly.io** with GitHub OAuth, Supabase Postgres for Brain data + operational telemetry + durable OAuth state + real-time auth-failure alerting; now multi-tenant (`brain_id` param, `BrainStore` abstraction, semantic search, sync/conflict tools — see `CLAUDE.md` "Brain Platform" section for the current tool list); production at `https://jem-brain-mcp.fly.dev/mcp`.
 
 All reference implementations are spec-compliant per the [MCP 2025-06-18 authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) plus RFCs 7591 / 7636 / 8252 / 8414 / 8707 / 9728.
 
@@ -217,6 +217,8 @@ Recording auth-failure telemetry is necessary but not sufficient. Telemetry that
 
 1. **a health check** whose verdict the operator surface's overall pass/warn/fail actually consults (not just a passive log panel) — count failures in a trailing window and return warn/fail against thresholds; and
 2. **an alert path** that pushes when a sustained-failure threshold is crossed.
+
+**Downgrade the benign case instead of alert-fatiguing on it.** A common post-migration/post-cutover pattern is a single *unregistered* client looping the same failure reason (e.g. `unknown_client_id` on a `refresh_token` grant) past a grace window — a stale client the user has already abandoned, not an active incident. Classify failures into a `connectorState` (e.g. `stale` vs `active`) and downgrade `stale` from `fail` to `warn` in both the health check's verdict and the alert severity, gated by a grace period (e.g. `*_STALE_GRACE_MINUTES`, default ~10 min) measured from first-seen. **Keep the downgrade conservative** — any ambiguity (multiple distinct clients, multiple failure reasons, an unknown/unregistered-clients set, or a short burst that hasn't run past the grace window) must keep full severity. Share the exact same classification function between the health check and the alerter so their verdicts never disagree. Reference implementation: brain-mcp-server's `computeStaleConnector` (`src/services/auth-alert.ts`), consumed by both the `hosted_mcp_auth_failures` doctor check and the alert dispatcher.
 
 ### Real-time alerting from the hosted process
 
@@ -437,11 +439,11 @@ When any of these land, bump the protocol with the new evidence folded in.
 - **Companion operator-facing protocol:** [`SLACK_BOT_REMOTE_MCP_ENROLLMENT.md`](SLACK_BOT_REMOTE_MCP_ENROLLMENT.md) — the per-user enrollment runbook (slack-mcp-server-specific application of this generic pattern)
 - **OpenAI operator-facing recovery:** [`OPENAI_MCP_CONNECTOR_RECOVERY.md`](OPENAI_MCP_CONNECTOR_RECOVERY.md) — ChatGPT personal, ChatGPT Business/workspace apps, Codex app/chat, and Codex CLI recovery after hosted MCP OAuth-state, DCR, callback, or tool-surface changes.
 - **Brain MCP forward-pointers (these reference this protocol):**
-  - `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md` § "Reference implementation now PROVEN"
-  - `~/Projects/ai-brain-jem/docs/PLAN_brain_roadmap.md` (effort estimates revised down post-slack-mcp-server)
+  - `~/Projects/brain-mcp-server/docs/ROADMAP.md` — canonical, current roadmap (the `ai-brain-jem` `PLAN_brain_roadmap.md` this section previously cited is superseded/historical; don't follow it for current status)
   - `01_ers-brain/MIGRATION_PLAN.md` step 6b (ERS Brain MCP, refreshed substrate pointer)
   - `01_ers-brain/docs/ROADMAP.md` § 5 Decisions log 2026-05-15 entry
 - **Adjacent ai-knowledge protocols:**
+  - [`MCP_SERVER_OPERATIONAL_TELEMETRY.md`](MCP_SERVER_OPERATIONAL_TELEMETRY.md) — general-purpose latency/usage telemetry shape (event-type taxonomy, timing layers, sanitization boundary); this protocol's § Auth-failure telemetry is the auth-specific slice of that broader pattern
   - [`SLACK_OPS_NOTIFICATION.md`](SLACK_OPS_NOTIFICATION.md) v2.5 § Roadmap (cross-cutting phase ledger that this protocol's reference implementation lives within)
   - [`SLACK_BOT_PROVISIONING.md`](SLACK_BOT_PROVISIONING.md) (Slack-app-specific setup, prerequisite for the slack-mcp-server reference)
   - [`SLACK_BOT_PERSISTENCE.md`](SLACK_BOT_PERSISTENCE.md) (LaunchAgent + named tunnel pattern, prerequisite for any always-on remote MCP server)
@@ -454,6 +456,7 @@ When any of these land, bump the protocol with the new evidence folded in.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.7 | 2026-07-03 | Stale-connector-downgrade classification pattern (conservative benign-case downgrade shared between health check and alerter, proven on brain-mcp-server); corrected slack-mcp-server reference description (Cloudflare Workers since v0.5.0, now v0.8.5+); cross-reference to new `MCP_SERVER_OPERATIONAL_TELEMETRY.md` protocol; brain-mcp-server reference bullet updated for its now-shipped multi-tenant/`brain_id`/semantic-search tool surface; retired a forward-pointer to a superseded roadmap doc. |
 | 1.6 | 2026-06-25 | Added companion OpenAI MCP connector recovery protocol link. Keeps provider-specific ChatGPT/Codex delete/recreate, workspace-app, fresh-session, and Codex CLI approval procedures out of the architecture pattern while making them discoverable from this canonical MCP protocol. |
 | 1.5 | 2026-06-23 | ChatGPT hosted Brain enrollment lesson: accept documented broker callback URI classes by narrow pattern; `unknown_client_id` at `/token` means stale broker-side DCR state when no durable `clients` row exists; recovery is full connector/app removal + reinstall/recreate, followed by verification of DCR row, token exchange, real tool call, and no fresh auth events. |
 | 1.4 | 2026-06-23 | Observability-loop and alerting hardening: auth-failure telemetry must feed a health check and an alert path; real-time best-effort alerting from the hosted process with severity routing and serialized per-severity cooldown; intended state-invalidating migrations should be recorded as operational events; durability should be verified across redeploys. |
