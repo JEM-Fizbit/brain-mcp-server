@@ -16,7 +16,7 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 **Local:** stdio only (`node dist/index.js`, `BRAIN_DIR` env) — fast path for local filesystem work and recovery.
 **Status:** Production
 
-> **Brain Platform (cloud, multi-tenant) — shipped, not aspirational.** The multi-tenant "Brain Platform that serves any Brain" (one `mcp__brain__*` namespace + `brain_id` param + per-Brain substrate) is **implemented**: `brain_list_brains`/`brain_describe` (`src/tools/registry.ts`), `brain_semantic_index`/`brain_semantic_search` (`src/tools/semantic.ts`), `brain_sync_status`/`brain_list_conflicts`/`brain_resolve_conflict` (`src/tools/sync.ts`), and the `BrainStore`/`ActiveBrainStore`/`RevisionBrainStore` abstractions (`src/services/brain-store.ts`, `active-brain-store.ts`, `revision-brain-store.ts`). Cloud transport + OAuth 2.1 + per-user attribution were lifted from `~/Projects/slack-mcp-server/` (now at v0.8.5+, ported to Cloudflare Workers since v0.5.0) rather than re-derived. `docs/specs/001-brain-platform-phase-1-2.md` (the original kickoff draft) is **superseded** — its git-backed hosting assumptions are retired; current hosted-sync architecture lives in `docs/specs/002-local-first-hosted-sync-contract.md` and `docs/specs/003-hosted-brain-sync-architecture.md`. **Canonical roadmap:** `docs/ROADMAP.md`. **Ownership & lifecycle:** `docs/OWNERSHIP_AND_LIFECYCLE.md` — the hosted MCP is personal-owned and ERS beta-shared (John sole user); a dedicated ERS MCP is forked at multi-tenant cutover. For current open work, check `BACKLOG.md` and `docs/specs/` rather than this paragraph.
+> **Active major initiative — Brain Platform (cloud, multi-tenant).** This server is evolving from single-user stdio into a multi-tenant "Brain Platform that serves any Brain" (one `mcp__brain__*` namespace + `brain_id` param + per-Brain substrate). It is an **evolution of this codebase, not a rewrite or new project.** Cloud transport + OAuth 2.1 + per-user attribution are already proven in a separate reference repo (`~/Projects/slack-mcp-server/` v0.3.0) — lift, don't re-derive. Next build window = JEM Phase 1+2 (HTTP transport + `BrainStore`/`BrainSemanticSearch` abstractions + `brain_id` + OAuth/GitHub-IdP + Tier 1 vector). **Kickoff plan:** `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md`. **Canonical roadmap:** `docs/ROADMAP.md` (the `ai-brain-jem` `PLAN_brain_roadmap.md` is superseded/historical). **Ownership & lifecycle:** `docs/OWNERSHIP_AND_LIFECYCLE.md` — the hosted MCP is personal-owned and ERS beta-shared (John sole user); a dedicated ERS MCP is forked at multi-tenant cutover. **Target architecture:** `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`. The implementation SPEC for this window goes at `docs/specs/001-brain-platform-phase-1-2.md` — draft and get sign-off before writing code.
 
 ---
 
@@ -34,7 +34,6 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 
 - OpenAI/ChatGPT/Codex custom MCP connector auth, stale Dynamic Client Registration, `unknown_client_id`, OAuth callback, or tool-surface recovery work: read [`docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md) before planning or editing.
 - Hosted remote MCP server, OAuth 2.1, Dynamic Client Registration, callback allow-list, JWT/session state, or connector-enrollment work: read [`docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md`](docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md) before planning or editing.
-- Transport switch (`src/index.ts`), storage-backend selection (`activeBrainStore`/`BrainStore`), or local-vs-hosted client-naming/promotion-gate work: read [`docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md`](docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md) before planning or editing.
 
 ---
 
@@ -148,6 +147,9 @@ brain-mcp-server/
 │   ├── schemas/
 │   │   └── tools.ts      # Zod schemas for all tool inputs
 │   └── tools/
+│       ├── registry.ts   # brain_list_brains, brain_describe
+│       ├── semantic.ts   # brain_semantic_index, brain_semantic_search
+│       ├── sync.ts       # brain_sync_status, brain_list_conflicts, brain_resolve_conflict
 │       ├── context.ts    # brain_load_context, brain_read_file
 │       ├── update.ts     # brain_update_file, brain_commit
 │       ├── status.ts     # brain_list_files, brain_search, brain_list_sources
@@ -201,7 +203,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 ## Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+|----------|-------------|----------|
 | `BRAIN_DIR` | Path to Brain markdown files directory | `~/Projects/ai-brain-jem/brain` |
 | `BRAIN_GITHUB_REPO` | GitHub repo for issue checks (owner/name) | `JEM-Fizbit/ai-brain-jem` |
 | `BRAIN_SOURCES_DIR` | Path to the `sources/` archive (sibling of `brain/`) | `~/Projects/ai-brain-jem/sources` |
