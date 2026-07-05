@@ -201,6 +201,37 @@ When more than one Brain is visible, pass `brain_id` explicitly. Use `ai-brain-j
 
 Allow-list in `~/.claude/settings.json` so `mcp__brain` tools never re-prompt: `mcp__brain__*` (hosted, default) and `mcp__brain-local__*` (fallback). Config changes load on the next Claude Code session.
 
+#### Claude Code CLI stale-client recovery
+
+The Claude Code CLI caches its own hosted-Brain OAuth Dynamic Client Registration separately from ChatGPT/Codex and from Claude Desktop/web. That cache can outlive a server-side OAuth-state migration, so a CLI surface that was never re-authorized after the June 2026 migration will fail even while every other surface works.
+
+Symptom: the authorize page at `https://jem-brain-mcp.fly.dev/authorize?...` fails immediately with:
+
+```text
+Authorization failed
+invalid_client: unknown client_id
+```
+
+The `client_id` in the failing URL is a stale registration the durable Postgres `clients` store no longer has. Re-running the in-session `authenticate` tool does not fix it — it reuses the same cached client. Confirm the server itself is healthy first (fresh DCR should succeed and metadata should resolve):
+
+```bash
+curl -sS -X POST https://jem-brain-mcp.fly.dev/register \
+  -H 'Content-Type: application/json' \
+  -d '{"client_name":"probe","redirect_uris":["http://localhost:3118/callback"],"token_endpoint_auth_method":"none","grant_types":["authorization_code"],"response_types":["code"]}'
+curl -sS https://jem-brain-mcp.fly.dev/.well-known/oauth-authorization-server
+```
+
+A `201` with a new `client_id` and a populated metadata document confirm the failure is client-side stale state, not a server outage.
+
+Fix — force a fresh registration from the CLI:
+
+1. Run `/mcp`, select `brain`.
+2. **Disable** it, then **re-enable** it (this build's menu has no "Clear authentication" item; disable/enable is the equivalent reset). Re-enable triggers a fresh OAuth flow that registers a new `client_id` instead of reusing the stale one.
+3. Complete the browser authorization. If the post-approval `http://localhost:<port>/callback?...` page fails to load, that is harmless — the tool completes the handshake on the callback.
+4. If disable/enable alone does not force fresh registration, fully remove and re-add the connector (`claude mcp remove brain`, then re-add with `https://jem-brain-mcp.fly.dev/mcp`).
+
+Verified 2026-07-05: disable/enable restored the Claude Code CLI `brain` connector after `invalid_client: unknown client_id`. Post-recovery read-only smoke via `brain_sync_status` — `ai-brain-jem` (revision, 34 files, 0 conflicts) and `ers-brain` (revision, 41 files, 0 conflicts). Unlike ChatGPT (which needs full delete/recreate), the CLI did not require removing the connector; the disable/enable cycle was sufficient.
+
 ### Claude Desktop / Cowork (`~/Library/Application Support/Claude/claude_desktop_config.json`)
 
 **Important — Desktop does NOT accept the `{ "type": "http", "url": ... }` shape that Claude Code uses.** `claude_desktop_config.json` only loads local stdio (`command`) servers; a bare `type: http` entry is rejected with "Some MCP servers could not be loaded ... were skipped: brain". So the hosted Brain does **not** go in this file.
