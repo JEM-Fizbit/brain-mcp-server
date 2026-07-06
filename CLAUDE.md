@@ -133,17 +133,31 @@ Claude Client → stdio → MCP Server → local filesystem (BRAIN_DIR) → resp
 ```
 brain-mcp-server/
 ├── src/
-│   ├── index.ts          # Entry point, server init, transport
+│   ├── index.ts          # Entry point, transport select (stdio/HTTP), server boot
+│   ├── mcp-server.ts     # MCP server construction + tool registration wiring
 │   ├── constants.ts      # Paths, limits, config
-│   ├── services/
-│   │   ├── brain.ts      # Brain filesystem operations + loadContext with nudges
-│   │   ├── git.ts        # Git operations (commit, push, pull)
-│   │   ├── log.ts        # Change log operations (append, read, getLastOpDate)
-│   │   ├── task-intake.ts # TASKS.md capture/triage queue formatting
-│   │   ├── lint.ts       # Health checks (bloat, stale, orphans, drift, capture queue, unindexed working binaries)
-│   │   ├── ingest.ts     # Source ingestion (analyze, save to sources/, record provenance)
-│   │   ├── inbox.ts      # Inbox scanning (list pending files in inbox/)
-│   │   └── issues.ts     # GitHub issue checks (open maintenance issues)
+│   ├── search-match.ts   # Shared search/match helper
+│   ├── http/             # Cloud (HTTP) transport
+│   │   ├── server.ts     # HTTP MCP server
+│   │   └── mcp-auth.ts   # Per-request auth for the HTTP transport
+│   ├── oauth/            # OAuth 2.1 provider (GitHub IdP, PKCE, JWT, DCR)
+│   │   ├── config.ts · metadata.ts · register.ts     # discovery + dynamic client registration
+│   │   ├── github.ts · pkce.ts · crypto.ts · jwt.ts · token.ts  # auth-code/PKCE/token flow
+│   │   └── state.ts · postgres-state.ts              # in-memory + Postgres-backed OAuth state
+│   ├── services/         # Core logic (26 modules). Highlights:
+│   │   ├── brain.ts · brain-store.ts · active-brain-store.ts · revision-brain-store.ts  # Brain access + multi-tenant store abstractions
+│   │   ├── git.ts · log.ts · task-intake.ts          # git ops, change log, TASKS capture/triage
+│   │   ├── lint.ts · lint-fix.ts · lint-apply.ts     # health checks + autofix
+│   │   ├── ingest.ts · inbox.ts · issues.ts          # source ingestion, inbox scan, GH issue checks
+│   │   ├── registry.ts · semantic.ts                 # brain registry + semantic index/search
+│   │   ├── active-artifact-store.ts · auto-sync.ts   # artifact store selection, background sync
+│   │   ├── auth-alert.ts · auth-telemetry.ts · operation-telemetry.ts · tool-telemetry.ts  # alerts + telemetry
+│   │   └── pooler.ts · request-context.ts · runtime-config.ts · date.ts · slack.ts  # infra helpers
+│   ├── sources/          # Ingested-source store (index.ts, postgres-source-store.ts, types.ts)
+│   ├── sync/             # Local-first ↔ hosted revision sync
+│   │   ├── local-sync-agent.ts · cli.ts · hash.ts    # sync agent + CLI + content hashing
+│   │   └── file-/memory-/postgres-revision-store.ts  # revision-store backends
+│   ├── artifacts/        # Binary artifact store (local + Supabase backends, hash/path/types)
 │   ├── schemas/
 │   │   └── tools.ts      # Zod schemas for all tool inputs
 │   └── tools/
