@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SERVER_VERSION } from "./constants.js";
 import { registerAllTools } from "./tools/index.js";
 import { instrumentToolLatency } from "./services/tool-telemetry.js";
 
@@ -21,7 +22,7 @@ export function createBrainMcpServer(): McpServer {
   const server = new McpServer(
     {
       name: "brain-mcp-server",
-      version: "1.0.0",
+      version: SERVER_VERSION,
     },
     { instructions: SERVER_INSTRUCTIONS },
   );

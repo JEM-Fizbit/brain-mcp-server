@@ -1,5 +1,13 @@
 import path from "node:path";
 import os from "node:os";
+import { createRequire } from "node:module";
+
+// Single source of truth for the server version: package.json. The health
+// endpoint and MCP server info both report it — it is the operator's
+// which-build-is-deployed tell, so it must never be hardcoded.
+export const SERVER_VERSION: string = createRequire(import.meta.url)(
+  "../package.json"
+).version;
 
 export const BRAIN_DIR =
   process.env.BRAIN_DIR ||
