@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { createBrainMcpServer } from "../mcp-server.js";
+import { SERVER_VERSION } from "../constants.js";
 import { classifyPoolerUrl } from "../services/pooler.js";
 import { buildOauthConfig, type OauthConfig } from "../oauth/config.js";
 import { protectedResourceMetadata, authorizationServerMetadata } from "../oauth/metadata.js";
@@ -204,7 +205,7 @@ export async function handleHttpRequest(
         transport: "http",
         mcp: {
           path: "/mcp",
-          server: { name: "brain-mcp-server", version: "1.0.0" },
+          server: { name: "brain-mcp-server", version: SERVER_VERSION },
         },
         oauth: {
           issuer: ctx.config.issuer,
