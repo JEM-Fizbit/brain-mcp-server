@@ -438,7 +438,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self stopManagedProcesses:nil];
 }
 
-// A raw SIGTERM/SIGINT (launchctl bootout/kickstart, pkill, logout) terminates
+// A raw SIGTERM/SIGINT (launchd bootout/kickstart, pkill, logout) terminates
 // the process without running the Cocoa termination flow, so
 // applicationWillTerminate never fires and the sync/cockpit children orphan
 // (reparent to launchd and keep holding their ports). Catch those signals with

@@ -8,6 +8,7 @@ import type {
   ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { revisionStoreProvider } from "./active-brain-store.js";
+import { attachPoolErrorLogger } from "./pg-pool.js";
 import { resolveToolBrain } from "./request-context.js";
 import {
   createOperationTelemetryContext,
@@ -46,14 +47,17 @@ function telemetryPool(): pg.Pool | null {
   poolCache?.pool.end().catch(() => undefined);
   poolCache = {
     key: connectionString,
-    pool: new Pool({
-      connectionString,
-      allowExitOnIdle: true,
-      connectionTimeoutMillis: 3000,
-      max: 2,
-      query_timeout: 3000,
-      statement_timeout: 3000,
-    }),
+    pool: attachPoolErrorLogger(
+      new Pool({
+        connectionString,
+        allowExitOnIdle: true,
+        connectionTimeoutMillis: 3000,
+        max: 2,
+        query_timeout: 3000,
+        statement_timeout: 3000,
+      }),
+      "tool_telemetry"
+    ),
   };
   return poolCache.pool;
 }

@@ -104,6 +104,28 @@ async function readFileHash(filePath: string): Promise<string | null> {
   }
 }
 
+type GuardedWriteResult = { ok: true } | { ok: false; currentHash: string | null };
+
+// Write via temp file + rename (atomic, no torn files on crash), re-checking
+// the target hash immediately before the rename so a local edit that landed
+// after the caller's clean-hash decision is never silently overwritten.
+async function writeLocalFileGuarded(
+  fullPath: string,
+  content: string,
+  expectedHash: string | null
+): Promise<GuardedWriteResult> {
+  await fs.mkdir(path.dirname(fullPath), { recursive: true });
+  const tmpPath = `${fullPath}.brain-sync-tmp-${process.pid}-${Date.now().toString(36)}`;
+  await fs.writeFile(tmpPath, content, "utf-8");
+  const currentHash = await readFileHash(fullPath);
+  if (currentHash !== expectedHash) {
+    await fs.rm(tmpPath, { force: true });
+    return { ok: false, currentHash };
+  }
+  await fs.rename(tmpPath, fullPath);
+  return { ok: true };
+}
+
 async function scanPolicy(root: string): Promise<{ skipNestedBrainDir: string | null }> {
   const rootLoaderPath = path.join(root, BRAIN_LOADER_FILENAME);
   const nestedBrainDir = path.join(root, NESTED_BRAIN_DIRNAME);
@@ -270,10 +292,20 @@ export class LocalSyncAgent {
           const remote = await timed(report, "pull", "revision_store_read", () =>
             this.options.store.readFile(this.options.brainId, filename)
           );
-          await timed(report, "pull", "local_write", async () => {
-            await fs.mkdir(path.dirname(fullPath), { recursive: true });
-            await fs.writeFile(fullPath, remote.content, "utf-8");
-          });
+          const guarded = await timed(report, "pull", "local_write", () =>
+            writeLocalFileGuarded(fullPath, remote.content, null)
+          );
+          if (!guarded.ok) {
+            const conflict = await this.recordPullConflict(
+              filename,
+              tracked?.revisionId ?? null,
+              head.revisionId,
+              guarded.currentHash,
+              head.contentHash
+            );
+            report.conflicts.push(conflict);
+            continue;
+          }
           state.files[filename] = {
             revisionId: head.revisionId,
             contentHash: head.contentHash,
@@ -326,10 +358,20 @@ export class LocalSyncAgent {
       const remote = await timed(report, "pull", "revision_store_read", () =>
         this.options.store.readFile(this.options.brainId, filename)
       );
-      await timed(report, "pull", "local_write", async () => {
-        await fs.mkdir(path.dirname(fullPath), { recursive: true });
-        await fs.writeFile(fullPath, remote.content, "utf-8");
-      });
+      const guarded = await timed(report, "pull", "local_write", () =>
+        writeLocalFileGuarded(fullPath, remote.content, localHash)
+      );
+      if (!guarded.ok) {
+        const conflict = await this.recordPullConflict(
+          filename,
+          tracked?.revisionId ?? null,
+          head.revisionId,
+          guarded.currentHash,
+          head.contentHash
+        );
+        report.conflicts.push(conflict);
+        continue;
+      }
       state.files[filename] = {
         revisionId: head.revisionId,
         contentHash: head.contentHash,

@@ -15,6 +15,7 @@
 
 import pg from "pg";
 import { postSlackMessage } from "./slack.js";
+import { attachPoolErrorLogger } from "./pg-pool.js";
 
 const { Pool } = pg;
 
@@ -231,14 +232,17 @@ function alertPool(connectionString: string): pg.Pool {
   alertPoolCache?.pool.end().catch(() => undefined);
   alertPoolCache = {
     key: connectionString,
-    pool: new Pool({
-      connectionString,
-      allowExitOnIdle: true,
-      connectionTimeoutMillis: 3000,
-      max: 1,
-      query_timeout: 5000,
-      statement_timeout: 5000,
-    }),
+    pool: attachPoolErrorLogger(
+      new Pool({
+        connectionString,
+        allowExitOnIdle: true,
+        connectionTimeoutMillis: 3000,
+        max: 1,
+        query_timeout: 5000,
+        statement_timeout: 5000,
+      }),
+      "auth_alert"
+    ),
   };
   return alertPoolCache.pool;
 }

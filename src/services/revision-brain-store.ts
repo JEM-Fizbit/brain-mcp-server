@@ -262,7 +262,9 @@ export class RevisionBrainStore implements BrainStore {
           `old_content found ${occurrences} times in ${filename}. It must be unique. Provide more surrounding context to disambiguate.`
         );
       }
-      nextContent = existing.replace(oldContent, content);
+      // Function replacer: a plain-string replacement would interpret
+      // $-patterns ($$, $&, $`, $') and silently corrupt the file.
+      nextContent = existing.replace(oldContent, () => content);
     } else if (mode === "append") {
       const existing = current ? await this.readFile(brainId, filename) : "";
       const separator = existing.endsWith("\n") || existing.length === 0 ? "" : "\n";

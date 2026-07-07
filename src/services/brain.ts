@@ -221,11 +221,14 @@ export async function updateFile(
         `old_content found ${occurrences} times in ${filename}. It must be unique. Provide more surrounding context to disambiguate.`
       );
     }
-    const updated = existing.replace(old_content, content);
+    // Function replacer: a plain-string replacement would interpret
+    // $-patterns ($$, $&, $`, $') and silently corrupt the file.
+    const updated = existing.replace(old_content, () => content);
     await fs.writeFile(filePath, updated, "utf-8");
   } else if (mode === "append") {
     const existing = await fs.readFile(filePath, "utf-8").catch(() => "");
-    const separator = existing.endsWith("\n") ? "" : "\n";
+    const separator =
+      existing.endsWith("\n") || existing.length === 0 ? "" : "\n";
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, existing + separator + content, "utf-8");
   } else {

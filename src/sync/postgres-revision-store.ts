@@ -1,5 +1,6 @@
 import pg from "pg";
 import { contentHash } from "./hash.js";
+import { attachPoolErrorLogger } from "../services/pg-pool.js";
 import { lineMatchesSearchQuery } from "../search-match.js";
 import type {
   ChangePage,
@@ -186,7 +187,10 @@ export class PostgresRevisionStore implements RevisionStore {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool(postgresPoolOptions(poolOrConnectionString))
+        ? attachPoolErrorLogger(
+            new Pool(postgresPoolOptions(poolOrConnectionString)),
+            "revision_store"
+          )
         : poolOrConnectionString;
   }
 
@@ -272,6 +276,14 @@ export class PostgresRevisionStore implements RevisionStore {
 
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
     return transaction(this.pool, async (client) => {
+      // Serialize writers per (brain, filename). The head-row lock below
+      // cannot lock a row that does not exist yet, so two concurrent first
+      // creations would otherwise both be accepted and one head silently
+      // displaced with no conflict recorded.
+      await client.query(
+        `select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2, 0))`,
+        [input.brainId, input.filename]
+      );
       const currentResult = await client.query<HeadRow>(
         `
           select r.*, f.updated_at

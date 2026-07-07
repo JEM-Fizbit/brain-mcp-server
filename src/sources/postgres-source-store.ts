@@ -5,6 +5,7 @@ import {
 } from "../search-match.js";
 import { contentHash } from "../sync/hash.js";
 import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
+import { attachPoolErrorLogger } from "../services/pg-pool.js";
 import type {
   CreateSourceInput,
   RecordArtifactTextInput,
@@ -149,7 +150,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool(postgresPoolOptions(poolOrConnectionString))
+        ? attachPoolErrorLogger(
+            new Pool(postgresPoolOptions(poolOrConnectionString)),
+            "source_store"
+          )
         : poolOrConnectionString;
   }
 
