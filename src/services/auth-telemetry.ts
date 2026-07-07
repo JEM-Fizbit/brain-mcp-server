@@ -1,6 +1,7 @@
 import pg from "pg";
 import { revisionStoreProvider } from "./active-brain-store.js";
 import { maybeAlertOnAuthFailure } from "./auth-alert.js";
+import { attachPoolErrorLogger } from "./pg-pool.js";
 
 const { Pool } = pg;
 
@@ -29,14 +30,17 @@ function telemetryPool(): pg.Pool | null {
   poolCache?.pool.end().catch(() => undefined);
   poolCache = {
     key: connectionString,
-    pool: new Pool({
-      connectionString,
-      allowExitOnIdle: true,
-      connectionTimeoutMillis: 3000,
-      max: 1,
-      query_timeout: 3000,
-      statement_timeout: 3000,
-    }),
+    pool: attachPoolErrorLogger(
+      new Pool({
+        connectionString,
+        allowExitOnIdle: true,
+        connectionTimeoutMillis: 3000,
+        max: 1,
+        query_timeout: 3000,
+        statement_timeout: 3000,
+      }),
+      "auth_telemetry"
+    ),
   };
   return poolCache.pool;
 }

@@ -1,6 +1,7 @@
 import pg from "pg";
 import type { OauthStore, StateProvider } from "./state.js";
 import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
+import { attachPoolErrorLogger } from "../services/pg-pool.js";
 
 const { Pool } = pg;
 type Pool = pg.Pool;
@@ -21,12 +22,15 @@ export class PostgresStateProvider implements StateProvider {
   constructor(poolOrConnectionString: Pool | string) {
     this.pool =
       typeof poolOrConnectionString === "string"
-        ? new Pool(
-            postgresPoolOptions(poolOrConnectionString, {
-              allowExitOnIdle: true,
-              maxEnv: "BRAIN_OAUTH_STATE_PG_POOL_MAX",
-              defaultMax: 2,
-            })
+        ? attachPoolErrorLogger(
+            new Pool(
+              postgresPoolOptions(poolOrConnectionString, {
+                allowExitOnIdle: true,
+                maxEnv: "BRAIN_OAUTH_STATE_PG_POOL_MAX",
+                defaultMax: 2,
+              })
+            ),
+            "oauth_state"
           )
         : poolOrConnectionString;
   }
