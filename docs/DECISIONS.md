@@ -8,6 +8,25 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-06 — Brain Platform Review: six checkpoint decisions locked (topology, migration, schemas, linking, build-vs-adopt, MD-vs-HTML)
+
+**Decision:** The 2026-07 Brain Platform Review (evidence base: `~/Projects/claude-ops/plans/brain-platform-review-2026-07/` — 86 verified findings, 4 workstream reports, landscape whitepaper v2) closed with John approving all six recommendations on 2026-07-06:
+
+1. **Migration:** ERS team rollout runs on a fresh ERS-owned stack — new ERS Supabase org+project (re-run migrations + security gate), new Fly app in an ERS org, new GitHub OAuth app under ERS-Genomics, ERS-only registry with `default_brain_id: ers-brain` and **no** `GITHUB_ALLOWED_*` env fallback. Data cutover by re-seed from the SharePoint Markdown mirror (archived `pg_dump` + export checkpoint first); the restore rehearsal from `docs/hosted-brain-recovery-and-git-export.md` runs against the *new* project during cutover; `ers-brain` content **and** ERS-related telemetry/OAuth rows are then verifiably deleted from the personal pilot. GitHub stays the IdP at rollout (principals pinned by numeric `provider_user_id`); Entra ID is roadmap.
+2. **Topology:** Two single-tenant deployments of the same codebase; the personal `jem-brain-mcp` stack is untouched apart from shrinking its registry back to one brain. Rationale: the runtime binds exactly one revision-store database per process (registry `storage_backend` is ignored by the hosted path), and the compliance test is symmetric — JEM personal data on ERS infra is as unacceptable as ERS data on personal infra. **"Fork" in `OWNERSHIP_AND_LIFECYCLE.md` means deployment fork, not code fork**: one upstream repo, ERS pins tagged releases (optional ERS-Genomics mirror for custody).
+3. **Schemas:** Both brain schemas stay; JEM keeps numeric prefixes (stable identifiers, never renumbered), ERS stays prefix-free. The server's only hard filename contracts remain `00_loader.md` + `NOW.md`.
+4. **Linking:** Reference integrity becomes lint-enforced — a `dead-wikilink` rule first, then an `external_refs` family (no `/Users/<name>/` paths in knowledge files, SharePoint refs need `sharepoint.com` hrefs via a site-mapping table, bare URLs wrapped); advisory (non-blocking) warnings on the write path.
+5. **Build-vs-adopt (memory layer):** Keep building brain-mcp-server; adopt components, never a platform. Standing kill criteria recorded in the review's `research/build-vs-adopt.md`.
+6. **Storage/UX:** Markdown stays canonical; live links via native web URLs per reference class now, cockpit content routes + `/r` resolver later.
+
+**Why:** ERS rollout (5–20 trusted users) pulls the Phase 0→1 trigger this doc already defines; the review's audit found the architecture sound but the shared-instance topology impossible to make compliant, and the 2026 market convergence on files-canonical memory (Letta MemFS pivot, Karpathy LLM-wiki, Google OKF) removed the case for adopting a framework.
+
+**Alternatives rejected:** shared instance on either party's infra (fails symmetric compliance; unsupported by per-process store binding); Supabase project transfer to ERS (would hand JEM personal data to ERS); code fork (doubles single-maintainer burden, forecloses productization); adopting Letta/Zep/Mem0/Cognee (wrong shape or lock-in; three forced migrations in 24 months across the adopt path); HTML-first storage (dead on arrival vs. MD-canonical + rendered surfaces); numeric prefixes for ERS / dropping them for JEM (each argued from how tools actually navigate).
+
+**Related:** `~/Projects/claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md` (roadmap + success criteria); `reports/audit-platform.md`, `reports/audit-infra-migration.md`, `reports/audit-schemas-content.md`, `reports/gaps-and-unknowns.md` (findings incl. the P0 fixes shipped alongside this entry); `docs/OWNERSHIP_AND_LIFECYCLE.md` (wording update pending per decision 2).
+
+---
+
 ## 2026-07-01 — Cockpit gains one localhost write endpoint for per-item fix approval
 
 **Decision:** The Brain Cockpit — previously read-only — gains a **Fixes** tab and two routes on its per-profile loopback server: `GET /api/fixes/plan` (read-only, live per-item plan) and `POST /api/fixes/apply` (the one write endpoint). The tab lists each atomic fix (each orphan, each archived/stamped task, the date bump) with its own checkbox plus an "Approve all" control, and applies only the approved ids. Apply **re-reads current Brain state and recomputes the plan**, so approved ids that no longer match a live candidate are ignored — a stale plan cannot write against changed content. This supersedes the spec-009 menubar modal as the primary approval UX; the menubar button and CLI remain as the no-GUI paths. The fix rules reuse `lint-fix.ts` via an approved-key filter — no duplicated logic.
