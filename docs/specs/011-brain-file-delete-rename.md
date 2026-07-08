@@ -1,96 +1,99 @@
-# 011 - Brain file delete & rename (tombstone revisions + delete-aware sync)
+# 011 - Brain file delete & rename (tombstone revisions + guarded delete-aware sync)
 
-**Status:** DRAFT — awaiting John's sign-off before code (per CLAUDE.md spec gate)
-**Source:** Brain-platform review finding **A3-7** (`~/Projects/claude-ops/plans/brain-platform-review-2026-07/`), promoted to a **P0 pre-production blocker** 2026-07-07. The hosted revision store has no concept of delete or rename: local deletions resurrect within ~5s, and renames/moves leave a duplicate stale head served to hosted clients. Recurred ≥3× (2026-06-27 duplicate-brain-paths incident requiring the offline reconcile script; 2026-07-07 `ip_landscape.md` move during the A5 batch, neutralized with a redirect tombstone = registry action A11).
-**Roadmap link:** platform-review roadmap P0; unblocks team content curation (delete/rename impossible today), A11, and lifts the interim "no renames/deletes in the Brain" rule.
-**Decisions impact:** introduces tombstone revisions to the append-only store (schema migration) + delete-aware sync. Requires a `docs/DECISIONS.md` entry.
-**Related:** `db/migrations/2026-06-14_001_hosted_brain_postgres.sql`; `src/sync/types.ts`; `src/sync/postgres-revision-store.ts`, `memory-revision-store.ts`, `file-revision-store.ts`; `src/sync/local-sync-agent.ts`; `src/services/{brain,revision-brain-store,brain-store}.ts`; `src/tools/update.ts`; `src/schemas/tools.ts`; `scripts/reconcile-duplicate-brain-paths-postgres.mjs`.
+**Status:** DRAFT **v2** (2026-07-08) — revised against two adversarial reviews; awaiting John's sign-off before code (per CLAUDE.md spec gate).
+**Reviews:** `reviews/011-review1-correctness.md` (Opus 4.8, against-the-code — 2 blockers, 5 majors, all accepted) · `reviews/011-review2-prior-art.md` (Fable 5, prior-art — storage half idiomatic; guarded-inference mandated; explicit-only alternative rejected with evidence). v1's sync design contained a mass-data-loss hole (empty/unmounted scan → tombstone the whole Brain); v2's guard set is the fix, stolen from Syncthing/Unison/rsync/OneDrive practice.
+**Source:** platform finding **A3-7**, promoted P0 2026-07-07: the hosted revision store has no delete/rename concept — local deletions resurrect within ~5s; renames leave duplicate stale heads. Recurred ≥3× (2026-06-27 incident; 2026-07-07 `ip_landscape.md` move = registry action A11).
+**Roadmap link:** platform-review roadmap P0; unblocks team curation, A11, and lifts the interim "no renames/deletes" rule.
+**Decisions impact:** tombstone revisions (schema migration), guarded delete-aware sync, atomic rename. Requires a `docs/DECISIONS.md` entry on ship.
+**Related:** `db/migrations/2026-06-14_001…sql`; `src/sync/{types,local-sync-agent,cli,postgres-revision-store,memory-revision-store,file-revision-store}.ts`; `src/services/{brain,revision-brain-store,brain-store,active-brain-store}.ts`; `src/tools/update.ts`; `src/schemas/tools.ts`; `docs/conflict-resolution.md` (must be updated — see Rollout); `scripts/reconcile-duplicate-brain-paths-postgres.mjs`.
 
-## Governing invariant
+## Governing invariants
 
-**Deletion removes the file from every human-readable surface (local filesystem, SharePoint/OneDrive, Obsidian graph). The tombstone exists only in the revision store — for history, attribution, and recovery. No tombstone artifact ever appears in the vault** (no `.tombstone` sidecar, no leftover stub). The Markdown files remain the canonical human surface; the DB is derived infrastructure that additionally remembers deletions.
+1. **Deletion removes the file from every human-readable surface** (filesystem, SharePoint/OneDrive, Obsidian graph). The tombstone exists only in the revision store — history, attribution, recovery. No tombstone artifact in the vault.
+2. **Absence-inference never runs unguarded.** A file missing from a local scan is a *candidate* delete only when the folder is provably healthy, the disappearance is small, and it persists across scans. Bulk disappearance is damage, not intent — zero tombstones, alert, triage. (Prior art: Syncthing `.stfolder`, Unison `confirmbigdel`, rsync `--max-delete`, OneDrive mass-delete review.)
+3. **Delete ships with restore.** Recoverability is real only if an agent/operator can exercise it — `brain_restore_file` is v1 scope, not deferred.
 
-## Design decisions (agreed with John 2026-07-07)
+## Design decisions (v2 — changes from v1 marked Δ)
 
-1. **Tombstone = an append-only revision, not a head flag.** A delete is a normal revision marked deleted; the head points at it; reads treat it as absent; history + actor + undelete are preserved.
-2. **Rename = write-new + tombstone-old (one operation), NOT a first-class rename revision.** Linked via `renamed_from` / `renamed_to` metadata.
-3. **Rename rewrites inbound wikilinks** across the brain (`[[old]]`→`[[new]]`, incl. alias and relative-path forms, and markdown links) — matching Obsidian-native rename, since the MCP path bypasses Obsidian's own link-fixer. *(Upgraded from the initial "thin" default at John's request 2026-07-07.)*
-4. **Soft-delete, recoverable.** No hard purge in the normal tool (recoverability is what makes delete safe without an interactive confirm, which MCP can't do). Hard purge-from-history stays a separate break-glass op for secrets/PII only.
-5. **Delete gets CAS.** Delete-vs-concurrent-edit → a `sync_conflict` for resolution, never silent loss.
-6. **Protected files.** The delete/rename tools refuse to remove/rename the server's structural-contract files: `00_loader.md`, `NOW.md` (hardcoded in `constants.ts`).
-7. **Scope v1:** hosted + local/stdio paths + delete-aware sync (both directions); fold in A11 (real-delete the `ip_landscape.md` stub) and demote `reconcile-duplicate-brain-paths-postgres.mjs` to break-glass. Defer: first-class rename revisions, a dedicated undelete tool, bulk cleanup of the 2026-06-27 residue (trivial once delete exists).
+1. Tombstone = append-only revision (`deleted=true`, `content=null`); head points at it. *(R2: textbook CouchDB `_deleted` shape.)*
+2. Rename = write-new + tombstone-old with `renamed_from`/`renamed_to` metadata — **Δ executed in ONE store transaction** (atomic rename primitive; R1 #4: two txns can reproduce the duplicate-head bug on mid-rename conflict).
+3. Rename rewrites inbound wikilinks — **Δ with the corrected link model**: extensionless-basename mapping (`foo.md` ↔ `[[foo]]`), escaped-pipe aliases in tables (`[[foo\|Alias]]`), plain aliases (`[[foo|Alias]]`), relpath forms, markdown `](path)` links; **collision rule = skip + warn** when the basename is non-unique (R1 #7, R2: Obsidian path-qualification is the reference). Link-rewrite failures are **first-class reported outcomes** — the v1 spec's "dead-wikilink lint backstop" does not exist in code (R1 #6) and is NOT relied on; D4 remains a separate roadmap item.
+4. Soft-delete, recoverable — **Δ plus `brain_restore_file` in v1** (R1 #3 + R2 #2: every mature system pairs delete with an easy restore; recoverability complements, never substitutes for, the mass-delete guards).
+5. Delete gets CAS: stale base → conflict; delete-vs-edit and edit-vs-delete both conflict, never silent.
+6. Protected files (`00_loader.md`, `NOW.md`, from `constants.ts:22-23`) — **Δ enforced in BOTH the tools and the sync path, and promoted to the folder-health marker** (R1 #2 + R2: one mechanism solves both — their absence means "folder unhealthy," never "delete them").
+7. **Δ Guarded inference** (replaces v1's bare absence-inference; explicit-signal-only alternative evaluated and rejected — the motivating incidents were on-disk ops, not MCP calls; R2 §4).
 
-## Schema (migration `db/migrations/2026-07-07_001_brain_file_tombstones.sql`)
+## Schema (migration `db/migrations/2026-07-08_001_brain_file_tombstones.sql`)
 
-Additive, safe on the live personal Supabase; **must also be applied to the future ERS-owned project** (migration carries with the codebase).
+Additive; verified safe (R1): `add column deleted boolean not null default false` (metadata-only); `alter column content drop not null` + `check (deleted or content is not null)`; existing rows pass. **No RLS/grant change needed** (003 policies are `using(true)`; columns inherit table grants). `content_sha256` nullable for tombstones — **no sentinel sha** (R1 #5: sha256("") collides with deleting a legitimately-empty file via the short-circuit). Rename pairing in existing `metadata jsonb`. Optional denormalized `brain_files.current_deleted` — decide in build. Applies to the live personal project now (Hard Gate, operator-run) and carries to the ERS-owned project at migration.
 
-- `brain.brain_file_revisions`: add `deleted boolean not null default false`; make `content` nullable (`content text` — enforce `content is not null` when `deleted=false` via a CHECK: `check (deleted or content is not null)`); a tombstone revision has `deleted=true`, `content=null`, `content_sha256` = a sentinel (e.g. sha of empty) or nullable. `origin` unchanged (a delete carries the normal `local_agent`/`hosted_mcp` origin + actor — deletion is attributable like any write).
-- `brain.brain_files`: no new column required — a file is "deleted" iff its `current_revision_id` points at a `deleted=true` revision. (Optionally add `current_deleted boolean` denormalized for cheap filtering; decide in build.)
-- Rename metadata: store `renamed_from` / `renamed_to` in the revision `metadata jsonb` (already exists) — no column.
+## RevisionStore interface (`src/sync/types.ts`) — all three backends (postgres/memory/file)
 
-## RevisionStore interface (`src/sync/types.ts`)
-
-- `FileHead` gains `deleted?: boolean`.
-- New: `proposeDeletion(input: { brainId, filename, baseRevisionId, origin, actor }): Promise<RevisionProposalResult>` — same CAS contract as `proposeRevision` (stale base → conflict), writes a tombstone revision, repoints head. `unchanged` if already deleted.
-- `listFiles` gains a `{ includeDeleted?: boolean }` option (default **false** for the read/tool layer; the sync agent calls with `true` to see tombstones). `readFile` on a deleted head throws a typed `FileDeletedError` (so `brain_read_file` can report "deleted" cleanly, and undelete can still fetch prior content via revision history).
-- Implement across all three backends: `postgres-revision-store.ts` (real), `memory-revision-store.ts` (substrate of `file-revision-store.ts`), so the default test suite exercises deletion on the memory/file path.
-
-## Read/tool layer (deleted heads are invisible)
-
-- `brain_list_files`, `brain_search`, `brain_load_context` filter out `deleted` heads (call `listFiles({includeDeleted:false})`; search/read skip tombstones).
-- `brain_read_file` on a deleted file → clean "file was deleted (revision X, by actor, at time); use restore to recover" message, not a crash.
+- `FileHead.deleted?: boolean`.
+- `proposeDeletion({brainId, filename, baseRevisionId, origin, actor})` — CAS as `proposeRevision`; **idempotency on `current.deleted`** (re-delete → `unchanged`), NOT sha equality (R1 #5).
+- **Δ `proposeRename({brainId, from, to, baseRevisionId, origin, actor})`** — one transaction: create `to` revision (content of `from`, `renamed_from` metadata) + tombstone `from` (`renamed_to` metadata). Conflict on stale `from` base or live `to` head → whole txn aborts, nothing half-applied.
+- `listFiles(brainId, {includeDeleted?: boolean})` — default **false**. **Δ enumerated callers** (R1 #11): tools/search/`warmActiveBrainStore` → false; sync agent → true; `brainExists` → **true** (an all-tombstoned brain still exists — its history does); `syncStatus`/CLI counts → report live + deleted counts separately.
+- `readFile`/`getHead` on a deleted head → typed `FileDeletedError` (never build a head from null content — R1 #5 null-guards in `headFromRow`, `revisionFromRow`, memory `headOf`); `searchFiles` excludes deleted heads (`and not r.deleted`).
+- **Δ Recreate-over-tombstone:** `proposeRevision` with `base=null` onto a `deleted` head = **accepted recreate** (CouchDB semantics), not a conflict (R1 #9).
 
 ## New tools (`src/tools/update.ts`, `src/schemas/tools.ts`)
 
-- **`brain_delete_file`** (`brain_id`, `filename`): `assertWriteRole`; protected-file guard; `proposeDeletion` against current head (CAS); **returns the inbound-link count** ("N files link to this — links will dangle") as an advisory in the result; writes a `LOG.md` entry (human-visible audit even for Obsidian-only users). Soft/recoverable.
-- **`brain_rename_file`** (`brain_id`, `from`, `to`): `assertWriteRole`; protected-file guard on `from`; validate `to` (filename rules, not already a live file). Operation order: (1) read `from` content; (2) `proposeRevision` `to` with `renamed_from` metadata; (3) `proposeDeletion` `from` with `renamed_to` metadata; (4) **rewrite inbound wikilinks** brain-wide (`[[from]]`, `[[from|alias]]`, `[[relpath/from]]`, and markdown `](from)` forms → `to`), each as a normal revision on the linking file. Partial-failure handling: if step 2/3 conflict, abort before link rewrites and report; link-rewrite failures are reported per-file, non-fatal (lint's `dead-wikilink` rule is the backstop).
+- **`brain_delete_file`** (`brain_id`, `filename`): `assertWriteRole`; protected-file guard; CAS `proposeDeletion`; returns **inbound-link count** advisory ("N files link here — links will dangle"); writes a LOG.md entry. Soft, recoverable.
+- **`brain_rename_file`** (`brain_id`, `from`, `to`): `assertWriteRole`; protected guard on `from`; validate `to` (filename rules; not a live head). Calls atomic `proposeRename`, then link rewrites (each a normal revision on the linking file; per-file failures reported in the result, non-fatal). LOG entry records the pair + rewrite outcomes.
+- **Δ `brain_restore_file`** (`brain_id`, `filename`): restores the last pre-tombstone content as a new revision (accepted recreate); errors cleanly if the file isn't deleted. The "easy restore surface" prior art demands.
 
-## Delete-aware sync (`src/sync/local-sync-agent.ts`) — the behavioral flip
+## Sync changes (`src/sync/local-sync-agent.ts`) — the guarded redesign
 
-Today: **push** only visits files that exist locally (a deleted file is never seen → no propagation); **pull** *resurrects* a missing-but-tracked local file (lines 290-316). Both change.
+**Δ Correction (R1 #8):** the cycle is **already push-then-pull** (`local-sync-agent.ts:390-403`) — v1's "flip" claim was wrong; no reorder. The real changes:
 
-- **Sync cycle order becomes push-then-pull** (so a local delete is propagated as a tombstone before pull can act).
-- **Push — propagate local deletes:** after scanning, diff `state.files` (tracked) against the scanned set. A tracked filename absent from the scan = an intentional local delete → `proposeDeletion(baseRevisionId = tracked.revisionId)`. Stale base → conflict (delete-vs-remote-edit). On accept, drop from `state.files`. **This replaces the pull-side resurrection** — a missing tracked file now means "deleted," and the tombstone is recoverable, so accidental disappearance (damage) is not silently lost forever.
-- **Pull — apply remote tombstones:** `listFiles({includeDeleted:true})`. For a head with `deleted=true`: if the local file is absent → already consistent (drop from state). If present and clean (`localHash === tracked.contentHash`) → **unlink the local file** + drop from state (this is the delete arriving from another surface). If present and dirty (locally edited since) → **conflict** (remote-delete-vs-local-edit), never auto-delete.
-- Remove/replace the old "restore missing tracked file on pull" branch (it is the resurrection bug). Missing-locally is now owned by the push path.
+**Push — guarded local-delete inference.** After the scan, tracked-but-absent files are delete *candidates*, propagated as tombstones ONLY if **all** guards pass:
+1. **Folder-health marker** — scan must be non-empty AND contain both protected files (`00_loader.md`, `NOW.md`). Missing/unreadable root (`scanMarkdownFiles` must distinguish "dir unreadable" from "file absent" — today it swallows readdir errors, `:153`) or missing marker → **abort the cycle entirely**, log + alert, tombstone nothing. *(Kills R1 blocker #1's unmount case and blocker #2 in one mechanism.)*
+2. **Mass-delete threshold** — candidates > `BRAIN_SYNC_MAX_DELETES` (default **5**) or > `BRAIN_SYNC_MAX_DELETE_PCT` (default **10%** of tracked) in one cycle → propagate **zero** tombstones; write conflict/triage rows + Slack alert (the async equivalent of OneDrive's review prompt). *(Kills the in-folder mass-wipe case Syncthing's marker misses — issue #9718.)*
+3. **Two-scan debounce** — a candidate must be absent on **two consecutive scans** before tombstoning (rides out mid-move/cloud-sync transients at 5s cadence).
+Surviving candidates → `proposeDeletion(base=tracked.revisionId)`; stale base → conflict (delete-vs-remote-edit). Accepted → drop from `state.files` + **LOG entry (inferred deletes are as auditable as tool deletes — R2 #5)**.
 
-## Obsidian / human-readable behavior (documented, per John's Q)
+**Pull — apply remote tombstones + rename pairing.** `listFiles({includeDeleted:true})`:
+- Tombstoned head, local absent → consistent; drop from state.
+- Tombstoned head, local present + clean → **unlink** local file; drop from state.
+- Tombstoned head, local present + dirty (edited since) → **conflict**, never auto-delete.
+- **Δ Rename pairing (R2 #3):** a tombstone whose `renamed_to` pairs with a same-cycle new/changed head → apply as a local **move** (rename the file) instead of unlink+write — Obsidian and OneDrive see a rename, not delete+create.
+- Protected files are never unlinked by pull (tombstoned protected head = alarm + conflict row, not deletion).
 
-- **Deleted file:** gone from the folder + Obsidian graph; no artifact left behind.
-- **Dangling backlinks after delete:** inbound `[[links]]` go red / become broken graph edges — inherent to any deletion. Mitigations: the delete tool warns with the inbound-link count; the `dead-wikilink` lint rule (platform-review D4) flags them.
-- **Rename:** old node → new node; inbound wikilinks **are rewritten** (decision 3) so the graph stays intact — parity with Obsidian-native rename. A human renaming *inside* Obsidian is already fine (Obsidian fixes links on disk; delete-propagation tombstones the old path instead of resurrecting).
-- **History/recovery is DB-side:** a deleted file's who/when/undo lives in the revision store + the `LOG.md` entry, not the vault. Undelete is an MCP/operator action (v1: restore by writing a new revision from history; dedicated tool deferred).
+**Resurrection branch (`:290-317`) — removed, precisely** (R1 #10: ONLY that branch; the new-file write path `:358-382` is separate and preserved). Its two old jobs are re-covered: intentional deletes now propagate (this spec); genuine damage is caught by the guards (abort/threshold) and repaired via `brain_restore_file` — matching prior art, which propagates deletes and pairs them with easy restore rather than auto-resurrecting (R2 on R1 #3).
 
-## A11 + reconcile-script demotion (folded in)
+**Tombstone retention (R2 #6):** retained indefinitely; purge-from-history remains the break-glass op (secrets/PII only). Pull re-lists all heads per cycle so tombstones add O(deleted) work forever — accepted at this scale; compaction + the pre-existing `Number(ISO)=NaN` cursor bug are noted for the perf workstream (R1 #12), not this spec.
 
-- Once `brain_delete_file` exists, A11 = call it on the `ip_landscape.md` stub (its first real use) → the tombstone-redirect stub is removed cleanly from both surfaces.
-- `scripts/reconcile-duplicate-brain-paths-postgres.mjs` → documented as **break-glass only**; the tool is the normal path. The 2026-06-27 residue (ERS state 115-vs-41) can be cleaned via the new delete once shipped.
+## Obsidian / human-readable behavior
 
-## Testing (default `npm test`, memory/file backend)
+Deleted file: gone from vault + graph; no artifact. Dangling inbound links after a *delete*: inherent; the delete tool warns with the count (lint backstop is future D4 — not claimed here). Rename: links rewritten (decision 3) and the pull side applies paired renames as moves, so both the graph and the OneDrive history see a rename. History/undo: `LOG.md` (human-visible) + revision store; restore via `brain_restore_file`. Obsidian-native renames/deletes on the local tree flow through the same guarded inference (a native rename appears as create+absence; the debounce + hash pairing keep it safe; worst case it propagates as delete+create — correct content, coarser history).
 
-- Tombstone round-trip: delete → head reports deleted → `listFiles` (default) omits it → `readFile` throws `FileDeletedError` → `listFiles({includeDeleted:true})` shows it.
-- CAS: delete against stale base → conflict; concurrent delete-vs-edit → conflict.
-- Sync: local delete → push tombstone → (second agent) pull → local unlink; remote-delete-vs-local-edit → conflict, no unlink; **regression: a locally-deleted file is NOT resurrected** (the A3-7 bug, pinned).
-- Rename: content moves; `renamed_from/to` metadata set; **inbound `[[old]]`→`[[new]]` rewritten** across fixtures; protected-file rename refused.
-- Protected-file delete refused; `assertWriteRole` denies a reader.
-- Postgres-backed equivalents behind `BRAIN_POSTGRES_TEST_DATABASE_URL` (env-gated).
+## A11 + reconcile-script demotion
 
-## Verification (cite per CLAUDE.md)
+First real delete = `brain_delete_file` on the `ip_landscape.md` redirect stub (A11). `reconcile-duplicate-brain-paths-postgres.mjs` → break-glass only. The 2026-06-27 residue cleanup uses the new tool.
 
-- `npm run build` — TypeScript compile.
-- `npm test` — build + node test runner (all new tests; default memory/file path).
-- `BRAIN_POSTGRES_TEST_DATABASE_URL=… npm test` — the Postgres tombstone/CAS path.
-- Migration applied to the live project via the documented migration flow (hosted/Postgres-mutating — **Hard Gate**, operator-run, not routine verification).
-- QA tier: **Full** + Hard Gate on the migration and the first live delete (data-integrity + irreversible-adjacent, though soft-delete keeps it recoverable).
+## Testing (default `npm test` on memory/file backends; postgres suite env-gated)
+
+Everything from v1 (tombstone round-trip, CAS delete-vs-edit both directions, protected-file refusal, reader-denied, rename metadata + link rewrites incl. `\|` aliases and collision-skip, no-resurrection regression) **plus the guard matrix (the point of v2)**:
+- Empty scan / unreadable root → cycle aborts, zero tombstones (pins R1 blocker #1).
+- Marker file missing → abort; marker present but N>threshold absent → zero tombstones + triage rows.
+- Debounce: absent-once → no tombstone; absent-twice → tombstone.
+- Protected file absent → never tombstoned (pins R1 blocker #2); tombstoned protected head on pull → conflict, not unlink.
+- Atomic rename: mid-rename conflict → nothing applied (no duplicate head).
+- Recreate-over-tombstone → accepted, not conflict. `brain_restore_file` round-trip.
+- Pull rename-pairing → local move (file identity preserved).
+- Sync-inferred delete writes a LOG entry.
+
+## Verification
+
+`npm run build` · `npm test` · `BRAIN_POSTGRES_TEST_DATABASE_URL=… npm test` · migration via documented flow (**Hard Gate**, operator-run) · QA tier: **Full** + Hard Gate on the migration and first live delete.
 
 ## Rollout
 
-1. Migration (additive) → live personal project.
-2. Ship tools + sync changes; deploy to Fly; smoke a delete + rename round-trip on a throwaway test file (hosted + local).
-3. Execute A11 (delete the `ip_landscape.md` stub).
-4. Lift the interim no-rename/delete rule in ERS + JEM `AGENTS.md`.
-5. Carry the migration into the ERS-owned project at infra migration.
+1. Migration (additive) → live personal project (Hard Gate).
+2. Ship store + tools + guarded sync; deploy; smoke delete/rename/restore round-trip on a throwaway file (hosted + local).
+3. **Update `docs/conflict-resolution.md` + `docs/hosted-brain-recovery-and-git-export.md`** — the "Recovery Bias / resurrection" language changes meaning (R1 #3); same change, same commit.
+4. Execute A11. 5. Lift the interim no-rename/delete rule in both Brains' AGENTS.md. 6. Migration carries to the ERS-owned project.
 
 ## Non-goals (v1)
 
-First-class rename revisions; a dedicated `brain_undelete` tool (restore-from-history is available via revision read + write); hard purge-from-history; bulk auto-cleanup of pre-existing duplicates (do via the new delete); `sources/`-archive/binary-artifact deletion (separate concern).
+First-class rename revisions · hard purge (break-glass only) · tombstone GC/compaction · the D4 `dead-wikilink` lint rule (separate roadmap item; link-rewrite failures are reported, not lint-dependent) · Obsidian `.trash` integration (optional future explicit-signal enhancement; non-default setting, can't be the sole signal) · `sources/`-archive/binary deletion · cursor fix (`Number(ISO)=NaN`) and pull-scan perf (perf workstream).
