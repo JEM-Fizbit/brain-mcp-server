@@ -21,6 +21,10 @@ import {
   revisionActor,
   resolveToolBrain,
 } from "../services/request-context.js";
+import {
+  countInboundLinkers,
+  rewriteLinksAfterRename,
+} from "../services/link-maintenance.js";
 
 export function registerUpdateTools(server: McpServer): void {
   server.tool(
@@ -64,11 +68,18 @@ export function registerUpdateTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertWriteRole(ctx);
-        const result = await activeBrainStore().deleteFile(
+        const store = activeBrainStore();
+        const linkers = await countInboundLinkers(store, ctx.brainId, filename);
+        const result = await store.deleteFile(
           ctx.brainId,
           filename,
           revisionActor(ctx)
         );
+        const warn = linkers.length
+          ? ` ⚠️ ${linkers.length} file(s) still link to ${filename}; those links now dangle${
+              linkers.length <= 5 ? ` (${linkers.join(", ")})` : ""
+            }. Restore with brain_restore_file if unintended.`
+          : "";
         const sync = revisionStoreModeEnabled()
           ? ""
           : await maybeAutoSync(
@@ -76,7 +87,7 @@ export function registerUpdateTools(server: McpServer): void {
               autoSyncMessage("DELETE", filename),
               authorIdentity(ctx)
             );
-        return { content: [{ type: "text", text: result + sync }] };
+        return { content: [{ type: "text", text: result + warn + sync }] };
       } catch (error) {
         return { content: [{ type: "text", text: String(error) }], isError: true };
       }
@@ -91,12 +102,26 @@ export function registerUpdateTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertWriteRole(ctx);
-        const result = await activeBrainStore().renameFile(
+        const store = activeBrainStore();
+        const result = await store.renameFile(
           ctx.brainId,
           from,
           to,
           revisionActor(ctx)
         );
+        const rewrite = await rewriteLinksAfterRename(
+          store,
+          ctx.brainId,
+          from,
+          to,
+          revisionActor(ctx)
+        );
+        const linkNote = rewrite.updated
+          ? ` Updated ${rewrite.updated} inbound link(s).`
+          : "";
+        const ambigNote = rewrite.ambiguous
+          ? ` Some [[basename]] links were ambiguous (name shared by another file) and left unchanged — review manually.`
+          : "";
         const sync = revisionStoreModeEnabled()
           ? ""
           : await maybeAutoSync(
@@ -104,7 +129,9 @@ export function registerUpdateTools(server: McpServer): void {
               autoSyncMessage("UPDATE", `${from} -> ${to}`),
               authorIdentity(ctx)
             );
-        return { content: [{ type: "text", text: result + sync }] };
+        return {
+          content: [{ type: "text", text: result + linkNote + ambigNote + sync }],
+        };
       } catch (error) {
         return { content: [{ type: "text", text: String(error) }], isError: true };
       }
