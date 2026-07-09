@@ -32,6 +32,30 @@ function emptyReport(): LocalSyncReport {
     unchanged: [],
     conflicts: [],
     timings: [],
+    deleted: [],
+    deletionsSkipped: [],
+  };
+}
+
+// Structural files that must be present for the tree to be considered healthy.
+// Their absence from a scan means the folder is damaged / unmounted, not that
+// the user deleted them (both are protected and never intentionally removable).
+const HEALTH_MARKER_FILES = ["00_loader.md", "NOW.md"];
+
+const DEFAULT_MAX_DELETES = 5;
+const DEFAULT_MAX_DELETE_PCT = 10;
+
+function positiveIntFromEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function syncDeleteLimits(): { maxDeletes: number; maxPct: number } {
+  return {
+    maxDeletes: positiveIntFromEnv("BRAIN_SYNC_MAX_DELETES", DEFAULT_MAX_DELETES),
+    maxPct: positiveIntFromEnv("BRAIN_SYNC_MAX_DELETE_PCT", DEFAULT_MAX_DELETE_PCT),
   };
 }
 
@@ -262,9 +286,94 @@ export class LocalSyncAgent {
       }
     }
 
+    await this.inferGuardedDeletions(report, state, new Set(filenames));
+
     await timed(report, "push", "state_write", () => this.saveState(state));
     addTiming(report, "push", "total", totalStartedAt);
     return report;
+  }
+
+  /**
+   * Infer local deletions (tracked files absent from the scan) and propagate
+   * them as tombstones — but only behind three defence-in-depth guards
+   * (spec 011, review-1 blocker #1). An empty/unmounted folder, a damaged tree
+   * missing a structural marker, or an implausibly large batch never tombstones
+   * anything; a genuine single deletion must also survive two consecutive scans
+   * before it is applied.
+   */
+  private async inferGuardedDeletions(
+    report: LocalSyncReport,
+    state: LocalSyncState,
+    scannedSet: Set<string>
+  ): Promise<void> {
+    const trackedNames = Object.keys(state.files);
+    const candidates = trackedNames.filter((f) => !scannedSet.has(f));
+
+    if (candidates.length === 0) {
+      // Nothing is missing — reset any stale debounce memory.
+      if (state.pendingDeletions && state.pendingDeletions.length > 0) {
+        state.pendingDeletions = [];
+      }
+      return;
+    }
+
+    // Guard 1 — folder health. An empty scan or a vanished structural marker
+    // means the tree is unmounted/damaged, not that files were deleted.
+    const trackedSet = new Set(trackedNames);
+    const scanNonEmpty = scannedSet.size > 0;
+    const markersIntact = HEALTH_MARKER_FILES.every(
+      (marker) => !trackedSet.has(marker) || scannedSet.has(marker)
+    );
+    if (!scanNonEmpty || !markersIntact) {
+      report.deletionsSkipped.push(...candidates);
+      report.guardTripped = !scanNonEmpty
+        ? "empty_scan: no Markdown files found where files were tracked; refusing to infer deletions"
+        : "health_marker_missing: a structural marker (00_loader.md/NOW.md) is absent; refusing to infer deletions";
+      state.pendingDeletions = []; // an unhealthy scan must not arm the debounce
+      return;
+    }
+
+    // Guard 2 — debounce. Only files absent on two consecutive scans qualify.
+    const prevPending = new Set(state.pendingDeletions ?? []);
+    const confirmed = candidates.filter((f) => prevPending.has(f));
+
+    // Guard 3 — mass-delete threshold on the confirmed batch.
+    const { maxDeletes, maxPct } = syncDeleteLimits();
+    const pct = trackedNames.length
+      ? (confirmed.length / trackedNames.length) * 100
+      : 0;
+    const overThreshold = confirmed.length > maxDeletes || pct > maxPct;
+
+    if (confirmed.length > 0 && overThreshold) {
+      report.deletionsSkipped.push(...confirmed);
+      report.guardTripped =
+        `mass_delete: ${confirmed.length} confirmed deletion(s) ` +
+        `(${pct.toFixed(0)}% of ${trackedNames.length}) exceeds the limit ` +
+        `(max ${maxDeletes} files or ${maxPct}%); operator review required`;
+    } else {
+      for (const filename of confirmed) {
+        const tracked = state.files[filename];
+        const result = await timed(report, "push", "revision_store_write", () =>
+          this.options.store.proposeDeletion({
+            brainId: this.options.brainId,
+            filename,
+            baseRevisionId: tracked.revisionId,
+            origin: "local_agent",
+            actor: this.options.actor,
+          })
+        );
+        if (result.ok) {
+          delete state.files[filename];
+          report.deleted.push(filename);
+        } else {
+          report.conflicts.push(result.conflict);
+        }
+      }
+    }
+
+    // Debounce memory for the next scan: candidates still absent and still
+    // tracked (i.e. not tombstoned this cycle).
+    state.pendingDeletions = candidates.filter((f) => state.files[f]);
   }
 
   async pullHostedChanges(): Promise<LocalSyncReport> {
@@ -391,12 +500,15 @@ export class LocalSyncAgent {
     const startedAt = performance.now();
     const pushed = await this.pushLocalChanges();
     const pulled = await this.pullHostedChanges();
-    const report = {
+    const report: LocalSyncReport = {
       pushed: pushed.pushed,
       pulled: pulled.pulled,
       unchanged: [...pushed.unchanged, ...pulled.unchanged],
       conflicts: [...pushed.conflicts, ...pulled.conflicts],
       timings: [...pushed.timings, ...pulled.timings],
+      deleted: [...pushed.deleted, ...pulled.deleted],
+      deletionsSkipped: [...pushed.deletionsSkipped, ...pulled.deletionsSkipped],
+      guardTripped: pushed.guardTripped ?? pulled.guardTripped,
     };
     addTiming(report, "sync", "total", startedAt);
     return report;
