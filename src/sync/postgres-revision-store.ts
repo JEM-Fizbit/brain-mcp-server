@@ -18,6 +18,7 @@ import type {
   RevisionOrigin,
   RevisionProposal,
   RevisionProposalResult,
+  RevisionRenameProposal,
   RevisionStore,
   SearchOptions,
   SearchResult,
@@ -62,6 +63,7 @@ interface RevisionRow {
   content: string | null;
   content_sha256: string | null;
   deleted: boolean;
+  metadata: { renamedFrom?: string; renamedTo?: string } | null;
   origin: RevisionOrigin;
   actor_provider: string | null;
   actor_id: string | null;
@@ -125,6 +127,8 @@ function revisionFromRow(row: RevisionRow): RevisionContent {
     cursor: row.created_at.toISOString(),
     content: row.content ?? "",
     deleted: row.deleted === true,
+    renamedFrom: row.metadata?.renamedFrom,
+    renamedTo: row.metadata?.renamedTo,
   };
 }
 
@@ -144,6 +148,8 @@ function headFromRow(row: HeadRow | RevisionRow): FileHead {
     actor: actorFromRow(row),
     cursor: row.created_at.toISOString(),
     deleted,
+    renamedFrom: row.metadata?.renamedFrom,
+    renamedTo: row.metadata?.renamedTo,
   };
 }
 
@@ -516,6 +522,142 @@ export class PostgresRevisionStore implements RevisionStore {
         status: "accepted",
         head: headFromRow(revision),
         revision: revisionFromRow(revision),
+      };
+    });
+  }
+
+  async proposeRename(
+    input: RevisionRenameProposal
+  ): Promise<RevisionProposalResult> {
+    return transaction(this.pool, async (client) => {
+      // Lock both keys in a deterministic order to avoid deadlock.
+      for (const name of [input.from, input.to].sort()) {
+        await client.query(
+          `select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2, 0))`,
+          [input.brainId, name]
+        );
+      }
+      const headQuery = `
+        select r.*, f.updated_at
+        from brain.brain_files f
+        left join brain.brain_file_revisions r on r.id = f.current_revision_id
+        where f.brain_id = $1 and f.filename = $2
+        for update of f
+      `;
+      const from = (await client.query<HeadRow>(headQuery, [input.brainId, input.from])).rows[0] || null;
+      const to = (await client.query<HeadRow>(headQuery, [input.brainId, input.to])).rows[0] || null;
+
+      // Source must be live and the base must match (CAS).
+      if (!from?.id || from.deleted === true || input.baseRevisionId !== from.id) {
+        const conflict = await this.insertConflict(client, {
+          brainId: input.brainId,
+          filename: input.from,
+          localBaseRevisionId: input.baseRevisionId,
+          remoteHeadRevisionId: from?.id || null,
+          localContentHash: TOMBSTONE_HASH,
+          remoteContentHash: from?.content_sha256 || null,
+          localOrigin: input.origin,
+          remoteOrigin: from?.origin,
+          localActor: input.actor,
+          remoteActor: from?.id ? actorFromRow(from) : undefined,
+        });
+        return {
+          ok: false,
+          status: "conflict",
+          conflict,
+          currentHead: from?.id ? headFromRow(from) : null,
+        };
+      }
+
+      // Target must not be a live file (a tombstoned target is fine — recreate).
+      if (to?.id && to.deleted !== true) {
+        const conflict = await this.insertConflict(client, {
+          brainId: input.brainId,
+          filename: input.to,
+          localBaseRevisionId: null,
+          remoteHeadRevisionId: to.id,
+          localContentHash: from.content_sha256 || TOMBSTONE_HASH,
+          remoteContentHash: to.content_sha256 || null,
+          localOrigin: input.origin,
+          remoteOrigin: to.origin,
+          localActor: input.actor,
+          remoteActor: actorFromRow(to),
+        });
+        return {
+          ok: false,
+          status: "conflict",
+          conflict,
+          currentHead: headFromRow(to),
+        };
+      }
+
+      await client.query(
+        `insert into brain.brain_files (brain_id, filename)
+         values ($1, $2) on conflict (brain_id, filename) do nothing`,
+        [input.brainId, input.to]
+      );
+
+      const actorArgs = [
+        input.origin,
+        input.actor?.provider || null,
+        input.actor?.id || null,
+        input.actor?.name || null,
+        input.actor?.email || null,
+      ];
+
+      const toRev = (
+        await client.query<RevisionRow>(
+          `insert into brain.brain_file_revisions (
+             brain_id, filename, parent_revision_id, content, content_sha256,
+             deleted, metadata, origin, actor_provider, actor_id, actor_name, actor_email
+           ) values ($1, $2, $3, $4, $5, false, $6::jsonb, $7, $8, $9, $10, $11)
+           returning *`,
+          [
+            input.brainId,
+            input.to,
+            to?.id || null,
+            from.content,
+            from.content_sha256,
+            JSON.stringify({ renamedFrom: input.from }),
+            ...actorArgs,
+          ]
+        )
+      ).rows[0];
+      await client.query(
+        `update brain.brain_files set current_revision_id = $3,
+           current_content_sha256 = $4, updated_at = now()
+         where brain_id = $1 and filename = $2`,
+        [input.brainId, input.to, toRev.id, toRev.content_sha256]
+      );
+
+      const fromTomb = (
+        await client.query<RevisionRow>(
+          `insert into brain.brain_file_revisions (
+             brain_id, filename, parent_revision_id, content, content_sha256,
+             deleted, metadata, origin, actor_provider, actor_id, actor_name, actor_email
+           ) values ($1, $2, $3, null, null, true, $4::jsonb, $5, $6, $7, $8, $9)
+           returning *`,
+          [
+            input.brainId,
+            input.from,
+            from.id,
+            JSON.stringify({ renamedTo: input.to }),
+            ...actorArgs,
+          ]
+        )
+      ).rows[0];
+      await client.query(
+        `update brain.brain_files set current_revision_id = $3,
+           current_content_sha256 = null, updated_at = now()
+         where brain_id = $1 and filename = $2`,
+        [input.brainId, input.from, fromTomb.id]
+      );
+
+      return {
+        ok: true,
+        status: "accepted",
+        head: headFromRow(toRev),
+        revision: revisionFromRow(toRev),
       };
     });
   }

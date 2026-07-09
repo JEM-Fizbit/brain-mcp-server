@@ -229,3 +229,94 @@ test("PostgresRevisionStore delete/tombstone flow (spec 011)", async (t) => {
     await store.close();
   }
 });
+
+test("PostgresRevisionStore atomic rename flow (spec 011)", async (t) => {
+  if (!databaseUrl) {
+    t.skip("set BRAIN_POSTGRES_TEST_DATABASE_URL to run the mutating Postgres integration test");
+    return;
+  }
+  const { PostgresRevisionStore } = await import(
+    path.join(__dirname, "..", "dist", "sync", "index.js")
+  );
+  const store = new PostgresRevisionStore(databaseUrl);
+  const brainId = `test-brain-rename-${Date.now()}`;
+  try {
+    if (shouldApplyMigration) {
+      for (const file of [
+        "2026-06-14_001_hosted_brain_postgres.sql",
+        "2026-07-08_001_brain_file_tombstones.sql",
+      ]) {
+        await store.pool.query(
+          await fs.readFile(path.join(__dirname, "..", "db", "migrations", file), "utf-8")
+        );
+      }
+    }
+    await store.pool.query(
+      `insert into brain.brains (id, type, template_used, integration_mode)
+       values ($1, 'personal', 'personal', 'vertical')`,
+      [brainId]
+    );
+
+    const created = await store.proposeRevision({
+      brainId,
+      filename: "old.md",
+      baseRevisionId: null,
+      content: "# body\n",
+      origin: "hosted_mcp",
+    });
+
+    // Rename onto a live target conflicts (source untouched).
+    await store.proposeRevision({
+      brainId,
+      filename: "taken.md",
+      baseRevisionId: null,
+      content: "other\n",
+      origin: "hosted_mcp",
+    });
+    const blocked = await store.proposeRename({
+      brainId,
+      from: "old.md",
+      to: "taken.md",
+      baseRevisionId: created.head.revisionId,
+      origin: "local_agent",
+    });
+    assert.equal(blocked.ok, false);
+    assert.equal(blocked.status, "conflict");
+    assert.equal((await store.getHead(brainId, "old.md")).deleted ?? false, false);
+
+    // Clean rename: content moves, pairing recorded, old tombstoned.
+    const renamed = await store.proposeRename({
+      brainId,
+      from: "old.md",
+      to: "new.md",
+      baseRevisionId: created.head.revisionId,
+      origin: "local_agent",
+    });
+    assert.equal(renamed.status, "accepted");
+    assert.equal(renamed.head.renamedFrom, "old.md");
+    assert.equal((await store.readFile(brainId, "new.md")).content, "# body\n");
+    const oldHead = await store.getHead(brainId, "old.md");
+    assert.equal(oldHead.deleted, true);
+    assert.equal(oldHead.renamedTo, "new.md");
+    assert.equal(
+      (await store.listFiles(brainId)).find((f) => f.filename === "old.md"),
+      undefined
+    );
+
+    // Stale-base rename conflicts and creates no duplicate head.
+    const stale = await store.proposeRename({
+      brainId,
+      from: "new.md",
+      to: "newer.md",
+      baseRevisionId: "stale",
+      origin: "local_agent",
+    });
+    assert.equal(stale.ok, false);
+    assert.equal(await store.getHead(brainId, "newer.md"), null);
+  } finally {
+    await store.pool.query("delete from brain.brains where id = $1", [brainId]).catch(
+      () => undefined
+    );
+    await store.close();
+  }
+});
