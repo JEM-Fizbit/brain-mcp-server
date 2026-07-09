@@ -163,6 +163,8 @@ export interface RevisionStore {
   proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult>;
   proposeDeletion(input: RevisionDeletionProposal): Promise<RevisionProposalResult>;
   proposeRename(input: RevisionRenameProposal): Promise<RevisionProposalResult>;
+  /** Read a specific revision by id (including tombstones) — used for restore/history. */
+  readRevision(brainId: string, revisionId: string): Promise<RevisionContent | null>;
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage>;
   recordConflict(input: ConflictInput): Promise<ConflictRecord>;
   listConflicts(

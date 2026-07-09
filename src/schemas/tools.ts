@@ -65,6 +65,27 @@ export const UpdateFileSchema = BrainIdSchema.extend({
     .describe("Required for patch mode. The exact text to find and replace. Must match uniquely in the file."),
 });
 
+export const DeleteFileSchema = BrainIdSchema.extend({
+  filename: z
+    .string()
+    .describe(
+      "The Brain file to delete (must end in .md). Soft-delete: recoverable via brain_restore_file. The structural files 00_loader.md and NOW.md cannot be deleted."
+    ),
+});
+
+export const RenameFileSchema = BrainIdSchema.extend({
+  from: z.string().describe("The current filename (must end in .md)."),
+  to: z
+    .string()
+    .describe("The new filename (must end in .md; must not already exist as a live file)."),
+});
+
+export const RestoreFileSchema = BrainIdSchema.extend({
+  filename: z
+    .string()
+    .describe("A previously-deleted Brain file to restore to its last content (hosted Brain only)."),
+});
+
 export const CommitSchema = BrainIdSchema.extend({
   message: z
     .string()
