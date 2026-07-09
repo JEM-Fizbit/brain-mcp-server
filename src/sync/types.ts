@@ -144,6 +144,7 @@ export interface RevisionStore {
     options?: SearchOptions
   ): Promise<SearchResult[]>;
   proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult>;
+  proposeDeletion(input: RevisionDeletionProposal): Promise<RevisionProposalResult>;
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage>;
   recordConflict(input: ConflictInput): Promise<ConflictRecord>;
   listConflicts(

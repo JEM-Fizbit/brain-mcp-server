@@ -2,6 +2,7 @@ import pg from "pg";
 import { contentHash } from "./hash.js";
 import { attachPoolErrorLogger } from "../services/pg-pool.js";
 import { lineMatchesSearchQuery } from "../search-match.js";
+import { FileDeletedError } from "./types.js";
 import type {
   ChangePage,
   ChangeRecord,
@@ -10,8 +11,10 @@ import type {
   ConflictResolutionInput,
   ConflictResolutionResult,
   FileHead,
+  ListFilesOptions,
   RevisionActor,
   RevisionContent,
+  RevisionDeletionProposal,
   RevisionOrigin,
   RevisionProposal,
   RevisionProposalResult,
@@ -19,6 +22,9 @@ import type {
   SearchOptions,
   SearchResult,
 } from "./types.js";
+
+/** Sentinel hash for tombstone revisions — never a valid 64-hex sha256. */
+const TOMBSTONE_HASH = "deleted";
 
 const { Pool } = pg;
 type Pool = pg.Pool;
@@ -53,8 +59,9 @@ interface RevisionRow {
   brain_id: string;
   filename: string;
   parent_revision_id: string | null;
-  content: string;
-  content_sha256: string;
+  content: string | null;
+  content_sha256: string | null;
+  deleted: boolean;
   origin: RevisionOrigin;
   actor_provider: string | null;
   actor_id: string | null;
@@ -111,29 +118,32 @@ function revisionFromRow(row: RevisionRow): RevisionContent {
     filename: row.filename,
     revisionId: row.id,
     parentRevisionId: row.parent_revision_id,
-    contentHash: row.content_sha256,
+    contentHash: row.content_sha256 ?? TOMBSTONE_HASH,
     updatedAt: row.created_at.toISOString(),
     origin: row.origin,
     actor: actorFromRow(row),
     cursor: row.created_at.toISOString(),
-    content: row.content,
+    content: row.content ?? "",
+    deleted: row.deleted === true,
   };
 }
 
 function headFromRow(row: HeadRow | RevisionRow): FileHead {
   const updatedAt =
     "updated_at" in row ? row.updated_at.toISOString() : row.created_at.toISOString();
+  const deleted = row.deleted === true;
   return {
     brainId: row.brain_id,
     filename: row.filename,
     revisionId: row.id,
-    contentHash: row.content_sha256,
-    lineCount: lineCount(row.content),
-    byteCount: byteCount(row.content),
+    contentHash: row.content_sha256 ?? TOMBSTONE_HASH,
+    lineCount: deleted || row.content === null ? 0 : lineCount(row.content),
+    byteCount: deleted || row.content === null ? 0 : byteCount(row.content),
     updatedAt,
     origin: row.origin,
     actor: actorFromRow(row),
     cursor: row.created_at.toISOString(),
+    deleted,
   };
 }
 
@@ -225,19 +235,25 @@ export class PostgresRevisionStore implements RevisionStore {
     if (!row) {
       throw new Error(`File not found in Postgres revision store: ${filename}`);
     }
+    if (row.deleted === true) {
+      throw new FileDeletedError(filename);
+    }
     return revisionFromRow(row);
   }
 
-  async listFiles(brainId: string): Promise<FileHead[]> {
+  async listFiles(
+    brainId: string,
+    options: ListFilesOptions = {}
+  ): Promise<FileHead[]> {
     const result = await this.pool.query<HeadRow>(
       `
         select r.*, f.updated_at
         from brain.brain_files f
         join brain.brain_file_revisions r on r.id = f.current_revision_id
-        where f.brain_id = $1
+        where f.brain_id = $1 and ($2 or r.deleted = false)
         order by f.filename
       `,
-      [brainId]
+      [brainId, options.includeDeleted === true]
     );
     return result.rows.map(headFromRow);
   }
@@ -253,14 +269,14 @@ export class PostgresRevisionStore implements RevisionStore {
         select r.*
         from brain.brain_files f
         join brain.brain_file_revisions r on r.id = f.current_revision_id
-        where f.brain_id = $1
+        where f.brain_id = $1 and r.deleted = false
         order by f.filename
       `,
       [brainId]
     );
     const results: SearchResult[] = [];
     for (const row of files.rows) {
-      const lines = row.content.split("\n");
+      const lines = (row.content ?? "").split("\n");
       for (let index = 0; index < lines.length; index += 1) {
         if (!lineMatchesSearchQuery(lines[index], query)) continue;
         results.push({
@@ -297,7 +313,16 @@ export class PostgresRevisionStore implements RevisionStore {
       const current = currentResult.rows[0] || null;
       const nextHash = contentHash(input.content);
 
-      if (current?.id && current.content_sha256 === nextHash) {
+      // Recreate-over-tombstone (spec 011): new content with base=null onto a
+      // deleted head is an accepted recreate, not a conflict.
+      const recreatingOverTombstone =
+        current?.id && current.deleted === true && input.baseRevisionId === null;
+
+      if (
+        current?.id &&
+        current.deleted !== true &&
+        current.content_sha256 === nextHash
+      ) {
         return {
           ok: true,
           status: "unchanged",
@@ -307,8 +332,9 @@ export class PostgresRevisionStore implements RevisionStore {
       }
 
       if (
-        (current?.id && input.baseRevisionId !== current.id) ||
-        (!current && input.baseRevisionId !== null)
+        !recreatingOverTombstone &&
+        ((current?.id && input.baseRevisionId !== current.id) ||
+          (!current && input.baseRevisionId !== null))
       ) {
         const conflict = await this.insertConflict(client, {
           brainId: input.brainId,
@@ -392,6 +418,108 @@ export class PostgresRevisionStore implements RevisionStore {
     });
   }
 
+  async proposeDeletion(
+    input: RevisionDeletionProposal
+  ): Promise<RevisionProposalResult> {
+    return transaction(this.pool, async (client) => {
+      await client.query(
+        `select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2, 0))`,
+        [input.brainId, input.filename]
+      );
+      const currentResult = await client.query<HeadRow>(
+        `
+          select r.*, f.updated_at
+          from brain.brain_files f
+          left join brain.brain_file_revisions r on r.id = f.current_revision_id
+          where f.brain_id = $1 and f.filename = $2
+          for update of f
+        `,
+        [input.brainId, input.filename]
+      );
+      const current = currentResult.rows[0] || null;
+
+      // Idempotent: already deleted (idempotency on deleted, not on a hash).
+      if (current?.id && current.deleted === true) {
+        return {
+          ok: true,
+          status: "unchanged",
+          head: headFromRow(current),
+          revision: revisionFromRow(current),
+        };
+      }
+
+      // CAS: stale base, or nothing to delete → conflict, never a silent delete.
+      if (!current?.id || input.baseRevisionId !== current.id) {
+        const conflict = await this.insertConflict(client, {
+          brainId: input.brainId,
+          filename: input.filename,
+          localBaseRevisionId: input.baseRevisionId,
+          remoteHeadRevisionId: current?.id || null,
+          localContentHash: TOMBSTONE_HASH,
+          remoteContentHash: current?.content_sha256 || null,
+          localOrigin: input.origin,
+          remoteOrigin: current?.origin,
+          localActor: input.actor,
+          remoteActor: current?.id ? actorFromRow(current) : undefined,
+        });
+        return {
+          ok: false,
+          status: "conflict",
+          conflict,
+          currentHead: current?.id ? headFromRow(current) : null,
+        };
+      }
+
+      const revisionResult = await client.query<RevisionRow>(
+        `
+          insert into brain.brain_file_revisions (
+            brain_id,
+            filename,
+            parent_revision_id,
+            content,
+            content_sha256,
+            deleted,
+            origin,
+            actor_provider,
+            actor_id,
+            actor_name,
+            actor_email
+          )
+          values ($1, $2, $3, null, null, true, $4, $5, $6, $7, $8)
+          returning *
+        `,
+        [
+          input.brainId,
+          input.filename,
+          current.id,
+          input.origin,
+          input.actor?.provider || null,
+          input.actor?.id || null,
+          input.actor?.name || null,
+          input.actor?.email || null,
+        ]
+      );
+      const revision = revisionResult.rows[0];
+      await client.query(
+        `
+          update brain.brain_files
+          set current_revision_id = $3,
+              current_content_sha256 = null,
+              updated_at = now()
+          where brain_id = $1 and filename = $2
+        `,
+        [input.brainId, input.filename, revision.id]
+      );
+
+      return {
+        ok: true,
+        status: "accepted",
+        head: headFromRow(revision),
+        revision: revisionFromRow(revision),
+      };
+    });
+  }
+
   async listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {
     const result = await this.pool.query<RevisionRow>(
       `
@@ -408,7 +536,7 @@ export class PostgresRevisionStore implements RevisionStore {
       brainId: row.brain_id,
       filename: row.filename,
       revisionId: row.id,
-      contentHash: row.content_sha256,
+      contentHash: row.content_sha256 ?? TOMBSTONE_HASH,
       updatedAt: row.created_at.toISOString(),
       origin: row.origin,
       actor: actorFromRow(row),

@@ -11,7 +11,9 @@ import type {
   ConflictResolutionInput,
   ConflictResolutionResult,
   FileHead,
+  ListFilesOptions,
   RevisionContent,
+  RevisionDeletionProposal,
   RevisionProposal,
   RevisionProposalResult,
   RevisionStore,
@@ -36,8 +38,8 @@ export class FileRevisionStore implements RevisionStore {
     return this.withStore(false, (store) => store.readFile(brainId, filename));
   }
 
-  listFiles(brainId: string): Promise<FileHead[]> {
-    return this.withStore(false, (store) => store.listFiles(brainId));
+  listFiles(brainId: string, options?: ListFilesOptions): Promise<FileHead[]> {
+    return this.withStore(false, (store) => store.listFiles(brainId, options));
   }
 
   searchFiles(
@@ -52,6 +54,12 @@ export class FileRevisionStore implements RevisionStore {
 
   proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
     return this.withStore(true, (store) => store.proposeRevision(input));
+  }
+
+  proposeDeletion(
+    input: RevisionDeletionProposal
+  ): Promise<RevisionProposalResult> {
+    return this.withStore(true, (store) => store.proposeDeletion(input));
   }
 
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {

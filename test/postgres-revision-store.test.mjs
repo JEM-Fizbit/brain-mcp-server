@@ -113,3 +113,119 @@ test("PostgresRevisionStore compare-and-swap flow", async (t) => {
     await store.close();
   }
 });
+
+test("PostgresRevisionStore delete/tombstone flow (spec 011)", async (t) => {
+  if (!databaseUrl) {
+    t.skip("set BRAIN_POSTGRES_TEST_DATABASE_URL to run the mutating Postgres integration test");
+    return;
+  }
+
+  const { PostgresRevisionStore } = await import(
+    path.join(__dirname, "..", "dist", "sync", "index.js")
+  );
+  const { FileDeletedError } = await import(
+    path.join(__dirname, "..", "dist", "sync", "types.js")
+  );
+  const store = new PostgresRevisionStore(databaseUrl);
+  const brainId = `test-brain-del-${Date.now()}`;
+
+  try {
+    if (shouldApplyMigration) {
+      for (const file of [
+        "2026-06-14_001_hosted_brain_postgres.sql",
+        "2026-07-08_001_brain_file_tombstones.sql",
+      ]) {
+        const sql = await fs.readFile(
+          path.join(__dirname, "..", "db", "migrations", file),
+          "utf-8"
+        );
+        await store.pool.query(sql);
+      }
+    }
+    await store.pool.query(
+      `insert into brain.brains (id, type, template_used, integration_mode)
+       values ($1, 'personal', 'personal', 'vertical')`,
+      [brainId]
+    );
+
+    const created = await store.proposeRevision({
+      brainId,
+      filename: "note.md",
+      baseRevisionId: null,
+      content: "# hi\n",
+      origin: "hosted_mcp",
+    });
+    assert.equal(created.status, "accepted");
+
+    // Stale-base delete conflicts (never silent).
+    const staleDelete = await store.proposeDeletion({
+      brainId,
+      filename: "note.md",
+      baseRevisionId: "does-not-exist",
+      origin: "local_agent",
+    });
+    assert.equal(staleDelete.ok, false);
+    assert.equal(staleDelete.status, "conflict");
+
+    // Real delete.
+    const del = await store.proposeDeletion({
+      brainId,
+      filename: "note.md",
+      baseRevisionId: created.head.revisionId,
+      origin: "local_agent",
+    });
+    assert.equal(del.status, "accepted");
+    assert.equal(del.head.deleted, true);
+
+    // Excluded from default listFiles; visible with includeDeleted.
+    assert.equal(
+      (await store.listFiles(brainId)).find((f) => f.filename === "note.md"),
+      undefined
+    );
+    assert.equal(
+      (await store.listFiles(brainId, { includeDeleted: true })).find(
+        (f) => f.filename === "note.md"
+      )?.deleted,
+      true
+    );
+
+    // readFile throws FileDeletedError.
+    await assert.rejects(
+      () => store.readFile(brainId, "note.md"),
+      (err) => err instanceof FileDeletedError
+    );
+
+    // Re-delete is idempotent.
+    assert.equal(
+      (
+        await store.proposeDeletion({
+          brainId,
+          filename: "note.md",
+          baseRevisionId: del.head.revisionId,
+          origin: "local_agent",
+        })
+      ).status,
+      "unchanged"
+    );
+
+    // Recreate over the tombstone with base=null is accepted, not a conflict.
+    const recreated = await store.proposeRevision({
+      brainId,
+      filename: "note.md",
+      baseRevisionId: null,
+      content: "# back\n",
+      origin: "hosted_mcp",
+    });
+    assert.equal(recreated.status, "accepted");
+    assert.equal((await store.readFile(brainId, "note.md")).content, "# back\n");
+    assert.equal(
+      (await store.listFiles(brainId)).find((f) => f.filename === "note.md")?.deleted ?? false,
+      false
+    );
+  } finally {
+    await store.pool.query("delete from brain.brains where id = $1", [brainId]).catch(
+      () => undefined
+    );
+    await store.close();
+  }
+});
