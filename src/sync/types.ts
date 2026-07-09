@@ -18,6 +18,31 @@ export interface FileHead {
   origin: RevisionOrigin;
   actor?: RevisionActor;
   cursor: string;
+  /** True when the head is a tombstone (spec 011). Absent/false = live file. */
+  deleted?: boolean;
+}
+
+/** Thrown by readFile when the file's head is a tombstone (deleted). */
+export class FileDeletedError extends Error {
+  constructor(filename: string) {
+    super(`File is deleted in the revision store: ${filename}`);
+    this.name = "FileDeletedError";
+  }
+}
+
+/** Input to propose a deletion (tombstone) — same CAS contract as a revision. */
+export interface RevisionDeletionProposal {
+  brainId: string;
+  filename: string;
+  baseRevisionId: string | null;
+  origin: RevisionOrigin;
+  actor?: RevisionActor;
+}
+
+/** Options for listing files. */
+export interface ListFilesOptions {
+  /** Include tombstoned (deleted) heads. Default false. */
+  includeDeleted?: boolean;
 }
 
 export interface RevisionContent extends FileHead {
@@ -112,7 +137,7 @@ export interface ChangePage {
 export interface RevisionStore {
   getHead(brainId: string, filename: string): Promise<FileHead | null>;
   readFile(brainId: string, filename: string): Promise<RevisionContent>;
-  listFiles(brainId: string): Promise<FileHead[]>;
+  listFiles(brainId: string, options?: ListFilesOptions): Promise<FileHead[]>;
   searchFiles(
     brainId: string,
     query: string,

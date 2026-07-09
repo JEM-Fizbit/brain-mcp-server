@@ -1,5 +1,6 @@
 import { contentHash } from "./hash.js";
 import { lineMatchesSearchQuery } from "../search-match.js";
+import { FileDeletedError } from "./types.js";
 import type {
   ChangePage,
   ChangeRecord,
@@ -8,7 +9,9 @@ import type {
   ConflictResolutionInput,
   ConflictResolutionResult,
   FileHead,
+  ListFilesOptions,
   RevisionContent,
+  RevisionDeletionProposal,
   RevisionProposal,
   RevisionProposalResult,
   RevisionStore,
@@ -16,22 +19,30 @@ import type {
   SearchResult,
 } from "./types.js";
 
+/**
+ * Sentinel content hash for tombstone revisions. Not a valid 64-hex sha256, so it
+ * can never collide with a real content hash in the identical-content short-circuit.
+ */
+const TOMBSTONE_HASH = "deleted";
+
 function key(brainId: string, filename: string): string {
   return `${brainId}\0${filename}`;
 }
 
 function headOf(revision: RevisionContent): FileHead {
+  const deleted = revision.deleted === true;
   return {
     brainId: revision.brainId,
     filename: revision.filename,
     revisionId: revision.revisionId,
     contentHash: revision.contentHash,
-    lineCount: revision.content.split("\n").length,
-    byteCount: Buffer.byteLength(revision.content, "utf-8"),
+    lineCount: deleted ? 0 : revision.content.split("\n").length,
+    byteCount: deleted ? 0 : Buffer.byteLength(revision.content, "utf-8"),
     updatedAt: revision.updatedAt,
     origin: revision.origin,
     actor: revision.actor,
     cursor: revision.cursor,
+    deleted,
   };
 }
 
@@ -91,12 +102,19 @@ export class MemoryRevisionStore implements RevisionStore {
     if (!head) {
       throw new Error(`File not found in hosted revision store: ${filename}`);
     }
+    if (head.deleted === true) {
+      throw new FileDeletedError(filename);
+    }
     return head;
   }
 
-  async listFiles(brainId: string): Promise<FileHead[]> {
+  async listFiles(
+    brainId: string,
+    options: ListFilesOptions = {}
+  ): Promise<FileHead[]> {
     return Array.from(this.heads.values())
       .filter((head) => head.brainId === brainId)
+      .filter((head) => options.includeDeleted || head.deleted !== true)
       .map(headOf)
       .sort((a, b) => a.filename.localeCompare(b.filename));
   }
@@ -113,6 +131,7 @@ export class MemoryRevisionStore implements RevisionStore {
       a.filename.localeCompare(b.filename)
     )) {
       if (head.brainId !== brainId) continue;
+      if (head.deleted === true) continue;
       const lines = head.content.split("\n");
       for (let index = 0; index < lines.length; index += 1) {
         if (!lineMatchesSearchQuery(lines[index], query)) continue;
@@ -133,7 +152,12 @@ export class MemoryRevisionStore implements RevisionStore {
     const current = this.heads.get(fileKey) || null;
     const nextHash = contentHash(input.content);
 
-    if (current && current.contentHash === nextHash) {
+    // Recreate-over-tombstone (spec 011): writing new content with base=null onto a
+    // deleted head is an accepted recreate/undelete, not a conflict.
+    const recreatingOverTombstone =
+      current?.deleted === true && input.baseRevisionId === null;
+
+    if (current && !current.deleted && current.contentHash === nextHash) {
       return {
         ok: true,
         status: "unchanged",
@@ -143,8 +167,9 @@ export class MemoryRevisionStore implements RevisionStore {
     }
 
     if (
-      (current && input.baseRevisionId !== current.revisionId) ||
-      (!current && input.baseRevisionId !== null)
+      !recreatingOverTombstone &&
+      ((current && input.baseRevisionId !== current.revisionId) ||
+        (!current && input.baseRevisionId !== null))
     ) {
       const conflict = await this.recordConflict({
         brainId: input.brainId,
@@ -189,6 +214,85 @@ export class MemoryRevisionStore implements RevisionStore {
       filename: input.filename,
       revisionId,
       contentHash: nextHash,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+    });
+
+    return {
+      ok: true,
+      status: "accepted",
+      head: headOf(revision),
+      revision,
+    };
+  }
+
+  async proposeDeletion(
+    input: RevisionDeletionProposal
+  ): Promise<RevisionProposalResult> {
+    const fileKey = key(input.brainId, input.filename);
+    const current = this.heads.get(fileKey) || null;
+
+    // Idempotent: re-deleting an already-deleted file is a no-op (spec 011,
+    // idempotency on current.deleted — NOT on content hash).
+    if (current?.deleted === true) {
+      return {
+        ok: true,
+        status: "unchanged",
+        head: headOf(current),
+        revision: current,
+      };
+    }
+
+    // CAS: stale base, or nothing to delete → conflict, never a silent delete.
+    if (
+      !current ||
+      input.baseRevisionId !== current.revisionId
+    ) {
+      const conflict = await this.recordConflict({
+        brainId: input.brainId,
+        filename: input.filename,
+        localBaseRevisionId: input.baseRevisionId,
+        remoteHeadRevisionId: current?.revisionId || null,
+        localContentHash: TOMBSTONE_HASH,
+        remoteContentHash: current?.contentHash || null,
+        localOrigin: input.origin,
+        remoteOrigin: current?.origin,
+        localActor: input.actor,
+        remoteActor: current?.actor,
+      });
+      return {
+        ok: false,
+        status: "conflict",
+        conflict,
+        currentHead: current ? headOf(current) : null,
+      };
+    }
+
+    const revisionId = `rev_${++this.revisionSeq}`;
+    const cursor = String(++this.cursorSeq);
+    const updatedAt = new Date().toISOString();
+    const revision: RevisionContent = {
+      brainId: input.brainId,
+      filename: input.filename,
+      revisionId,
+      parentRevisionId: current.revisionId,
+      contentHash: TOMBSTONE_HASH,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+      cursor,
+      content: "",
+      deleted: true,
+    };
+    this.revisions.set(revisionId, revision);
+    this.heads.set(fileKey, revision);
+    this.changes.push({
+      cursor,
+      brainId: input.brainId,
+      filename: input.filename,
+      revisionId,
+      contentHash: TOMBSTONE_HASH,
       updatedAt,
       origin: input.origin,
       actor: input.actor,
