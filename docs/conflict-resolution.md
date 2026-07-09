@@ -124,6 +124,20 @@ npm run sync:reconcile:duplicate-brain-paths -- --brain-id ai-brain-jem --local-
 
 Add `--apply` only after the dry run shows the affected filenames are sync metadata drift, not reviewed Brain content. The repair marks matching open conflicts `superseded`, removes stale hosted heads and sync-state rows, and keeps revision history intact.
 
+## Deletions And Renames (Guarded)
+
+Deletion and rename are revision-store operations (spec 011). A delete appends a **tombstone** revision (the head keeps its history; the file leaves every human surface); a rename is an atomic create-new + tombstone-old that also rewrites inbound `[[wikilinks]]`. Recovery is first-class: `brain_restore_file` brings a tombstoned file back to its last content.
+
+The local sync agent never treats a missing file as a deletion on its own. Push-side inference passes three guards before any tombstone:
+
+1. **Folder health** — an empty scan, or a scan missing a structural marker (`00_loader.md`/`NOW.md`) that was previously tracked, is treated as an unmounted/damaged tree. Zero tombstones; `guardTripped` is reported in the sync summary and health file.
+2. **Debounce** — a file must be absent on two consecutive scans before deletion is applied. A transient half-synced scan tombstones nothing.
+3. **Mass-delete threshold** — a confirmed batch larger than `BRAIN_SYNC_MAX_DELETES` (default 5) or `BRAIN_SYNC_MAX_DELETE_PCT` (default 10%) is **skipped for operator review**, never auto-applied. The skipped files appear in the sync summary's `deletionsSkipped` with a `guardTripped` reason.
+
+Pull applies a hosted tombstone only as an explicit signal: it removes a **clean** local copy, records a **conflict** (never deletes) if the local copy has unsynced edits, and never unlinks a protected structural file. A locally-missing tracked file is **not** resurrected — local absence is owned by the guarded push path.
+
+**When a guard trips (mass-delete skipped):** this is expected on a large intentional cleanup. Confirm the deletions are real (not an unmount or a bad local root), then either delete the files through `brain_delete_file` (which bypasses inference — an explicit signal), or raise the limit for that run via `BRAIN_SYNC_MAX_DELETES` / `BRAIN_SYNC_MAX_DELETE_PCT`. Never work around a persistent guard trip by deleting hosted heads in Supabase.
+
 ## What Not To Do
 
 Do not:
