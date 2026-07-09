@@ -136,13 +136,13 @@ test("hosted MCP write pulls to clean local Markdown tree", async () => {
   assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote first\n");
 });
 
-test("pull restores a tracked hosted file that is missing locally", async () => {
+test("pull does not resurrect a tracked file that is missing locally (spec 011: absence is owned by guarded push, not pull-side inference)", async () => {
   const store = new MemoryRevisionStore();
   const { brainDir, stateFile } = dirs("restore-missing-tracked-local");
   await accept(
     await store.proposeRevision({
       brainId: "ai-brain-jem",
-      filename: "NOW.md",
+      filename: "topic.md",
       baseRevisionId: null,
       content: "Remote canonical\n",
       origin: "hosted_mcp",
@@ -150,13 +150,16 @@ test("pull restores a tracked hosted file that is missing locally", async () => 
   );
   const agent = makeAgent(store, { brainDir, stateFile });
   await agent.pullHostedChanges();
-  await fs.rm(path.join(brainDir, "NOW.md"));
+  await fs.rm(path.join(brainDir, "topic.md"));
 
   const report = await agent.pullHostedChanges();
 
-  assert.deepEqual(report.pulled, ["NOW.md"]);
-  assert.equal(report.conflicts.length, 0);
-  assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote canonical\n");
+  assert.deepEqual(report.pulled, [], "not resurrected");
+  assert.equal(report.conflicts.length, 0, "no conflict — push side decides");
+  await assert.rejects(
+    () => readBrainFile(brainDir, "topic.md"),
+    "file left absent for the guarded push path to handle"
+  );
 });
 
 test("hosted write does not overwrite dirty local Markdown", async () => {

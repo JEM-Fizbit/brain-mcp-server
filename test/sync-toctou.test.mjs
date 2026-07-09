@@ -89,43 +89,9 @@ test("pull records a conflict instead of overwriting a local edit that lands mid
   assert.deepEqual(leftovers, [], "no temp files left behind");
 });
 
-test("restore of a missing tracked file yields to a local write that lands mid-restore", async () => {
-  const store = new MemoryRevisionStore();
-  const root = path.join(tmpRoot, "mid-restore-write");
-  const brainDir = path.join(root, "brain");
-  const stateFile = path.join(root, ".brain-sync", "state.json");
-  const localPath = path.join(brainDir, "NOW.md");
-  await fs.mkdir(brainDir, { recursive: true });
-  await fs.writeFile(localPath, "v1\n", "utf-8");
-
-  const actor = { provider: "test", id: "agent" };
-  const pushAgent = new LocalSyncAgent({
-    brainId: "ai-brain-jem",
-    store,
-    actor,
-    brainDir,
-    stateFile,
-  });
-  await pushAgent.pushLocalChanges();
-
-  // File goes missing locally; the restore branch will fetch remote content.
-  await fs.rm(localPath);
-
-  const localEdit = "recreated locally during restore\n";
-  const pullAgent = new LocalSyncAgent({
-    brainId: "ai-brain-jem",
-    store: storeThatEditsLocallyDuringRead(store, localPath, localEdit),
-    actor,
-    brainDir,
-    stateFile,
-  });
-  const report = await pullAgent.pullHostedChanges();
-
-  assert.equal(
-    await fs.readFile(localPath, "utf-8"),
-    localEdit,
-    "a file recreated locally mid-restore must not be clobbered"
-  );
-  assert.equal(report.pulled.length, 0);
-  assert.equal(report.conflicts.length, 1);
-});
+// The former "restore of a missing tracked file yields to a local write that
+// lands mid-restore" test was removed with spec 011: pull no longer resurrects
+// a locally-missing file (that path was the resurrection branch review-1 flagged
+// as fighting guarded push-side deletion). The surviving safety property — a
+// locally-modified file that is tombstoned remotely is never clobbered — is
+// covered by test/sync-pull-tombstone.test.mjs.
