@@ -662,6 +662,17 @@ export class PostgresRevisionStore implements RevisionStore {
     });
   }
 
+  async readRevision(
+    brainId: string,
+    revisionId: string
+  ): Promise<RevisionContent | null> {
+    const result = await this.pool.query<RevisionRow>(
+      `select * from brain.brain_file_revisions where brain_id = $1 and id = $2`,
+      [brainId, revisionId]
+    );
+    return result.rows[0] ? revisionFromRow(result.rows[0]) : null;
+  }
+
   async listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {
     const result = await this.pool.query<RevisionRow>(
       `

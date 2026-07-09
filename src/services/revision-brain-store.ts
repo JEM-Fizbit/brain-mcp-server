@@ -5,14 +5,15 @@ import {
   MAX_SEARCH_RESULTS_CEILING,
   SEARCH_LINE_CHAR_LIMIT,
 } from "../constants.js";
-import type {
-  BrainStore,
-  CommitResult,
-  FileMetadata,
-  ReadScope,
-  SearchScope,
-  SyncStatus,
-  WriteMode,
+import {
+  assertNotProtected,
+  type BrainStore,
+  type CommitResult,
+  type FileMetadata,
+  type ReadScope,
+  type SearchScope,
+  type SyncStatus,
+  type WriteMode,
 } from "./brain-store.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
 import type {
@@ -295,6 +296,7 @@ export class RevisionBrainStore implements BrainStore {
     actor?: RevisionActor
   ): Promise<string> {
     validateFilename(filename);
+    assertNotProtected(filename, "delete");
     const current = await this.revisionStore.getHead(brainId, filename);
     if (!current || current.deleted === true) {
       throw new Error(`File not found: ${filename}`);
@@ -322,6 +324,7 @@ export class RevisionBrainStore implements BrainStore {
   ): Promise<string> {
     validateFilename(from);
     validateFilename(to);
+    assertNotProtected(from, "rename");
     const current = await this.revisionStore.getHead(brainId, from);
     if (!current || current.deleted === true) {
       throw new Error(`File not found: ${from}`);
@@ -340,6 +343,43 @@ export class RevisionBrainStore implements BrainStore {
       );
     }
     return `Renamed ${from} -> ${to}`;
+  }
+
+  async restoreFile(
+    brainId: string,
+    filename: string,
+    actor?: RevisionActor
+  ): Promise<string> {
+    validateFilename(filename);
+    const current = await this.revisionStore.getHead(brainId, filename);
+    if (!current || current.deleted !== true) {
+      throw new Error(`File is not deleted (nothing to restore): ${filename}`);
+    }
+    const tombstone = await this.revisionStore.readRevision(
+      brainId,
+      current.revisionId
+    );
+    const priorId = tombstone?.parentRevisionId;
+    if (!priorId) {
+      throw new Error(`No prior revision to restore for ${filename}`);
+    }
+    const prior = await this.revisionStore.readRevision(brainId, priorId);
+    if (!prior || prior.deleted === true) {
+      throw new Error(`No live prior content to restore for ${filename}`);
+    }
+    // Recreate over the tombstone (base=null is the accepted-recreate path).
+    const result = await this.revisionStore.proposeRevision({
+      brainId,
+      filename,
+      baseRevisionId: null,
+      content: prior.content,
+      origin: "hosted_mcp",
+      actor,
+    });
+    if (!result.ok) {
+      throw new Error(`Restore conflict for ${filename}: current head changed`);
+    }
+    return `Restored ${filename}: ${lineCount(prior.content)} lines`;
   }
 
   async appendLog(

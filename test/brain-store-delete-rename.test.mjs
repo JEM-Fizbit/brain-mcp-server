@@ -87,3 +87,32 @@ test("RevisionBrainStore.renameFile moves content and clears the old name", asyn
   assert.equal(files.find((f) => f.name === "new.md")?.name, "new.md");
   assert.equal(files.find((f) => f.name === "old.md"), undefined);
 });
+
+test("RevisionBrainStore.restoreFile brings back the last content after a delete", async () => {
+  const store = hostedStore();
+  await store.writeFile(B, "note.md", "v1\n", "replace");
+  await store.writeFile(B, "note.md", "v2 final\n", "replace");
+  await store.deleteFile(B, "note.md");
+  await store.restoreFile(B, "note.md");
+  assert.equal(await store.readFile(B, "note.md"), "v2 final\n");
+  const files = await store.listFiles(B);
+  assert.equal(files.find((f) => f.name === "note.md")?.name, "note.md");
+});
+
+test("restoreFile errors when the file is not deleted", async () => {
+  const store = hostedStore();
+  await store.writeFile(B, "live.md", "x\n", "replace");
+  await assert.rejects(() => store.restoreFile(B, "live.md"), /not deleted|nothing to restore/i);
+});
+
+test("deleteFile refuses the protected structural files", async () => {
+  const store = hostedStore();
+  await store.writeFile(B, "00_loader.md", "loader\n", "replace");
+  await assert.rejects(() => store.deleteFile(B, "00_loader.md"), /protected/i);
+});
+
+test("renameFile refuses to rename a protected file away", async () => {
+  const store = hostedStore();
+  await store.writeFile(B, "NOW.md", "now\n", "replace");
+  await assert.rejects(() => store.renameFile(B, "NOW.md", "renamed.md"), /protected/i);
+});

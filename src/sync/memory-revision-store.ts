@@ -424,6 +424,14 @@ export class MemoryRevisionStore implements RevisionStore {
     };
   }
 
+  async readRevision(
+    brainId: string,
+    revisionId: string
+  ): Promise<RevisionContent | null> {
+    const revision = this.revisions.get(revisionId);
+    return revision && revision.brainId === brainId ? revision : null;
+  }
+
   async listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {
     const since = sinceCursor ? Number(sinceCursor) : 0;
     const changes = this.changes.filter(

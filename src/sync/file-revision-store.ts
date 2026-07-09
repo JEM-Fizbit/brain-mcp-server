@@ -67,6 +67,13 @@ export class FileRevisionStore implements RevisionStore {
     return this.withStore(true, (store) => store.proposeRename(input));
   }
 
+  readRevision(
+    brainId: string,
+    revisionId: string
+  ): Promise<RevisionContent | null> {
+    return this.withStore(false, (store) => store.readRevision(brainId, revisionId));
+  }
+
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {
     return this.withStore(false, (store) => store.listChanges(brainId, sinceCursor));
   }

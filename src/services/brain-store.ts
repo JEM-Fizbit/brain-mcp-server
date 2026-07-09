@@ -1,4 +1,4 @@
-import type { SourceCategory, LogOpType } from "../constants.js";
+import { LOADER_FILE, NOW_FILE, type SourceCategory, type LogOpType } from "../constants.js";
 import type {
   ConflictRecord,
   ConflictResolutionResult,
@@ -35,6 +35,20 @@ export interface SyncStatus {
   latestCursor: string | null;
 }
 
+/**
+ * Structural files the server hard-depends on (brain_load_context throws without
+ * them). They may never be deleted or renamed away via the tools/stores.
+ */
+const PROTECTED_FILES = new Set<string>([LOADER_FILE, NOW_FILE]);
+
+export function assertNotProtected(filename: string, action: string): void {
+  if (PROTECTED_FILES.has(filename)) {
+    throw new Error(
+      `Cannot ${action} the protected structural file ${filename} — the server requires ${LOADER_FILE} and ${NOW_FILE}.`
+    );
+  }
+}
+
 export interface BrainStore {
   brainExists(brainId: string): Promise<boolean>;
   readFile(brainId: string, filename: string, scope?: ReadScope): Promise<string>;
@@ -63,6 +77,11 @@ export interface BrainStore {
     brainId: string,
     from: string,
     to: string,
+    actor?: RevisionActor
+  ): Promise<string>;
+  restoreFile(
+    brainId: string,
+    filename: string,
     actor?: RevisionActor
   ): Promise<string>;
   appendLog(
@@ -143,6 +162,7 @@ export class FilesystemBrainStore implements BrainStore {
     filename: string,
     _actor?: RevisionActor
   ): Promise<string> {
+    assertNotProtected(filename, "delete");
     return brain.deleteFile(filename, brainId);
   }
 
@@ -152,7 +172,14 @@ export class FilesystemBrainStore implements BrainStore {
     to: string,
     _actor?: RevisionActor
   ): Promise<string> {
+    assertNotProtected(from, "rename");
     return brain.renameFile(from, to, brainId);
+  }
+
+  async restoreFile(): Promise<string> {
+    throw new Error(
+      "Restore is only available on the hosted revision Brain store (the filesystem Brain keeps no deletion history)."
+    );
   }
 
   appendLog(

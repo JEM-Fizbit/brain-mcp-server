@@ -1,5 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { UpdateFileSchema, CommitSchema } from "../schemas/tools.js";
+import {
+  UpdateFileSchema,
+  CommitSchema,
+  DeleteFileSchema,
+  RenameFileSchema,
+  RestoreFileSchema,
+} from "../schemas/tools.js";
 import {
   autoSyncMessage,
   maybeAutoSync,
@@ -46,6 +52,88 @@ export function registerUpdateTools(server: McpServer): void {
           content: [{ type: "text", text: String(error) }],
           isError: true,
         };
+      }
+    }
+  );
+
+  server.tool(
+    "brain_delete_file",
+    "Delete a Brain file. Soft-delete — recoverable via brain_restore_file. Refuses the structural files 00_loader.md and NOW.md. Inbound [[wikilinks]] to the file will dangle after deletion.",
+    DeleteFileSchema.shape,
+    async ({ brain_id, filename }, extra) => {
+      try {
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
+        const result = await activeBrainStore().deleteFile(
+          ctx.brainId,
+          filename,
+          revisionActor(ctx)
+        );
+        const sync = revisionStoreModeEnabled()
+          ? ""
+          : await maybeAutoSync(
+              ctx.brainId,
+              autoSyncMessage("DELETE", filename),
+              authorIdentity(ctx)
+            );
+        return { content: [{ type: "text", text: result + sync }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: String(error) }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    "brain_rename_file",
+    "Rename/move a Brain file (atomic: creates the new path, tombstones the old). Refuses to rename 00_loader.md or NOW.md, or to overwrite a live target. Inbound [[wikilinks]] are updated where unambiguous.",
+    RenameFileSchema.shape,
+    async ({ brain_id, from, to }, extra) => {
+      try {
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
+        const result = await activeBrainStore().renameFile(
+          ctx.brainId,
+          from,
+          to,
+          revisionActor(ctx)
+        );
+        const sync = revisionStoreModeEnabled()
+          ? ""
+          : await maybeAutoSync(
+              ctx.brainId,
+              autoSyncMessage("UPDATE", `${from} -> ${to}`),
+              authorIdentity(ctx)
+            );
+        return { content: [{ type: "text", text: result + sync }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: String(error) }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    "brain_restore_file",
+    "Restore a previously-deleted Brain file to its last content (hosted Brain only).",
+    RestoreFileSchema.shape,
+    async ({ brain_id, filename }, extra) => {
+      try {
+        const ctx = await resolveToolBrain(brain_id, extra);
+        assertWriteRole(ctx);
+        const result = await activeBrainStore().restoreFile(
+          ctx.brainId,
+          filename,
+          revisionActor(ctx)
+        );
+        const sync = revisionStoreModeEnabled()
+          ? ""
+          : await maybeAutoSync(
+              ctx.brainId,
+              autoSyncMessage("UPDATE", filename),
+              authorIdentity(ctx)
+            );
+        return { content: [{ type: "text", text: result + sync }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: String(error) }], isError: true };
       }
     }
   );
