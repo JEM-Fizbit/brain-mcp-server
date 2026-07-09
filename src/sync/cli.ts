@@ -5,7 +5,8 @@ import { BRAIN_DIR } from "../constants.js";
 import { FileRevisionStore } from "./file-revision-store.js";
 import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
-import type { LocalSyncReport, RevisionStore } from "./types.js";
+import { summarizeReport } from "./report-summary.js";
+import type { RevisionStore } from "./types.js";
 
 type SyncCommand = "push" | "pull" | "once" | "status" | "summary" | "watch";
 type RevisionStoreProvider = "file" | "postgres";
@@ -161,20 +162,6 @@ function outputConfig(config: SyncCliConfig): Omit<SyncCliConfig, "databaseUrl">
   return {
     ...config,
     databaseUrl: config.databaseUrl ? "set" : "missing",
-  };
-}
-
-function summarizeReport(report: LocalSyncReport) {
-  const totalTiming = report.timings.find(
-    (timing) => timing.operation === "sync" && timing.phase === "total"
-  );
-  return {
-    pushed: report.pushed.length,
-    pulled: report.pulled.length,
-    unchanged: report.unchanged.length,
-    conflicts: report.conflicts.length,
-    conflictFiles: report.conflicts.map((conflict) => conflict.filename),
-    totalMs: totalTiming?.ms ?? null,
   };
 }
 
