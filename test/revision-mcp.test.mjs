@@ -523,3 +523,86 @@ test("HTTP MCP and local sync agent complete hosted-local-hosted loop", async ()
   });
   assert.equal(readBack, "Local-to-hosted through sync\n");
 });
+
+test("HTTP MCP delete → read-fails → restore round-trips through the revision store", async () => {
+  const harness = await setupHarness("delete-restore");
+  await callTool(harness, "brain_update_file", {
+    filename: "doomed.md",
+    mode: "replace",
+    content: "important body\n",
+  });
+  await callTool(harness, "brain_update_file", {
+    filename: "linker.md",
+    mode: "replace",
+    content: "see [[doomed]] for details\n",
+  });
+
+  const del = await callTool(harness, "brain_delete_file", {
+    filename: "doomed.md",
+  });
+  assert.match(del, /doomed\.md/);
+  assert.match(del, /link/i, "dangling-link warning surfaced");
+  assert.match(del, /linker\.md/, "names the linking file");
+
+  const readDeleted = await callTool(harness, "brain_read_file", {
+    filename: "doomed.md",
+  });
+  assert.match(readDeleted, /deleted/i, "a deleted file reads as deleted");
+
+  const restore = await callTool(harness, "brain_restore_file", {
+    filename: "doomed.md",
+  });
+  assert.match(restore, /doomed\.md/);
+
+  const readBack = await callTool(harness, "brain_read_file", {
+    filename: "doomed.md",
+  });
+  assert.equal(readBack, "important body\n", "restored to last content");
+});
+
+test("HTTP MCP rename moves the file and rewrites inbound [[wikilinks]]", async () => {
+  const harness = await setupHarness("rename-links");
+  await callTool(harness, "brain_update_file", {
+    filename: "old.md",
+    mode: "replace",
+    content: "# old body\n",
+  });
+  await callTool(harness, "brain_update_file", {
+    filename: "ref.md",
+    mode: "replace",
+    content: "context: [[old]] and [[old|Alias]]\n",
+  });
+
+  const rename = await callTool(harness, "brain_rename_file", {
+    from: "old.md",
+    to: "new.md",
+  });
+  assert.match(rename, /inbound link/i, "reports the link rewrite");
+
+  const readOld = await callTool(harness, "brain_read_file", {
+    filename: "old.md",
+  });
+  assert.match(readOld, /deleted/i, "old path reads as deleted after rename");
+  assert.equal(
+    await callTool(harness, "brain_read_file", { filename: "new.md" }),
+    "# old body\n"
+  );
+  assert.equal(
+    await callTool(harness, "brain_read_file", { filename: "ref.md" }),
+    "context: [[new]] and [[new|Alias]]\n"
+  );
+});
+
+test("HTTP MCP refuses to delete or rename a protected structural file", async () => {
+  const harness = await setupHarness("protected-refusal");
+  const del = await callTool(harness, "brain_delete_file", {
+    filename: "NOW.md",
+  });
+  assert.match(del, /protected structural file NOW\.md/);
+
+  const rename = await callTool(harness, "brain_rename_file", {
+    from: "00_loader.md",
+    to: "loader-renamed.md",
+  });
+  assert.match(rename, /protected structural file 00_loader\.md/);
+});
