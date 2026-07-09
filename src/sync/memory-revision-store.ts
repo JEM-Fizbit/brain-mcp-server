@@ -14,6 +14,7 @@ import type {
   RevisionDeletionProposal,
   RevisionProposal,
   RevisionProposalResult,
+  RevisionRenameProposal,
   RevisionStore,
   SearchOptions,
   SearchResult,
@@ -43,6 +44,8 @@ function headOf(revision: RevisionContent): FileHead {
     actor: revision.actor,
     cursor: revision.cursor,
     deleted,
+    renamedFrom: revision.renamedFrom,
+    renamedTo: revision.renamedTo,
   };
 }
 
@@ -303,6 +306,121 @@ export class MemoryRevisionStore implements RevisionStore {
       status: "accepted",
       head: headOf(revision),
       revision,
+    };
+  }
+
+  async proposeRename(
+    input: RevisionRenameProposal
+  ): Promise<RevisionProposalResult> {
+    const fromKey = key(input.brainId, input.from);
+    const toKey = key(input.brainId, input.to);
+    const fromHead = this.heads.get(fromKey) || null;
+    const toHead = this.heads.get(toKey) || null;
+
+    // Source must be live and the base must match (CAS).
+    if (
+      !fromHead ||
+      fromHead.deleted === true ||
+      input.baseRevisionId !== fromHead.revisionId
+    ) {
+      const conflict = await this.recordConflict({
+        brainId: input.brainId,
+        filename: input.from,
+        localBaseRevisionId: input.baseRevisionId,
+        remoteHeadRevisionId: fromHead?.revisionId || null,
+        localContentHash: TOMBSTONE_HASH,
+        remoteContentHash: fromHead?.contentHash || null,
+        localOrigin: input.origin,
+        remoteOrigin: fromHead?.origin,
+        localActor: input.actor,
+        remoteActor: fromHead?.actor,
+      });
+      return {
+        ok: false,
+        status: "conflict",
+        conflict,
+        currentHead: fromHead ? headOf(fromHead) : null,
+      };
+    }
+
+    // Target must not be a live file (a tombstoned target is fine — recreate).
+    if (toHead && toHead.deleted !== true) {
+      const conflict = await this.recordConflict({
+        brainId: input.brainId,
+        filename: input.to,
+        localBaseRevisionId: null,
+        remoteHeadRevisionId: toHead.revisionId,
+        localContentHash: fromHead.contentHash,
+        remoteContentHash: toHead.contentHash,
+        localOrigin: input.origin,
+        remoteOrigin: toHead.origin,
+        localActor: input.actor,
+        remoteActor: toHead.actor,
+      });
+      return {
+        ok: false,
+        status: "conflict",
+        conflict,
+        currentHead: headOf(toHead),
+      };
+    }
+
+    // Atomic in memory: no awaits between the two head mutations.
+    const updatedAt = new Date().toISOString();
+    const toRevisionId = `rev_${++this.revisionSeq}`;
+    const toCursor = String(++this.cursorSeq);
+    const toRevision: RevisionContent = {
+      brainId: input.brainId,
+      filename: input.to,
+      revisionId: toRevisionId,
+      parentRevisionId: toHead?.revisionId || null,
+      contentHash: fromHead.contentHash,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+      cursor: toCursor,
+      content: fromHead.content,
+      renamedFrom: input.from,
+    };
+    const fromRevisionId = `rev_${++this.revisionSeq}`;
+    const fromCursor = String(++this.cursorSeq);
+    const fromTombstone: RevisionContent = {
+      brainId: input.brainId,
+      filename: input.from,
+      revisionId: fromRevisionId,
+      parentRevisionId: fromHead.revisionId,
+      contentHash: TOMBSTONE_HASH,
+      updatedAt,
+      origin: input.origin,
+      actor: input.actor,
+      cursor: fromCursor,
+      content: "",
+      deleted: true,
+      renamedTo: input.to,
+    };
+
+    this.revisions.set(toRevisionId, toRevision);
+    this.heads.set(toKey, toRevision);
+    this.revisions.set(fromRevisionId, fromTombstone);
+    this.heads.set(fromKey, fromTombstone);
+    for (const rev of [toRevision, fromTombstone]) {
+      this.changes.push({
+        cursor: rev.cursor,
+        brainId: rev.brainId,
+        filename: rev.filename,
+        revisionId: rev.revisionId,
+        contentHash: rev.contentHash,
+        updatedAt: rev.updatedAt,
+        origin: rev.origin,
+        actor: rev.actor,
+      });
+    }
+
+    return {
+      ok: true,
+      status: "accepted",
+      head: headOf(toRevision),
+      revision: toRevision,
     };
   }
 

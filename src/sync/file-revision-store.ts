@@ -16,6 +16,7 @@ import type {
   RevisionDeletionProposal,
   RevisionProposal,
   RevisionProposalResult,
+  RevisionRenameProposal,
   RevisionStore,
   SearchOptions,
   SearchResult,
@@ -60,6 +61,10 @@ export class FileRevisionStore implements RevisionStore {
     input: RevisionDeletionProposal
   ): Promise<RevisionProposalResult> {
     return this.withStore(true, (store) => store.proposeDeletion(input));
+  }
+
+  proposeRename(input: RevisionRenameProposal): Promise<RevisionProposalResult> {
+    return this.withStore(true, (store) => store.proposeRename(input));
   }
 
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage> {

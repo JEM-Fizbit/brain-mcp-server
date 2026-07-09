@@ -20,6 +20,10 @@ export interface FileHead {
   cursor: string;
   /** True when the head is a tombstone (spec 011). Absent/false = live file. */
   deleted?: boolean;
+  /** On the new head after a rename: the path this file was renamed FROM. */
+  renamedFrom?: string;
+  /** On the old-path tombstone after a rename: the path it was renamed TO. */
+  renamedTo?: string;
 }
 
 /** Thrown by readFile when the file's head is a tombstone (deleted). */
@@ -43,6 +47,19 @@ export interface RevisionDeletionProposal {
 export interface ListFilesOptions {
   /** Include tombstoned (deleted) heads. Default false. */
   includeDeleted?: boolean;
+}
+
+/**
+ * Input to atomically rename a file (spec 011): one operation creates `to`
+ * (content of `from`) and tombstones `from`. baseRevisionId is the source head.
+ */
+export interface RevisionRenameProposal {
+  brainId: string;
+  from: string;
+  to: string;
+  baseRevisionId: string | null;
+  origin: RevisionOrigin;
+  actor?: RevisionActor;
 }
 
 export interface RevisionContent extends FileHead {
@@ -145,6 +162,7 @@ export interface RevisionStore {
   ): Promise<SearchResult[]>;
   proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult>;
   proposeDeletion(input: RevisionDeletionProposal): Promise<RevisionProposalResult>;
+  proposeRename(input: RevisionRenameProposal): Promise<RevisionProposalResult>;
   listChanges(brainId: string, sinceCursor?: string): Promise<ChangePage>;
   recordConflict(input: ConflictInput): Promise<ConflictRecord>;
   listConflicts(
