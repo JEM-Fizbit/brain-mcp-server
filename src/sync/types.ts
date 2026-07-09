@@ -185,6 +185,13 @@ export interface LocalSyncState {
   clientId: string;
   cursor: string | null;
   files: Record<string, LocalFileSyncState>;
+  /**
+   * Files that were tracked but absent on the previous scan (spec 011 guarded
+   * sync). A local deletion is only inferred after a file is absent on two
+   * consecutive scans (debounce), so a transient half-synced scan cannot
+   * tombstone anything.
+   */
+  pendingDeletions?: string[];
 }
 
 export type SyncOperation = "push" | "pull" | "sync";
@@ -211,4 +218,10 @@ export interface LocalSyncReport {
   unchanged: string[];
   conflicts: ConflictRecord[];
   timings: SyncTiming[];
+  /** Files tombstoned this cycle from inferred local deletions (spec 011). */
+  deleted: string[];
+  /** Deletion candidates held back by a guard (debounce/health/mass-delete). */
+  deletionsSkipped: string[];
+  /** Human-readable reason a delete-inference guard fired this cycle, if any. */
+  guardTripped?: string;
 }
