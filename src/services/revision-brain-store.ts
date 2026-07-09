@@ -289,6 +289,59 @@ export class RevisionBrainStore implements BrainStore {
     return `Updated ${filename}: ${lineCount(nextContent)} lines, ${byteCount(nextContent)} bytes`;
   }
 
+  async deleteFile(
+    brainId: string,
+    filename: string,
+    actor?: RevisionActor
+  ): Promise<string> {
+    validateFilename(filename);
+    const current = await this.revisionStore.getHead(brainId, filename);
+    if (!current || current.deleted === true) {
+      throw new Error(`File not found: ${filename}`);
+    }
+    const result = await this.revisionStore.proposeDeletion({
+      brainId,
+      filename,
+      baseRevisionId: current.revisionId,
+      origin: "hosted_mcp",
+      actor,
+    });
+    if (!result.ok) {
+      throw new Error(
+        `Delete conflict for ${filename}: current head is ${result.currentHead?.revisionId || "none"} (edited concurrently)`
+      );
+    }
+    return `Deleted ${filename}`;
+  }
+
+  async renameFile(
+    brainId: string,
+    from: string,
+    to: string,
+    actor?: RevisionActor
+  ): Promise<string> {
+    validateFilename(from);
+    validateFilename(to);
+    const current = await this.revisionStore.getHead(brainId, from);
+    if (!current || current.deleted === true) {
+      throw new Error(`File not found: ${from}`);
+    }
+    const result = await this.revisionStore.proposeRename({
+      brainId,
+      from,
+      to,
+      baseRevisionId: current.revisionId,
+      origin: "hosted_mcp",
+      actor,
+    });
+    if (!result.ok) {
+      throw new Error(
+        `Rename conflict: ${from} -> ${to} — the target may already exist or ${from} changed concurrently`
+      );
+    }
+    return `Renamed ${from} -> ${to}`;
+  }
+
   async appendLog(
     brainId: string,
     opType: LogOpType,

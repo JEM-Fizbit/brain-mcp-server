@@ -246,6 +246,50 @@ export async function updateFile(
   return `Updated ${filename}: ${lines} lines, ${stat.size} bytes`;
 }
 
+export async function deleteFile(
+  filename: string,
+  brainId?: string
+): Promise<string> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const filePath = resolveFilePath(brainDir, filename);
+  try {
+    await fs.unlink(filePath);
+  } catch (error: any) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`File not found: ${filename}`);
+    }
+    throw error;
+  }
+  return `Deleted ${filename}`;
+}
+
+export async function renameFile(
+  from: string,
+  to: string,
+  brainId?: string
+): Promise<string> {
+  const { brainDir } = await getBrainPaths(brainId);
+  const fromPath = resolveFilePath(brainDir, from);
+  const toPath = resolveFilePath(brainDir, to);
+  const targetExists = await fs.access(toPath).then(
+    () => true,
+    () => false
+  );
+  if (targetExists) {
+    throw new Error(`Target already exists: ${to}`);
+  }
+  await fs.mkdir(path.dirname(toPath), { recursive: true });
+  try {
+    await fs.rename(fromPath, toPath);
+  } catch (error: any) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`File not found: ${from}`);
+    }
+    throw error;
+  }
+  return `Renamed ${from} -> ${to}`;
+}
+
 export async function listFileNames(brainId?: string): Promise<string[]> {
   const { brainDir } = await getBrainPaths(brainId);
   const entries = await fs.readdir(brainDir, { withFileTypes: true });

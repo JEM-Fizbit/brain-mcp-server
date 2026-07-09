@@ -54,6 +54,17 @@ export interface BrainStore {
     oldContent?: string,
     actor?: RevisionActor
   ): Promise<string>;
+  deleteFile(
+    brainId: string,
+    filename: string,
+    actor?: RevisionActor
+  ): Promise<string>;
+  renameFile(
+    brainId: string,
+    from: string,
+    to: string,
+    actor?: RevisionActor
+  ): Promise<string>;
   appendLog(
     brainId: string,
     opType: LogOpType,
@@ -125,6 +136,23 @@ export class FilesystemBrainStore implements BrainStore {
     _actor?: RevisionActor
   ): Promise<string> {
     return brain.updateFile(filename, content, mode, oldContent, brainId);
+  }
+
+  deleteFile(
+    brainId: string,
+    filename: string,
+    _actor?: RevisionActor
+  ): Promise<string> {
+    return brain.deleteFile(filename, brainId);
+  }
+
+  renameFile(
+    brainId: string,
+    from: string,
+    to: string,
+    _actor?: RevisionActor
+  ): Promise<string> {
+    return brain.renameFile(from, to, brainId);
   }
 
   appendLog(
