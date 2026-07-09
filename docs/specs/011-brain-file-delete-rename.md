@@ -69,7 +69,7 @@ Deleted file: gone from vault + graph; no artifact. Dangling inbound links after
 
 ## A11 + reconcile-script demotion
 
-First real delete = `brain_delete_file` on the `ip_landscape.md` redirect stub (A11). `reconcile-duplicate-brain-paths-postgres.mjs` → break-glass only. The 2026-06-27 residue cleanup uses the new tool.
+First real delete = `brain_delete_file` on the `ip_landscape.md` redirect stub (A11). `reconcile-duplicate-brain-paths-postgres.mjs` → break-glass only. The 2026-06-27 residue cleanup uses the new tool. If a **bulk** restore is ever needed, shape it like Dropbox Rewind (R2 steal list): point-in-time, whole-brain, reconstructed from revision history — a break-glass script, not a tool.
 
 ## Testing (default `npm test` on memory/file backends; postgres suite env-gated)
 
