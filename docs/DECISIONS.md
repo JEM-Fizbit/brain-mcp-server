@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-10 — Brain file delete/rename via tombstone revisions + guarded delete-aware sync
+
+**Decision:** Deletion and rename are first-class revision-store operations, not filesystem side effects. A delete appends a **tombstone revision** (`deleted=true`, `content`/`content_sha256` null) that the head points at; a rename is an **atomic** create-new + tombstone-old in one store transaction, carrying `renamedFrom`/`renamedTo` metadata and rewriting inbound `[[wikilinks]]`. Delete ships with `brain_restore_file`. The local sync agent infers a local deletion only behind **three defence-in-depth guards** — folder health (a scan that is empty or missing a structural marker `00_loader.md`/`NOW.md` is treated as unmounted/damaged, never as deletions), a two-scan **debounce**, and a **mass-delete threshold** (`BRAIN_SYNC_MAX_DELETES`, default 5; `BRAIN_SYNC_MAX_DELETE_PCT`, default 10%) — and pull applies hosted tombstones as explicit signals (unlink only a clean local copy, conflict on unsynced edits, never touch a protected file). The old pull-side "resurrect a locally-missing tracked file" branch is removed.
+
+**Why:** The hosted revision store had no delete/rename concept, so local deletions resurrected within ~5s and renames left duplicate stale heads — recurred ≥3× (2026-06-27; the 2026-07-07 `ip_landscape.md` move = registry action A11). Two adversarial reviews (correctness + prior-art) found that a naive "missing file = delete" would tombstone the **whole Brain** on an empty/unmounted OneDrive scan; the guard set is lifted from Syncthing `.stfolder`, Unison `confirmbigdel`, and rsync `--max-delete`. Tombstone-as-revision preserves the append-only/CAS/attribution model (textbook CouchDB `_deleted`). Absence is now owned solely by the guarded push path, which is why pull-side resurrection had to go — it re-created exactly the file push was trying to tombstone.
+
+**Alternatives rejected:** Explicit-signal-only deletion (no inference) — rejected by review 2 because the real incidents were on-disk file removals, not MCP calls, so an explicit-only path would not have caught them. Hard-delete/purge of history — rejected; recoverability requires the tombstone chain. Two-transaction rename — rejected (R1 #4: a mid-rename conflict reproduces the duplicate-head bug).
+
+**Related:** `docs/specs/011-brain-file-delete-rename.md` (+ `reviews/011-review1-correctness.md`, `reviews/011-review2-prior-art.md`); `db/migrations/2026-07-08_001_brain_file_tombstones.sql`; `src/sync/{types,local-sync-agent,report-summary,postgres-,memory-,file-revision-store}.ts`; `src/services/{wikilinks,link-maintenance,brain,brain-store,revision-brain-store}.ts`; `src/tools/update.ts`; `docs/conflict-resolution.md`.
+
+---
+
 ## 2026-07-06 — Brain Platform Review: six checkpoint decisions locked (topology, migration, schemas, linking, build-vs-adopt, MD-vs-HTML)
 
 **Decision:** The 2026-07 Brain Platform Review (evidence base: `~/Projects/claude-ops/plans/brain-platform-review-2026-07/` — 86 verified findings, 4 workstream reports, landscape whitepaper v2) closed with John approving all six recommendations on 2026-07-06:

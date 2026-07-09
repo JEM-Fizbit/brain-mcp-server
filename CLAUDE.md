@@ -176,7 +176,7 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (22 total — 21 distinct + 1 alias)
+### Tools (25 total — 24 distinct + 1 alias)
 
 Registered in `src/tools/index.ts` across the registry, semantic, sync, context, update, status, log, tasks, lint, ingest, and inbox modules.
 
@@ -197,6 +197,9 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 - `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
 - `brain_read_file` — Read a specific Brain file by name. Accepts `scope`: "brain" (default) or "sources" to read from the source archive instead.
 - `brain_update_file` — Write changes to a Brain file (replace, append, or patch with find-and-replace)
+- `brain_delete_file` — Soft-delete a Brain file (tombstone revision; recoverable). Refuses `00_loader.md`/`NOW.md`; warns about inbound `[[wikilinks]]` that will dangle (spec 011)
+- `brain_rename_file` — Atomically rename/move a Brain file (create-new + tombstone-old) and rewrite unambiguous inbound `[[wikilinks]]`. Refuses protected files and live-target overwrite (spec 011)
+- `brain_restore_file` — Restore a previously-deleted Brain file to its last content, hosted only (spec 011)
 - `brain_commit` — Git commit (optionally push)
 - `brain_list_files` — List all Brain vault files with staleness metadata
 - `brain_list_sources` — List files in the source archive, optionally filtered by category
@@ -221,6 +224,8 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 | `BRAIN_DIR` | Path to Brain markdown files directory | `~/Projects/ai-brain-jem/brain` |
 | `BRAIN_GITHUB_REPO` | GitHub repo for issue checks (owner/name) | `JEM-Fizbit/ai-brain-jem` |
 | `BRAIN_SOURCES_DIR` | Path to the `sources/` archive (sibling of `brain/`) | `~/Projects/ai-brain-jem/sources` |
+| `BRAIN_SYNC_MAX_DELETES` | Guarded sync (spec 011): max confirmed local deletions auto-applied per cycle; a larger batch is skipped for operator review | `5` |
+| `BRAIN_SYNC_MAX_DELETE_PCT` | Guarded sync (spec 011): max % of tracked files auto-deleted per cycle before the mass-delete guard trips | `10` |
 
 ---
 
