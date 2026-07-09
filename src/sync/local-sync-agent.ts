@@ -383,7 +383,9 @@ export class LocalSyncAgent {
     const heads = await timed(report, "pull", "revision_store_list", async () =>
       filterIncludedHeads(
         this.options,
-        await this.options.store.listFiles(this.options.brainId)
+        await this.options.store.listFiles(this.options.brainId, {
+          includeDeleted: true,
+        })
       )
     );
     let maxCursor = state.cursor ? Number(state.cursor) : 0;
@@ -396,34 +398,42 @@ export class LocalSyncAgent {
         readFileHash(fullPath)
       );
 
-      if (tracked?.revisionId === head.revisionId) {
+      // A hosted tombstone is an explicit deletion signal (not inference):
+      // apply it by removing a clean local copy, refuse if the copy has
+      // unsynced edits, and never touch a protected structural file.
+      if (head.deleted) {
+        maxCursor = Math.max(maxCursor, Number(head.cursor));
+        if (HEALTH_MARKER_FILES.includes(filename)) {
+          continue; // never unlink 00_loader.md / NOW.md from a remote tombstone
+        }
         if (localHash === null) {
-          const remote = await timed(report, "pull", "revision_store_read", () =>
-            this.options.store.readFile(this.options.brainId, filename)
-          );
-          const guarded = await timed(report, "pull", "local_write", () =>
-            writeLocalFileGuarded(fullPath, remote.content, null)
-          );
-          if (!guarded.ok) {
-            const conflict = await this.recordPullConflict(
-              filename,
-              tracked?.revisionId ?? null,
-              head.revisionId,
-              guarded.currentHash,
-              head.contentHash
-            );
-            report.conflicts.push(conflict);
-            continue;
-          }
-          state.files[filename] = {
-            revisionId: head.revisionId,
-            contentHash: head.contentHash,
-            localHash: head.contentHash,
-          };
-          report.pulled.push(filename);
-          maxCursor = Math.max(maxCursor, Number(head.cursor));
+          delete state.files[filename]; // already gone locally — reconcile only
           continue;
         }
+        const clean = tracked ? localHash === tracked.localHash : false;
+        if (!clean) {
+          const conflict = await this.recordPullConflict(
+            filename,
+            tracked?.revisionId ?? null,
+            head.revisionId,
+            localHash,
+            head.contentHash
+          );
+          report.conflicts.push(conflict);
+          continue;
+        }
+        await timed(report, "pull", "local_write", () =>
+          fs.rm(fullPath, { force: true })
+        );
+        delete state.files[filename];
+        report.deleted.push(filename);
+        continue;
+      }
+
+      if (tracked?.revisionId === head.revisionId) {
+        // A tracked file missing locally is NOT resurrected: local absence is
+        // owned by the guarded push-side deletion path (spec 011). Leave it
+        // absent and let push decide whether it is a real deletion.
         report.unchanged.push(filename);
         maxCursor = Math.max(maxCursor, Number(head.cursor));
         continue;
