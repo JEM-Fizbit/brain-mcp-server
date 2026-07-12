@@ -174,31 +174,33 @@ On ship (same change window as §6):
 2. **ERS governance sign-off package** — now tracked transparently in a dedicated register: **`governance/brain-mcp-fork-signoff.md` in the ERS Brain** (created 2026-07-12; sign-off = John + ELT). Contents (who signs, and when): named ERS account owners + billing cards for Fly org / Supabase org / GitHub OAuth app; no-read-audit posture (A2-10); vendor DPA review (Fly + Supabase — never reviewed); content governance (recommend reader-majority, writers = John + 1–2 curators until concurrency hardening); data-residency/region confirmation; PITR; licence-acknowledgment signatory; purge sign-off (§6 is irreversible).
 3. **Where the "real ERS colleague on ers-brain" test runs — your lean: on the fork.** The audit strongly corroborates: the prior review's success criteria place first-colleague onboarding on the ERS stack in M4 after P1 hardening, and the infra audit states the pilot posture "must end before a single colleague is onboarded." Corollary sub-decisions: which colleague, and confirmation that M4's gates (cross-tenant test, registry validation, onboarding runbook) hold even for a single friendly tester.
 
-**Gate-0 technical decisions (blocking specific steps):**
+**Gate-0 technical decisions — ALL RESOLVED (John, 2026-07-12, one-by-one walkthrough):**
 
-| # | Decision | Blocks | Recommendation available? |
+| # | Decision | Blocks | Resolution (John, 2026-07-12) |
 |---|---|---|---|
-| 4 | John's ERS registry identity: `jemilad-ers` (id **259372947**, fetched 2026-07-12) vs `JEM-Fizbit` (220941196), and role (owner vs admin). Docs currently contradict each other | §3.6 | Lean `jemilad-ers` for exit hygiene — and the switch is free: the re-seed restarts attribution history, so there is no continuity to preserve. Verify OAuth-app third-party policy first |
-| 5 | Hostname: `ers-brain-mcp.fly.dev` vs custom domain (e.g. under `ersgenomics.online`, consistent with the other ERS MCPs) — **one-way door** | §3.3, §5 | Either works; decide once, before OAuth app creation |
-| 6 | Fly org shape: new org under John's Fly account vs separate ERS-email Fly account; and ERS accepting Fly as a second hosting provider beside Cloudflare (this server is not Workers-portable without rework) | §3.1 | — |
-| 7 | PITR: defer (baseline ~$31/mo) vs enable 7-day (+$100/mo) | §3.2 | **Defer** — SharePoint mirror + revision history + guarded sync already give near-zero content RPO; PITR doesn't cover Storage anyway; reversible toggle |
-| 8 | `GITHUB_ALLOWED_*` hard-disable in code (boot-refuse in HTTP mode) vs env-absence + test assertion only | §1 | Recommend hard-gate — a future `fly secrets set` must not be able to reopen owner-grant on the company brain |
-| 9 | Registry authority: image-baked JSON (onboarding = redeploy) vs volume/secret-mounted (mutable) — onboarding cadence for 5–20 users decides | §2, §3.6 | Start image-baked (reproducible, matches today); revisit at M4 |
-| 10 | Deploy pipeline: operator-local `fly deploy` (who besides John gets deploy rights?) vs tag-triggered CI in the mirror | §2.3 | Operator-local for v1; CI test-only on tag push is a cheap later upgrade |
-| 11 | Slack alerting day one: rotated jembot + ERS channel/DM vs launch with alerting off | §3.8 | Recommend on at/immediately after cutover — spec 004's origin story is exactly this scenario |
-| 12 | Day-2 ingest bus factor: second named ERS operator vs accepted single-operator with documented risk (a CI/Graph pipeline is a later build) | §7.5 | — |
-| 13 | Tag anchor: `v1.2.0` at the version-bump commit vs current HEAD; backfill older tags? | §1.6 | Anchor at HEAD (docs-only drift since the bump); backfill optional |
-| 14 | Scheduled-doctor credential placement: pooler URL as a GitHub Actions org secret vs Fly cron machine keeping creds inside Fly | §7.2 | Lean Fly cron (creds stay in one provider) |
-| 15 | Personal-stack alerting replacement after the jembot token is removed (none + local doctor vs personal-workspace bot) | §6(b) | John's call; none is safe |
-| 16 | Timezone (`BRAIN_DATE_TIME_ZONE`) and region pair (lhr/eu-west-2 vs Dublin) for the ERS stack | §3 | Keep lhr/eu-west-2 (proven latency profile) unless residency review says otherwise |
+| 4 | John's ERS registry identity + role | §3.6 | **`jemilad-ers` (259372947), owner.** Switch is free — the re-seed restarts attribution history. Pre-flight: verify the ERS-Genomics third-party OAuth-app policy |
+| 5 | Hostname — **one-way door** | §3.3, §5 | **Custom ERS domain**; working name `brain.ersgenomics.online` (matches the `slack.`/`m365-graph.` estate); exact label confirmed at CNAME creation, before the OAuth app exists. Side effect: the Fly app name becomes internal-only |
+| 6 | Fly org shape + provider acceptance | §3.1 | **Separate ERS Fly account** under `john.milad@ersgenomics.com` (ERS card; second admin added when named); same shape for the ERS Supabase org. ELT still to bless Fly as a second provider (register item 3) |
+| 7 | PITR | §3.2 | **Defer** (baseline ~$31/mo). Revisit trigger: colleagues writing hosted-first without local mirrors |
+| 8 | `GITHUB_ALLOWED_*` enforcement | §1 | **Hard gate in code**: refuse to boot in HTTP mode when set unless an explicit opt-in flag is present (personal deploy sets the flag); plus the fly.toml absence test |
+| 9 | Registry authority | §2, §3.6 | **Image-baked JSON for v1** (access changes = auditable commit + redeploy); revisit at team rollout — the dormant Postgres principals tables are the upgrade path |
+| 10 | Deploy pipeline | §2.3 | **Operator-local + guarded deploy script**; tag-triggered test-only CI is a cheap later add; deploy rights beyond John = second-admin item |
+| 11 | Slack alerting day one | §3.8 | **On at cutover**: rotated jembot token + explicit channel/DM (deploy tokenless first, add once `/health` is green). Follow-on in BACKLOG: migrate to an ERS-owned Slack app |
+| 12 | Day-2 ingest bus factor | §7.5 | **Accept single-operator at launch** (documented in runbook + register); **fast follower**: automated Graph-API ingestion — candidate: build on the ms-graph-mcp Entra app (new consent tranche for SharePoint/Files read) + Fly cron runner. BACKLOG item captured |
+| 13 | Tag anchor | §1.6 | **`v1.2.0` at HEAD** when the §1 work starts; backfill optional |
+| 14 | Scheduled-doctor credential placement | §7.2 | **Fly cron machine in the ERS org** — credentials never leave the provider that already holds them |
+| 15 | Personal-stack alerting replacement | §6(b) | **None** — local doctor/menu-bar only; zero Slack dependencies on the personal stack. Reversible any time |
+| 16 | Region pair + timezone | §3 | **lhr + eu-west-2, `BRAIN_DATE_TIME_ZONE=Europe/Dublin`** — subject only to the DPA/residency review (register item 6/7) not objecting |
 
 ## 10. Cutover checklist (condensed operator runbook)
 
 ```
-GATE 0  □ Decisions 1–16 (§9) recorded  □ owners+billing named  □ hostname locked
-        □ identity chosen (ids on file: jemilad-ers=259372947, JEM-Fizbit=220941196)
-        □ purge predicate for OAuth rows written  □ sign-off register (ers-brain governance/) worked through
-        □ MCP stateless-spec migration date verified (see risks)
+GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
+        ☑ identity: jemilad-ers (259372947), owner   ☑ hostname: custom ERS domain (label at CNAME time)
+        □ ELT register items (go-ahead/budget, billing card, Fly acceptance, read-audit, DPA,
+          content governance, licence signatory, second admin, colleague pick)
+          — ers-brain governance/brain-mcp-fork-signoff.md
+        □ purge predicate for OAuth rows written  □ MCP stateless-spec migration date verified (see risks)
 PREP    □ §1 P0 upstream changes merged + tagged v1.2.x  □ npm test green
         □ private ERS-Genomics mirror created + overlay (registry, fly.toml, expectations, runbook)
 M1      □ Fly org+app  □ Supabase org+project  □ 5 migrations + advisors  □ brain_runtime login (:6543)
@@ -258,7 +260,7 @@ Per-phase verification is embedded above: §3.9 empty-stack smokes, §4.5 parity
 
 ## Assumptions (correct before "approved")
 
-1. App name `ers-brain-mcp` and region pair lhr/eu-west-2 are placeholders pending Gate 0 (§9 #5, #16).
+1. Region pair (lhr/eu-west-2) and hostname (custom ERS domain) are resolved (§9 #5, #16); the Fly app name `ers-brain-mcp` remains a suggestion — with a custom domain fronting it, the app name is internal-only and enrollment-invisible.
 2. The SharePoint `sources/` tree is acceptable as the artifact archive (Storage objects excluded from DB dumps) — flagged inside §9 headline decision 2 (the sign-off package).
 3. The 3 `working/*` source rows are seed path-drift, not intentional content (evidence: absent from SharePoint `sources/`, duplicate vault files) — excluded from re-seed and gone with the purge.
 4. ERS accepts Fly as a second hosting provider (its other MCPs are on Cloudflare Workers; this server is not Workers-portable without rework).
