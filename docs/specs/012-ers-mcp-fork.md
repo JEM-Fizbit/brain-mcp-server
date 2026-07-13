@@ -197,7 +197,8 @@ On ship (same change window as §6):
 ```
 GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
         ☑ identity: jemilad-ers (259372947), owner   ☑ hostname: custom ERS domain (label at CNAME time)
-        ☑ 2026-07-13: migration UNGATED (ELT memo = record, not approval); pilot = John + Cillian
+        ☑ 2026-07-13: migration UNGATED (ELT memo = record; ELT comments due 22 Jul feed the
+          rollout gate, not the migration); pilot = John + Cillian
           (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
           (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
         □ purge predicate for OAuth rows written  □ MCP stateless-spec migration date verified (see risks)
