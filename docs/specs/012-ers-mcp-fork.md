@@ -131,7 +131,7 @@ Post-enrollment: run the REMOTE_MCP_SERVICE_PATTERN test matrix against the ERS 
 
 ## 6. Personal-stack separation (M3b) — the "pristine" guarantees
 
-Two directions, both required by exit portability. **This is the point of no return — gated on §5 soak + §4.6 rehearsal + Gate-0 purge sign-off.** "Never delete data as a fix" discipline: the purge is not a fix, it is the governance boundary — and it runs only after the archived dump has been restore-verified.
+Two directions, both required by exit portability. **This is the point of no return — gated on §5 soak + §4.6 rehearsal + an explicit purge sign-off (register item 10: CEO, on the verification evidence).** "Never delete data as a fix" discipline: the purge is not a fix, it is the governance boundary — and it runs only after the archived dump has been restore-verified.
 
 **(a) ERS data off the personal stack (verified purge):**
 1. Registry shrink first: remove `ers-brain` + the role grant from the personal registry, redeploy `jem-brain-mcp` → hosted surface stops resolving `ers-brain`.
@@ -170,7 +170,7 @@ On ship (same change window as §6):
 
 **The three headline decisions (John + ERS governance):**
 
-1. **Fork timing — fork now vs mitigated personal-stack beta.** For *now*: exit-hygiene debt compounds (every week adds ERS content/telemetry/OAuth rows to purge and deepens beta habits); the audit finds no technical blocker, ~2–4 operator days + ~1–2 weeks of prep/hardening; your own 2026-07-10 note records "prefer forking sooner." For *deferring*: Gate-0 governance (owners, billing, DPA, sign-offs) has real lead time; the mitigations in §1 + §6(b) can land pre-fork and cap the personal-stack contamination in the meantime; no second user is imminent until M4 hardening exists anyway. **Direction set (John, 2026-07-12): fork sooner — exit hygiene.** Confirm with ELT via the sign-off register (decision 2); Gate 0 starts now.
+1. **Fork timing — fork now vs mitigated personal-stack beta.** For *now*: exit-hygiene debt compounds (every week adds ERS content/telemetry/OAuth rows to purge and deepens beta habits); the audit finds no technical blocker, ~2–4 operator days + ~1–2 weeks of prep/hardening; your own 2026-07-10 note records "prefer forking sooner." For *deferring*: Gate-0 governance (owners, billing, DPA, sign-offs) has real lead time; the mitigations in §1 + §6(b) can land pre-fork and cap the personal-stack contamination in the meantime; no second user is imminent until M4 hardening exists anyway. **Direction set (John, 2026-07-12): fork sooner — exit hygiene. Reframed 2026-07-13: the migration is UNGATED** — it is itself the risk reduction (moves ERS data off personal infra), so the ELT memo records decisions rather than requesting approval, and **the ELT decision point moves to rollout beyond the John+Cillian pilot** (register item 14: evidence package = vendor DPA reviews, isolation-test results, pilot experience, onboarding guide, proposed access model).
 2. **ERS governance sign-off package** — now tracked transparently in a dedicated register: **`governance/brain-mcp-fork-signoff.md` in the ERS Brain** (created 2026-07-12; sign-off = John + ELT). Contents (who signs, and when): named ERS account owners + billing cards for Fly org / Supabase org / GitHub OAuth app; no-read-audit posture (A2-10); vendor DPA review (Fly + Supabase — never reviewed); content governance (recommend reader-majority, writers = John + 1–2 curators until concurrency hardening); data-residency/region confirmation; PITR; licence-acknowledgment signatory; purge sign-off (§6 is irreversible).
 3. **Where the "real ERS colleague on ers-brain" test runs — on the fork** (the audit corroborates: the prior review's success criteria place first-colleague onboarding on the ERS stack after P1 hardening; the pilot posture "must end before a single colleague is onboarded"). **Resolved 2026-07-13 (John): Cillian McGorman is the first colleague (second user) AND takes emergency access / second-admin (break-glass)** — closing register items 12+13 and the §6 residual second-admin flag, subject to the ELT memo's objection window. M4's gates (cross-tenant test, onboarding guide, vendor DPA review) still hold for him.
 
@@ -197,9 +197,9 @@ On ship (same change window as §6):
 ```
 GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
         ☑ identity: jemilad-ers (259372947), owner   ☑ hostname: custom ERS domain (label at CNAME time)
-        □ ELT register items (go-ahead/budget, billing card, Fly acceptance, read-audit, DPA,
-          content governance, licence signatory, second admin, colleague pick)
-          — ers-brain governance/brain-mcp-fork-signoff.md
+        ☑ 2026-07-13: migration UNGATED (ELT memo = record, not approval); pilot = John + Cillian
+          (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
+          (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
         □ purge predicate for OAuth rows written  □ MCP stateless-spec migration date verified (see risks)
 PREP    □ §1 P0 upstream changes merged + tagged v1.2.x  □ npm test green
         □ private ERS-Genomics mirror created + overlay (registry, fly.toml, expectations, runbook)
