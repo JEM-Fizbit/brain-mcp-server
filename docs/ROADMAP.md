@@ -197,6 +197,17 @@ Exit criteria:
 - operational responsibilities are clear;
 - hosted Brain can be provisioned, monitored, recovered, and retired repeatably.
 
+## Longer-Term Hosting Direction (recorded 2026-07-13)
+
+ERS's ultimate ambition (John, ELT memo `ERSG_Memo_ERS_Brain_Ownership.docx` §4, 2026-07)
+is to host the ERS deployment on ERS-owned **on-premises hardware** (Mac mini/Studio-class)
+once — and if — that infrastructure exists and a migration is proven not to compromise
+performance or reliability. Launch posture stays Fly.io + Supabase. The ERS custom-domain
+decision (spec 012 §9 #5) makes a later hosting move invisible to users (no connector
+re-enrollment), and the same portability holds in principle for the personal stack —
+echoing the self-hosting/Mac-mini room noted in DECISIONS 2026-06-14. Revisit when the
+hardware exists; requires a self-host substrate story for Postgres + object storage.
+
 ## Near-Term Next Steps
 
 Recommended order:

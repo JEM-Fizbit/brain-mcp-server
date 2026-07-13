@@ -145,7 +145,7 @@ Two directions, both required by exit portability. **This is the point of no ret
 2. Confirm jembot app custody sits with ERS (creator/collaborator review) — credential boundary follows ownership boundary.
 3. Personal-hygiene flag (same window, John's stack, his call): the personal app itself still runs the `GITHUB_ALLOWED_*` side door — recommend replacing with an explicit registry principal and unsetting both secrets.
 
-**Residual single-operator dependencies that survive the fork (flag, don't block):** the ERS sync daemon + canonical SharePoint checkout live on John's personal laptop; John's identity is initially the sole ERS admin. Mitigations to schedule: named second ERS admin / break-glass credentials (Supabase + Fly + GitHub OAuth app), and optionally a second sync-runner machine (no code obstacle found; macOS-specific OneDrive + FDA requirements apply).
+**Residual single-operator dependencies that survive the fork (flag, don't block):** the ERS sync daemon + canonical SharePoint checkout live on John's personal laptop; John's identity is initially the sole ERS admin. Mitigations: **second admin / break-glass = Cillian McGorman (named 2026-07-13**, provisioned at stand-up: Supabase org, Fly account, GitHub OAuth app**)**, and optionally a second sync-runner machine (no code obstacle found; macOS-specific OneDrive + FDA requirements apply).
 
 ## 7. Security re-gate + monitoring
 
@@ -172,7 +172,7 @@ On ship (same change window as §6):
 
 1. **Fork timing — fork now vs mitigated personal-stack beta.** For *now*: exit-hygiene debt compounds (every week adds ERS content/telemetry/OAuth rows to purge and deepens beta habits); the audit finds no technical blocker, ~2–4 operator days + ~1–2 weeks of prep/hardening; your own 2026-07-10 note records "prefer forking sooner." For *deferring*: Gate-0 governance (owners, billing, DPA, sign-offs) has real lead time; the mitigations in §1 + §6(b) can land pre-fork and cap the personal-stack contamination in the meantime; no second user is imminent until M4 hardening exists anyway. **Direction set (John, 2026-07-12): fork sooner — exit hygiene.** Confirm with ELT via the sign-off register (decision 2); Gate 0 starts now.
 2. **ERS governance sign-off package** — now tracked transparently in a dedicated register: **`governance/brain-mcp-fork-signoff.md` in the ERS Brain** (created 2026-07-12; sign-off = John + ELT). Contents (who signs, and when): named ERS account owners + billing cards for Fly org / Supabase org / GitHub OAuth app; no-read-audit posture (A2-10); vendor DPA review (Fly + Supabase — never reviewed); content governance (recommend reader-majority, writers = John + 1–2 curators until concurrency hardening); data-residency/region confirmation; PITR; licence-acknowledgment signatory; purge sign-off (§6 is irreversible).
-3. **Where the "real ERS colleague on ers-brain" test runs — your lean: on the fork.** The audit strongly corroborates: the prior review's success criteria place first-colleague onboarding on the ERS stack in M4 after P1 hardening, and the infra audit states the pilot posture "must end before a single colleague is onboarded." Corollary sub-decisions: which colleague, and confirmation that M4's gates (cross-tenant test, registry validation, onboarding runbook) hold even for a single friendly tester.
+3. **Where the "real ERS colleague on ers-brain" test runs — on the fork** (the audit corroborates: the prior review's success criteria place first-colleague onboarding on the ERS stack after P1 hardening; the pilot posture "must end before a single colleague is onboarded"). **Resolved 2026-07-13 (John): Cillian McGorman is the first colleague (second user) AND takes emergency access / second-admin (break-glass)** — closing register items 12+13 and the §6 residual second-admin flag, subject to the ELT memo's objection window. M4's gates (cross-tenant test, onboarding guide, vendor DPA review) still hold for him.
 
 **Gate-0 technical decisions — ALL RESOLVED (John, 2026-07-12, one-by-one walkthrough):**
 
@@ -247,6 +247,10 @@ SHIP    □ security gate doc (ERS)  □ registers re-homed  □ OWNERSHIP/DECIS
 | §7 monitoring/day-2 + gate re-run | ~2–4 days (partly parallel) |
 | Gate-0 admin (orgs, billing, sign-offs) | ~0.5 day work; **lead time is governance, not labor** |
 | **Total to a forked, monitored, separated estate** | **≈ 2 focused weeks** (M4 team-onboarding hardening excluded — separate ~2–3 week track per the platform review) |
+
+**Re-estimated 2026-07-13 (John — agentic coding):** the per-block figures above are conservative solo-dev estimates retained for reference. With Claude Code doing the code-side work, active effort compresses to **~1–2 days**; the elapsed 1–2 weeks is dominated by the ELT objection window (to 24 Jul), the deliberate 2–3-day soak, connector-enrollment choreography across four client surfaces, and governance latency — not engineering.
+
+**Longer-term hosting direction (recorded 2026-07-13, ELT memo §4 + ROADMAP.md):** ERS's ultimate ambition is to self-host these services on ERS-owned on-prem hardware (Mac mini/Studio-class) once that infrastructure exists and a migration is proven not to compromise performance or reliability. The custom-domain decision (§9 #5) makes that later move user-invisible. Launch posture stays Fly + Supabase; echoes the self-hosting room noted in DECISIONS 2026-06-14.
 
 ## Test plan
 
