@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-06-25
+**Last updated:** 2026-07-15
 
 Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
 
@@ -226,6 +226,16 @@ BRAIN_MENUBAR_APP="$HOME/Applications/<Brain> Monitor.app" \
 BRAIN_MENUBAR_BUNDLE_ID="com.example.<brain>-monitor" \
 npm run sync:menubar:install
 ```
+
+The installer defaults to the repo-supported Node 22 runtime. On Homebrew
+systems it prefers the stable `opt/node@22/bin/node` path so a routine formula
+upgrade cannot strand the monitor on a removed versioned `Cellar` executable.
+Set `BRAIN_MENUBAR_NODE` only when an explicit stable Node 22 path is required;
+do not configure a versioned `Cellar` path. If no stable Node 22 executable is
+available, installation fails instead of silently pinning an unsupported host
+Node. Managed child launch failures retry automatically, and doctor refreshes
+write to temporary files before atomically promoting valid JSON, preserving the
+last usable report when a launch fails.
 
 For one operator app that supervises both JEM and ERS, pass
 `BRAIN_MENUBAR_PROFILES_JSON` as a JSON array. Each profile supports `id` or
