@@ -457,6 +457,9 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.cockpitProcess.env.BRAIN_COCKPIT_PORT, "8798");
   assert.match(source, /NSStatusBar/);
   assert.match(source, /startManagedProcesses/);
+  assert.match(source, /scheduleManagedProcessRestartNamed/);
+  assert.match(source, /afterDelay:30\.0/);
+  assert.match(source, /cancelPreviousPerformRequestsWithTarget/);
   assert.match(source, /syncTaskNameForProfile/);
   assert.match(source, /cockpitTaskNameForProfile/);
   assert.match(source, /writeStackStatus/);
@@ -498,6 +501,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /Diagnostics/);
   assert.match(source, /NSTimer/);
   assert.match(source, /readDoctorReportForProfile/);
+  assert.match(source, /promoteDoctorOutputFromPath/);
+  assert.match(source, /NSDataWritingAtomic/);
+  assert.match(source, /outputTempPath/);
+  assert.match(source, /previous report kept/);
   assert.match(source, /actionItemsForDoctorReport/);
   assert.match(source, /Brain Action/);
   assert.match(source, /sawChecking && !sawAction && !sawWarn && !sawKnown/);
@@ -516,6 +523,41 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /health\[@"report"\]/);
   assert.match(source, /report\[@"conflicts"\]/);
   assert.notEqual(stat.mode & 0o111, 0);
+});
+
+test("menu-bar installer prefers a stable Homebrew Node 22 path", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Stable Node Brain Monitor.app");
+  const brainRoot = path.join(tmpRoot, "stable-node-brain");
+  const homebrewPrefix = path.join(tmpRoot, "homebrew");
+  const stableNodePath = path.join(homebrewPrefix, "opt", "node@22", "bin", "node");
+  await fs.mkdir(path.dirname(stableNodePath), { recursive: true });
+  await fs.writeFile(stableNodePath, "#!/bin/sh\nexit 0\n", "utf-8");
+  await fs.chmod(stableNodePath, 0o755);
+
+  const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
+    env: {
+      ...process.env,
+      HOMEBREW_PREFIX: homebrewPrefix,
+      BRAIN_MENUBAR_NODE: "",
+      BRAIN_COCKPIT_LAUNCHD_NODE: "",
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_BUNDLE_ID: "com.example.stable-node-brain-monitor",
+      BRAIN_ID: "stable-node-brain",
+      BRAIN_REPO_ROOT: brainRoot,
+    },
+  });
+
+  const result = JSON.parse(stdout);
+  const config = JSON.parse(
+    await fs.readFile(
+      path.join(appPath, "Contents", "Resources", "brain-menubar-config.json"),
+      "utf-8"
+    )
+  );
+  assert.equal(result.nodePath, stableNodePath);
+  assert.equal(config.nodePath, stableNodePath);
+  assert.equal(config.syncProcess.launchPath, stableNodePath);
+  assert.equal(config.cockpitProcess.launchPath, stableNodePath);
 });
 
 test("menu-bar app can supervise multiple Brain local stacks", async () => {

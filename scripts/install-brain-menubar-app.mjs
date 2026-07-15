@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -14,10 +15,55 @@ const appPath =
 const appName = path.basename(appPath, ".app") || "Brain Monitor";
 const bundleId =
   process.env.BRAIN_MENUBAR_BUNDLE_ID || "com.jem.brain-menubar";
-const nodePath =
-  process.env.BRAIN_MENUBAR_NODE ||
-  process.env.BRAIN_COCKPIT_LAUNCHD_NODE ||
-  process.execPath;
+const supportedNodeMajor = 22;
+
+async function isExecutable(filePath) {
+  try {
+    await fs.access(filePath, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveManagedNodePath() {
+  const configuredPath =
+    process.env.BRAIN_MENUBAR_NODE ||
+    process.env.BRAIN_COCKPIT_LAUNCHD_NODE;
+  if (configuredPath) {
+    return configuredPath;
+  }
+
+  const homebrewPrefixes = [
+    process.env.HOMEBREW_PREFIX,
+    "/opt/homebrew",
+    "/usr/local",
+  ].filter(Boolean);
+  const stableCandidates = [
+    ...new Set(
+      homebrewPrefixes.map((prefix) =>
+        path.join(prefix, "opt", `node@${supportedNodeMajor}`, "bin", "node")
+      )
+    ),
+  ];
+  for (const candidate of stableCandidates) {
+    if (await isExecutable(candidate)) {
+      return candidate;
+    }
+  }
+
+  const currentMajor = Number(process.versions.node.split(".")[0]);
+  if (currentMajor === supportedNodeMajor && (await isExecutable(process.execPath))) {
+    return process.execPath;
+  }
+
+  throw new Error(
+    `Brain Monitor requires Node ${supportedNodeMajor}. ` +
+      `Install node@${supportedNodeMajor} or set BRAIN_MENUBAR_NODE to a stable Node ${supportedNodeMajor} executable.`
+  );
+}
+
+const nodePath = await resolveManagedNodePath();
 const doctorScriptPath =
   process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
@@ -989,11 +1035,13 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   __weak typeof(self) weakSelf = self;
   task.terminationHandler = ^(NSTask *finishedTask) {
     dispatch_async(dispatch_get_main_queue(), ^{
+      [stdoutHandle closeFile];
+      [stderrHandle closeFile];
       [weakSelf.managedTasks removeObjectForKey:name];
       [weakSelf writeStackStatus];
       if (![weakSelf.intentionalStops containsObject:name]) {
         [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ exited %d; restarting", name, finishedTask.terminationStatus]];
-        [weakSelf performSelector:@selector(restartManagedProcessNamed:) withObject:name afterDelay:3.0];
+        [weakSelf scheduleManagedProcessRestartNamed:name afterDelay:3.0];
       }
       [weakSelf rebuildMenu:nil];
     });
@@ -1005,12 +1053,26 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     [self rememberCockpitFingerprintForTaskName:name processConfig:processConfig];
     [self recordLastAction:[NSString stringWithFormat:@"%@ running", name]];
   } @catch (NSException *exception) {
-    [self recordLastAction:[NSString stringWithFormat:@"%@ failed: %@", name, exception.name]];
+    [stdoutHandle closeFile];
+    [stderrHandle closeFile];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ failed: %@; retrying", name, exception.name]];
+    [self scheduleManagedProcessRestartNamed:name afterDelay:30.0];
   }
   [self writeStackStatus];
 }
 
+- (void)scheduleManagedProcessRestartNamed:(NSString *)name afterDelay:(NSTimeInterval)delay {
+  if ([self.intentionalStops containsObject:name]) {
+    return;
+  }
+  [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(restartManagedProcessNamed:) object:name];
+  [self performSelector:@selector(restartManagedProcessNamed:) withObject:name afterDelay:delay];
+}
+
 - (void)restartManagedProcessNamed:(NSString *)name {
+  if ([self.intentionalStops containsObject:name]) {
+    return;
+  }
   NSDictionary *processConfig = self.managedProcessConfigs[name];
   if (processConfig) {
     [self startManagedProcess:name processConfig:processConfig];
@@ -1402,6 +1464,30 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self rebuildMenu:nil];
 }
 
+- (BOOL)promoteDoctorOutputFromPath:(NSString *)sourcePath toPath:(NSString *)destinationPath {
+  NSData *data = [NSData dataWithContentsOfFile:sourcePath];
+  if (!data || data.length == 0) {
+    [[NSFileManager defaultManager] removeItemAtPath:sourcePath error:nil];
+    return NO;
+  }
+  id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+  if (![json isKindOfClass:[NSDictionary class]]) {
+    [[NSFileManager defaultManager] removeItemAtPath:sourcePath error:nil];
+    return NO;
+  }
+  BOOL wrote = [data writeToFile:destinationPath options:NSDataWritingAtomic error:nil];
+  [[NSFileManager defaultManager] removeItemAtPath:sourcePath error:nil];
+  return wrote;
+}
+
+- (void)promoteDoctorErrorFromPath:(NSString *)sourcePath toPath:(NSString *)destinationPath {
+  NSData *data = [NSData dataWithContentsOfFile:sourcePath];
+  if (data) {
+    [data writeToFile:destinationPath options:NSDataWritingAtomic error:nil];
+  }
+  [[NSFileManager defaultManager] removeItemAtPath:sourcePath error:nil];
+}
+
 - (void)runDoctorTaskForProfile:(NSDictionary *)profile automatic:(BOOL)automatic {
   NSString *brainId = [self brainIdForProfile:profile];
   if ([self.runningDoctorProfiles containsObject:brainId]) {
@@ -1421,11 +1507,19 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
   [self ensureParentDirectoryForPath:outputPath];
   [self ensureParentDirectoryForPath:errorPath];
-  [[NSFileManager defaultManager] createFileAtPath:outputPath contents:nil attributes:nil];
-  [[NSFileManager defaultManager] createFileAtPath:errorPath contents:nil attributes:nil];
-  NSFileHandle *stdoutHandle = [NSFileHandle fileHandleForWritingAtPath:outputPath];
-  NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:errorPath];
+  NSString *outputTempPath = [outputPath stringByAppendingString:@".next"];
+  NSString *errorTempPath = [errorPath stringByAppendingString:@".next"];
+  [[NSFileManager defaultManager] removeItemAtPath:outputTempPath error:nil];
+  [[NSFileManager defaultManager] removeItemAtPath:errorTempPath error:nil];
+  [[NSFileManager defaultManager] createFileAtPath:outputTempPath contents:nil attributes:nil];
+  [[NSFileManager defaultManager] createFileAtPath:errorTempPath contents:nil attributes:nil];
+  NSFileHandle *stdoutHandle = [NSFileHandle fileHandleForWritingAtPath:outputTempPath];
+  NSFileHandle *stderrHandle = [NSFileHandle fileHandleForWritingAtPath:errorTempPath];
   if (!stdoutHandle || !stderrHandle) {
+    [stdoutHandle closeFile];
+    [stderrHandle closeFile];
+    [[NSFileManager defaultManager] removeItemAtPath:outputTempPath error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:errorTempPath error:nil];
     if (!automatic) {
       [self recordLastAction:@"Doctor log open failed"];
     }
@@ -1458,8 +1552,14 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self.runningDoctorProfiles addObject:brainId];
   task.terminationHandler = ^(NSTask *finishedTask) {
     dispatch_async(dispatch_get_main_queue(), ^{
+      [stdoutHandle closeFile];
+      [stderrHandle closeFile];
+      BOOL promoted = [weakSelf promoteDoctorOutputFromPath:outputTempPath toPath:outputPath];
+      [weakSelf promoteDoctorErrorFromPath:errorTempPath toPath:errorPath];
       [weakSelf.runningDoctorProfiles removeObject:brainId];
-      if (!automatic || finishedTask.terminationStatus != 0) {
+      if (!promoted) {
+        [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ doctor output invalid; previous report kept", displayName]];
+      } else if (!automatic || finishedTask.terminationStatus != 0) {
         [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ doctor exited %d", displayName, finishedTask.terminationStatus]];
       }
       [weakSelf rebuildMenu:nil];
@@ -1472,6 +1572,10 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       [self recordLastAction:[NSString stringWithFormat:@"%@ doctor running", displayName]];
     }
   } @catch (NSException *exception) {
+    [stdoutHandle closeFile];
+    [stderrHandle closeFile];
+    [[NSFileManager defaultManager] removeItemAtPath:outputTempPath error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:errorTempPath error:nil];
     [self.runningDoctorProfiles removeObject:brainId];
     [self recordLastAction:[NSString stringWithFormat:@"Doctor failed: %@", exception.name]];
   }
