@@ -95,10 +95,20 @@ For local operator scripts, copy `.env.local.example` to `.env.local` and fill t
 
 ## Deploy
 
+Production deploys are release-tag-only. Every commit that changes the package
+version must receive its matching annotated `v<version>` tag immediately; do not
+deploy an untagged branch head or a lightweight tag.
+
 ```bash
-npm test
-fly deploy --app jem-brain-mcp
+BRAIN_FLY_APP=jem-brain-mcp npm run deploy:guarded
 ```
+
+The guarded deploy refuses a dirty tree, a non-exact or non-annotated tag, and a
+tag that does not match `package.json`. It runs `npm test` before calling Fly,
+passes the commit SHA and package version into OCI image labels, and appends the
+successful app/tag/SHA/date record to the ignored local file
+`.brain-deploy/provenance.jsonl` (override with
+`BRAIN_DEPLOY_PROVENANCE_FILE`).
 
 ## Runtime Smoke Tests
 
@@ -136,7 +146,7 @@ After `hosted:test-drive` passes, follow [`docs/hosted-client-cutover.md`](./hos
 For a non-destructive hosted operator check, run:
 
 ```bash
-npm run hosted:doctor
+BRAIN_FLY_APP=jem-brain-mcp npm run hosted:doctor
 ```
 
 The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, lint freshness, pending inbox files, launchd status on macOS, Fly app status when `flyctl` is available, and a `pooler_config` check that classifies `BRAIN_REVISION_DATABASE_URL` (warns on the session pooler `:5432`; reports active connection count + per-pool `max`). It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly/lint/inbox warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold, `BRAIN_SYNC_CLOSE_TIMEOUT_MS` to change how long the local sync daemon waits for store shutdown before exiting for launchd restart, or `BRAIN_LINT_NUDGE_DAYS` to change the lint freshness threshold.

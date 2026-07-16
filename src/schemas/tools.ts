@@ -134,22 +134,7 @@ export const SemanticSearchSchema = BrainIdSchema.extend({
 
 export const ListSourcesSchema = BrainIdSchema.extend({
   category: z
-    .enum([
-      "bios",
-      "cv",
-      "career_history",
-      "assessments",
-      "writing_samples",
-      "analysis",
-      "meeting_notes",
-      "correspondence",
-      "personal",
-      "research",
-      "travel",
-      "favourites",
-      "photos",
-      "other",
-    ])
+    .string()
     .optional()
     .describe("Optional category to filter by. If omitted, returns all source files across all categories."),
 });
@@ -247,22 +232,7 @@ export const CaptureItemSchema = BrainIdSchema.extend({
 
 export const ReportItemSchema = CaptureItemSchema;
 
-const sourceCategoryEnum = z.enum([
-  "bios",
-  "cv",
-  "career_history",
-  "assessments",
-  "writing_samples",
-  "analysis",
-  "meeting_notes",
-  "correspondence",
-  "personal",
-  "research",
-  "travel",
-  "favourites",
-  "photos",
-  "other",
-]);
+const sourceCategory = z.string();
 
 export const IngestSchema = BrainIdSchema.extend({
   source_content: z
@@ -276,7 +246,7 @@ export const IngestSchema = BrainIdSchema.extend({
   source_label: z
     .string()
     .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
-  category: sourceCategoryEnum
+  category: sourceCategory
     .describe("Source category — determines which subfolder in sources/ the file is saved to."),
   dry_run: z
     .boolean()
@@ -288,7 +258,7 @@ export const IngestCompleteSchema = BrainIdSchema.extend({
   source_label: z
     .string()
     .describe("Label of the source that was ingested."),
-  category: sourceCategoryEnum
+  category: sourceCategory
     .describe("Source category."),
   original_file: z
     .string()

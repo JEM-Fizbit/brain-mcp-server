@@ -32,6 +32,7 @@ const { Pool } = pg;
 
 const baseUrl = (process.env.BRAIN_HOSTED_BASE_URL || "https://jem-brain-mcp.fly.dev")
   .replace(/\/$/, "");
+const flyApp = process.env.BRAIN_FLY_APP?.trim();
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
 const brainDir =
   process.env.BRAIN_DIR || path.join(os.homedir(), "Projects", "ai-brain-jem", "brain");
@@ -1098,22 +1099,28 @@ async function checkLaunchd() {
 }
 
 async function checkFlyStatus() {
+  if (!flyApp) {
+    addCheck("fly_status", "warn", {
+      error: "BRAIN_FLY_APP is not set; Fly status check skipped.",
+    });
+    return;
+  }
   try {
-    const { stdout } = await exec("flyctl", ["status", "--app", "jem-brain-mcp"], {
+    const { stdout } = await exec("flyctl", ["status", "--app", flyApp], {
       timeout: 20000,
       maxBuffer: 1024 * 1024,
     });
     addCheck("fly_status", /1 passing/.test(stdout) ? "pass" : "warn", {
-      app: "jem-brain-mcp",
+      app: flyApp,
       summary: stdout
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => /jem-brain-mcp|started|passing|deployment-/.test(line))
+        .filter((line) => line.includes(flyApp) || /started|passing|deployment-/.test(line))
         .slice(0, 8),
     });
   } catch (error) {
     addCheck("fly_status", "warn", {
-      app: "jem-brain-mcp",
+      app: flyApp,
       error: error.stderr?.trim() || error.message,
     });
   }

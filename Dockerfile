@@ -13,6 +13,10 @@ RUN npm run build
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ARG GIT_SHA=unknown
+ARG APP_VERSION=unknown
+LABEL org.opencontainers.image.revision=$GIT_SHA \
+  org.opencontainers.image.version=$APP_VERSION
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \

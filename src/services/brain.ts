@@ -12,7 +12,6 @@ import {
   SEARCH_LINE_CHAR_LIMIT,
   SEARCH_TOTAL_CHAR_LIMIT,
   LINT_NUDGE_DAYS,
-  SOURCE_CATEGORIES,
   type SourceCategory,
 } from "../constants.js";
 import * as log from "./log.js";
@@ -72,7 +71,6 @@ async function listSourceFileNames(
     for (const entry of rootEntries) {
       if (!entry.isDirectory()) continue;
       if (category && entry.name !== category) continue;
-      if (!SOURCE_CATEGORIES.includes(entry.name as SourceCategory)) continue;
       const subPath = path.join(sourcesRoot, entry.name);
       const subEntries = await fs.readdir(subPath, { withFileTypes: true });
       for (const sub of subEntries) {

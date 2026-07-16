@@ -2,6 +2,10 @@
   "name": "brain-mcp-server",
   "version": "1.2.0",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JEM-Fizbit/brain-mcp-server.git"
+  },
   "type": "module",
   "packageManager": "npm@10.9.8",
   "engines": {
@@ -29,6 +33,7 @@
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",
     "hosted:doctor": "node scripts/hosted-doctor.mjs",
+    "deploy:guarded": "node scripts/deploy-guarded.mjs",
     "brain:lint:fix": "node scripts/brain-lint-fix.mjs",
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "eval:brain:routing": "node scripts/eval-brain-routing.mjs",

@@ -27,6 +27,12 @@ function slugify(label: string): string {
     .slice(0, 60);
 }
 
+function assertSourceCategory(category: SourceCategory): void {
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(category)) {
+    throw new Error("Source category must be a single safe directory name.");
+  }
+}
+
 /**
  * Analyze the current Brain file inventory for an ingest operation.
  * Returns the list of all Brain files and available source categories
@@ -120,6 +126,7 @@ export async function saveSource(
   category: SourceCategory,
   brainId?: string
 ): Promise<string> {
+  assertSourceCategory(category);
   const { sourcesRoot } = await getBrainPaths(brainId);
   const categoryPath = path.join(sourcesRoot, category);
 

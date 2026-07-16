@@ -7,13 +7,12 @@ import { loadLocalEnv } from "./lib/load-local-env.mjs";
 loadLocalEnv();
 
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
-const supabaseUrl = process.env.BRAIN_SUPABASE_URL || "https://omnwbcdtmtvxasgdmvwr.supabase.co";
+const supabaseUrl = process.env.BRAIN_SUPABASE_URL;
 const serviceRoleKey = process.env.BRAIN_SUPABASE_SERVICE_ROLE_KEY;
 const bucket = process.env.BRAIN_SUPABASE_STORAGE_BUCKET || "brain-artifacts";
 const byteAccess = process.env.BRAIN_ARTIFACT_BYTE_ACCESS || "metadata_only";
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
-const brainRoot =
-  process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
+const brainRoot = process.env.BRAIN_REPO_ROOT;
 const limit = process.env.BRAIN_SOURCE_UPLOAD_LIMIT
   ? Number(process.env.BRAIN_SOURCE_UPLOAD_LIMIT)
   : null;
@@ -22,6 +21,16 @@ if (!databaseUrl) {
   console.error(
     "BRAIN_REVISION_DATABASE_URL is missing. Set it before uploading source artifacts."
   );
+  process.exit(2);
+}
+
+if (!supabaseUrl) {
+  console.error("BRAIN_SUPABASE_URL is missing. Set the target Supabase project URL before uploading source artifacts.");
+  process.exit(2);
+}
+
+if (!brainRoot) {
+  console.error("BRAIN_REPO_ROOT is missing. Set it to the Brain repository root before uploading source artifacts.");
   process.exit(2);
 }
 
