@@ -8,6 +8,7 @@ const {
   severityForCount,
   decideAuthAlert,
   computeStaleConnector,
+  readAuthAlertConfig,
   readAuthAlertThresholds,
   formatReasonSummary,
   buildAuthAlertMessage,
@@ -197,6 +198,26 @@ test("readAuthAlertThresholds honors env overrides", () => {
       staleGraceMinutes: 25,
     }
   );
+});
+
+test("Slack alerting requires explicit channel and DM targets when token is set", () => {
+  const missingTargets = readAuthAlertConfig({
+    BRAIN_SLACK_BOT_TOKEN: "xoxb-test",
+    BRAIN_ID: "ai-brain-jem",
+  });
+  assert.equal(missingTargets.enabled, false);
+  assert.equal(missingTargets.channel, "");
+  assert.equal(missingTargets.dm, "");
+
+  const configured = readAuthAlertConfig({
+    BRAIN_SLACK_BOT_TOKEN: "xoxb-test",
+    BRAIN_SLACK_ALERT_CHANNEL: "C-OPS",
+    BRAIN_SLACK_ALERT_DM: "U-OPERATOR",
+    BRAIN_ID: "ai-brain-jem",
+  });
+  assert.equal(configured.enabled, true);
+  assert.equal(configured.channel, "C-OPS");
+  assert.equal(configured.dm, "U-OPERATOR");
 });
 
 // --- formatReasonSummary + buildAuthAlertMessage (pure) -------------------

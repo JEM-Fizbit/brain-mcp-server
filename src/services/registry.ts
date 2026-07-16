@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { BRAIN_DIR, GITHUB_REPO, INBOX_DIR, SOURCES_ROOT } from "../constants.js";
+import { runtimeBrainId } from "./runtime-env.js";
 
 export type BrainRole = "owner" | "admin" | "member" | "reader";
 export type BrainType = "personal" | "shared";
@@ -83,7 +84,7 @@ export function validateBrainId(value: string): void {
 }
 
 function defaultBrainId(): string {
-  return process.env.BRAIN_ID || "ai-brain-jem";
+  return runtimeBrainId();
 }
 
 function defaultRepoPath(): string {

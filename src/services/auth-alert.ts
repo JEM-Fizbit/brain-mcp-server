@@ -15,6 +15,7 @@
 
 import pg from "pg";
 import { postSlackMessage } from "./slack.js";
+import { runtimeBrainId } from "./runtime-env.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
 
 const { Pool } = pg;
@@ -188,13 +189,19 @@ export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthA
     env.BRAIN_SLACK_BOT_TOKEN && env.BRAIN_SLACK_BOT_TOKEN.length > 0
       ? env.BRAIN_SLACK_BOT_TOKEN
       : null;
+  const channel = env.BRAIN_SLACK_ALERT_CHANNEL?.trim() || "";
+  const dm = env.BRAIN_SLACK_ALERT_DM?.trim() || "";
   return {
-    enabled: Boolean(botToken) && env.BRAIN_AUTH_ALERT_ENABLED !== "0",
+    enabled:
+      Boolean(botToken) &&
+      Boolean(channel) &&
+      Boolean(dm) &&
+      env.BRAIN_AUTH_ALERT_ENABLED !== "0",
     botToken,
-    channel: env.BRAIN_SLACK_ALERT_CHANNEL || "C0B27NK40H4",
-    dm: env.BRAIN_SLACK_ALERT_DM || "U06SWS92Y5V",
+    channel,
+    dm,
     thresholds: readAuthAlertThresholds(env),
-    brainId: env.BRAIN_ID || "ai-brain-jem",
+    brainId: runtimeBrainId(env),
     cockpitUrl: env.BRAIN_HOSTED_COCKPIT_URL || "http://127.0.0.1:8787/",
   };
 }
