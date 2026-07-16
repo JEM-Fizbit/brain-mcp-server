@@ -76,6 +76,8 @@ All land upstream so both stacks inherit them; the mirror then needs zero source
 
 **P1 (ship with the fork, not gating):** OAuth metadata doc URLs env-driven (currently hardcode the personal repo URL into public discovery metadata); menubar installer per-profile env passthrough (§4.5 — or accept the two-checkout workaround); S1-guard/inbox error text rewritten so hosted users aren't advised into a local-stdio fallback that bypasses the revision store; sync heartbeat event (§7). **Decision, not default (§9):** hard-disabling the `GITHUB_ALLOWED_*` code path (e.g. refuse to boot in HTTP mode when set) vs env-absence discipline.
 
+**Execution status (2026-07-16):** P0 and P1 completed upstream with test-first coverage. Release anchor: annotated tag `v1.2.0`.
+
 Verification: `npm test` (logic changes) + `npm run build`; each change follows normal spec-less commit discipline (mechanical, intent in commit messages, this spec is the record).
 
 ## 2. Fork mechanics — repo custody + upstream relationship
@@ -202,7 +204,7 @@ GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
           (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
           (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
         □ purge predicate for OAuth rows written  ☑ MCP stateless-spec release date verified (see risks)
-PREP    □ §1 P0 upstream changes merged + tagged v1.2.x  □ npm test green
+PREP    ☑ §1 P0+P1 upstream changes merged + tagged v1.2.0  ☑ npm test green
         □ private ERS-Genomics mirror created + overlay (registry, fly.toml, expectations, runbook)
 M1      □ Fly org+app  □ Supabase org+project  □ 5 migrations + advisors  □ brain_runtime login (:6543)
         □ bucket private  □ GitHub OAuth app  □ secrets set (no GITHUB_ALLOWED_*)  □ ERS seed row
