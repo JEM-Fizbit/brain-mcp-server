@@ -12,7 +12,7 @@ function formatSize(bytes: number): string {
 export function registerInboxTools(server: McpServer): void {
   server.tool(
     "brain_scan_inbox",
-    "List files pending in the Brain inbox. Drop files into the inbox/ folder for processing. Returns filenames, sizes, and dates.",
+    "List files pending in a filesystem-backed Brain inbox. Hosted Postgres deployments use their documented operator ingestion workflow. Returns filenames, sizes, and dates when an inbox is available.",
     ScanInboxSchema.shape,
     async ({ brain_id }, extra) => {
       try {
@@ -28,7 +28,7 @@ export function registerInboxTools(server: McpServer): void {
                 text: [
                   `Server-side inbox scanning is unavailable for Postgres-backed Brain ${ctx.brainId}.`,
                   "The hosted MCP server has no Fly-local inbox directory for this Brain.",
-                  "Use the local cockpit/doctor or the local sync mirror to inspect pending local inbox files.",
+                  "Use the deployment's operator ingestion workflow so source metadata and artifacts land in its authoritative stores.",
                 ].join("\n"),
               },
             ],

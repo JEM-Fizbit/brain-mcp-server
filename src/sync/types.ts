@@ -172,6 +172,7 @@ export interface RevisionStore {
     status?: "open" | "resolved" | "superseded"
   ): Promise<ConflictRecord[]>;
   resolveConflict(input: ConflictResolutionInput): Promise<ConflictResolutionResult>;
+  recordSyncHeartbeat?(input: SyncHeartbeatInput): Promise<void>;
 }
 
 export interface LocalFileSyncState {
@@ -224,4 +225,9 @@ export interface LocalSyncReport {
   deletionsSkipped: string[];
   /** Human-readable reason a delete-inference guard fired this cycle, if any. */
   guardTripped?: string;
+}
+
+export interface SyncHeartbeatInput {
+  brainId: string;
+  report: LocalSyncReport;
 }

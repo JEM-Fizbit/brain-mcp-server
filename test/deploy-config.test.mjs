@@ -28,6 +28,7 @@ test("Fly config keeps universal hosted deployment invariants", async () => {
   assert.equal(flyEnvValue(flyConfig, "TRANSPORT"), "http");
   assert.ok(flyEnvValue(flyConfig, "BRAIN_ID"));
   assert.ok(flyEnvValue(flyConfig, "BRAIN_PLATFORM_CONFIG"));
+  assert.ok(flyEnvValue(flyConfig, "MCP_OAUTH_DOCUMENTATION_URL"));
   assert.match(flyConfig, /BRAIN_REVISION_STORE = "postgres"/);
   assert.match(flyConfig, /BRAIN_OAUTH_STATE_STORE = "postgres"/);
   assert.match(flyConfig, /MCP_OAUTH_REFRESH_REUSE_GRACE_SEC = "15"/);

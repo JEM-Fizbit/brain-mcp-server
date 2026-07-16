@@ -69,6 +69,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 | `HOST` or `MCP_HTTP_HOST` | HTTP bind host when `TRANSPORT=http` | `127.0.0.1` |
 | `PORT` | HTTP bind port and local OAuth base fallback | `3000` |
 | `MCP_OAUTH_PUBLIC_BASE` | Public HTTPS base URL for hosted OAuth and MCP metadata | `http://127.0.0.1:$PORT` |
+| `MCP_OAUTH_DOCUMENTATION_URL` | Deployment documentation URL advertised by OAuth discovery metadata | required in HTTP mode |
 | `MCP_OAUTH_SIGNING_SECRET` | Required in HTTP mode. HS256 access-token signing secret | unset |
 | `GITHUB_OAUTH_CLIENT_ID` | Required in HTTP mode. GitHub OAuth app client ID | unset |
 | `GITHUB_OAUTH_CLIENT_SECRET` | Required in HTTP mode. GitHub OAuth app client secret | unset |

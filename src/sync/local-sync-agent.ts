@@ -521,6 +521,17 @@ export class LocalSyncAgent {
       guardTripped: pushed.guardTripped ?? pulled.guardTripped,
     };
     addTiming(report, "sync", "total", startedAt);
+    if (this.options.store.recordSyncHeartbeat) {
+      try {
+        await this.options.store.recordSyncHeartbeat({
+          brainId: this.options.brainId,
+          report,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[sync-heartbeat] Could not record heartbeat: ${message.slice(0, 180)}`);
+      }
+    }
     return report;
   }
 

@@ -319,7 +319,8 @@ export function pathsForBrain(brain: BrainDefinition): BrainPaths {
     throw new Error(
       `Brain ${brain.id} uses the "${brain.storage_backend}" backend; host filesystem ` +
         `operations (ingest, source save, log append, git) are unavailable here. Run these ` +
-        `via a local stdio server with a filesystem-backed Brain (set BRAIN_DIR).`
+        `through the deployment's documented operator workflow against its authoritative ` +
+        `revision/source stores; do not substitute a separate filesystem Brain for hosted state.`
     );
   }
   const brainDir = String(brain.storage_config.brain_dir || "");

@@ -6,7 +6,7 @@ export function protectedResourceMetadata(config: OauthConfig): Record<string, u
     authorization_servers: [config.issuer],
     scopes_supported: config.scopes,
     bearer_methods_supported: ["header"],
-    resource_documentation: "https://github.com/JEM-Fizbit/brain-mcp-server",
+    resource_documentation: config.documentationUrl,
   };
 }
 
@@ -26,6 +26,6 @@ export function authorizationServerMetadata(config: OauthConfig): Record<string,
     ],
     code_challenge_methods_supported: ["S256"],
     scopes_supported: config.scopes,
-    service_documentation: "https://github.com/JEM-Fizbit/brain-mcp-server",
+    service_documentation: config.documentationUrl,
   };
 }

@@ -74,8 +74,8 @@ Cockpit refresh path is unchanged; the new doctor check simply appears in `paylo
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `BRAIN_SLACK_BOT_TOKEN` | jembot bot token (`xoxb-…`). **Gate** — unset disables all alerting. Fly secret. | unset |
-| `BRAIN_SLACK_ALERT_CHANNEL` | `warn` destination | `C0B27NK40H4` (#claude-ops) |
-| `BRAIN_SLACK_ALERT_DM` | `fail` destination | `U06SWS92Y5V` (operator DM) |
+| `BRAIN_SLACK_ALERT_CHANNEL` | `warn` destination; required with token | unset (alerting disabled) |
+| `BRAIN_SLACK_ALERT_DM` | `fail` destination; required with token | unset (alerting disabled) |
 | `BRAIN_AUTH_ALERT_WINDOW_MINUTES` | Trailing window for the count | `60` |
 | `BRAIN_AUTH_ALERT_WARN_THRESHOLD` | `warn` at count ≥ this | `3` |
 | `BRAIN_AUTH_ALERT_FAIL_THRESHOLD` | `fail` at count ≥ this | `10` |
