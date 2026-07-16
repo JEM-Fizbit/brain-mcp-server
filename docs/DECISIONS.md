@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-16 — ERS Brain deployment fork executes through a mandatory private tag-tracking mirror
+
+**Decision:** The ERS Brain migration authorized on 2026-07-13 proceeds now; ELT comments inform the rollout gate beyond the John+Cillian pilot, not whether the migration may begin. This entry amends the 2026-07-06 topology wording: the ERS deployment uses a **mandatory private ERS-org mirror** of the public upstream, tracks **annotated upstream release tags only**, and carries only the ERS config/test/docs overlay. All source development remains upstream and `src/`, `db/`, and `scripts/` never diverge in the mirror.
+
+**Why:** ERS needs custody of its deployment configuration and release inputs without creating a second code line. The private overlay keeps staff identifiers and deployment-specific configuration out of the public upstream, while tag-only intake makes every ERS deployment reviewable and reproducible.
+
+**Alternatives rejected:** The 2026-07-06 optional-mirror wording (insufficient ERS custody); deploying directly from public `main` (unreviewed moving target); a source-code fork (permanent divergence and doubled maintenance); committing the ERS registry or deployment overlay upstream (public disclosure of ERS-specific configuration).
+
+**Related:** 2026-07-06 decision below (D1 migration + D2 topology, amended here); `docs/specs/012-ers-mcp-fork.md`; `docs/savepoints/2026-07-16-ers-fork-execution.md`.
+
+---
+
 ## 2026-07-10 — Brain file delete/rename via tombstone revisions + guarded delete-aware sync
 
 **Decision:** Deletion and rename are first-class revision-store operations, not filesystem side effects. A delete appends a **tombstone revision** (`deleted=true`, `content`/`content_sha256` null) that the head points at; a rename is an **atomic** create-new + tombstone-old in one store transaction, carrying `renamedFrom`/`renamedTo` metadata and rewriting inbound `[[wikilinks]]`. Delete ships with `brain_restore_file`. The local sync agent infers a local deletion only behind **three defence-in-depth guards** — folder health (a scan that is empty or missing a structural marker `00_loader.md`/`NOW.md` is treated as unmounted/damaged, never as deletions), a two-scan **debounce**, and a **mass-delete threshold** (`BRAIN_SYNC_MAX_DELETES`, default 5; `BRAIN_SYNC_MAX_DELETE_PCT`, default 10%) — and pull applies hosted tombstones as explicit signals (unlink only a clean local copy, conflict on unsynced edits, never touch a protected file). The old pull-side "resurrect a locally-missing tracked file" branch is removed.

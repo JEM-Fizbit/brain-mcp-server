@@ -1,9 +1,9 @@
 # 012 — ERS Brain MCP fork: ERS-owned stack stand-up, data cutover, and personal-stack separation
 
-**Status:** draft
+**Status:** approved — execution authorized 2026-07-13
 **Source:** BACKLOG.md line "ERS Brain MCP fork / cutover (future, large — but **prefer sooner**) …" (+ related lines: adversarial cross-tenant isolation test; IP/licensing hygiene)
 **Roadmap link:** [ROADMAP.md](../ROADMAP.md) Milestone 3 (ERS-Owned Supabase Migration) + Milestone 4 (ERS Multi-User Access); platform-review roadmap M1–M4 (`claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md`)
-**Decisions impact:** implements [DECISIONS 2026-07-06](../DECISIONS.md) D1 (migration) + D2 (topology). Requires a **new DECISIONS entry at approval** reconciling D2's "optional ERS-Genomics mirror" with the newer (2026-07-10) destination-state requirement of a mandatory ERS-org repo — resolution proposed in §2. Gate-0 decisions in §9 are **surfaced, not locked**.
+**Decisions impact:** implements [DECISIONS 2026-07-06](../DECISIONS.md) D1 (migration) + D2 (topology), as amended by the 2026-07-16 entry: the migration is ungated and the deployment-fork topology is a **mandatory private ERS-org mirror tracking upstream annotated tags plus a config/test/docs overlay**. All decisions in §9 are resolved and locked.
 **Related:** [OWNERSHIP_AND_LIFECYCLE.md](../OWNERSHIP_AND_LIFECYCLE.md) (destination state, exit portability); [spec 003](003-hosted-brain-sync-architecture.md) (tenant-agnostic constraints); [hosted-client-cutover.md](../hosted-client-cutover.md) (enrollment runbook template); [security gate](../security/hosted-brain-supabase-security-gate.md); **evidence base:** `claude-ops/plans/brain-platform/2026-07-12-ers-fork-dependency-audit.md` — 13-surface read-only dependency audit (2026-07-12) with file:line refs for every claim below. The evidence file stays in claude-ops (local-only) because this repo is public and the aggregate is recon-grade.
 
 ## Problem
@@ -166,7 +166,7 @@ On ship (same change window as §6):
 - **Docs:** OWNERSHIP_AND_LIFECYCLE ownership table + destination-state wording (D2 reconciliation); new DECISIONS entry; ERS variants of deploy/cutover/recovery runbooks live in the mirror; personal docs keep personal values.
 - **BACKLOG.md:** delete the fork line (this spec's archive is the record); the cross-tenant-test line closes with §7; the IP/licensing line stays (separate work).
 
-## 9. Decisions surfaced — NOT resolved here
+## 9. Decision register — resolved
 
 **The three headline decisions (John + ERS governance):**
 
@@ -201,7 +201,7 @@ GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
           rollout gate, not the migration); pilot = John + Cillian
           (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
           (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
-        □ purge predicate for OAuth rows written  □ MCP stateless-spec migration date verified (see risks)
+        □ purge predicate for OAuth rows written  ☑ MCP stateless-spec release date verified (see risks)
 PREP    □ §1 P0 upstream changes merged + tagged v1.2.x  □ npm test green
         □ private ERS-Genomics mirror created + overlay (registry, fly.toml, expectations, runbook)
 M1      □ Fly org+app  □ Supabase org+project  □ 5 migrations + advisors  □ brain_runtime login (:6543)
@@ -227,7 +227,7 @@ SHIP    □ security gate doc (ERS)  □ registers re-homed  □ OWNERSHIP/DECIS
 
 ## 12. Risks
 
-1. **MCP stateless-spec migration reported for 2026-07-28** — compiled from web research, never independently verified; collides with a plausible migration window. Verify and schedule around it (Gate 0 checklist item).
+1. **MCP stateless-spec release expected 2026-07-28 — verified 2026-07-16.** The [official draft changelog](https://modelcontextprotocol.io/specification/draft/changelog) confirms the sessionless/stateless changes; the [official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) says the full spec and stable SDK v2 are expected on 28 July 2026. This is not a same-day production cutoff: SDK v1.x remains the supported production line until then and is promised fixes/security updates for at least six months after v2 ships. Complete the ERS fork on the current supported v1 line; schedule the v2/CIMD migration as a separate post-fork work unit.
 2. **Counts drift** — hosted file counts have moved 40→41→44 across docs; the spec deliberately parameterizes on cutover-day measurement, never doc constants.
 3. **`pg_dump` tooling gap** — no Postgres-17-compatible dump path installed; unblock (or Docker) before M2. The restore rehearsal has never been executed on any stack; it is a go-live blocker here by design.
 4. **Supabase MCP connector is single-org** — cutover ops need a connector/PAT scoped to the ERS org (and the pilot org for the purge); the PAT-based local MCP BACKLOG item would retire the re-auth dance.
@@ -263,7 +263,7 @@ Per-phase verification is embedded above: §3.9 empty-stack smokes, §4.5 parity
 - §1 implementation: `npm run build`, `npm test`
 - Infra steps: operator-run hard gates per [docs/TOOLING.md](../TOOLING.md) — every hosted/deploy-affecting command is ask-first, never run as routine verification.
 
-## Assumptions (correct before "approved")
+## Approved execution assumptions
 
 1. Region pair (lhr/eu-west-2) and hostname (custom ERS domain) are resolved (§9 #5, #16); the Fly app name `ers-brain-mcp` remains a suggestion — with a custom domain fronting it, the app name is internal-only and enrollment-invisible.
 2. The SharePoint `sources/` tree is acceptable as the artifact archive (Storage objects excluded from DB dumps) — flagged inside §9 headline decision 2 (the sign-off package).
