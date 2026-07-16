@@ -16,8 +16,12 @@ if (!databaseUrl) {
 }
 
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
-const brainRoot =
-  process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
+const brainRoot = process.env.BRAIN_REPO_ROOT;
+
+if (!brainRoot) {
+  console.error("BRAIN_REPO_ROOT is missing. Set it to the Brain repository root before source inventory.");
+  process.exit(2);
+}
 
 const inventoryRoots = [
   { root: path.join(brainRoot, "sources"), categoryPrefix: "" },

@@ -11,8 +11,7 @@ loadLocalEnv();
 const execFileAsync = promisify(execFile);
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const brainId = process.env.BRAIN_ID || "ai-brain-jem";
-const brainRoot =
-  process.env.BRAIN_REPO_ROOT || "/Users/johnemilad/Projects/ai-brain-jem";
+const brainRoot = process.env.BRAIN_REPO_ROOT;
 const limit = process.env.BRAIN_SOURCE_TEXT_LIMIT
   ? Number(process.env.BRAIN_SOURCE_TEXT_LIMIT)
   : null;
@@ -21,6 +20,11 @@ if (!databaseUrl) {
   console.error(
     "BRAIN_REVISION_DATABASE_URL is missing. Set it before extracting source text."
   );
+  process.exit(2);
+}
+
+if (!brainRoot) {
+  console.error("BRAIN_REPO_ROOT is missing. Set it to the Brain repository root before extracting source text.");
   process.exit(2);
 }
 

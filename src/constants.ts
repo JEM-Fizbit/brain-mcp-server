@@ -89,7 +89,7 @@ export const SOURCE_CATEGORIES = [
   "photos",
   "other",
 ] as const;
-export type SourceCategory = (typeof SOURCE_CATEGORIES)[number];
+export type SourceCategory = string;
 
 /** Staleness thresholds in days */
 export const STALENESS = {

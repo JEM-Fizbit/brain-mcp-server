@@ -13,7 +13,16 @@ if [ -z "${BRAIN_SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
   export BRAIN_SUPABASE_SERVICE_ROLE_KEY
 fi
 
-export BRAIN_SUPABASE_URL="${BRAIN_SUPABASE_URL:-https://omnwbcdtmtvxasgdmvwr.supabase.co}"
+if [ -z "${BRAIN_SUPABASE_URL:-}" ]; then
+  IFS= read -r -p "Paste BRAIN_SUPABASE_URL: " BRAIN_SUPABASE_URL
+  export BRAIN_SUPABASE_URL
+fi
+
+if [ -z "${BRAIN_REPO_ROOT:-}" ]; then
+  IFS= read -r -p "Paste BRAIN_REPO_ROOT: " BRAIN_REPO_ROOT
+  export BRAIN_REPO_ROOT
+fi
+
 export BRAIN_SUPABASE_STORAGE_BUCKET="${BRAIN_SUPABASE_STORAGE_BUCKET:-brain-artifacts}"
 export BRAIN_ARTIFACT_BYTE_ACCESS=admin
 
