@@ -22,6 +22,7 @@ import type {
   RevisionStore,
   SearchOptions,
   SearchResult,
+  SyncHeartbeatInput,
 } from "./types.js";
 
 /** Sentinel hash for tombstone revisions — never a valid 64-hex sha256. */
@@ -212,6 +213,53 @@ export class PostgresRevisionStore implements RevisionStore {
 
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  async recordSyncHeartbeat(input: SyncHeartbeatInput): Promise<void> {
+    const counts = {
+      pushed: input.report.pushed.length,
+      pulled: input.report.pulled.length,
+      unchanged: input.report.unchanged.length,
+      conflicts: input.report.conflicts.length,
+      deleted: input.report.deleted.length,
+      deletionsSkipped: input.report.deletionsSkipped.length,
+    };
+    const durationMs = input.report.timings.find(
+      (timing) => timing.operation === "sync" && timing.phase === "total"
+    )?.ms ?? null;
+    const metadata = {
+      version: 1,
+      source: "local_sync_agent",
+      timingLayer: "sync_cycle",
+      durationType: "sync_cycle",
+      ok: true,
+      counts,
+      guardTripped: Boolean(input.report.guardTripped),
+    };
+
+    try {
+      await this.pool.query(
+        `
+          insert into brain.sync_events (
+            brain_id,
+            event_type,
+            duration_ms,
+            metadata,
+            created_at
+          )
+          values ($1, $2, $3, $4::jsonb, now())
+        `,
+        [
+          input.brainId,
+          "sync_heartbeat",
+          durationMs,
+          JSON.stringify(metadata),
+        ]
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[sync-heartbeat] Could not record heartbeat: ${message.slice(0, 180)}`);
+    }
   }
 
   async getHead(brainId: string, filename: string): Promise<FileHead | null> {

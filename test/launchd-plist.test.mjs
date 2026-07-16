@@ -581,6 +581,11 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       id: "ers-brain",
       name: "ERS",
       brainRoot: ersRoot,
+      env: {
+        BRAIN_REVISION_DATABASE_URL: "postgresql://ers-runtime.example.invalid/postgres",
+        BRAIN_HOSTED_BASE_URL: "https://brain.example.com",
+        BRAIN_FLY_APP: "example-brain-mcp",
+      },
       stateFile: path.join(tmpRoot, "state", "ers", "state.json"),
       healthFile: path.join(tmpRoot, "state", "ers", "state.health.json"),
       logDir: path.join(tmpRoot, "logs", "ers"),
@@ -630,6 +635,13 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
   assert.equal(config.brains[1].brainDir, path.join(ersRoot, "brain"));
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8788");
   assert.equal(config.brains[1].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "ers", "brain-monitor-stack.json"));
+  assert.equal(config.brains[1].env.BRAIN_REVISION_DATABASE_URL, "postgresql://ers-runtime.example.invalid/postgres");
+  assert.equal(config.brains[1].syncProcess.env.BRAIN_HOSTED_BASE_URL, "https://brain.example.com");
+  assert.equal(config.brains[1].cockpitProcess.env.BRAIN_FLY_APP, "example-brain-mcp");
+  const configStat = await fs.stat(
+    path.join(appPath, "Contents", "Resources", "brain-menubar-config.json")
+  );
+  assert.equal(configStat.mode & 0o777, 0o600);
   assert.deepEqual(
     JSON.parse(config.brains[1].env.BRAIN_COCKPIT_PROFILES_JSON).map((profile) => [
       profile.brainId,

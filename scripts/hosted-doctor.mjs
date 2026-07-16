@@ -6,6 +6,10 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
+  evaluateSyncHeartbeat,
+  SYNC_HEARTBEAT_EVENT_TYPE,
+} from "./lib/sync-heartbeat.mjs";
+import {
   diagnoseLatencyPerformance,
   authFailureSummaryFromSyncEventRows,
   HOSTED_MCP_AUTH_EVENT_TYPE,
@@ -97,6 +101,9 @@ const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
 const maxSyncHealthAgeMs = Number(
   process.env.BRAIN_SYNC_HEALTH_MAX_AGE_MS || 2 * 60 * 1000
+);
+const maxSyncHeartbeatAgeMs = Number(
+  process.env.BRAIN_SYNC_HEARTBEAT_MAX_AGE_MS || 5 * 60 * 1000
 );
 const lintNudgeDays = Number(process.env.BRAIN_LINT_NUDGE_DAYS || 30);
 const latencySloThresholds = normalizeLatencySloThresholds({
@@ -691,6 +698,44 @@ async function checkUserOperationLatency() {
   }
 }
 
+async function checkSyncHeartbeat() {
+  if (process.env.BRAIN_REVISION_STORE !== "postgres" || !databaseUrl) {
+    addCheck("sync_heartbeat", "pass", {
+      state: "not_applicable",
+      revisionStore: process.env.BRAIN_REVISION_STORE || "filesystem",
+    });
+    return;
+  }
+
+  const pool = new Pool({ max: 1, connectionString: databaseUrl });
+  try {
+    const result = await pool.query(
+      `
+        select created_at, duration_ms, metadata
+        from brain.sync_events
+        where brain_id = $1 and event_type = $2
+        order by created_at desc
+        limit 1
+      `,
+      [brainId, SYNC_HEARTBEAT_EVENT_TYPE]
+    );
+    const evaluation = evaluateSyncHeartbeat(
+      result.rows[0] || null,
+      Date.now(),
+      maxSyncHeartbeatAgeMs
+    );
+    addCheck("sync_heartbeat", evaluation.status, evaluation);
+  } catch (error) {
+    addCheck("sync_heartbeat", "warn", {
+      state: "unreadable",
+      maxAgeMs: maxSyncHeartbeatAgeMs,
+      error: String(error?.message || error).slice(0, 180),
+    });
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
 function latencyRowsQuery(sourceFilter) {
   return `
     select event_type, filename, duration_ms, metadata, created_at
@@ -1205,6 +1250,7 @@ function buildOperatorActions(status) {
   const lint = checkByName("lint_nudge");
   const inbox = checkByName("inbox");
   const latency = checkByName("user_operation_latency");
+  const heartbeat = checkByName("sync_heartbeat");
 
   const openConflicts = postgres?.details?.openConflicts || 0;
   if (openConflicts > 0) {
@@ -1245,6 +1291,16 @@ function buildOperatorActions(status) {
         supervisorKind === "menubar"
           ? "Open Brain Monitor, restart this Brain's local stack, then rerun hosted:doctor."
           : "Restart the local sync agent if the state is stale, missing, or not confidently active.",
+    });
+  }
+
+  if (heartbeat?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "sync_heartbeat_stale",
+      title: "Hosted sync heartbeat is missing or stale.",
+      detail:
+        "Confirm the profile's local sync watcher is running with the correct database target; a sleeping or offline sync host will stop emitting heartbeats.",
     });
   }
 
@@ -1331,6 +1387,7 @@ function buildOperatorActions(status) {
     "lint_nudge",
     "inbox",
     "hosted_mcp_auth_failures",
+    "sync_heartbeat",
   ]);
   if (latencyFinding) handledWarnings.add("user_operation_latency");
   if (hostedHealth?.details?.faultDomain === "local_connectivity") {
@@ -1452,6 +1509,7 @@ await Promise.all([
   timedCheck("local_sync_state", checkLocalState),
   timedCheck("sync_lock", checkSyncLock),
   timedCheck("sync_health", checkSyncHealth),
+  timedCheck("sync_heartbeat", checkSyncHeartbeat),
   timedCheck("user_operation_latency", checkUserOperationLatency),
   timedCheck("hosted_mcp_auth_failures", checkAuthFailures),
   timedCheck("lint_nudge", checkLintNudge),

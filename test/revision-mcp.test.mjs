@@ -404,6 +404,8 @@ test("HTTP MCP hosted inbox scan does not require a server brain_dir", async () 
 
   const result = await callTool(harness, "brain_scan_inbox");
   assert.match(result, /Server-side inbox/);
+  assert.match(result, /deployment's operator ingestion workflow/);
+  assert.doesNotMatch(result, /local stdio server|local sync mirror/);
   assert.match(result, /Postgres-backed Brain/);
 });
 

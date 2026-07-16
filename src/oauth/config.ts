@@ -18,6 +18,7 @@ export interface OauthConfig {
   registrationEndpoint: string;
   protectedResourceMetadataUrl: string;
   authorizationServerMetadataUrl: string;
+  documentationUrl: string;
   scopes: string[];
   signingSecret: string;
   githubClientId: string;
@@ -62,6 +63,7 @@ export function buildOauthConfig(): OauthConfig {
     registrationEndpoint: `${publicBase}/register`,
     protectedResourceMetadataUrl: `${publicBase}/.well-known/oauth-protected-resource/mcp`,
     authorizationServerMetadataUrl: `${publicBase}/.well-known/oauth-authorization-server`,
+    documentationUrl: requiredEnv("MCP_OAUTH_DOCUMENTATION_URL"),
     scopes: ["mcp:tools"],
     signingSecret: requiredEnv("MCP_OAUTH_SIGNING_SECRET"),
     githubClientId: requiredEnv("GITHUB_OAUTH_CLIENT_ID"),

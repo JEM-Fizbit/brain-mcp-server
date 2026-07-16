@@ -240,7 +240,13 @@ last usable report when a launch fails.
 For one operator app that supervises both JEM and ERS, pass
 `BRAIN_MENUBAR_PROFILES_JSON` as a JSON array. Each profile supports `id` or
 `brainId`, `name` or `displayName`, `brainRoot` or `brainDir`, `stateFile`,
-`healthFile`, `logDir`, and `cockpitUrl`:
+`healthFile`, `logDir`, `cockpitUrl`, and an optional `env` object. The profile
+environment allow-list is `BRAIN_REVISION_STORE`,
+`BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, and `BRAIN_FLY_APP`;
+these values are passed only to that profile's sync, cockpit, and doctor
+processes. This lets two profiles target different hosted stacks from one app.
+The generated config is owner-readable only (`0600`) because a database URL is
+a credential; never commit or print the profiles JSON:
 
 ```bash
 BRAIN_MENUBAR_APP="$HOME/Applications/Brain Monitor.app" \
@@ -308,6 +314,13 @@ configured profile. Override the polling interval with
 `BRAIN_MENUBAR_DOCTOR_INTERVAL_MS`; values below 60000 are clamped to 60
 seconds so the local menu does not create avoidable hosted-check churn. Manual
 `Refresh Doctor` remains available for immediate operator checks.
+
+For Postgres-backed profiles, every successful sync cycle writes a
+metadata-only `brain.sync_events` row with `event_type = 'sync_heartbeat'`.
+The row contains counts, duration, and guard status only—never filenames,
+content, database URLs, or credentials. `hosted:doctor` warns when the latest
+heartbeat is older than five minutes; override the threshold with
+`BRAIN_SYNC_HEARTBEAT_MAX_AGE_MS` for a deliberately slower watcher cadence.
 
 ## Operator Contract
 
@@ -397,7 +410,7 @@ Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.
 
 Hosted auth failures write metadata-only events to the same table with event type `hosted_mcp_auth`, metadata source `hosted_mcp_server`, `timingLayer = "auth"`, and operation kind `auth`. These rows are meant to expose stale/disconnected connector credentials, token expiry, invalid grants, and missing bearer headers. They record sanitized reason codes and HTTP status; OAuth token failures use the detailed server-side failure class when available, such as `unknown_client_id` or `client_authentication_failed`, while keeping the OAuth error family as the safe target. They also record the non-secret OAuth `clientId` and `grantType` when derivable (raw `clientId` so it joins to the `oauth_state` `clients` registry; both sanitized — `clientId` is attacker-controlled on the failure path). They do not record access tokens, refresh tokens, authorization headers, request bodies, client secrets, `User-Agent`/IP, or Brain content. Auth events appear in usage counts and the Operation Log, and they drive a dedicated `hosted_mcp_auth_failures` doctor check, but they remain excluded from latency trendlines and SLO calculations. The `hosted_mcp_auth_failures` check counts failures (`metadata->>'ok' = 'false'`) in a trailing window and returns `warn`/`fail`, so the Checks tab and overall status reflect auth health. It returns a bounded summary for the cockpit: current-window failures and successes, failure rate, prior-window delta, first/last failure, active-vs-stale state, reason/client/grant/target/name/HTTP breakdowns, fixed buckets for a trendline, and recent metadata-only failures. It also classifies a benign **stale connector** — a single *unregistered* `clientId` looping `unknown_client_id` on a `refresh_token` grant past `BRAIN_HOSTED_MCP_AUTH_STALE_GRACE_MINUTES` (default 10) — via `connectorState`, and downgrades that case from `fail` to `warn` through `effectiveStatus` (the Checks tab reads `effectiveStatus`). The downgrade is conservative: any ambiguity (multiple client ids, mixed reasons, unknown registered set, or a short burst) keeps full severity. Tune the bounded auth read with `BRAIN_HOSTED_MCP_AUTH_EVENT_LIMIT`, `BRAIN_HOSTED_MCP_AUTH_RECENT_LIMIT`, and `BRAIN_HOSTED_MCP_AUTH_BUCKETS`. It shares its window, thresholds, and stale-connector downgrade with the alerter described next.
 
-The hosted server also raises real-time Slack alerts on auth failures. When a `hosted_mcp_auth` failure is recorded, the server evaluates — best-effort and non-blocking, never adding latency to the auth path — whether to post: `warn` (default ≥ 3 failures in the trailing 60m) goes to `#claude-ops`, and `fail` (default ≥ 10) goes to the operator DM with an `[Action needed]` prefix. A per-severity cooldown (default 30m) throttles a persistent condition while letting a worsening `warn → fail` escalate immediately. Alert dispatches are recorded as metadata-only `hosted_mcp_auth_alert` rows (`source = 'hosted_mcp_server'`, `kind = 'auth_alert'`) carrying only severity, count, window, reason codes, HTTP status, channel, and an `ok` flag — never tokens, headers, bodies, SQL text, or Brain content. Alerting is gated on `BRAIN_SLACK_BOT_TOKEN`; with no token it is a no-op (so local/dev and tests stay hermetic). Configure with `BRAIN_SLACK_BOT_TOKEN` (a Slack bot token with `chat:write`, set as a Fly secret), `BRAIN_SLACK_ALERT_CHANNEL` (default `C0B27NK40H4`), `BRAIN_SLACK_ALERT_DM` (default `U06SWS92Y5V`), `BRAIN_AUTH_ALERT_WINDOW_MINUTES` (60), `BRAIN_AUTH_ALERT_WARN_THRESHOLD` (3), `BRAIN_AUTH_ALERT_FAIL_THRESHOLD` (10), `BRAIN_AUTH_ALERT_COOLDOWN_MINUTES` (30), and `BRAIN_AUTH_ALERT_ENABLED=0` to disable. Set `BRAIN_AUTH_ALERT_AWAIT=1` only to await the post for diagnostics.
+The hosted server also raises real-time Slack alerts on auth failures. When a `hosted_mcp_auth` failure is recorded, the server evaluates — best-effort and non-blocking, never adding latency to the auth path — whether to post: `warn` (default ≥ 3 failures in the trailing 60m) goes to the configured channel, and `fail` (default ≥ 10) goes to the configured operator DM with an `[Action needed]` prefix. A per-severity cooldown (default 30m) throttles a persistent condition while letting a worsening `warn → fail` escalate immediately. Alert dispatches are recorded as metadata-only `hosted_mcp_auth_alert` rows (`source = 'hosted_mcp_server'`, `kind = 'auth_alert'`) carrying only severity, count, window, reason codes, HTTP status, channel, and an `ok` flag — never tokens, headers, bodies, SQL text, or Brain content. Alerting requires `BRAIN_SLACK_BOT_TOKEN`, `BRAIN_SLACK_ALERT_CHANNEL`, and `BRAIN_SLACK_ALERT_DM`; if any is absent it is a no-op (so local/dev and tests stay hermetic and a deployment cannot silently alert the wrong destination). Configure the token as a Fly secret and both destinations explicitly, plus `BRAIN_AUTH_ALERT_WINDOW_MINUTES` (60), `BRAIN_AUTH_ALERT_WARN_THRESHOLD` (3), `BRAIN_AUTH_ALERT_FAIL_THRESHOLD` (10), `BRAIN_AUTH_ALERT_COOLDOWN_MINUTES` (30), and `BRAIN_AUTH_ALERT_ENABLED=0` to disable. Set `BRAIN_AUTH_ALERT_AWAIT=1` only to await the post for diagnostics.
 
 Sync-wait latency is measured by `npm run smoke:hosted:oauth` and `npm run hosted:test-drive`, because it measures local-hosted propagation rather than one server tool handler. Those flows write `sync_wait` rows by default. The same smoke/test-drive flows also write client-observed end-to-end samples by default with metadata source `hosted_mcp_client_e2e` and `timingLayer = "client_e2e"`. These rows include client/network/MCP response parsing overhead and are reported separately from countable server tool calls to avoid double-counting usage. Disable those diagnostic client rows with `BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE=0`.
 

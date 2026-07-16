@@ -139,6 +139,12 @@ const resourcesDir = path.join(contentsDir, "Resources");
 const executablePath = path.join(macosDir, appName);
 const nativeSourcePath = path.join(resourcesDir, "brain-menubar-app.m");
 const configPath = path.join(resourcesDir, "brain-menubar-config.json");
+const profileEnvKeys = new Set([
+  "BRAIN_REVISION_STORE",
+  "BRAIN_REVISION_DATABASE_URL",
+  "BRAIN_HOSTED_BASE_URL",
+  "BRAIN_FLY_APP",
+]);
 
 function parseUrl(value) {
   try {
@@ -206,6 +212,21 @@ function normalizeProfile(rawProfile, index) {
   const profileDoctorErrorPath =
     raw.doctorErrorPath || path.join(profileLogDir, "hosted-doctor.err.log");
   const profileSyncEnabled = !isExplicitlyFalse(raw.syncEnabled);
+  const profileEnv = {};
+  if (raw.env !== undefined) {
+    if (!raw.env || typeof raw.env !== "object" || Array.isArray(raw.env)) {
+      throw new Error(`Brain profile ${profileBrainId} env must be an object`);
+    }
+    for (const [key, value] of Object.entries(raw.env)) {
+      if (!profileEnvKeys.has(key)) {
+        throw new Error(`Brain profile ${profileBrainId} env key is not supported: ${key}`);
+      }
+      if (typeof value !== "string" || value.length === 0) {
+        throw new Error(`Brain profile ${profileBrainId} env value must be a non-empty string: ${key}`);
+      }
+      profileEnv[key] = value;
+    }
+  }
 
   if (!Number.isInteger(profileIntervalMs) || profileIntervalMs < 1000) {
     throw new Error(
@@ -227,6 +248,7 @@ function normalizeProfile(rawProfile, index) {
   const cockpitStdout = path.join(profileLogDir, "monitor-cockpit.out.log");
   const cockpitStderr = path.join(profileLogDir, "monitor-cockpit.err.log");
   const baseEnv = {
+    ...profileEnv,
     BRAIN_ID: profileBrainId,
     BRAIN_PROFILE_NAME: raw.displayName || raw.name || profileBrainId,
     BRAIN_DIR: profileBrainDir,
@@ -1762,6 +1784,7 @@ for (const profile of brainProfiles) {
 }
 await fs.writeFile(path.join(contentsDir, "Info.plist"), plist, "utf-8");
 await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+await fs.chmod(configPath, 0o600);
 await fs.writeFile(nativeSourcePath, nativeSource, "utf-8");
 await exec("/usr/bin/cc", [
   "-fobjc-arc",
