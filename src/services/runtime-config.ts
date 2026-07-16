@@ -3,6 +3,7 @@ import {
   revisionStoreProvider,
 } from "./active-brain-store.js";
 import { artifactStoreProvider } from "./active-artifact-store.js";
+import { assertHttpIdentityConfig } from "./runtime-env.js";
 
 function truthy(value: string | undefined): boolean {
   return value === "1" || value === "true" || value === "yes";
@@ -41,6 +42,7 @@ export function runtimeStatus(): RuntimeStatus {
 }
 
 export function assertHttpRuntimeConfig(): void {
+  assertHttpIdentityConfig();
   const status = runtimeStatus();
   const missing: string[] = [];
 

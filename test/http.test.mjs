@@ -94,6 +94,7 @@ test("health reports non-secret runtime store modes", async () => {
   await withEnv(
     {
       TRANSPORT: "http",
+      BRAIN_ID: "ai-brain-jem",
       BRAIN_REVISION_STORE: "postgres",
       BRAIN_OAUTH_STATE_STORE: undefined,
       BRAIN_REVISION_DATABASE_URL: "postgresql://example.invalid/postgres",
@@ -133,6 +134,7 @@ test("HTTP Postgres runtime requires Supabase artifact storage config", async ()
   await withEnv(
     {
       TRANSPORT: "http",
+      BRAIN_ID: "ai-brain-jem",
       BRAIN_REVISION_STORE: "postgres",
       BRAIN_REVISION_DATABASE_URL: "postgresql://example.invalid/postgres",
       BRAIN_ARTIFACT_STORE: undefined,
@@ -152,6 +154,7 @@ test("HTTP Postgres OAuth state requires a database URL", async () => {
   await withEnv(
     {
       TRANSPORT: "http",
+      BRAIN_ID: "ai-brain-jem",
       BRAIN_OAUTH_STATE_STORE: "postgres",
       BRAIN_REVISION_STORE: undefined,
       BRAIN_REVISION_DATABASE_URL: undefined,
@@ -172,6 +175,7 @@ test("HTTP Supabase artifact metadata runtime does not require service role key"
   await withEnv(
     {
       TRANSPORT: "http",
+      BRAIN_ID: "ai-brain-jem",
       BRAIN_REVISION_STORE: "postgres",
       BRAIN_REVISION_DATABASE_URL: "postgresql://example.invalid/postgres",
       BRAIN_ARTIFACT_STORE: "supabase",
@@ -188,6 +192,7 @@ test("HTTP Supabase artifact admin byte access fails fast without service role k
   await withEnv(
     {
       TRANSPORT: "http",
+      BRAIN_ID: "ai-brain-jem",
       BRAIN_REVISION_STORE: "postgres",
       BRAIN_REVISION_DATABASE_URL: undefined,
       BRAIN_ARTIFACT_STORE: "supabase",

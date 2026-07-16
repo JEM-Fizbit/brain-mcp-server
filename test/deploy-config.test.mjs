@@ -1,15 +1,33 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
+const expectations = JSON.parse(
+  await fs.readFile(path.join(__dirname, "deploy-expectations.json"), "utf-8")
+);
 
-test("Fly config uses Supabase stores instead of the retired git hot path", async () => {
+function flyEnvValue(flyConfig, name) {
+  const match = flyConfig.match(new RegExp(`^\\s*${name}\\s*=\\s*"([^"]+)"`, "m"));
+  return match?.[1];
+}
+
+function imagePathToRepoPath(imagePath) {
+  assert.match(imagePath, /^\/app\//, "deployment registry must be image-baked under /app");
+  return path.join(repoRoot, imagePath.slice("/app/".length));
+}
+
+test("Fly config keeps universal hosted deployment invariants", async () => {
   const flyConfig = await fs.readFile(path.join(repoRoot, "fly.toml"), "utf-8");
 
+  assert.equal(flyEnvValue(flyConfig, "TRANSPORT"), "http");
+  assert.ok(flyEnvValue(flyConfig, "BRAIN_ID"));
+  assert.ok(flyEnvValue(flyConfig, "BRAIN_PLATFORM_CONFIG"));
   assert.match(flyConfig, /BRAIN_REVISION_STORE = "postgres"/);
   assert.match(flyConfig, /BRAIN_OAUTH_STATE_STORE = "postgres"/);
   assert.match(flyConfig, /MCP_OAUTH_REFRESH_REUSE_GRACE_SEC = "15"/);
@@ -22,6 +40,7 @@ test("Fly config uses Supabase stores instead of the retired git hot path", asyn
   assert.doesNotMatch(flyConfig, /BRAIN_DEPLOY_KEY/);
   assert.doesNotMatch(flyConfig, /brain_deploy_key/);
   assert.doesNotMatch(flyConfig, /BRAIN_SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(flyConfig, /GITHUB_ALLOWED_(?:LOGINS|EMAILS)/);
 });
 
 test("Fly image does not install or configure deploy-key SSH access", async () => {
@@ -38,73 +57,82 @@ test("Fly image does not install or configure deploy-key SSH access", async () =
   assert.match(entrypoint, /exec "\$@"/);
 });
 
-test("Fly image carries the John-only JEM and ERS pilot registry", async () => {
-  const flyConfig = await fs.readFile(path.join(repoRoot, "fly.toml"), "utf-8");
-  const dockerfile = await fs.readFile(path.join(repoRoot, "Dockerfile"), "utf-8");
-  const entrypoint = await fs.readFile(
-    path.join(repoRoot, "scripts", "fly-entrypoint.sh"),
-    "utf-8"
-  );
-  const registry = JSON.parse(
-    await fs.readFile(
-      path.join(repoRoot, "config", "brain-platform.john-ers-pilot.json"),
-      "utf-8"
-    )
-  );
+test("HTTP entrypoint refuses to start without an explicit existing registry", async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "brain-entrypoint-test-"));
+  const registryPath = path.join(tmpDir, "registry.json");
+  const entrypoint = path.join(repoRoot, "scripts", "fly-entrypoint.sh");
+  const command = [entrypoint, "sh", "-c", "exit 0"];
 
-  assert.match(
-    flyConfig,
-    /BRAIN_PLATFORM_CONFIG = "\/app\/config\/brain-platform\.john-ers-pilot\.json"/
-  );
-  assert.match(dockerfile, /COPY config \.\/config/);
-  assert.match(entrypoint, /\/data\/config\/registry\.json/);
-  assert.equal(registry.version, 1);
-  assert.equal(registry.default_brain_id, "ai-brain-jem");
-  assert.deepEqual(
-    registry.brains.map((brain) => brain.id).sort(),
-    ["ai-brain-jem", "ers-brain"]
-  );
-  assert.ok(
-    registry.brains.every((brain) => brain.storage_backend === "postgres")
-  );
-  const jemBrain = registry.brains.find((brain) => brain.id === "ai-brain-jem");
-  const ersBrain = registry.brains.find((brain) => brain.id === "ers-brain");
-  assert.ok(jemBrain);
-  assert.ok(ersBrain);
-  assert.equal(jemBrain.metadata.owner_scope, "personal");
-  assert.deepEqual(jemBrain.metadata.canonical_for, [
-    "john-milad",
-    "personal-context",
-    "personal-operations",
-  ]);
-  assert.equal(jemBrain.metadata.authority_tier, "canonical");
-  assert.equal(ersBrain.metadata.owner_scope, "company");
-  assert.deepEqual(ersBrain.metadata.canonical_for, [
-    "ers-genomics",
-    "ers-company-context",
-    "ers-work-context",
-  ]);
-  assert.equal(ersBrain.metadata.authority_tier, "canonical");
-  assert.match(ersBrain.metadata.fallback_note, /may lag the canonical company Brain/);
-  const john = registry.principals.find((principal) => principal.login === "JEM-Fizbit");
-  assert.ok(john);
-  assert.equal(john.provider_user_id, "220941196");
-  assert.equal(john.roles["ai-brain-jem"], "owner");
-  assert.equal(john.roles["ers-brain"], "owner");
-  assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
+  try {
+    const missingEnv = {
+      PATH: process.env.PATH,
+      TRANSPORT: "http",
+      BRAIN_PLATFORM_CONFIG: registryPath,
+    };
+    const missing = spawnSync("sh", command, { env: missingEnv, encoding: "utf-8" });
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /BRAIN_PLATFORM_CONFIG.*existing file/i);
+
+    await fs.writeFile(registryPath, "{}\n", "utf-8");
+    const present = spawnSync("sh", command, { env: missingEnv, encoding: "utf-8" });
+    assert.equal(present.status, 0, present.stderr);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
 });
 
-test("ERS Brain pilot seed is data-only and private by default", async () => {
+test("image-baked registry satisfies universal and profile expectations", async () => {
+  const flyConfig = await fs.readFile(path.join(repoRoot, "fly.toml"), "utf-8");
+  const dockerfile = await fs.readFile(path.join(repoRoot, "Dockerfile"), "utf-8");
+  const configuredRegistryPath = flyEnvValue(flyConfig, "BRAIN_PLATFORM_CONFIG");
+  assert.ok(configuredRegistryPath);
+  const registry = JSON.parse(
+    await fs.readFile(imagePathToRepoPath(configuredRegistryPath), "utf-8")
+  );
+
+  assert.match(dockerfile, /COPY config \.\/config/);
+  assert.equal(registry.version, 1);
+  assert.ok(registry.brains.some((brain) => brain.id === registry.default_brain_id));
+  assert.ok(registry.principals.some((principal) =>
+    /^\d+$/.test(principal.provider_user_id || "") &&
+    principal.roles?.[registry.default_brain_id] === "owner"
+  ));
+  assert.ok(registry.brains.every((brain) => brain.storage_backend === "postgres"));
+  assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
+
+  assert.equal(registry.default_brain_id, expectations.registry.default_brain_id);
+  assert.deepEqual(
+    registry.brains.map((brain) => brain.id).sort(),
+    [...expectations.registry.brain_ids].sort()
+  );
+  for (const [brainId, expectedMetadata] of Object.entries(
+    expectations.registry.brain_metadata || {}
+  )) {
+    const brain = registry.brains.find((candidate) => candidate.id === brainId);
+    assert.ok(brain, `expected Brain ${brainId}`);
+    for (const [key, value] of Object.entries(expectedMetadata)) {
+      assert.deepEqual(brain.metadata?.[key], value);
+    }
+  }
+  const principal = registry.principals.find((candidate) =>
+    candidate.provider === expectations.registry.principal.provider &&
+    candidate.provider_user_id === expectations.registry.principal.provider_user_id
+  );
+  assert.ok(principal, "expected deployment principal");
+  assert.deepEqual(principal.roles, expectations.registry.principal.roles);
+});
+
+test("deployment seed is data-only and private by default", {
+  skip: expectations.pilot_seed ? false : "deployment profile has no pilot seed",
+}, async () => {
   const seed = await fs.readFile(
-    path.join(repoRoot, "db", "seeds", "2026-06-24_001_bootstrap_ers_brain_pilot.sql"),
+    path.join(repoRoot, expectations.pilot_seed.path),
     "utf-8"
   );
 
   assert.match(seed, /insert into brain\.brains/i);
-  assert.match(seed, /'ers-brain'/);
-  assert.match(seed, /'shared'/);
-  assert.match(seed, /john-only-pilot/);
-  assert.match(seed, /production_cutover_requires_ers_owned_project/);
+  assert.match(seed, new RegExp(`'${expectations.pilot_seed.brain_id}'`));
+  for (const marker of expectations.pilot_seed.markers) assert.match(seed, new RegExp(marker));
   assert.doesNotMatch(seed, /\bgrant\b/i);
   assert.doesNotMatch(seed, /\bcreate policy\b/i);
   assert.doesNotMatch(seed, /\banon\b/i);

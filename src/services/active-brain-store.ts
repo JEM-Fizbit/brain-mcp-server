@@ -7,6 +7,7 @@ import { PostgresRevisionStore, postgresPoolOptions } from "../sync/postgres-rev
 import { PostgresSourceMetadataStore } from "../sources/postgres-source-store.js";
 import { instrumentPostgresPool } from "./operation-telemetry.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
+import { runtimeBrainId } from "./runtime-env.js";
 
 const { Pool } = pg;
 
@@ -72,7 +73,7 @@ export function activeBrainStore(): BrainStore {
 }
 
 export async function warmActiveBrainStore(
-  brainId = process.env.BRAIN_ID || "ai-brain-jem"
+  brainId = runtimeBrainId()
 ): Promise<void> {
   if (revisionStoreProvider() !== "postgres") return;
   const store = activeBrainStore();

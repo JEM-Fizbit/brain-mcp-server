@@ -2,6 +2,7 @@ import pg from "pg";
 import { revisionStoreProvider } from "./active-brain-store.js";
 import { maybeAlertOnAuthFailure } from "./auth-alert.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
+import { runtimeBrainId } from "./runtime-env.js";
 
 const { Pool } = pg;
 
@@ -116,7 +117,7 @@ async function recordAuthEvent(input: {
         values ($1, $2, null, $3, $4::jsonb, now())
       `,
       [
-        process.env.BRAIN_ID || "ai-brain-jem",
+        runtimeBrainId(),
         HOSTED_MCP_AUTH_EVENT_TYPE,
         Math.max(0, Number(input.durationMs.toFixed(3))),
         JSON.stringify(metadata),
