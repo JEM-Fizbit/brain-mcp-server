@@ -1,6 +1,6 @@
 # Prototype Brain Context Inventory
 
-**Status:** read-only inventory complete; JEM `v1.4.0` observation active; downstream updates remain deferred until the JEM/ERS spec 013 content contract stabilises
+**Status:** read-only inventory complete; JEM/ERS `v1.4.1` observation active; downstream updates remain deferred until the shared spec 013 content contract stabilises
 **Last checked:** 2026-07-17
 **Related:** [`specs/013-brain-context-architecture.md`](specs/013-brain-context-architecture.md); [`../BACKLOG.md`](../BACKLOG.md)
 
@@ -27,8 +27,8 @@ The initial JEM content migration deliberately did not widen into non-Brain work
 ## Update order
 
 1. Observe the deployed `v1.3.2` graph-parser correction without changing enforcement. Completed before JEM migration approval.
-2. Complete the approved JEM content migration and observation gate. The migration shipped in `v1.4.0`; observation remains active in `graph_shadow`.
-3. Complete the separately gated ERS migration and observation gate.
+2. Complete the approved JEM content migration and bounded gate review. The migration shipped in `v1.4.0`; the review passed and JEM remains in advisory `graph_shadow`.
+3. Complete the separately gated ERS migration and observation gate. The migration shipped in `v1.4.1`; observation remains active in advisory `graph_shadow`.
 4. Update the public primer to the proven final contract.
 5. Review the ERS onboarding prototype and Cowork project pointers, including Edge, without imposing server-only controls on non-Brain workspaces.
 
