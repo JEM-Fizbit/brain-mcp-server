@@ -46,7 +46,7 @@ Full current-state/target-state detail with file:line refs is in the evidence fi
 | Registry/config | Image-baked `config/brain-platform.john-ers-pilot.json`; `default_brain_id: ai-brain-jem`; sole principal JEM-Fizbit `220941196` owner of both brains | New `config/brain-platform.ers.json` (ERS-mirror-only, repo is public): `default_brain_id: ers-brain`, ERS principals pinned by numeric id | ~1–2 d |
 | Local ops (John's Mac) | Brain Monitor runs a JEM + an ERS profile today, but **both share one `.env.local`** → the ERS profile syncs SharePoint↔**personal** Postgres, and its doctor health-checks the personal stack (hardcoded app/base URL) | Per-profile env passthrough (or second checkout); ERS profile re-pointed at ERS DB/host with fresh sync state | ~1.5–2 d |
 | Data | Audit 2026-07-12: 44 md files (+1 tombstoned head), 309 revisions, 128 sources (125 real + 3 drift), 57 texts, 128 storage objects, 243 latency events, 0 chunks. After the 2026-07-17 spec 013 migration: 50 md files, zero conflicts, and exact SharePoint/hosted convergence | Re-seed the current SharePoint mirror (D1); fresh history; pilot rows verifiably purged after soak | ~1.5–2 d |
-| Release/custody | Annotated release tags and guarded deploy provenance are active upstream; `v1.4.1` contains the deployed structural runtime and `v1.4.2` is the reconciled mirror candidate | Private ERS-Genomics mirror + overlay, tracking reviewed upstream tags only | ~2–3 d |
+| Release/custody | Annotated release tags and guarded deploy provenance are active upstream; `v1.4.1` contains the deployed structural runtime; `v1.4.2` was the first imported mirror tag; `v1.4.3` adds tenant-neutral single-Brain profile tests and overlay-aware guarded provenance | Private ERS-Genomics mirror + overlay, tracking reviewed upstream tags only | ~2–3 d |
 | Monitoring | One alert path (auth failures → Slack), inside the monitored process; doctor 100% laptop-bound; no external uptime check; backups never rehearsed | External `/health` monitor, off-laptop scheduled doctor, sync heartbeat, backup-restore cadence | ~2–4 d |
 | Billing | Personal Fly + Supabase | ERS cards on both; baseline **~$31/mo** (~$6 Fly + $25 Supabase Pro); PITR-7d would be +$100/mo (defer recommended — §9) | ~0.5 d admin |
 
@@ -76,7 +76,7 @@ All land upstream so both stacks inherit them; the mirror then needs zero source
 
 **P1 (ship with the fork, not gating):** OAuth metadata doc URLs env-driven (currently hardcode the personal repo URL into public discovery metadata); menubar installer per-profile env passthrough (§4.5 — or accept the two-checkout workaround); S1-guard/inbox error text rewritten so hosted users aren't advised into a local-stdio fallback that bypasses the revision store; sync heartbeat event (§7). **Decision, not default (§9):** hard-disabling the `GITHUB_ALLOWED_*` code path (e.g. refuse to boot in HTTP mode when set) vs env-absence discipline.
 
-**Execution status (2026-07-17):** P0 and P1 completed upstream with test-first coverage at `v1.2.0`. The generic spec 013 server and Brain-structure work is deployed through `v1.4.1`; `v1.4.2` reconciles the fork runbook, complete migration manifest, structural data baseline, and regression coverage without changing the deployed runtime. `v1.4.2` is the exact candidate for the first private-mirror population.
+**Execution status (2026-07-17):** P0 and P1 completed upstream with test-first coverage at `v1.2.0`. The generic spec 013 server and Brain-structure work is deployed through `v1.4.1`; `v1.4.2` reconciled the fork runbook, complete migration manifest, structural data baseline, and regression coverage and became the first private-mirror import. The first real overlay preflight then exposed two generic release-contract gaps: the deployment test still named both pilot Brains, and the exact-tag deploy guard could not attest a committed overlay. `v1.4.3` fixes both upstream without changing `src/`, `db/`, the runtime image, or the resolved topology. It is the required base for the first private overlay.
 
 Verification: `npm test` (logic changes) + `npm run build`; each change follows normal spec-less commit discipline (mechanical, intent in commit messages, this spec is the record).
 
@@ -206,8 +206,8 @@ GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
           (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
           (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
         □ purge predicate for OAuth rows written  ☑ MCP stateless-spec release date verified (see risks)
-PREP    ☑ §1 P0+P1 upstream changes merged  ☑ structural release deployed  ☑ v1.4.2 mirror candidate tagged  ☑ npm test green
-        ☑ private ERS-Genomics repo created empty  □ populate from v1.4.2 + add overlay (registry, fly.toml, expectations, runbook)
+PREP    ☑ §1 P0+P1 upstream changes merged  ☑ structural release deployed  ☑ v1.4.2 imported  ☑ v1.4.3 overlay hardening tagged
+        ☑ npm test green  ☑ private ERS-Genomics repo under custody  □ import v1.4.3 + add overlay (registry, fly.toml, expectations, runbook)
 M1      □ Fly org+app  □ Supabase org+project  □ 6 migrations + advisors/security gate  □ brain_runtime login (:6543)
         □ bucket private  □ GitHub OAuth app  □ secrets set (no GITHUB_ALLOWED_*)  □ ERS seed row
         □ deploy @tag  □ /health + OAuth/DCR + runtime-role smokes  □ assets registered
