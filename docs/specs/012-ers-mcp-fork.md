@@ -15,7 +15,7 @@ The hosted Brain MCP is personal-owned and ERS beta-shared (John sole user). The
 ## Acceptance criteria
 
 - ERS stack live: `https://<ers-host>/health` green (`revisionStore=postgres`, `artifactStore=supabase`, `oauthStateStore=postgres`, `gitHotPath=disabled`); OAuth enrollment + one read and one narrow write verified from each active ERS client surface.
-- Data parity at cutover: hosted `ers-brain` file count == SharePoint mirror count (44 at audit time — **re-measure on cutover day**), sources == 125 (the 3 `working/*` path-drift rows excluded), extracted texts ≈ 57; bidirectional sync parity passes (`--write --verify-local` and `--local-write --verify-hosted`).
+- Data parity at cutover: hosted `ers-brain` file count == SharePoint mirror count (50 after the 2026-07-17 structural migration — **re-measure on cutover day**), sources == 125 (the 3 `working/*` path-drift rows excluded), extracted texts ≈ 57; bidirectional sync parity passes (`--write --verify-local` and `--local-write --verify-hosted`).
 - Restore rehearsal (recovery doc §8 steps) executed against the **ERS** project and timed, before cutover is declared done.
 - Security gate re-run passes on the ERS project; new dated gate doc committed; Supabase advisors clean after every migration.
 - Personal stack pristine: purge verification queries (§6) all return 0; `brain_list_brains` on the personal connector returns only `ai-brain-jem`; jembot token rotated and absent from `jem-brain-mcp` secrets; personal `hosted:doctor` green throughout.
@@ -27,7 +27,7 @@ The hosted Brain MCP is personal-owned and ERS beta-shared (John sole user). The
 ## Out of scope
 
 - **Entra ID IdP module** — locked as roadmap-not-rollout (D1). GitHub stays IdP; the Entra path is sized in §2.4 for planning only. Precedent exists (ERS ms-graph-mcp Entra app, tenant `a0b54b24-…`).
-- **Semantic/vector search build** — `brain_semantic_index`/`brain_semantic_search` hard-error on any postgres-backed brain (S1-guard; the index is filesystem-only, `brain.source_chunks` is dormant schema with zero runtime readers). ERS launches with keyword `brain_search` only; a vector build is a separate promotion. Any doc implying the index can be "rebuilt on ERS infra post-cutover" is wrong.
+- **Semantic/vector search build** — `brain_semantic_index`/`brain_semantic_search` hard-error on any postgres-backed brain (S1-guard; the index is filesystem-only, `brain.source_chunks` is dormant schema with zero runtime readers). ERS launches with ranked Postgres full-text `brain_search`, not vector search; a vector build is a separate promotion. Any doc implying a semantic/vector index can be "rebuilt on ERS infra post-cutover" is wrong.
 - **Multi-user RLS redesign** — RLS stays `using(true)` role-boundary-only; isolation remains app-layer (registry + `brain_id`), verified by the cross-tenant test. Per-principal RLS is an M4+ question.
 - **M4 team-onboarding hardening** (registry validation, hot-file concurrency, load test at 20 concurrent, colleague quickstart, adoption owner) — gates adding colleagues, not this fork; promote separately from the platform-review P1 list.
 - **IP/licensing legal execution** — MIT LICENSE + `"license": "MIT"` already exist in-repo (verified; the prior "license unaudited" gap is closed). What remains is the written "ERS deploys under licence" acknowledgment — logistics flagged in §9, wording is counsel's job, separate BACKLOG item.
@@ -40,13 +40,13 @@ Full current-state/target-state detail with file:line refs is in the evidence fi
 | Surface | Current (personal stack) | ERS target | LOE |
 |---|---|---|---|
 | Fly | App `jem-brain-mcp`, org `personal`, lhr, 1× shared-cpu-1x/1GB, always-on, **no volume**, no custom domain, 9 secrets, no CI (operator-local `fly deploy`) | New ERS Fly org (none exists) + app (suggest `ers-brain-mcp`), same shape, all secrets minted fresh | ~1 d |
-| Supabase | `brain-platform-pilot` ref `omnwbcdtmtvxasgdmvwr`, "ERSG Prototypes" org (**personal-owned despite the name**), eu-west-2, Pro; PITR off | New ERS org + project; 5 migrations in order (incl. `2026-07-08_001` tombstones — post-audit addition); `brain_runtime` login on transaction pooler `:6543`; bucket `brain-artifacts`; security re-gate | ~1–2 d |
+| Supabase | `brain-platform-pilot` ref `omnwbcdtmtvxasgdmvwr`, "ERSG Prototypes" org (**personal-owned despite the name**), eu-west-2, Pro; PITR off | New ERS org + project; 6 migrations in order (including durable OAuth state, tombstones, and the private revision-FTS index); `brain_runtime` login on transaction pooler `:6543`; bucket `brain-artifacts`; security re-gate | ~1–2 d |
 | OAuth / IdP | GitHub OAuth app (presumed JEM-Fizbit-owned — unrecorded), HS256 JWT, DCR, postgres oauth_state; `GITHUB_ALLOWED_*` fallback **actively set** | New GitHub OAuth app under ERS-Genomics; fresh signing secret; empty oauth_state; **no** `GITHUB_ALLOWED_*`; full connector re-enrollment (hostname ⇒ new `iss`/`aud`, nothing carries over) | ~1 d |
 | Slack alerting | claude-jembot (**ERS-scoped**, workspace `T01SDRYJMM1`) token in **personal** Fly secrets; channel/DM are hardcoded code defaults | Token rotated → ERS app only, channel/DM set explicitly; personal stack sheds the token (reverse dependency resolved both directions) | ~0.5–1 d |
 | Registry/config | Image-baked `config/brain-platform.john-ers-pilot.json`; `default_brain_id: ai-brain-jem`; sole principal JEM-Fizbit `220941196` owner of both brains | New `config/brain-platform.ers.json` (ERS-mirror-only, repo is public): `default_brain_id: ers-brain`, ERS principals pinned by numeric id | ~1–2 d |
 | Local ops (John's Mac) | Brain Monitor runs a JEM + an ERS profile today, but **both share one `.env.local`** → the ERS profile syncs SharePoint↔**personal** Postgres, and its doctor health-checks the personal stack (hardcoded app/base URL) | Per-profile env passthrough (or second checkout); ERS profile re-pointed at ERS DB/host with fresh sync state | ~1.5–2 d |
-| Data | Live 2026-07-12: 44 md files (+1 tombstoned head), 309 revisions, 128 sources (125 real + 3 drift), 57 texts, 128 storage objects, 243 latency events, 0 chunks; SharePoint mirror current (44 md / 125 sources) | Re-seed from SharePoint mirror (D1); fresh history; pilot rows verifiably purged after soak | ~1.5–2 d |
-| Release/custody | **Zero git tags** (D2's "pins tagged releases" currently unimplementable); no CI; no deploy provenance; public repo | Tagging discipline from v1.2.0; private ERS-Genomics mirror + overlay; guarded deploy script with sha/tag provenance | ~2–3 d |
+| Data | Audit 2026-07-12: 44 md files (+1 tombstoned head), 309 revisions, 128 sources (125 real + 3 drift), 57 texts, 128 storage objects, 243 latency events, 0 chunks. After the 2026-07-17 spec 013 migration: 50 md files, zero conflicts, and exact SharePoint/hosted convergence | Re-seed the current SharePoint mirror (D1); fresh history; pilot rows verifiably purged after soak | ~1.5–2 d |
+| Release/custody | Annotated release tags and guarded deploy provenance are active upstream; `v1.4.1` contains the deployed structural runtime and `v1.4.2` is the reconciled mirror candidate | Private ERS-Genomics mirror + overlay, tracking reviewed upstream tags only | ~2–3 d |
 | Monitoring | One alert path (auth failures → Slack), inside the monitored process; doctor 100% laptop-bound; no external uptime check; backups never rehearsed | External `/health` monitor, off-laptop scheduled doctor, sync heartbeat, backup-restore cadence | ~2–4 d |
 | Billing | Personal Fly + Supabase | ERS cards on both; baseline **~$31/mo** (~$6 Fly + $25 Supabase Pro); PITR-7d would be +$100/mo (defer recommended — §9) | ~0.5 d admin |
 
@@ -76,7 +76,7 @@ All land upstream so both stacks inherit them; the mirror then needs zero source
 
 **P1 (ship with the fork, not gating):** OAuth metadata doc URLs env-driven (currently hardcode the personal repo URL into public discovery metadata); menubar installer per-profile env passthrough (§4.5 — or accept the two-checkout workaround); S1-guard/inbox error text rewritten so hosted users aren't advised into a local-stdio fallback that bypasses the revision store; sync heartbeat event (§7). **Decision, not default (§9):** hard-disabling the `GITHUB_ALLOWED_*` code path (e.g. refuse to boot in HTTP mode when set) vs env-absence discipline.
 
-**Execution status (2026-07-16):** P0 and P1 completed upstream with test-first coverage. Release anchor: annotated tag `v1.2.0`.
+**Execution status (2026-07-17):** P0 and P1 completed upstream with test-first coverage at `v1.2.0`. The generic spec 013 server and Brain-structure work is deployed through `v1.4.1`; `v1.4.2` reconciles the fork runbook, complete migration manifest, structural data baseline, and regression coverage without changing the deployed runtime. `v1.4.2` is the exact candidate for the first private-mirror population.
 
 Verification: `npm test` (logic changes) + `npm run build`; each change follows normal spec-less commit discipline (mechanical, intent in commit messages, this spec is the record).
 
@@ -97,12 +97,14 @@ Ask-first applies to every step; all are ERS-infra-mutating. Ordered; 1–3 are 
 1. **ERS Fly org** (none exists — confirmed live): new org, ERS billing card, ERS admin. `fly apps create ers-brain-mcp --org <ers-org>` (name = suggestion; region `lhr` unless Gate 0 moves it).
 2. **ERS Supabase org + project** (Pro — hard floor: Free has no backups), region matched to Fly. Record the new ref.
 3. **GitHub OAuth app under ERS-Genomics** — *after* the hostname decision: homepage + callback `https://<ers-host>/authorize/github/callback`, scopes `read:user user:email`.
-4. **Migrations, in file order (all five, verified tenant-neutral):** `2026-06-14_001` → `_002` → `_003` → `2026-06-22_001` → `2026-07-08_001`. Advisors after each. Migration 001 auto-creates the private `brain-artifacts` bucket — verify `public=false`, zero object policies.
+4. **Migrations, in file order (all six, verified tenant-neutral):** `2026-06-14_001_hosted_brain_postgres.sql` → `2026-06-14_002_harden_hosted_brain_advisors.sql` → `2026-06-14_003_brain_runtime_role.sql` → `2026-06-22_001_durable_oauth_state.sql` → `2026-07-08_001_brain_file_tombstones.sql` → `2026-07-17_001_brain_revision_fts.sql`. Advisors after each and the full security gate after the sequence. Migration 001 auto-creates the private `brain-artifacts` bucket — verify `public=false`, zero object policies. The FTS migration adds a private tombstone-filtered GIN index and no grants.
 5. **Credentials:** create the `brain_runtime`-member LOGIN role outside migrations; build `BRAIN_REVISION_DATABASE_URL` on `:6543` with `brain_runtime_user.<new-ref>`; capture `BRAIN_SUPABASE_URL`; hold the service-role key in the ERS secret store for operator-shell ingestion only — never a Fly secret while runtime stays `metadata_only`.
 6. **ERS registry** (`config/brain-platform.ers.json`, mirror-only): `default_brain_id: "ers-brain"`, single brain `ers-brain` (production metadata — drop `john-only-pilot`, set real `access_policy`/`team_access`), principals = John's ERS identity pinned by numeric `provider_user_id` (identity choice is Gate 0; ids on file: `jemilad-ers` = **259372947** — fetched 2026-07-12 — vs `JEM-Fizbit` = 220941196). Recommend omitting `login`/`email` from principal records so matching is numeric-id-only.
+
+   Carry the validated `lint.graph_roots` and rotated-history `exempt_globs`. Any `BRAIN_LINT_MODE_OVERRIDES` value must contain only registry-known ids; the ERS-only deployment must never copy the pilot's `ai-brain-jem` override because startup rejects unknown ids.
 7. **ERS-production seed** derived from `db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql` with rewritten metadata (required — every data table FKs `brain.brains(id)`). The JEM pilot seed **never** runs on the ERS project.
 8. **Fly config + secrets:** ERS `fly.toml` deltas — app name, `MCP_OAUTH_PUBLIC_BASE`, `BRAIN_ID=ers-brain`, `BRAIN_PLATFORM_CONFIG` → ERS registry, ERS timezone, drop the vestigial `BRAIN_PLATFORM_STATE_ROOT=/data/state`; explicit `BRAIN_SLACK_ALERT_CHANNEL`/`_DM` if alerting is on. Secrets minted fresh: `MCP_OAUTH_SIGNING_SECRET`, `GITHUB_OAUTH_CLIENT_ID/SECRET`, `BRAIN_REVISION_DATABASE_URL`, `BRAIN_SUPABASE_URL`, optional rotated `BRAIN_SLACK_BOT_TOKEN`. Deliberately absent: `GITHUB_ALLOWED_*`, `GITHUB_OAUTH_MOCK_*`, `BRAIN_SUPABASE_SERVICE_ROLE_KEY`.
-9. **Deploy + empty-stack smoke:** guarded deploy at the pinned tag; `/health` field assertions; RFC 9728/8414 metadata + 401 + DCR probes (all three callback classes); `smoke:hosted:oauth` read-only; `smoke:brain-runtime-role` with `BRAIN_ID=ers-brain`.
+9. **Deploy + empty-stack smoke:** guarded deploy at the pinned tag; `/health` field assertions; RFC 9728/8414 metadata + 401 + DCR probes (all three callback classes); `smoke:hosted:oauth` read-only; `smoke:brain-runtime-role` with `BRAIN_ID=ers-brain`; verify the revision-FTS index exists and no public grants were added. After the content seed, add one ranked-search assertion and the structural-file role checks to the acceptance evidence.
 10. **Register every asset** in `ers-registry/ers-assets.md` as created (§8), keys recoverable via ERS custody, not John's personal accounts as sole path.
 
 ## 4. Data cutover (M2, ~1 day; write-freeze ≤ half day)
@@ -111,7 +113,7 @@ Source of truth for content: the SharePoint Markdown mirror (current — verifie
 
 1. **Pre-flight checkpoint (personal pilot):** archived `pg_dump` (needs a Postgres-17-compatible dump path or Docker — currently uninstalled, see risks) + Markdown/git export checkpoint per `docs/hosted-brain-recovery-and-git-export.md`; `hosted:doctor` must show 0 open conflicts. Storage objects are excluded from the dump — the SharePoint `sources/` tree is proposed as the artifact archive (sign-off in §9).
 2. **Write freeze** on `ers-brain` (self-discipline; John is the only writer). Stop the ERS sync watcher; archive its `state.json` (both the Application Support copy and the checkout's `.brain-sync/`).
-3. **Markdown re-seed:** `BRAIN_ID=ers-brain BRAIN_DIR="<SharePoint>/01_ers-brain/brain" npm run sync:seed:all-markdown:postgres` against the ERS DB with a **fresh** state file. Expect the live md count (44 at audit; re-measure).
+3. **Markdown re-seed:** `BRAIN_ID=ers-brain BRAIN_DIR="<SharePoint>/01_ers-brain/brain" npm run sync:seed:all-markdown:postgres` against the ERS DB with a **fresh** state file. The current structural baseline is 50 Markdown files; re-measure immediately before seeding and treat the live SharePoint count as authoritative.
 4. **Sources re-seed:** `sources:inventory:postgres` → `sources:upload:postgres` (operator shell, `BRAIN_ARTIFACT_BYTE_ACCESS=admin` + ERS service-role key) → `sources:extract-text:postgres` → `sources:verify-list:postgres`, all with `BRAIN_REPO_ROOT=<SharePoint checkout>` and `BRAIN_EXPECTED_SOURCE_COUNT=125` — **not** the pilot's 128; the 3 `working/*` rows are path-drift duplicating vault files and must not be re-created.
 5. **Parity verification:** `verify-core-postgres` counts; one bounded sync cycle; bidirectional parity (`--write --verify-local`, `--local-write --verify-hosted`).
 6. **Restore rehearsal on the ERS project** (folded in per the locked decision): restore the ERS project's own backup to a scratch project, verify counts, time it, record in the new gate doc.
@@ -204,9 +206,9 @@ GATE 0  ☑ technical decisions 4–16 resolved (John, 2026-07-12 — §9 table)
           (Cillian also second admin); the standing ELT gate = rollout beyond the pilot
           (register item 14 — ers-brain governance/brain-mcp-fork-signoff.md)
         □ purge predicate for OAuth rows written  ☑ MCP stateless-spec release date verified (see risks)
-PREP    ☑ §1 P0+P1 upstream changes merged + tagged v1.2.0  ☑ npm test green
-        □ private ERS-Genomics mirror created + overlay (registry, fly.toml, expectations, runbook)
-M1      □ Fly org+app  □ Supabase org+project  □ 5 migrations + advisors  □ brain_runtime login (:6543)
+PREP    ☑ §1 P0+P1 upstream changes merged  ☑ structural release deployed  ☑ v1.4.2 mirror candidate tagged  ☑ npm test green
+        ☑ private ERS-Genomics repo created empty  □ populate from v1.4.2 + add overlay (registry, fly.toml, expectations, runbook)
+M1      □ Fly org+app  □ Supabase org+project  □ 6 migrations + advisors/security gate  □ brain_runtime login (:6543)
         □ bucket private  □ GitHub OAuth app  □ secrets set (no GITHUB_ALLOWED_*)  □ ERS seed row
         □ deploy @tag  □ /health + OAuth/DCR + runtime-role smokes  □ assets registered
 M2      □ pilot pg_dump + export checkpoint (restore-verified)  □ doctor: 0 conflicts  □ write freeze
@@ -230,12 +232,13 @@ SHIP    □ security gate doc (ERS)  □ registers re-homed  □ OWNERSHIP/DECIS
 ## 12. Risks
 
 1. **MCP stateless-spec release expected 2026-07-28 — verified 2026-07-16.** The [official draft changelog](https://modelcontextprotocol.io/specification/draft/changelog) confirms the sessionless/stateless changes; the [official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) says the full spec and stable SDK v2 are expected on 28 July 2026. This is not a same-day production cutoff: SDK v1.x remains the supported production line until then and is promised fixes/security updates for at least six months after v2 ships. Complete the ERS fork on the current supported v1 line; schedule the v2/CIMD migration as a separate post-fork work unit.
-2. **Counts drift** — hosted file counts have moved 40→41→44 across docs; the spec deliberately parameterizes on cutover-day measurement, never doc constants.
+2. **Counts drift** — hosted file counts moved 40→41→44 and then 50 after the structural migration; the spec deliberately parameterizes on cutover-day measurement, never doc constants.
 3. **`pg_dump` tooling gap** — no Postgres-17-compatible dump path installed; unblock (or Docker) before M2. The restore rehearsal has never been executed on any stack; it is a go-live blocker here by design.
 4. **Supabase MCP connector is single-org** — cutover ops need a connector/PAT scoped to the ERS org (and the pilot org for the purge); the PAT-based local MCP BACKLOG item would retire the re-auth dance.
 5. **Effort figures are judgment, not measurement** (flagged in the prior review); nothing dynamic (restore, load, the migration itself) has been executed yet.
 6. **Single-operator residuals** (§6) — accepted at fork, must not silently become permanent; the second-admin/break-glass item needs an owner and a date.
 7. **Public upstream repo** — nothing ERS-identifying may ever be committed upstream (registry, staff ids, ERS runbooks with internal URLs); the mirror is the only home for those. John's own numeric GitHub id remaining world-readable upstream is his accepted status quo.
+8. **Graph-primary beta window through 2026-07-24** — this does not block mirror population, M1 stand-up, or M2 reseeding. Keep the inverse legacy comparison and immediate `graph_shadow` rollback path active through the window; defer only the comparator-cleanup decision until it closes cleanly.
 
 ## LOE summary
 
@@ -257,7 +260,7 @@ SHIP    □ security gate doc (ERS)  □ registers re-homed  □ OWNERSHIP/DECIS
 
 ## Test plan
 
-Per-phase verification is embedded above: §3.9 empty-stack smokes, §4.5 parity + §4.6 rehearsal, §5 per-surface matrix, §6 purge queries, §7 gate + cross-tenant 403 test. Upstream code changes (§1): `npm test` + targeted new tests (deploy-expectations profile, fly.toml `GITHUB_ALLOWED_*` absence, alert-env-required, entrypoint fail-fast).
+Per-phase verification is embedded above: §3.9 empty-stack smokes, §4.5 parity + §4.6 rehearsal, §5 per-surface matrix, §6 purge queries, §7 gate + cross-tenant 403 test. Upstream code changes (§1): `npm test` + targeted tests for the deploy-expectations profile, `fly.toml` `GITHUB_ALLOWED_*` absence, alert-env requirements, entrypoint fail-fast, and complete in-order migration manifests in both fresh-stack docs.
 
 ## Verification commands
 
