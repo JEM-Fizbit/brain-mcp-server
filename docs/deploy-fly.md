@@ -1,6 +1,6 @@
 # Fly Deployment
 
-> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback. Release `v1.3.2` is deployed as of 2026-07-17.
+> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback. Release `v1.4.0` (`0115afb`, Fly machine version 46) is deployed as of 2026-07-17, with JEM in `graph_shadow` observation and ERS unchanged in `legacy`.
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 

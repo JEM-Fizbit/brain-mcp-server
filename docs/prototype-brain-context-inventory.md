@@ -1,6 +1,6 @@
 # Prototype Brain Context Inventory
 
-**Status:** read-only inventory complete; downstream updates deferred until the spec 013 content contract stabilises
+**Status:** read-only inventory complete; JEM `v1.4.0` observation active; downstream updates remain deferred until the JEM/ERS spec 013 content contract stabilises
 **Last checked:** 2026-07-17
 **Related:** [`specs/013-brain-context-architecture.md`](specs/013-brain-context-architecture.md); [`../BACKLOG.md`](../BACKLOG.md)
 
@@ -22,12 +22,12 @@ Prevent spec 013 from being copied mechanically into every folder that happens t
 
 Edge is currently a project document archive, not another operational Brain. Its stable contract routes strategy and durable personal context back to JEM Brain while keeping working documents and project state in the project workspace. The follow-up is therefore pointer reconciliation, not a second server-backed Brain migration.
 
-The JEM corpus still contains references to an older standalone Edge Brain location. Those references must be reviewed during the JEM content migration, when the canonical Edge hub and project-home pointer can be updated together and tested through the routing evaluator.
+The initial JEM content migration deliberately did not widen into non-Brain workspace reconciliation. References to an older standalone Edge Brain location therefore remain a later pointer review: update the canonical Edge hub and project-home wording together, then test the resulting JEM route through the routing evaluator. Keep this coupled to the broader downstream review rather than treating Edge as another server-backed Brain.
 
 ## Update order
 
-1. Observe the deployed `v1.3.2` graph-parser correction without changing enforcement.
-2. Complete the approved JEM content migration and observation gate.
+1. Observe the deployed `v1.3.2` graph-parser correction without changing enforcement. Completed before JEM migration approval.
+2. Complete the approved JEM content migration and observation gate. The migration shipped in `v1.4.0`; observation remains active in `graph_shadow`.
 3. Complete the separately gated ERS migration and observation gate.
 4. Update the public primer to the proven final contract.
 5. Review the ERS onboarding prototype and Cowork project pointers, including Edge, without imposing server-only controls on non-Brain workspaces.

@@ -31,6 +31,10 @@ The real hosted client shadow rehearsal also passed on 2026-06-16. Post-rehearsa
 
 The spec 013 server-foundation rollout and fenced-example graph-parser correction passed on 2026-07-17 at release `v1.3.2`. `/health` reported version `1.3.2` with Postgres revisions, Supabase artifacts, Postgres OAuth state and the git hot path disabled. Deployed read-only checks reported 35 JEM files and 46 ERS files, zero open conflicts for both Brains, ranked search results for both Brains, the two adjudicated JEM graph-shadow findings, and no graph-shadow enforcement for legacy-mode ERS. A one-off read-only ERS graph calculation confirmed both template descriptors reachable and left only the intentionally unreachable fork-signoff file. The rollout did not migrate either Brain's content or introduce the task-context compiler.
 
+The separately approved JEM content release passed on 2026-07-17 at `v1.4.0` (`0115afb`). JEM now has 39 hosted files, zero open conflicts and a 1,851-token bootstrap, with all routing, policy, signpost and search evaluations unchanged from the pre-migration baseline. Its local mirror hash-matched the migrated payloads after sync resumed. JEM remains in advisory `graph_shadow` for real-use observation; ERS remains unmodified at 46 hosted files, zero open conflicts and `legacy` mode. No schema, compiler, ERS migration or hosted-principal change was included.
+
+An optional interactive read-only test-drive was deliberately stopped after Chrome supplied the unregistered `jemilad-ers` GitHub session and the server rejected it. For this personal-owned John-only pilot, complete GitHub OAuth as `JEM-Fizbit`, including when John accesses `ers-brain`; an ERS work-account principal is not currently registered. Do not widen the principal registry as connector troubleshooting.
+
 ## Cutover Decision
 
 Hosted MCP is promoted as the normal remote JEM Brain path.

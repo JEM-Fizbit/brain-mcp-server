@@ -1,6 +1,6 @@
 # 013 — Brain Context Architecture
 
-**Status:** approved; server Phases 1–3 and the graph-parser correction deployed in `v1.3.2` on 2026-07-17 with JEM graph-shadow and ERS legacy; Brain-content migration and compiler decision not started
+**Status:** approved; server Phases 1–3 complete and the JEM Phase 4 content release deployed in `v1.4.0` on 2026-07-17; JEM observation active in `graph_shadow`, ERS unchanged in `legacy`, compiler decision pending
 **Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
@@ -28,6 +28,12 @@ The first shadow-observation pass later on 2026-07-17 found that fenced code blo
 
 The correction was released as `v1.3.2` (`f80fbe1`) on 2026-07-17 without changing the JEM-shadow/ERS-legacy override. Fly machine version 45 passed its health check; `/health` reported `1.3.2` with Postgres revisions, Supabase artifacts, Postgres OAuth state and the git hot path disabled. Read-only checks executed against the deployed artifact reported 35 JEM and 46 ERS files, zero open conflicts, and only the two adjudicated JEM working-artifact findings. A one-off read-only ERS graph calculation left only `governance/brain-mcp-fork-signoff.md` unreachable and confirmed both template descriptors reachable. No Brain content, schema, task-context compiler or migration changed.
 
+The JEM Phase 4 content release was approved separately after that observation pass and deployed as `v1.4.0` (`0115afb`) on 2026-07-17. Before the hosted revision-tracked writes, the consolidated local sync stack was paused and a 35-file local/hosted hash-matched snapshot was recorded at `~/Projects/ai-brain-jem/.brain-sync/snapshots/spec013-phase4-pre-migration-20260717T125736Z`. The coordinated release rotated JEM history, created the named operating destinations, slimmed the loader and current-state surface, and revised the server/tool descriptions without changing schema or building the task-context compiler.
+
+Post-release JEM verification reported 39 hosted files, zero open conflicts, cursor `2026-07-17T13:51:17.209Z`, a 1,851-token loader-plus-`NOW.md` bootstrap (down from 9,265 estimated tokens), and unchanged evaluator results: 27/27 routing cases, 17/17 policy markers, 92/92 signposts and 10/10 search cases. Graph shadow retains only the same two adjudicated historical working-artifact findings and remains advisory. The restarted local mirror hash-matched all ten migrated payloads and completed healthy sync cycles. ERS remained at 46 files with zero conflicts and its pre-release cursor `2026-07-16T23:54:36.335Z` unchanged in `legacy`; no ERS content was readied for migration. Fly machine version 46 and `/health` reported `1.4.0` with the existing Postgres/Supabase/OAuth storage contract intact.
+
+An optional interactive read-only test-drive was stopped when Chrome supplied the unregistered `jemilad-ers` GitHub session; the server rejected that principal as designed. The current John-only pilot authorizes `JEM-Fizbit`, including for John's access to `ers-brain`. This account-selection event did not modify Brain content and is not a release regression; direct authenticated MCP reads plus health, lint, sync and hash checks supplied the release evidence.
+
 ## Why this work exists
 
 The loader is currently overloaded as:
@@ -47,7 +53,7 @@ The mechanical orphan-to-loader fix contributed less historical bloat than first
 
 `NOW.md` has a parallel problem. It is always loaded, can grow into a changelog and currently carries the same instruction-injection potency as the loader without the same proposed write protection.
 
-## Current baseline
+## Pre-migration baseline
 
 There are two operational Brains:
 
@@ -56,10 +62,10 @@ There are two operational Brains:
 
 Both are served by this codebase. The John-only pilot currently exposes both through one hosted registry; the approved destination is two owner-scoped deployments of the same upstream codebase, with ERS consuming tagged releases through its private mirror.
 
-Current mechanics relevant to this decision:
+Mechanics recorded when this decision was approved:
 
 - `brain_load_context` accepts only `brain_id` and returns complete `00_loader.md` plus complete `NOW.md`.
-- The current fixed bootstrap is approximately 36.9 KB for JEM and 25.8 KB for ERS.
+- The pre-migration fixed bootstrap was approximately 36.9 KB for JEM and 25.8 KB for ERS.
 - Hosted Postgres search is boolean line matching without useful ranking; structured results are flattened before reaching the shared store interface.
 - The role model is `owner | admin | member | reader`, but the current write check rejects only `reader` and fails open for unknown role strings.
 - `00_loader.md` and `NOW.md` are protected from delete/rename, but not ordinary updates.
@@ -404,6 +410,8 @@ The ERS private mirror stays pinned to the pre-013 upstream tag until its conten
 5. Run the before/after evaluator and policy-marker checks.
 6. Observe real use before proceeding.
 
+Steps 1–5 were released in `v1.4.0`; step 6 is the active gate. Keep JEM in `graph_shadow` throughout the bounded observation period. The content and release gates are green, but the observation gate must close before any separately approved ERS migration or graph enforcement.
+
 ### Phase 5 — ERS migration
 
 1. Satisfy the four ERS preconditions.
@@ -462,15 +470,22 @@ For this revised documentation:
 - confirm each Fable §10 required revision maps to an explicit section;
 - confirm only docs changed.
 
-For future implementation:
+Completed for the JEM Phase 4 release:
 
 - focused tests for edge parsing, graph shadow, lint fix exclusions, read-only lint, fail-closed roles, structural-file gates, budgets and per-Brain overrides;
 - frozen routing/policy fixtures using production search;
 - `npm run eval:brain:routing`;
 - `npm test`;
 - hosted read-only evaluation against both Brain IDs;
-- sync-aware restore rehearsal before ERS migration; and
-- staged production observation.
+- sync-aware snapshot and local/hosted hash verification; and
+- staged production deployment followed by JEM observation in `graph_shadow`.
+
+Still required before ERS migration:
+
+- close the JEM observation gate with no material retrieval, sync or graph-shadow regression;
+- satisfy all four ERS preconditions above;
+- rehearse the ERS sync-aware restore path; and
+- obtain separate approval for ERS migration.
 
 ## Assumptions and proof gaps
 
@@ -480,4 +495,4 @@ For future implementation:
 - Client-surface variance must be measured by the rebuilt evaluator.
 - Spec 011's full closure of ERS A3-7 must be verified rather than inferred.
 - Per-file ACLs remain out of scope unless rollout requirements change.
-- No implementation authority is implied by this revised draft.
+- The JEM release does not imply authority for ERS migration, graph enforcement, schema changes, the task-context compiler or hosted-principal changes.
