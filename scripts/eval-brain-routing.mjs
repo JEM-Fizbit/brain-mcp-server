@@ -31,6 +31,7 @@ function usage() {
     "",
     "Options:",
     "  --golden <path>     Golden-case JSON file",
+    "  --fixtures <path>   Frozen evaluator bundle (cases + Brains + registry)",
     "  --registry <path>   Brain registry JSON file",
     "  --jem-dir <path>    Local ai-brain-jem markdown root",
     "  --ers-dir <path>    Local ers-brain markdown root",
@@ -43,6 +44,7 @@ function parseArgs(argv) {
   const options = {
     golden: path.join(repoRoot, "evals", "brain-routing", "golden.json"),
     registry: path.join(repoRoot, "config", "brain-platform.john-ers-pilot.json"),
+    fixtures: undefined,
     brainDirs: {
       "ai-brain-jem": process.env.BRAIN_EVAL_JEM_DIR || defaultBrainDirs["ai-brain-jem"],
       "ers-brain": process.env.BRAIN_EVAL_ERS_DIR || defaultBrainDirs["ers-brain"],
@@ -64,6 +66,8 @@ function parseArgs(argv) {
       options.golden = path.resolve(nextValue());
     } else if (flag === "--registry") {
       options.registry = path.resolve(nextValue());
+    } else if (flag === "--fixtures") {
+      options.fixtures = path.resolve(nextValue());
     } else if (flag === "--jem-dir") {
       options.brainDirs["ai-brain-jem"] = path.resolve(nextValue());
     } else if (flag === "--ers-dir") {
@@ -107,11 +111,20 @@ async function main() {
     return;
   }
 
-  const [cases, registry, loaded] = await Promise.all([
-    readJsonFile(options.golden),
-    readJsonFile(options.registry),
-    loadBrains(options.brainDirs),
-  ]);
+  const [cases, registry, loaded] = options.fixtures
+    ? await (async () => {
+        const fixture = await readJsonFile(options.fixtures);
+        return [
+          fixture.cases,
+          fixture.registry,
+          { brains: fixture.brains, missing: [] },
+        ];
+      })()
+    : await Promise.all([
+        readJsonFile(options.golden),
+        readJsonFile(options.registry),
+        loadBrains(options.brainDirs),
+      ]);
 
   const results = evaluateBrainRoutingGolden({
     cases,

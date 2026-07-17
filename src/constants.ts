@@ -32,6 +32,7 @@ export const MAX_SEARCH_RESULTS = 50;
 export const MAX_SEARCH_RESULTS_CEILING = 500;
 export const SEARCH_LINE_CHAR_LIMIT = 5000;
 export const SEARCH_TOTAL_CHAR_LIMIT = 150_000;
+export const BOOTSTRAP_TOKEN_LIMIT = 2_500;
 export const LOG_FILE = "LOG.md";
 export const LINE_LIMIT = 200;
 

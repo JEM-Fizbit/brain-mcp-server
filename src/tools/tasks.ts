@@ -58,7 +58,8 @@ async function captureItem(
       next,
       "replace",
       undefined,
-      revisionActor(ctx)
+      revisionActor(ctx),
+      ctx.role
     );
     const sync = revisionStoreModeEnabled()
       ? ""

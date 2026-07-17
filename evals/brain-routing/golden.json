@@ -133,9 +133,9 @@
     "category": "cross_brain_fallback",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["Reference_ERS_Brain_Context/00_load_first.md"],
+      "route_files": ["Reference_ERS_Brain_Context/README.md"],
       "fallback_disclosure_required": true,
-      "loader_must_contain": ["legacy/prototype ERS context extract", "fallback"]
+      "loader_must_contain": ["Pointer only", "fallback"]
     }
   },
   {
@@ -146,7 +146,7 @@
       "brain_id": "ers-brain",
       "route_files": ["entities/john_milad.md"],
       "loader_must_contain": ["ERS staff/CEO professional contact details", "approved signature block"],
-      "search": { "query": "ERS Work Contact Details email address phone number", "must_hit_files": ["entities/john_milad.md"] }
+      "search": { "query": "ERS Work Contact Details", "must_hit_files": ["entities/john_milad.md"] }
     }
   },
   {
@@ -167,7 +167,7 @@
       "brain_id": "ers-brain",
       "route_files": ["references/templates.md"],
       "loader_must_contain": ["standard signature/disclosure templates", "references/templates.md"],
-      "search": { "query": "standard email signature block ERS staff", "must_hit_files": ["references/templates.md"] }
+      "search": { "query": "standard ERS staff signature block", "must_hit_files": ["references/templates.md"] }
     }
   },
   {

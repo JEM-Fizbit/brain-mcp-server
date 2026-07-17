@@ -107,12 +107,28 @@ test("restoreFile errors when the file is not deleted", async () => {
 
 test("deleteFile refuses the protected structural files", async () => {
   const store = hostedStore();
-  await store.writeFile(B, "00_loader.md", "loader\n", "replace");
+  await store.writeFile(
+    B,
+    "00_loader.md",
+    "loader\n",
+    "replace",
+    undefined,
+    undefined,
+    "admin"
+  );
   await assert.rejects(() => store.deleteFile(B, "00_loader.md"), /protected/i);
 });
 
 test("renameFile refuses to rename a protected file away", async () => {
   const store = hostedStore();
-  await store.writeFile(B, "NOW.md", "now\n", "replace");
+  await store.writeFile(
+    B,
+    "NOW.md",
+    "now\n",
+    "replace",
+    undefined,
+    undefined,
+    "owner"
+  );
   await assert.rejects(() => store.renameFile(B, "NOW.md", "renamed.md"), /protected/i);
 });

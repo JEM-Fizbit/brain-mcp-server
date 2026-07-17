@@ -2905,11 +2905,9 @@ const page = String.raw`<!doctype html>
       // ---- Fixes tab: per-item mechanical fixes -----------------------------
       let fixesLoadedOnce = false;
       const FIX_KIND_LABELS = {
-        orphan_index: "Index orphaned files into the loader",
         task_relocate: "Move completed tasks into Done",
         done_stamp: "Stamp undated Done items with today's date",
         done_archive: "Archive Done items older than 30 days",
-        reviewed_date: "Bump the loader \"Last reviewed\" date",
       };
 
       function fixesStatus(text) {

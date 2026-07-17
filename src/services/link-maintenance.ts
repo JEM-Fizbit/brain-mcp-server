@@ -1,5 +1,10 @@
-import type { BrainStore, FileMetadata } from "./brain-store.js";
+import {
+  isProtectedStructuralFile,
+  type BrainStore,
+  type FileMetadata,
+} from "./brain-store.js";
 import type { RevisionActor } from "../sync/types.js";
+import type { BrainRole } from "./registry.js";
 import { findInboundLinkFiles, rewriteInboundLinks, type FileEntry } from "./wikilinks.js";
 
 /** Read every live brain-scope file's content into {name, content} entries. */
@@ -30,14 +35,36 @@ export async function rewriteLinksAfterRename(
   brainId: string,
   from: string,
   to: string,
-  actor?: RevisionActor
-): Promise<{ updated: number; ambiguous: boolean }> {
+  actor?: RevisionActor,
+  role?: BrainRole
+): Promise<{ updated: number; ambiguous: boolean; protectedSkipped: string[] }> {
   const files = await gatherBrainFiles(store, brainId);
   const { updates, ambiguous } = rewriteInboundLinks(files, from, to);
+  const protectedSkipped: string[] = [];
   for (const update of updates) {
-    await store.writeFile(brainId, update.name, update.content, "replace", undefined, actor);
+    if (
+      isProtectedStructuralFile(update.name) &&
+      role !== "owner" &&
+      role !== "admin"
+    ) {
+      protectedSkipped.push(update.name);
+      continue;
+    }
+    await store.writeFile(
+      brainId,
+      update.name,
+      update.content,
+      "replace",
+      undefined,
+      actor,
+      role
+    );
   }
-  return { updated: updates.length, ambiguous };
+  return {
+    updated: updates.length - protectedSkipped.length,
+    ambiguous,
+    protectedSkipped,
+  };
 }
 
 /** Files that contain an inbound wikilink resolving to `filename` (for a delete warning). */

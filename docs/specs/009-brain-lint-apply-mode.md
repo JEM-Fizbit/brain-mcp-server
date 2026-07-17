@@ -1,10 +1,12 @@
 # 009 - Brain Lint Apply Mode (hosted mechanical auto-fix)
 
-**Status:** implemented 2026-07-01 — tool + `fix`/`dry_run` flags, CLI delegation target, and the confirm-gated Brain Monitor "Apply Lint Fixes..." menu action all landed
+**Status:** implemented 2026-07-01; partially superseded 2026-07-17 by spec 013 — orphan indexing and loader reviewed-date writes are removed, ordinary task fixes remain
 **Source:** conversation request, 2026-07-01, after retiring the `brain-health-audit` routine ([claude-ops/LOG.md](../../../claude-ops/LOG.md) 2026-07-01 CLEANUP). The routine's mechanical auto-fixes had no hosted equivalent; this brings them into the server as canonical logic so no scheduled routine has to re-implement (and drift from) `src/services/lint.ts`.
 **Roadmap link:** Brain quality hardening; "maintenance is automation-first" (`docs/ROADMAP.md`).
 **Decisions impact:** Relaxes the cockpit/Monitor **read-only invariant** — requires a new `docs/DECISIONS.md` entry (see §6).
 **Related:** `src/services/lint.ts`; `src/tools/lint.ts`; `src/services/active-brain-store.js` (`writeFile`); `src/services/request-context.ts` (`revisionActor`, `assertWriteRole`); `src/constants.ts` (`BLOAT_EXEMPT`); `docs/hosted-cockpit.md`.
+
+> Current contract: spec 013 and the 2026-07-17 decision supersede fixes A and C below. `brain_lint({ fix: true })` may relocate/date-stamp/archive ordinary `TASKS.md` content only; it never modifies `00_loader.md` or `NOW.md`. The remainder of this document records the original 2026-07-01 design.
 
 ## Problem
 

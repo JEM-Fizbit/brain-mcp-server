@@ -1,7 +1,14 @@
 import pg from "pg";
 import { contentHash } from "./hash.js";
 import { attachPoolErrorLogger } from "../services/pg-pool.js";
-import { lineMatchesSearchQuery } from "../search-match.js";
+import {
+  meaningfulSearchTokens,
+  normalizeSearchText,
+} from "../search-match.js";
+import {
+  rankSearchCandidates,
+  type SearchCandidate,
+} from "../search-ranking.js";
 import { FileDeletedError } from "./types.js";
 import type {
   ChangePage,
@@ -75,6 +82,10 @@ interface RevisionRow {
 
 interface HeadRow extends RevisionRow {
   updated_at: Date;
+}
+
+interface SearchRevisionRow extends RevisionRow {
+  search_rank: number | string;
 }
 
 interface ConflictRow {
@@ -318,30 +329,113 @@ export class PostgresRevisionStore implements RevisionStore {
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
     const maxResults = Math.max(1, Math.min(options.maxResults || 50, 500));
-    const files = await this.pool.query<RevisionRow>(
+    const ftsQuery =
+      meaningfulSearchTokens(query).join(" ") || normalizeSearchText(query);
+    if (!ftsQuery) return [];
+    const visibleFiles = options.visibleFiles
+      ? Array.from(new Set(options.visibleFiles))
+      : null;
+    if (visibleFiles && visibleFiles.length === 0) return [];
+    const ftsFiles = await this.pool.query<SearchRevisionRow>(
       `
-        select r.*
+        with search_query as (
+          select websearch_to_tsquery('simple', $2) as value
+        )
+        select
+          r.*,
+          ts_rank_cd(
+            to_tsvector('simple', coalesce(r.filename, '') || ' ' || coalesce(r.content, '')),
+            q.value,
+            32
+          ) as search_rank
         from brain.brain_files f
         join brain.brain_file_revisions r on r.id = f.current_revision_id
-        where f.brain_id = $1 and r.deleted = false
-        order by f.filename
+        cross join search_query q
+        where f.brain_id = $1
+          and r.deleted = false
+          and q.value @@ to_tsvector(
+            'simple',
+            coalesce(r.filename, '') || ' ' || coalesce(r.content, '')
+          )
+          and (
+            $4::boolean
+            or (
+              lower(r.filename) !~ '(^|/)(log|journal)\\.md$'
+              and lower(r.filename) not like 'archive/%'
+              and lower(r.filename) not like 'working/%'
+            )
+          )
+          and ($5::text[] is null or r.filename = any($5::text[]))
+        order by search_rank desc, r.filename
+        limit $3
       `,
-      [brainId]
+      [
+        brainId,
+        ftsQuery,
+        Math.max(maxResults * 4, 20),
+        options.includeOperational === true,
+        visibleFiles,
+      ]
     );
-    const results: SearchResult[] = [];
-    for (const row of files.rows) {
-      const lines = (row.content ?? "").split("\n");
-      for (let index = 0; index < lines.length; index += 1) {
-        if (!lineMatchesSearchQuery(lines[index], query)) continue;
-        results.push({
-          filename: row.filename,
-          lineNumber: index + 1,
-          line: lines[index],
-        });
-        if (results.length >= maxResults) return results;
+    const rankRows = (
+      rows: SearchRevisionRow[],
+      nativeFts: boolean
+    ): SearchResult[] => {
+      const candidates: SearchCandidate[] = [];
+      for (const row of rows) {
+        const lines = (row.content ?? "").split("\n");
+        for (let index = 0; index < lines.length; index += 1) {
+          candidates.push({
+            filename: row.filename,
+            lineNumber: index + 1,
+            line: lines[index],
+            scope: "brain",
+            nativeScore: nativeFts ? Number(row.search_rank) : undefined,
+            nativeMechanism: nativeFts ? "fts" : undefined,
+          });
+        }
       }
-    }
-    return results;
+      return rankSearchCandidates(candidates, query, {
+        maxResults,
+        visibleFiles: visibleFiles ? new Set(visibleFiles) : undefined,
+      }).map(({ filename, lineNumber, line, score, mechanism }) => ({
+        filename,
+        lineNumber,
+        line,
+        score,
+        mechanism,
+      }));
+    };
+
+    const ftsRanked = rankRows(ftsFiles.rows, true);
+    if (ftsRanked.length > 0) return ftsRanked;
+
+    // Normalized/camel-case compatibility fallback. FTS is the production
+    // primary path; when its tokenization yields no line-level result (for
+    // example `c net id` vs `CNetID`), fetch the bounded visible knowledge set
+    // and run the same deterministic scorer used by local search/evals.
+    const fallbackFiles = await this.pool.query<SearchRevisionRow>(
+        `
+          select r.*, 0::double precision as search_rank
+          from brain.brain_files f
+          join brain.brain_file_revisions r on r.id = f.current_revision_id
+          where f.brain_id = $1
+            and r.deleted = false
+            and (
+              $2::boolean
+              or (
+                lower(r.filename) !~ '(^|/)(log|journal)\\.md$'
+                and lower(r.filename) not like 'archive/%'
+                and lower(r.filename) not like 'working/%'
+              )
+            )
+            and ($3::text[] is null or r.filename = any($3::text[]))
+          order by r.filename
+          limit 500
+        `,
+        [brainId, options.includeOperational === true, visibleFiles]
+      );
+    return rankRows(fallbackFiles.rows, false);
   }
 
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {

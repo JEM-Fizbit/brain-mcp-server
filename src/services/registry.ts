@@ -9,6 +9,18 @@ export type BrainRole = "owner" | "admin" | "member" | "reader";
 export type BrainType = "personal" | "shared";
 export type IntegrationMode = "vertical" | "aggregation" | "hybrid";
 export type StorageBackend = "filesystem" | "postgres";
+export type BrainLintReachabilityMode = "legacy" | "graph_shadow" | "graph";
+
+export interface BrainLintConfig {
+  reachability_mode?: BrainLintReachabilityMode;
+  graph_roots?: string[];
+  relative_parent_scope?: "disabled" | "within_brain";
+  sharepoint_url_mappings?: Array<{
+    url_prefix: string;
+    brain_path_prefix: string;
+  }>;
+  exempt_globs?: string[];
+}
 
 export interface BrainStorageConfig {
   repo_path?: string;
@@ -31,6 +43,7 @@ export interface BrainDefinition {
   vector_scope?: string[];
   created_at?: string;
   metadata?: Record<string, unknown>;
+  lint?: BrainLintConfig;
 }
 
 export interface RegistryPrincipal {
@@ -66,6 +79,20 @@ export interface BrainPaths {
 }
 
 const BRAIN_ID_RE = /^[a-z][a-z0-9-]{1,62}$/;
+const BRAIN_ROLES = new Set<BrainRole>(["owner", "admin", "member", "reader"]);
+const LINT_MODES = new Set<BrainLintReachabilityMode>([
+  "legacy",
+  "graph_shadow",
+  "graph",
+]);
+
+export function isBrainRole(value: unknown): value is BrainRole {
+  return typeof value === "string" && BRAIN_ROLES.has(value as BrainRole);
+}
+
+function isLintMode(value: unknown): value is BrainLintReachabilityMode {
+  return typeof value === "string" && LINT_MODES.has(value as BrainLintReachabilityMode);
+}
 
 function defaultConfigPath(): string {
   return path.join(os.homedir(), ".config", "brain-platform", "registry.json");
@@ -135,6 +162,42 @@ function assertRegistryShape(registry: BrainRegistry): void {
     if (brain.storage_backend !== "filesystem" && brain.storage_backend !== "postgres") {
       throw new Error(`Unsupported storage_backend for ${brain.id}: ${brain.storage_backend}`);
     }
+    const lint = brain.lint;
+    if (lint?.reachability_mode !== undefined && !isLintMode(lint.reachability_mode)) {
+      throw new Error(
+        `Unsupported lint reachability_mode for ${brain.id}: ${String(lint.reachability_mode)}`
+      );
+    }
+    if (
+      lint?.relative_parent_scope !== undefined &&
+      lint.relative_parent_scope !== "disabled" &&
+      lint.relative_parent_scope !== "within_brain"
+    ) {
+      throw new Error(
+        `Unsupported relative_parent_scope for ${brain.id}: ${String(lint.relative_parent_scope)}`
+      );
+    }
+    for (const field of ["graph_roots", "exempt_globs"] as const) {
+      const value = lint?.[field];
+      if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== "string"))) {
+        throw new Error(`Brain ${brain.id} lint.${field} must be an array of strings.`);
+      }
+    }
+    if (
+      lint?.sharepoint_url_mappings !== undefined &&
+      (!Array.isArray(lint.sharepoint_url_mappings) ||
+        lint.sharepoint_url_mappings.some(
+          (mapping) =>
+            !mapping ||
+            typeof mapping.url_prefix !== "string" ||
+            !mapping.url_prefix.startsWith("https://") ||
+            typeof mapping.brain_path_prefix !== "string"
+        ))
+    ) {
+      throw new Error(
+        `Brain ${brain.id} lint.sharepoint_url_mappings must contain HTTPS url_prefix and brain_path_prefix strings.`
+      );
+    }
   }
 
   if (registry.default_brain_id) {
@@ -145,6 +208,67 @@ function assertRegistryShape(registry: BrainRegistry): void {
       );
     }
   }
+
+  for (const principal of registry.principals || []) {
+    if (!principal || typeof principal.provider !== "string" || !principal.roles) {
+      throw new Error("Every registry principal must define provider and roles.");
+    }
+    for (const [brainId, role] of Object.entries(principal.roles)) {
+      if (!seen.has(brainId)) {
+        throw new Error(`Principal role references unknown brain_id: ${brainId}`);
+      }
+      if (!isBrainRole(role)) {
+        throw new Error(
+          `Unsupported Brain role for ${principal.provider}/${brainId}: ${String(role)}`
+        );
+      }
+    }
+  }
+}
+
+function applyLintModeOverrides(registry: BrainRegistry): BrainRegistry {
+  const raw = process.env.BRAIN_LINT_MODE_OVERRIDES?.trim();
+  if (!raw) return registry;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `BRAIN_LINT_MODE_OVERRIDES must be valid JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("BRAIN_LINT_MODE_OVERRIDES must be a JSON object keyed by brain_id.");
+  }
+
+  const overrides = parsed as Record<string, unknown>;
+  const known = new Set(registry.brains.map((brain) => brain.id));
+  for (const [brainId, mode] of Object.entries(overrides)) {
+    if (!known.has(brainId)) {
+      throw new Error(`BRAIN_LINT_MODE_OVERRIDES references unknown brain_id: ${brainId}`);
+    }
+    if (!isLintMode(mode)) {
+      throw new Error(
+        `BRAIN_LINT_MODE_OVERRIDES has unsupported mode for ${brainId}: ${String(mode)}`
+      );
+    }
+  }
+
+  return {
+    ...registry,
+    brains: registry.brains.map((brain) => {
+      const mode = overrides[brain.id];
+      if (mode === undefined) return brain;
+      return {
+        ...brain,
+        lint: {
+          ...brain.lint,
+          reachability_mode: mode as BrainLintReachabilityMode,
+        },
+      };
+    }),
+  };
 }
 
 export async function loadRegistry(): Promise<BrainRegistry> {
@@ -161,6 +285,8 @@ export async function loadRegistry(): Promise<BrainRegistry> {
     registry = synthesizedRegistry();
   }
 
+  assertRegistryShape(registry);
+  registry = applyLintModeOverrides(registry);
   assertRegistryShape(registry);
   return registry;
 }
@@ -242,7 +368,14 @@ export function accessibleRoles(
   const record = registry.principals?.find((candidate) =>
     principalMatches(candidate, principal)
   );
-  if (record?.roles) return record.roles;
+  if (record?.roles) {
+    for (const [brainId, role] of Object.entries(record.roles)) {
+      if (!isBrainRole(role)) {
+        throw new Error(`Unsupported Brain role for ${brainId}: ${String(role)}`);
+      }
+    }
+    return record.roles;
+  }
 
   if (principal.provider === "github" && registry.default_brain_id) {
     const allowedLogins = envList("GITHUB_ALLOWED_LOGINS");

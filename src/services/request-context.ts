@@ -31,9 +31,13 @@ export async function resolveToolBrain(
 }
 
 export function assertWriteRole(ctx: ToolBrainContext): void {
+  if (ctx.role === "owner" || ctx.role === "admin" || ctx.role === "member") return;
   if (ctx.role === "reader") {
     throw new Error(`Write access denied for Brain: ${ctx.brainId}`);
   }
+  throw new Error(
+    `Write access denied for Brain ${ctx.brainId}: unknown role ${String(ctx.role)}`
+  );
 }
 
 export function authorIdentity(ctx: ToolBrainContext): string | undefined {

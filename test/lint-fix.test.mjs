@@ -11,8 +11,6 @@ const {
   stampDoneItems,
   relocateCompletedTasks,
   archiveOldDoneItems,
-  indexOrphans,
-  bumpReviewedDate,
 } = await import(path.join(__dirname, "..", "dist", "services", "lint-fix.js"));
 
 // --- parseDoneDate / daysBetween ---------------------------------------------
@@ -108,72 +106,4 @@ test("archiveOldDoneItems enumerates >30d items and archives selectively", () =>
 test("archiveOldDoneItems never enumerates an unstamped item", () => {
   const t = ["# T", "", "## Done", "- [x] no date", ""].join("\n");
   assert.equal(archiveOldDoneItems(t, "", "2026-07-01", 30).items.length, 0);
-});
-
-test("indexOrphans enumerates one item per orphan and indexes selectively", () => {
-  const loader = [
-    "## All Files",
-    "",
-    "### Core Context",
-    "- `01_identity.md` — Who John is.",
-    "",
-    "### Reference Data",
-    "- `REF_facts.md` — Extracted facts.",
-    "",
-  ].join("\n");
-  const plan = indexOrphans(loader, ["07_new.md", "REF_new.md"], new Set());
-  assert.equal(plan.items.length, 2);
-  assert.equal(plan.content, loader);
-  assert.deepEqual(new Set(plan.items.map((i) => i.kind)), new Set(["orphan_index"]));
-
-  const only = plan.items.find((i) => i.summary.includes("07_new.md"));
-  const applied = indexOrphans(loader, ["07_new.md", "REF_new.md"], new Set([only.id]));
-  assert.match(applied.content, /- `07_new.md` — \(description pending review\)/);
-  assert.doesNotMatch(applied.content, /REF_new.md/);
-});
-
-test("indexOrphans places orphans under a flat 'All files' section (no ### subheadings)", () => {
-  // ERS-style loader: differently-named H2, flat list, no ### subheadings.
-  const loader = [
-    "## All files (inventory as of scaffold)",
-    "",
-    "- `00_loader.md` — this file.",
-    "- `governance/guardrails.md` — rules.",
-    "",
-    "## Source categories",
-    "",
-    "- example",
-    "",
-  ].join("\n");
-  const plan = indexOrphans(loader, ["governance/ai_internal.md"], new Set());
-  const id = plan.items[0].id;
-
-  const applied = indexOrphans(loader, ["governance/ai_internal.md"], new Set([id]));
-  assert.ok(applied.appliedIds.includes(id), "placed orphan should be in appliedIds");
-  // Placed inside the All files section, before the next H2.
-  const allFilesBlock = applied.content.split("## Source categories")[0];
-  assert.match(allFilesBlock, /- `governance\/ai_internal.md` — \(description pending review\)/);
-});
-
-test("indexOrphans reports appliedIds only for orphans it could actually place", () => {
-  const loader = "## Something Else\n\n- x\n"; // no All-files section at all
-  const plan = indexOrphans(loader, ["07_x.md"], new Set());
-  const id = plan.items[0].id;
-  const res = indexOrphans(loader, ["07_x.md"], new Set([id]));
-  assert.equal(res.content, loader, "unplaceable orphan leaves content unchanged");
-  assert.deepEqual(res.appliedIds, [], "an orphan it could not place is not reported applied");
-});
-
-test("bumpReviewedDate updates the Last reviewed line to today", () => {
-  const loader = "## Maintenance\n\n- **Last reviewed:** 2026-06-17\n";
-  const { content, bumped } = bumpReviewedDate(loader, "2026-07-01");
-  assert.equal(bumped, true);
-  assert.match(content, /- \*\*Last reviewed:\*\* 2026-07-01/);
-});
-
-test("bumpReviewedDate is a no-op when the line is absent", () => {
-  const loader = "## Maintenance\n\nnothing\n";
-  const { content, bumped } = bumpReviewedDate(loader, "2026-07-01");
-  assert.equal(bumped, false);
-  assert.equal(content, loader);
 });

@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "id": "personal-contact-email",
+      "prompt": "What is my email address?",
+      "category": "personal_contact",
+      "expected": {
+        "brain_id": "ai-brain-jem",
+        "route_files": ["01_identity.md"],
+        "loader_must_contain": ["contact details", "01_identity.md"],
+        "search": {
+          "query": "my email address",
+          "must_hit_files": ["01_identity.md"]
+        }
+      }
+    },
+    {
+      "id": "stable-identifier-policy",
+      "prompt": "Save my academic account identifier.",
+      "category": "account_identifier",
+      "expected": {
+        "brain_id": "ai-brain-jem",
+        "route_files": ["09_tools_stack.md"],
+        "loader_must_contain": ["Stable identifiers vs secrets"],
+        "allow_store_non_secret_identifier": true,
+        "refuse_secret_storage": true,
+        "search": {
+          "query": "uchicago cnet id",
+          "must_hit_files": ["09_tools_stack.md"]
+        }
+      }
+    },
+    {
+      "id": "ers-authority",
+      "prompt": "Give me ERS company facts.",
+      "category": "cross_brain_authority",
+      "expected": {
+        "brain_id": "ers-brain",
+        "canonical_for": "ers-genomics",
+        "loader_must_contain": ["company facts", "entities/ers_genomics.md"]
+      }
+    }
+  ],
+  "brains": {
+    "ai-brain-jem": {
+      "files": {
+        "00_loader.md": "# Loader\nContact details route: `01_identity.md`.\nStable identifiers vs secrets route: `09_tools_stack.md`.\n",
+        "NOW.md": "# NOW\n",
+        "01_identity.md": "Email address and phone number.\n",
+        "09_tools_stack.md": "UChicago CNetID is one of the stable non-secret account identifiers. Never store passwords, tokens, MFA secrets, or private keys.\n"
+      }
+    },
+    "ers-brain": {
+      "files": {
+        "00_loader.md": "# Loader\nCompany facts route: `entities/ers_genomics.md`.\n",
+        "NOW.md": "# NOW\n",
+        "entities/ers_genomics.md": "# ERS Genomics\n"
+      }
+    }
+  },
+  "registry": {
+    "brains": [
+      {
+        "id": "ai-brain-jem",
+        "metadata": {
+          "canonical_for": ["john-milad", "personal-context"]
+        }
+      },
+      {
+        "id": "ers-brain",
+        "metadata": {
+          "canonical_for": ["ers-genomics", "ers-company-context"]
+        }
+      }
+    ]
+  }
+}

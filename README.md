@@ -24,15 +24,15 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_commit` | Git commit changes, optionally push |
 | `brain_list_files` | List all Brain files with staleness metadata |
 | `brain_list_sources` | List files in the sources/ archive, with optional category filter |
-| `brain_search` | Search for keywords or lookup phrases. Exact matches are preferred; normalized fallback handles spacing, punctuation, camel-case, and common lookup wording. Accepts `scope` = `brain` (default), `sources`, or `all` |
+| `brain_search` | Structured ranked search with scores and mechanism codes. Accepts `scope` = `brain` (default), `sources`, or `all`; operational/history paths are excluded unless `include_operational=true` |
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
-| `brain_lint` | Run a health check (bloat, staleness, orphan backlinks, drift, missing cross-references). Pass `fix=true` to apply the mechanical, non-fabricating fixes (index orphans into the loader, relocate completed `[x]` tasks to Done, archive Done items >30d into `archive/tasks-done.md`, bump the loader's Last reviewed date); `dry_run=true` previews without writing. See [Applying Brain lint fixes](#applying-brain-lint-fixes) |
+| `brain_lint` | Read-only health check by default: bloat, staleness, legacy/graph-shadow reachability, 2,500-token bootstrap budget, drift, and maintenance signals. `fix=true` can only relocate/date-stamp/archive ordinary task content; structural files are never auto-fixed. See [Applying Brain lint fixes](#applying-brain-lint-fixes) |
 | `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
 | `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
 | `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
 
-The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). Claude escalates scope automatically when a query implicates original material rather than a Brain summary. `brain_search` remains keyword-first, but normalized fallback makes queries like `cnet id` match `CNetID` and longer lookup phrases match lines containing the meaningful terms.
+The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). `brain_search` returns deterministic ranked matches; normalized fallback makes queries like `cnet id` match `CNetID`. Its default knowledge scope excludes `LOG.md`, `JOURNAL.md`, `archive/**`, and `working/**`; set `include_operational=true` only when those paths are intended.
 
 ## Requirements
 
@@ -76,12 +76,19 @@ npx @modelcontextprotocol/inspector node dist/index.js
 | `GITHUB_ALLOWED_LOGINS` | Comma-separated GitHub login allowlist for fallback owner access | unset |
 | `GITHUB_ALLOWED_EMAILS` | Comma-separated email allowlist for fallback owner access | unset |
 | `BRAIN_PLATFORM_CONFIG` | Registry JSON path for hosted/multi-Brain mode | `~/.config/brain-platform/registry.json` |
+| `BRAIN_LINT_MODE_OVERRIDES` | Validated per-Brain JSON mode map, e.g. `{"ai-brain-jem":"graph_shadow","ers-brain":"legacy"}`. Malformed JSON, unknown Brains, and unknown modes fail startup | unset; registry/default `legacy` |
 | `BRAIN_PLATFORM_STATE_ROOT` | File-backed OAuth state root for local/dev fallback | `~/.config/brain-platform/state` |
 | `BRAIN_OAUTH_STATE_STORE` | OAuth client/session state store: `file` or `postgres`. Hosted should use `postgres` so connector enrollment survives Fly machine replacement | `file` |
 | `MCP_OAUTH_REFRESH_REUSE_GRACE_SEC` | Optional short refresh-token reuse window for cloud-synced client refresh races. Hosted uses `15`; local/dev defaults to strict one-time rotation | `0` |
 | `BRAIN_AUTO_SYNC` | Filesystem/git mode only. When true, successful mutating Brain tools automatically commit changes. Do not enable for Supabase-backed hosted runtime | unset / false |
 | `BRAIN_AUTO_PUSH` | Filesystem/git mode only. When auto-sync is enabled, push commits to origin unless set false. Do not enable for Supabase-backed hosted runtime | true |
 | `BRAIN_DATE_TIME_ZONE` | IANA timezone used for Brain log/source dates | `TZ` or `UTC` |
+
+### Lint rollout and structural-file authorisation
+
+Each registry Brain may define a typed `lint` block with `reachability_mode`, optional `graph_roots`, `relative_parent_scope`, SharePoint URL mappings, and exemption globs. The default remains `legacy`; use `graph_shadow` to report graph/legacy deltas without changing enforced orphan results. Promote a Brain to `graph` only after its shadow findings have been adjudicated.
+
+Hosted revision-store writes to `00_loader.md` and `NOW.md` require an exact `owner` or `admin` role. Registry roles are validated fail-closed, while `reader` remains able to run detection-only lint. This gate intentionally does not cover direct local filesystem or SharePoint edits, sync ingestion, direct database administration, or the current stdio/system owner bypass. Those paths remain deployment/sync hardening work; the hosted gate must not be treated as universal enforcement. See [`docs/specs/013-brain-context-architecture.md`](./docs/specs/013-brain-context-architecture.md).
 
 ## Hosted HTTP Deployment
 
@@ -114,7 +121,7 @@ Hosted deployments can also raise **real-time auth-failure alerts to Slack** (wa
 
 ### Applying Brain lint fixes
 
-`brain_lint` detects issues; its mechanical, non-fabricating fixes (index orphans into the loader, relocate completed `[x]` tasks to Done, archive Done items older than 30 days into `archive/tasks-done.md`, bump the loader's Last reviewed date) can be applied from three surfaces, all sharing one implementation:
+`brain_lint` detection is read-only for every read-authorised role. Its remaining mechanical fixes relocate completed `[x]` tasks to Done, date-stamp them, and archive Done items older than 30 days into `archive/tasks-done.md`. Orphans, graph ambiguity, bootstrap budget excess, `00_loader.md`, and `NOW.md` are review items and are never auto-fixed. The ordinary-content fixes can be applied from three surfaces, all sharing one implementation:
 
 - **Cockpit Fixes tab** (primary) — lists each fix with a checkbox plus "Approve all", applies only what you approve. Backed by a loopback-only write endpoint (Host allowlist + per-process nonce + JSON-only).
 - **Brain Monitor menu-bar app** — Controls → "Apply Lint Fixes..." (confirm-gated dry-run → apply).
@@ -225,7 +232,7 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 
 The routing logic lives in the loader (a Markdown file you maintain), not in code. The server is content-agnostic — it knows nothing about your specific Brain content, only how to serve Markdown files.
 
-Brain files use `[[backlinks]]` (Obsidian-style wikilinks) to cross-reference each other. During ingest, the LLM maintains these links across all affected files. The lint process checks for orphan content files (zero inbound backlinks). The Brain directory can be opened as an Obsidian vault for graph view and backlink navigation.
+Brain files may cross-reference each other with `[[wikilinks]]`, relative Markdown links, backtick file/directory references, and configured SharePoint mappings. Legacy lint remains the default; `graph_shadow` computes convention-aware reachability from `00_loader.md`, `NOW.md`, and configured roots without changing enforcement. The Brain directory can be opened as an Obsidian vault for graph view and backlink navigation.
 
 ### Brain Routing Evals
 
@@ -235,7 +242,7 @@ The repo includes a read-only deterministic eval lane for loader and routing reg
 npm run eval:brain:routing -- --jem-dir "/path/to/ai-brain-jem/brain" --ers-dir "/path/to/ers-brain/brain"
 ```
 
-The golden set lives in [`evals/brain-routing/golden.json`](./evals/brain-routing/golden.json). It checks route files, registry authority metadata, fallback disclosure markers, search tolerance, source escalation, and secret-storage refusal signposts. See [`docs/specs/008-brain-routing-evals.md`](./docs/specs/008-brain-routing-evals.md) for scope and next slices.
+The golden set lives in [`evals/brain-routing/golden.json`](./evals/brain-routing/golden.json). The evaluator uses the production ranking code, reports policy markers separately from retargetable signposts, and records bootstrap/follow-up-read/latency metrics. Run the frozen server fixture with `npm run eval:brain:routing -- --fixtures evals/brain-routing/fixtures/server-foundation.json`. See [`docs/specs/008-brain-routing-evals.md`](./docs/specs/008-brain-routing-evals.md).
 
 ## Recommended Workflow
 

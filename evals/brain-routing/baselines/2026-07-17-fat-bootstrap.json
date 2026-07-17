@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-07-17",
+  "scope": "read-only local production-search evaluator against the current pre-spec-013-migration Brain corpora",
+  "status": "pass",
+  "cases": {
+    "total": 27,
+    "passed": 27,
+    "failed": 0
+  },
+  "assertions": {
+    "policy_markers": {
+      "total": 17,
+      "passed": 17,
+      "failed": 0
+    },
+    "signposts": {
+      "total": 92,
+      "passed": 92,
+      "failed": 0
+    },
+    "search": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    }
+  },
+  "bootstrap": {
+    "ai-brain-jem": {
+      "bytes": 36913,
+      "estimated_tokens": 9229
+    },
+    "ers-brain": {
+      "bytes": 25850,
+      "estimated_tokens": 6463
+    }
+  },
+  "route_files": {
+    "total": 28,
+    "passed": 28,
+    "failed": 0
+  },
+  "follow_up_reads": {
+    "total": 28,
+    "average": 1.037
+  },
+  "evaluator_latency_ms": {
+    "p50": 16.559,
+    "p95": 45.487,
+    "max": 109.278
+  },
+  "graph_shadow": {
+    "ai-brain-jem": {
+      "legacy_orphans": 0,
+      "graph_orphans": 3,
+      "added_findings": 3,
+      "removed_findings": 0,
+      "diagnostics": 288,
+      "enforced_orphans": 0
+    },
+    "ers-brain": {
+      "legacy_orphans": 1,
+      "graph_orphans": 1,
+      "added_findings": 0,
+      "removed_findings": 0,
+      "diagnostics": 1182,
+      "enforced_orphans": 1
+    }
+  },
+  "notes": [
+    "Bootstrap tokens use the documented four-bytes-per-token estimate.",
+    "The baseline contains metrics only; it does not persist prompts, queries, or retrieved snippets.",
+    "No Brain content was modified and no hosted MCP, client end-to-end, deployment, or migration path was exercised.",
+    "Latency is evaluator wall time on the recording machine and is not a hosted service SLO measurement.",
+    "Graph-shadow counts were recorded with the generic parser and no Brain-specific lint mappings or exemptions; legacy orphan enforcement remained unchanged. Findings require later migration-phase adjudication."
+  ]
+}

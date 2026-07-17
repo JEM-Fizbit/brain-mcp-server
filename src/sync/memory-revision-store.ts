@@ -1,5 +1,9 @@
 import { contentHash } from "./hash.js";
-import { lineMatchesSearchQuery } from "../search-match.js";
+import {
+  isDefaultKnowledgeSearchPath,
+  rankSearchCandidates,
+  type SearchCandidate,
+} from "../search-ranking.js";
 import { FileDeletedError } from "./types.js";
 import type {
   ChangePage,
@@ -128,26 +132,40 @@ export class MemoryRevisionStore implements RevisionStore {
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
     const maxResults = Math.max(1, Math.min(options.maxResults || 50, 500));
-    const results: SearchResult[] = [];
+    const candidates: SearchCandidate[] = [];
+    const visibleFiles = options.visibleFiles
+      ? new Set(options.visibleFiles)
+      : undefined;
 
     for (const head of Array.from(this.heads.values()).sort((a, b) =>
       a.filename.localeCompare(b.filename)
     )) {
       if (head.brainId !== brainId) continue;
       if (head.deleted === true) continue;
+      if (!options.includeOperational && !isDefaultKnowledgeSearchPath(head.filename)) {
+        continue;
+      }
+      if (visibleFiles && !visibleFiles.has(head.filename)) continue;
       const lines = head.content.split("\n");
       for (let index = 0; index < lines.length; index += 1) {
-        if (!lineMatchesSearchQuery(lines[index], query)) continue;
-        results.push({
+        candidates.push({
           filename: head.filename,
           lineNumber: index + 1,
           line: lines[index],
+          scope: "brain",
         });
-        if (results.length >= maxResults) return results;
       }
     }
-
-    return results;
+    return rankSearchCandidates(candidates, query, {
+      maxResults,
+      visibleFiles,
+    }).map(({ filename, lineNumber, line, score, mechanism }) => ({
+      filename,
+      lineNumber,
+      line,
+      score,
+      mechanism,
+    }));
   }
 
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {

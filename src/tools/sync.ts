@@ -93,7 +93,8 @@ export function registerSyncTools(server: McpServer): void {
           ctx.brainId,
           conflict_id,
           content,
-          revisionActor(ctx)
+          revisionActor(ctx),
+          ctx.role
         );
         const text = [
           `Resolved conflict ${result.conflict.conflictId} for ${result.conflict.filename}.`,

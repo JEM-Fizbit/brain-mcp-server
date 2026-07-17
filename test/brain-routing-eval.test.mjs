@@ -13,6 +13,7 @@ const fixtureBrains = {
         "# Loader",
         "John's contact details / public profiles / email address / phone number / mobile / headshots | `01_identity.md`; use `08_personal.md` only for private home/family/location context; use `09_tools_stack.md` for service-specific account identifiers/logins",
         "ERS Genomics context | Use the accessible canonical ERS Brain when available (currently `ers-brain`). If unavailable, use `ers_genomics.md` as John's personal summary/bridge and `Reference_ERS_Brain_Context/` as legacy fallback; state that fallback may lag.",
+        "Stable identifiers vs secrets: store non-secret identifiers; refuse authenticating secrets.",
         "Reading source archives: escalate to `sources` or `all` when a query clearly implicates original ingested material.",
       ].join("\n"),
       "01_identity.md": "Email address\nPhone number / mobile\n",

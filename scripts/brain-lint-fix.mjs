@@ -44,11 +44,9 @@ try {
     for (const item of items.slice(0, 10)) console.log(`    - ${item}`);
     if (items.length > 10) console.log(`    - ...and ${items.length - 10} more.`);
   };
-  line("Orphans indexed into loader", summary.orphansIndexed);
   line("Completed tasks relocated to Done", summary.tasksRelocated);
   line("Done items date-stamped", summary.doneStamped);
   line("Old Done items archived", summary.doneArchived);
-  if (summary.reviewedDateBumped) console.log("  Loader Last reviewed date bumped");
   if (!summary.dryRun && summary.filesWritten.length > 0) {
     console.log(`  Files written: ${summary.filesWritten.join(", ")}`);
   }
