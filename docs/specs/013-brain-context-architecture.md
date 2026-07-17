@@ -1,24 +1,26 @@
 # 013 — Brain Context Architecture
 
-**Status:** draft — Fable 5 independent review complete 2026-07-17 (verdict: **revise** — approve content/lint/roles layer with 10 revisions; defer the task compiler to a successor spec behind a measured gap). Spec revision pending.
-**Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, independent four-way comparison — content layer endorsed, compiler deferred, edge grammar/eval instrument/role sequencing mandated)
+**Status:** draft — revised after Fable 5 review; architecture direction recorded, implementation approval still required
+**Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
-**Decisions impact:** would supersede the 2026-07-01 decision that lint may index orphans directly into `00_loader.md`; would refine, not reverse, the 2026-07-06 decision to retain the distinct JEM and ERS content schemas
-**Related:** [`008-brain-routing-evals.md`](008-brain-routing-evals.md); [`009-brain-lint-apply-mode.md`](009-brain-lint-apply-mode.md); [`010-cockpit-fixes-tab.md`](010-cockpit-fixes-tab.md); [`../DECISIONS.md`](../DECISIONS.md); [`../OWNERSHIP_AND_LIFECYCLE.md`](../OWNERSHIP_AND_LIFECYCLE.md); `~/Projects/claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md`
+**Decisions impact:** supersedes the 2026-07-01 decision that lint may index orphans or bump review dates directly in `00_loader.md`; preserves the 2026-07-06 decision to retain distinct JEM and ERS content schemas
+**Related:** [`008-brain-routing-evals.md`](008-brain-routing-evals.md); [`009-brain-lint-apply-mode.md`](009-brain-lint-apply-mode.md); [`010-cockpit-fixes-tab.md`](010-cockpit-fixes-tab.md); [`014-task-context-compiler.md`](014-task-context-compiler.md); [review 1](reviews/013-review1-architecture.md); [`../DECISIONS.md`](../DECISIONS.md); [`../OWNERSHIP_AND_LIFECYCLE.md`](../OWNERSHIP_AND_LIFECYCLE.md); `~/Projects/claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md`
 
-## Decision to be made
+## Decision
 
-Choose the smallest Brain information and retrieval architecture that remains fast, accurate, explainable, maintainable and scalable across personal, shared-company and future departmental/work-personal Brains.
+Adopt a **shallow content graph plus ranked search**, without a server-side task-context compiler in this work unit:
 
-The current working recommendation is a **shallow content graph plus query-aware context compilation**:
+1. Keep the always-loaded bootstrap small and deterministic.
+2. Route from the bootstrap to one substantive hub, then to the canonical source when needed.
+3. Replace loader-direct orphan detection with convention-aware graph reachability.
+4. Remove all mechanical lint writes to `00_loader.md`.
+5. Harden roles fail-closed before restricting structural files.
+6. Instrument routing and search before deciding whether server-side context compilation is necessary.
 
-1. Store knowledge through progressive disclosure.
-2. Keep the normal retrieval path shallow: bootstrap → directly selected hub → canonical source.
-3. Compile task-relevant context in one MCP round trip where practical, rather than forcing agents to walk every index manually.
-4. Keep the server schema-agnostic: generic routing, graph, budget and permission mechanisms; Brain-specific knowledge remains in each Brain.
+The optional `task`/`max_tokens` compiler is deferred to [spec 014](014-task-context-compiler.md). It may activate only if the post-slimming evidence meets that spec's trigger; it is killed if the slim architecture already meets the agreed sufficiency target.
 
-This is a proposal, not an approved decision. A Fable 5 independent review must challenge it before implementation.
+This spec authorises no code or Brain-content changes until separately approved.
 
 ## Why this work exists
 
@@ -26,24 +28,18 @@ The loader is currently overloaded as:
 
 - the always-loaded Brain contract;
 - a task-routing table;
-- a complete file inventory; and
+- a complete file inventory;
+- a detailed ingestion and output-capture manual; and
 - the server's definition of whether content is discoverable.
 
-That combination creates a structural growth loop:
+The server also disagrees with both Brains' documented orphan convention. `brain_lint` tests whether files are directly named in `00_loader.md`, while the Brains describe orphans as files with no inbound graph path. The current parser ignores wikilinks, nested paths and SharePoint link mappings, so valid ERS content can be reported as orphaned.
 
-1. A new file is created below an existing hub or index.
-2. `brain_lint` checks whether the file is directly referenced by `00_loader.md`, rather than whether it is reachable through the Brain graph.
-3. The file is reported as an orphan even when a lower-level index already links it.
-4. `brain_lint({ fix: true })` proposes or performs a direct loader insertion.
-5. Every future context load pays the token and attention cost of that new entry.
+The mechanical orphan-to-loader fix contributed less historical bloat than first assumed: most growth came from human- and agent-authored protocols, file inventories and retrieval-miss patches. Both causes matter:
 
-This is implemented in `src/services/lint.ts` (loader-direct orphan detection) and `src/services/lint-fix.ts` (orphan-to-loader insertion). It was deliberately specified in spec 009 and recorded in the 2026-07-01 decision log. The resulting bloat is therefore a platform-design defect, not primarily an agent-discipline problem.
+- remove the server mechanism that rewards direct loader insertion; and
+- relocate detailed loader content into named, discoverable destinations.
 
-Observed examples:
-
-- The 2026-07-01 lint-apply run inserted orphan entries into the JEM loader.
-- ERS template descriptors linked from `references/templates.md` are still reported as orphans because lint does not traverse the intermediate index.
-- A project-specific Nexus route was added to the ERS loader even though `projects/README.md`, `projects/ai-transformation.md` and `projects/nexus-platform.md` already provided a valid hierarchy.
+`NOW.md` has a parallel problem. It is always loaded, can grow into a changelog and currently carries the same instruction-injection potency as the loader without the same proposed write protection.
 
 ## Current baseline
 
@@ -52,342 +48,429 @@ There are two operational Brains:
 - `ai-brain-jem` — personal, numerically prefixed and relatively flat;
 - `ers-brain` — shared-company, foldered by domain.
 
-Both are served by this codebase. The current John-only pilot exposes both through one hosted registry; the approved destination is two owner-scoped deployments of the same upstream codebase, with ERS consuming tagged releases through its private mirror.
+Both are served by this codebase. The John-only pilot currently exposes both through one hosted registry; the approved destination is two owner-scoped deployments of the same upstream codebase, with ERS consuming tagged releases through its private mirror.
 
 Current mechanics relevant to this decision:
 
-- `brain_load_context` accepts only `brain_id` and returns the complete `00_loader.md` plus complete `NOW.md`.
-- The current fixed bootstrap is approximately 25.8 KB for ERS and 36.9 KB for JEM before task-specific files are read.
-- Hosted Postgres Brains have keyword search but not a working semantic/vector retrieval path.
-- The role model is `owner | admin | member | reader`; every non-reader currently has unrestricted file-write authority.
-- `00_loader.md` and `NOW.md` are protected from deletion/rename, but not from ordinary update writes.
-- Spec 008 has a 27-case deterministic routing baseline, but no live context-compilation or follow-up-read evaluation.
+- `brain_load_context` accepts only `brain_id` and returns complete `00_loader.md` plus complete `NOW.md`.
+- The current fixed bootstrap is approximately 36.9 KB for JEM and 25.8 KB for ERS.
+- Hosted Postgres search is boolean line matching without useful ranking; structured results are flattened before reaching the shared store interface.
+- The role model is `owner | admin | member | reader`, but the current write check rejects only `reader` and fails open for unknown role strings.
+- `00_loader.md` and `NOW.md` are protected from delete/rename, but not ordinary updates.
+- `brain_lint({ fix: true })` can write the loader through both `orphan_index` and `reviewed_date`.
+- Spec 008 has a deterministic routing baseline, but no production-search or follow-up-read evaluation.
 
-The July 2026 architecture review concluded that the distinct JEM and ERS schemas are fundamentally sound and do not warrant a wholesale restructuring. This proposal keeps that decision: optimise the shared retrieval and maintenance contract without forcing cosmetic schema uniformity.
+The July 2026 platform review concluded that the JEM and ERS schemas are fundamentally sound. This work keeps both schemas and changes only the shared content, retrieval, lint and permission contracts.
 
 ## Architecture drivers
 
-The decision should optimise the combined cost of:
+Optimise the combined cost of:
 
-1. **Fixed context tax** — material loaded on every relevant session.
-2. **Round-trip latency** — sequential MCP reads needed before useful work begins.
-3. **Retrieval effectiveness** — correct, sufficient and canonical context for the task.
-4. **Attention quality** — irrelevant context can reduce model accuracy even when it fits within the context window.
-5. **Explainability** — operators must be able to see why files were selected.
-6. **Maintenance cost** — ordinary contributors should not need to understand root architecture.
-7. **Scalability** — new projects, users and departmental Brains must not require server forks or loader growth.
-8. **Access control** — inaccessible content and even sensitive metadata must not leak through routing or search.
-9. **Portability** — Markdown remains the canonical, inspectable and exportable knowledge format.
+1. **Fixed context tax** — material loaded in every Brain-aware session.
+2. **Round-trip latency** — sequential reads before useful work starts.
+3. **Retrieval effectiveness** — correct, sufficient and canonical context.
+4. **Attention quality** — irrelevant context can reduce accuracy.
+5. **Explainability** — operators can see why a route exists.
+6. **Maintenance cost** — ordinary contributors need not understand root architecture.
+7. **Scalability** — new projects, users and Brains do not force loader growth or server forks.
+8. **Access control** — inaccessible content and metadata do not leak through routing or search.
+9. **Portability** — Markdown remains canonical and inspectable.
 
-## Alternatives to compare
+Caching is not a decision driver: every session pays the bootstrap once, and within-session re-reads can be cached under any option.
 
-### A. Flat comprehensive loader
+## Alternatives
 
-List most tasks, projects and files directly in `00_loader.md`.
+### A. Flat comprehensive loader — rejected
 
-**Strength:** minimum first-hop ambiguity and no server-side routing intelligence.
+It is deterministic and transparent, but every addition creates a permanent token and attention tax and a shared write-contention surface.
 
-**Weakness:** every addition imposes a permanent global token and attention cost; multi-user maintenance converges on bloat.
+Reconsider only if multi-user plans are abandoned. Retain its useful property through generated file listing, not a hand-maintained inventory.
 
-### B. Deep manual hierarchy
+### B. Deep manual hierarchy — rejected as deep
 
-Keep the loader extremely small and require agents to traverse root index → domain index → programme hub → project hub → canonical source.
+It reduces bootstrap size but adds hops, stale indexes and client-harness dependence that the current corpus size does not justify.
 
-**Strength:** low fixed bootstrap and clear human organisation.
+Its shallow core — bootstrap, one substantive hub, canonical pointer — is adopted.
 
-**Weakness:** multiple sequential tool calls; fragile when agents skip a layer; encourages indexes that add no synthesis.
+### C. Pure search-first — rejected as the primary entry point
 
-### C. Search-first retrieval
+Search is useful for routing gaps and broad discovery, but cannot reliably push policy, authority and safety markers at cold start. Current hosted search also lacks ranking.
 
-Use keyword or semantic search as the normal entry point with minimal prescribed hierarchy.
+Its structured-search and ranking improvements are adopted as a fallback and measurement track. Reconsider search as the primary entry point if the corpus passes roughly 100 substantive sources and hub routing measurably degrades.
 
-**Strength:** shallow retrieval and low manual routing maintenance.
+### D. Shallow graph plus task-context compiler — split
 
-**Weakness:** weaker determinism, provenance and explainability; semantic search is not currently available on the hosted Postgres path.
+The shallow graph is adopted. The compiler is unmeasured and would add several new subsystems before proving a residual problem. It is deferred to spec 014 behind explicit trigger and kill criteria.
 
-### D. Shallow graph plus context compiler — current recommendation
+## Responsibility boundary
 
-Keep a small deterministic contract, directly retrievable hubs and canonical pointers. Use generic server-side routing, keyword search and graph expansion to assemble a bounded task packet in one call.
+### Brain content
 
-**Strength:** progressive storage without sequential turtles; explainable inclusion; shared mechanism across distinct Brain schemas.
+Each Brain owns:
 
-**Weakness:** adds a retrieval subsystem and creates a new boundary between content-defined routes and server ranking logic.
+- stable intent classes and policy markers;
+- hub files and their links;
+- canonical L2 pointers;
+- current-state content in `NOW.md`; and
+- human-readable operations and onboarding guidance.
 
-The independent review may recommend another design or a staged combination.
+Routing knowledge always retains a Markdown home. Server routes may be derived from content but do not become a second source of truth.
 
-## Proposed content architecture
+### Registry
+
+Per-Brain registry configuration owns:
+
+- graph-lint mode;
+- graph root and exemption options;
+- SharePoint URL mappings;
+- relative-parent-link scope; and
+- roles.
+
+Add a typed optional field to `BrainDefinition`:
+
+```typescript
+interface BrainLintConfig {
+  reachability_mode?: "legacy" | "graph_shadow" | "graph";
+  graph_roots?: string[];
+  relative_parent_scope?: "disabled" | "within_brain";
+  sharepoint_url_mappings?: Array<{
+    url_prefix: string;
+    brain_path_prefix: string;
+  }>;
+  exempt_globs?: string[];
+}
+```
+
+The default is `legacy`. `graph_shadow` computes and reports old and new orphan sets without changing enforcement or applying graph-derived fixes. `graph` becomes available only after the shadow acceptance gate passes.
+
+Because the registry is currently baked into the deployment image, add an environment override:
+
+```text
+BRAIN_LINT_MODE_OVERRIDES={"ai-brain-jem":"graph_shadow","ers-brain":"legacy"}
+```
+
+The server parses and validates this JSON map at startup. Unknown Brain IDs, unknown modes or malformed JSON fail startup rather than silently falling back. The override changes only `reachability_mode`; edge mappings and exemptions remain typed registry content. This allows a secrets/config change plus restart without rebuilding and preserves independent per-Brain rollout.
+
+### Server
+
+The server owns generic mechanisms only:
+
+- unchanged bootstrap loading;
+- structured and scored search;
+- link parsing and reachability;
+- role enforcement at the store boundary;
+- context-budget lint; and
+- metadata-only operational metrics.
+
+No JEM-, ERS-, Nexus- or person-specific routes belong in server code. Existing hardcoded semantic checks should be removed or represented through generic content/configuration during implementation.
+
+## Content architecture
 
 ### Level 0 — bootstrap
 
 `00_loader.md` contains only:
 
 - Brain identity, authority and canonicality rules;
-- essential safety/access boundaries;
-- six to ten stable top-level intent classes;
-- instructions for task-aware retrieval and source escalation.
+- essential safety, capture and access boundaries;
+- six to ten stable top-level intent classes with formal links to hubs;
+- the fallback rule when no route fits; and
+- a concise pointer to operations guidance.
 
-It does not contain:
+It does not contain a complete file inventory, individual projects or people merely because they exist, detailed ingestion procedures, temporary priorities, maintenance history or routes already owned by a hub.
 
-- a complete file inventory;
-- individual projects or people merely because they exist;
-- temporary priorities;
-- detailed output-specific routes that already belong in a domain index;
-- maintenance history.
+`NOW.md` is a one-screen hot set: current priorities, open decisions and links to active hubs. It does not contain an embedded changelog, a task repository or unreviewed agent instructions.
 
-`NOW.md` is the dynamic hot set: current priorities, open decisions and direct links to actively relevant hubs. It should remain one-screen orientation, not a historical narrative or task repository.
+The combined `00_loader.md` + `NOW.md` bootstrap budget is **2,500 tokens per Brain**, enforced by lint. This is a provisional budget: the decision log records it and later evidence may amend it. Word counts remain advisory, not release gates.
 
-Initial budget to validate rather than hard-code permanently:
+Both always-loaded files are structural and require `admin` or `owner` to update. Members remain able to edit ordinary hubs and content files.
 
-- fixed bootstrap: approximately 1,500 tokens or less;
-- `00_loader.md`: approximately 500–800 words;
-- `NOW.md`: approximately 300–600 words.
+### Level 1 — substantive hub
 
-### Level 1 — directly selected hub
+A task normally selects one substantive project, entity, governance, writing, commercial, technical-estate or reference hub.
 
-A task normally selects one substantive hub: project, entity, governance, writing, commercial, technical-estate or reference hub.
+A hub earns its existence only when it provides synthesis, distinct ownership or permissions, an independent lifecycle, improved retrieval precision or a necessary size boundary. An index that only forwards to another index is not a mandatory machine hop.
 
-A hub earns its existence only when it provides one or more of:
-
-- substantive cross-document synthesis;
-- distinct ownership or permissions;
-- an independent lifecycle/update cadence;
-- materially improved retrieval precision;
-- a necessary size boundary.
-
-An index that only forwards to another index is not a substantive hub and must not be a mandatory retrieval step.
+Optional hub frontmatter is limited to `aliases`, `canonical` and `owner` where ambiguity is real. If aliases later become deterministic routing inputs, they move into an admin-gated artifact; member-writable frontmatter must not silently acquire routing authority.
 
 ### Level 2 — canonical source
 
-The hub points to the live first-class home: project folder, policy corpus, register, CRM, repository, source document or other authoritative system.
+The hub points to the live first-class project folder, policy corpus, register, CRM, repository or source document. That destination is outside the Brain hierarchy and is a terminal pointer, not another Brain layer.
 
-That destination is outside the Brain hierarchy. It is not another Brain layer.
-
-### Graph, not strict tree
-
-Hubs may cross-link. Umbrella and project hubs can be siblings rather than mandatory parent/child traversal.
-
-For example, a Nexus task should normally resolve:
+For example:
 
 ```text
 bootstrap → projects/nexus-platform.md → canonical Nexus project home
 ```
 
-It should not require:
+`projects/README.md` remains useful for human portfolio browsing and broad discovery but is not a compulsory retrieval hop.
+
+## Named destinations for evicted loader content
+
+No loader block may be removed until its destination exists and the replacement pointer has been tested.
+
+| Loader content | JEM destination | ERS destination | Delivery rule |
+|---|---|---|---|
+| Brain identity, authority, safety and canonicality | Remains concise in `00_loader.md`; detail in existing identity/working-style hubs | Remains concise in `00_loader.md`; detail in `governance/README.md` and `governance/guardrails.md` | Push content remains in bootstrap |
+| Stable intent routes | Formal links from `00_loader.md` to existing numbered/domain hubs | Formal links from `00_loader.md` to existing domain `README.md` hubs | Six to ten intent classes only |
+| Ingestion, inbox, source categories and output-capture protocol | New `12_brain_operations.md` | New `governance/brain-operations.md` | `brain_ingest` and `brain_scan_inbox` tool descriptions also carry concise operational pointers and source-category help |
+| Work-capture routing | One-line boundary stays in loader; detailed rules in `12_brain_operations.md` | One-line boundary stays in loader; detailed rules in `governance/brain-operations.md` | Critical destination rules remain push content |
+| Full file inventory | `brain_list_files` plus links from numbered/entity hubs | `brain_list_files` plus domain `README.md` hubs | Never hand-maintained in loader |
+| Backlink, naming, review and maintenance procedures | `12_brain_operations.md` | `governance/brain-operations.md` | Lint/tool help points to the file |
+| Human quickstart and glossary | New root `README.md` | New root `README.md` | Human-facing; not loaded by default |
+| Temporary priorities and open decisions | `NOW.md`, within budget | `NOW.md`, within budget | Admin/owner curated |
+| Historical events and maintenance history | `JOURNAL.md` / `LOG.md`, rotated before migration | `JOURNAL.md` / `LOG.md`, rotated before migration | Excluded from default search |
+
+The server self-description must change in the same release as the content migration. It must no longer claim that the loader is the complete ingestion protocol; it should identify the loader as the bootstrap contract and point agents to the relevant operations file and tool descriptions.
+
+## Graph edge grammar
+
+### Roots and reachability
+
+- Required roots are `00_loader.md` and `NOW.md`.
+- Additional roots may be named in the per-Brain `graph_roots` registry field.
+- A content Markdown file is reachable when a valid directed edge path exists from a root.
+- External canonical destinations are terminal pointers: they validate discoverability but are never crawled.
+- Cycles are valid but do not create reachability unless the cycle is itself reachable from a root.
+
+### Counted edges
+
+1. **Wikilinks:** `[[path]]` and `[[path|label]]`; an omitted `.md` suffix is inferred.
+2. **Relative Markdown links:** `[label](path.md)` and fragment variants. Percent-encoding is decoded before path normalisation.
+3. **Backtick file references:** an exact Brain-relative or source-file-relative `path.md`.
+4. **Backtick directory references:** resolve to that directory's `README.md`, then `INDEX.md`; they do not make every descendant reachable.
+5. **Mapped SharePoint URLs:** an absolute URL counts only when it matches a configured `url_prefix`; the remainder maps to `brain_path_prefix` and resolves to a Brain file.
+
+Paths are normalised case-sensitively after URL decoding. Fragments do not affect file reachability. A relative `../` edge counts only when `relative_parent_scope` is `within_brain` and the normalised target remains inside the Brain root.
+
+### Non-edges and failures
+
+- bare prose mentions and unformatted filenames;
+- external URLs outside an approved SharePoint mapping;
+- absolute local filesystem paths;
+- directory references with no `README.md` or `INDEX.md`;
+- paths that escape the Brain root;
+- inaccessible files; and
+- cross-Brain references that the current principal cannot resolve.
+
+Invalid or inaccessible edges produce named diagnostics, never silent reachability. Search and lint must permission-filter before disclosing target filenames or metadata.
+
+### Exemptions
+
+Exemptions are explicit per-Brain globs, not hardcoded schema assumptions. The initial narrow exemption is rotated journal material such as `archive/JOURNAL-*.md`. Ordinary archive files are not automatically exempt.
+
+### Shadow rollout
+
+`graph_shadow` reports:
+
+- the legacy orphan set;
+- the graph-unreachable set;
+- added and removed findings;
+- unresolved/malformed edges by syntax; and
+- exemption use.
+
+It cannot alter fix plans. Both live corpora must produce zero adjudicated false-positive graph orphans before either Brain moves to `graph`.
+
+## Lint and automatic-fix contract
+
+- `brain_lint({ fix: false })` is read-only and available to any role with Brain read access.
+- `brain_lint({ fix: true })` continues to require write authority for each target file.
+- The `orphan_index` fix is removed; lint never inserts an orphan into the loader.
+- The `reviewed_date` fix is removed from Brain-content writes. Lint may report `last_checked_at` through operation status/telemetry, but it does not rewrite the loader.
+- No automatic fix may modify `00_loader.md` or `NOW.md`.
+- Deterministic ordinary-content repairs may remain only when their target is unambiguous and the caller is authorised for that target.
+- Bootstrap budget excess, graph ambiguity and structural-file changes are review items, not auto-fixes.
+
+This explicitly supersedes fixes A and C in the 2026-07-01 lint-apply decision while retaining its confirm-gated model for safe ordinary-content fixes.
+
+## Role and write-gate sequencing
+
+1. First harden role parsing and authorisation deny-by-default. Only the known `owner | admin | member | reader` values are accepted; unknown roles are rejected.
+2. Then enforce a store-layer structural-file allowlist: only `owner` and `admin` may write `00_loader.md` or `NOW.md`.
+3. Apply the gate to every hosted update path that reaches the shared store, not only the MCP tool wrapper.
+4. Test member rejection, admin acceptance and unknown-role rejection at the store boundary.
+
+Known limitations must remain explicit: local filesystem edits, SharePoint edits and sync ingestion do not pass through the hosted role gate; current stdio/system principals are also treated as owner across all Brains. Those bypasses remain until deployment isolation and sync principal hardening land through the ERS fork. The structural gate reduces hosted multi-user risk but is not represented as universal enforcement.
+
+## Search and retrieval track
+
+Spec 013 does not change the `brain_load_context({ brain_id })` interface or add a task packet.
+
+The retrieval work in scope is:
+
+1. Promote structured `SearchResult[]` to the shared `BrainStore` interface instead of flattening Postgres results.
+2. Add Postgres full-text search and deterministic scoring.
+3. Default-scope search to knowledge files, excluding `LOG.md`, `JOURNAL.md`, `archive/**` and `working/**` unless explicitly requested.
+4. Preserve a permission-filter-before-ranking seam for future per-file ACLs.
+5. Use production search code in routing evaluation rather than a separate fuzzy matcher.
+
+Normal flow:
 
 ```text
-bootstrap → projects/README → ai-transformation → nexus-platform
-          → project README → working document
+brain_load_context(brain_id)
+  → slim loader + NOW
+  → one L1 hub selected from formal intent routes
+  → one parallel read batch for the hub and any directly required source
+  → L2 canonical destination when live evidence is needed
 ```
 
-`projects/README.md` remains useful for human portfolio browsing and broad project discovery, but is not a compulsory machine retrieval hop.
+Failure flow:
 
-## Proposed retrieval architecture
+- no intent route fits → say so and use ranked `brain_search`;
+- hub is stale → existing drift lint reports it;
+- referenced file is absent → report the named missing edge and continue;
+- cross-Brain target is unavailable → report access failure, never silently omit it.
 
-Extend `brain_load_context` compatibly:
+## Telemetry contract
 
-```typescript
-brain_load_context({
-  brain_id: "ers-brain",
-  task: "Review the Nexus build-versus-adopt position",
-  max_tokens: 4000
-})
-```
-
-When `task` is supplied, the server would:
-
-1. load the compact Brain contract and current-state material;
-2. resolve exact filenames, titles, aliases and deterministic intent routes;
-3. run permission-filtered keyword search;
-4. expand relevant links and canonical pointers;
-5. rank and deduplicate candidates;
-6. include complete small hubs or bounded relevant sections;
-7. stop at the requested token budget; and
-8. return an inclusion manifest naming each selected file and reason.
-
-When `task` is omitted, existing callers receive the lean bootstrap. The first version must not depend on semantic/vector search. Semantic retrieval can be added later behind the same interface if production evaluations demonstrate value.
-
-The server remains schema-agnostic. It understands generic Markdown headings, links, file metadata, aliases, hub relationships, roles and budgets; it contains no hardcoded JEM, ERS, Nexus or person-specific routes.
-
-## Proposed maintenance and permission contract
-
-### Reachability
-
-Redefine an orphan as content that is unreachable through approved root routes, indexes, hubs or explicit metadata—not content absent from the root loader.
-
-Lint should distinguish:
-
-- genuinely unreachable content;
-- broken links;
-- content reachable only through an excessively deep route;
-- missing canonical pointers;
-- stale hubs;
-- root-loader leakage;
-- files exceeding context budgets.
-
-### Auto-fix boundary
-
-Remove orphan-to-loader insertion from `brain_lint({ fix: true })`.
-
-Permitted automatic fixes may include deterministic link or nearest-index repairs when the target is unambiguous. Ambiguous classification becomes a review item. No automated fix modifies `00_loader.md`.
-
-### Roles
-
-- `reader` — read/search/load only.
-- `member` — ordinary content and hub writes.
-- `admin` / `owner` — structural files and routing-contract changes.
-
-`00_loader.md` should require an admin/owner structural-write check. `NOW.md` remains curated operational content and does not require the same protection unless experience demonstrates a need.
-
-Per-file ACLs are not required for this first implementation unless the ERS rollout introduces content that cannot be shared with all registered readers. The retrieval interface should nevertheless preserve a permission-filter-before-ranking seam so later ACLs do not require a redesign.
+Persist only metadata such as mechanism codes, result counts, bytes/tokens, latency and follow-up-read counts. Never persist task text, search-query text or retrieved snippets in routing/search telemetry. A routing reason is a bounded code such as `intent_route`, `exact_path`, `fts_fallback` or `graph_edge`, not user content.
 
 ## Per-Brain migration
 
-### JEM Brain
+### JEM Brain first
 
+- Rotate `JOURNAL.md` and `LOG.md` before slimming.
 - Preserve numeric filenames as stable identifiers.
-- Slim the root loader and remove the complete file inventory.
-- Turn `05_projects.md` into a hub-of-hubs rather than a live state repository.
-- Move current/historical narrative out of `NOW.md` as needed.
-- Preserve direct identity, voice, career and mental-model routes where they materially improve task accuracy.
-- Do not force ERS-style folders merely for uniformity.
+- Create `12_brain_operations.md` and root `README.md`.
+- Turn `05_projects.md` into a hub-of-hubs rather than a live-state repository.
+- Preserve identity, voice, career and mental-model routes where they improve task accuracy.
+- Evaluate before and after content changes.
+- Do not force ERS-style folders.
 
-### ERS Brain
+### ERS Brain second
 
-- Preserve the existing domain-folder structure.
-- Remove the loader's complete file inventory.
-- Collapse detailed output-specific rows into stable domain routes where the output-pattern index already resolves them.
-- Remove project-specific loader rows, including Nexus, once graph-aware discovery is proven.
-- Keep `projects/nexus-platform.md` as the direct stable Nexus hub.
-- Keep `projects/ai-transformation.md` as a sibling programme synthesis, not a mandatory parent route.
-- Slim `NOW.md`, moving historical event detail to `JOURNAL.md`.
+ERS migration may start only after:
 
-Do not backfill structured frontmatter across every existing file. Titles, headings, paths, links and index descriptions should drive the first implementation. Add optional typed metadata only to hubs where aliases, ownership, sensitivity or canonical location remain ambiguous.
+1. spec 011 delete/rename is verified end-to-end on hosted `ers-brain`, closing the standing A3-7 rename/delete freeze;
+2. the ERS content-state audit has landed;
+3. JEM has passed its observation gate; and
+4. an onboarding quiet window is agreed.
+
+Then:
+
+- rotate `JOURNAL.md` and `LOG.md`;
+- preserve the current domain-folder structure;
+- create `governance/brain-operations.md` and root `README.md`;
+- remove detailed output and inventory rows after graph shadow proves reachability;
+- remove project-specific loader rows, including Nexus;
+- retain `projects/nexus-platform.md` as the direct stable Nexus hub;
+- retain `projects/ai-transformation.md` as a sibling synthesis; and
+- evaluate before and after content changes.
+
+The ERS private mirror stays pinned to the pre-013 upstream tag until its content migration is ready; unflagged lint or role behaviour must not arrive through an earlier shared release.
 
 ## Implementation sequence
 
-This work should ship as a separate release after the `v1.2.0` ERS deployment-fork baseline. Do not couple the information-architecture change to infrastructure migration or cutover.
+### Phase 0 — specification and approval
 
-### Phase 0 — independent review and decision
+1. Reconcile the Fable review into this spec.
+2. Record the decision and rejected alternatives.
+3. Create the trigger-gated compiler successor spec.
+4. Obtain explicit implementation approval.
 
-1. Run the Fable 5 xhigh review defined below.
-2. Reconcile it against the July 2026 platform review and current server evidence.
-3. Revise this spec.
-4. Record the approved decision and superseded alternatives in `docs/DECISIONS.md`.
-5. Obtain explicit approval before implementation.
+### Phase 1 — instrument first
 
-### Phase 1 — tests and observability first
+1. Promote structured search through the store interface and add production FTS/scoring.
+2. Rebuild the packet/routing evaluator around frozen fixtures and production search code.
+3. Separate policy-marker assertions from signpost assertions.
+4. Record fat-bootstrap baselines for both Brains, including tokens, route success, policy markers, follow-up reads and latency.
 
-1. Extend routing fixtures to cover direct hubs, graph reachability and excessive-depth failures.
-2. Add context-packet tests for inclusion reasons, permission filtering, token budgets and backward compatibility.
-3. Add metrics for context bytes/tokens, selected files, routing reason, server latency and follow-up reads.
-4. Record the current JEM and ERS baselines before changing content.
+### Phase 2 — server release A, flagged with no default change
 
-### Phase 2 — server changes behind compatibility boundaries
+1. Implement the edge parser and graph reachability in `graph_shadow`.
+2. Remove `orphan_index` and loader-writing `reviewed_date`.
+3. Allow read-only lint for read-authorised roles.
+4. Add bootstrap-budget lint.
+5. Add search default scoping.
 
-1. Add optional `task` and `max_tokens` to `LoadContextSchema`.
-2. Implement deterministic + keyword + graph context compilation.
-3. Replace loader-direct orphan detection with graph reachability.
-4. Remove orphan-to-loader auto-fix.
-5. Protect root-loader updates behind structural roles.
-6. Expose diagnostic mode before changing the default client workflow.
+### Phase 3 — authorisation
 
-### Phase 3 — one-Brain-at-a-time content migration
+1. Ship P1 deny-by-default role hardening.
+2. Add the store-layer `00_loader.md` + `NOW.md` owner/admin gate.
+3. Verify every hosted write path and document remaining local/sync bypasses.
 
-1. Migrate and evaluate JEM first.
-2. Enable compiled loading for JEM and observe real use.
-3. Migrate and evaluate ERS.
-4. Keep old content snapshots/revision heads available for rollback.
+### Phase 4 — JEM migration
 
-### Phase 4 — release and rollout
+1. Rotate logs and take sync-aware snapshots.
+2. Create the named destinations.
+3. Deploy the revised server self-description and tool descriptions in the same coordinated release as those destinations.
+4. Slim content.
+5. Run the before/after evaluator and policy-marker checks.
+6. Observe real use before proceeding.
 
-1. Cut a new upstream minor release after all gates pass.
-2. Deploy to the personal stack.
-3. Adopt the same upstream tag through the ERS private mirror after the ERS baseline is stable.
-4. Add the contract to future Brain scaffolding and onboarding guidance.
+### Phase 5 — ERS migration
+
+1. Satisfy the four ERS preconditions.
+2. Adopt the tested upstream tag through the private mirror.
+3. Run graph shadow and content migration in a quiet window.
+4. Verify and observe before graph enforcement.
+
+### Phase 6 — compiler decision
+
+Evaluate the measured residual gap against spec 014. Record either activation of that spec or an explicit no-build decision.
 
 ## Acceptance criteria
 
-- A new project or hub does not require a loader edit.
-- The Nexus query routes directly to `projects/nexus-platform.md` without a project-specific loader row.
-- ERS template descriptors linked through `references/templates.md` are not reported as orphans.
-- A genuinely unlinked content file is reported as unreachable.
-- `brain_lint({ fix: true })` cannot modify `00_loader.md`.
-- Members cannot modify `00_loader.md`; admins/owners can through an explicit structural path.
-- Existing `brain_load_context({ brain_id })` callers continue to work.
-- At least 90% of the agreed common-task golden set receives sufficient task context in one load call and no more than one follow-up Brain read.
-- The fixed bootstrap and compiled packets remain within approved token budgets.
-- Inclusion manifests explain every selected file.
-- Permission filtering occurs before candidate ranking or metadata disclosure.
-- Both JEM and ERS routing golden sets pass without imposing one Brain's filename/folder schema on the other.
-- A feature flag or compatibility mode can restore the prior load behaviour during rollout.
-
-## Failure modes to attack during review
-
-- The compiler becomes an opaque RAG subsystem and agents cannot explain context selection.
-- Keyword ranking misses important stable files that deterministic loader routes currently find.
-- Generic path or title heuristics privilege one Brain schema.
-- Link expansion creates context explosions or cycles.
-- A malicious or compromised Brain file manipulates inclusion through links or instructions.
-- Permission-inaccessible filenames, aliases or snippets leak during candidate ranking.
-- Content writers create hubs that are technically reachable but semantically useless.
-- Token budgets truncate the single load-bearing section a task needs.
-- `NOW.md` becomes another unbounded loader by accumulating hot links and history.
-- Simultaneous multi-user writes leave the graph/index in a transient inconsistent state.
-- The maintenance system creates generated indexes or metadata that become a second source of truth.
+1. Combined bootstrap is at most 2,500 tokens per Brain and lint enforces the provisional budget.
+2. Graph shadow produces zero adjudicated false-positive orphans on both live corpora using the specified edge grammar. ERS template descriptors are reachable; `governance/brain-mcp-fork-signoff.md` remains correctly flagged if still genuinely unreachable.
+3. No `fix: true` code path writes `00_loader.md` or `NOW.md`, including `reviewed_date`.
+4. Store-layer tests reject member writes to both structural files, accept admin/owner writes and reject unknown role strings.
+5. Read-only lint works for read-authorised roles without granting fix authority.
+6. The packet/routing evaluator uses frozen fixtures and production search code; policy-marker assertions are separate from retargetable signpost assertions.
+7. The post-slim JEM golden set is at least as good as the recorded pre-slim baseline on retargeted routing, with policy markers at 100%.
+8. `brain_load_context({ brain_id })` retains byte-identical assembly/envelope behaviour for unchanged fixture content and existing callers; content migration is the only intended payload change.
+9. Search returns structured scored results and excludes operational/history paths by default.
+10. Per-Brain lint mode defaults to `legacy`; the validated environment override can place JEM in shadow while ERS remains legacy.
+11. All evicted loader blocks have the named destination and replacement pointer defined above.
+12. Telemetry contains no task text, query text or retrieved snippets.
 
 ## Rollback
 
-- Keep `task` optional and preserve the simple bootstrap path.
-- Gate compiled retrieval behind a runtime or per-Brain feature flag until production evidence is adequate.
-- Make content slimming only after routing fixtures prove equivalent or better discovery.
-- Use revision history to restore prior loader/NOW/hub content if a Brain migration reduces task success.
-- Do not delete legacy routing tests until both Brains pass a sustained observation period.
+### Server behaviour
 
-## Independent review gate
+- Switch the affected Brain's mode to `legacy` through `BRAIN_LINT_MODE_OVERRIDES` and restart.
+- Redeploy the prior upstream tag if search, lint or role behaviour regresses.
+- Keep legacy routing fixtures until both Brains pass their observation periods.
+- Keep the ERS mirror pinned until its migration gate opens.
 
-Recommended reviewer setting: **Fable 5 · xhigh (Extra)**. Use ultracode only if the solo review finds unresolved competing architectures that need parallel investigation.
+### Content migration
 
-The reviewer must reconstruct the current architecture and choose among the alternatives independently. Do not frame the task as validating this proposal.
+Rollback is sync-aware; revision restore alone is insufficient:
 
-Required output:
+1. Pause the local sync agent for the affected Brain.
+2. Export and tag both local and hosted heads, recording file hashes.
+3. Restore the pre-migration snapshot on both local and hosted sides.
+4. Verify file sets and hashes match the tagged export.
+5. Run load, lint and routing smoke checks.
+6. Resume sync and verify no conflict or immediate re-push.
 
-- recommendation and confidence;
-- strongest case against the recommendation;
-- rejected alternatives and reconsideration triggers;
-- precise boundary between content, registry and server responsibilities;
-- normal and failure-path retrieval flows;
-- minimal machine-readable contract, if any;
-- security and multi-user implications;
-- measurable acceptance criteria;
-- migration, compatibility and rollback plan;
-- explicit verdict: approve, revise or reject spec 013.
+Do not attempt ERS rollback or migration while the A3-7 freeze remains open.
 
-## Fable 5 kickoff prompt
+## Verification
 
-```text
-Use Fable 5 at xhigh effort. Perform an independent, read-only architecture review of the Brain context and retrieval design before implementation. Start with AGENTS.md and docs/specs/013-brain-context-architecture.md in /Users/johnemilad/Projects/brain-mcp-server, then inspect the current load/lint/write code, specs 008–010, both current Brain loaders/NOW files, and the July 2026 Brain platform architecture review linked from spec 013. Do not assume spec 013 is correct. Compare flat-loader, deep-hierarchy, search-first and shallow-graph/context-compiler approaches against latency, retrieval quality, explainability, maintenance, permissions and multi-user scale. Return a decision-grade recommendation with rejected alternatives, failure modes, measurable acceptance criteria, migration/rollback and an approve/revise/reject verdict. Do not edit files or implement anything.
-```
+For this revised documentation:
 
-## Verification commands
-
-For this draft document:
-
-- `git diff --check`
+- `git diff --check`;
 - verify every relative Markdown link resolves;
-- confirm the file appears in the project's in-flight spec discovery.
+- confirm specs 013 and 014 appear in in-flight spec discovery;
+- confirm each Fable §10 required revision maps to an explicit section;
+- confirm only docs changed.
 
 For future implementation:
 
-- focused unit tests for context compilation, graph reachability, role gates and budget enforcement;
-- `npm run eval:brain:routing` against both current Brain roots;
+- focused tests for edge parsing, graph shadow, lint fix exclusions, read-only lint, fail-closed roles, structural-file gates, budgets and per-Brain overrides;
+- frozen routing/policy fixtures using production search;
+- `npm run eval:brain:routing`;
 - `npm test`;
-- hosted read-only context evaluation against both Brain IDs;
-- staged production observation before ERS rollout.
+- hosted read-only evaluation against both Brain IDs;
+- sync-aware restore rehearsal before ERS migration; and
+- staged production observation.
 
 ## Assumptions and proof gaps
 
-- Initial token budgets are hypotheses to validate, not permanent constants.
-- The target of 90% one-call task sufficiency requires a representative golden set and may need recalibration.
-- Hosted semantic search is not required for the first implementation.
-- ERS starts with broadly shared internal knowledge; per-file ACLs remain a later trigger unless rollout requirements change.
-- No implementation authority is implied by this draft. Approval follows the independent review and spec revision.
+- The 2,500-token bootstrap cap is provisional and may be amended by evidence.
+- Attention-quality harm from the current bootstrap remains asserted rather than directly measured.
+- Hosted latency evidence is based on small samples.
+- Client-surface variance must be measured by the rebuilt evaluator.
+- Spec 011's full closure of ERS A3-7 must be verified rather than inferred.
+- Per-file ACLs remain out of scope unless rollout requirements change.
+- No implementation authority is implied by this revised draft.

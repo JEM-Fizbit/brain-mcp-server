@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-17 — Adopt shallow Brain content graph; defer task-context compiler pending evidence
+
+**Decision:** Adopt a shallow L0/L1/L2 Brain content architecture plus ranked search: a slim `00_loader.md` contract, one-screen `NOW.md`, one directly selected substantive hub and a terminal canonical-source pointer. Replace loader-direct orphan detection with convention-aware graph reachability, remove the `orphan_index` and loader-writing `reviewed_date` auto-fixes, and enforce a provisional combined bootstrap budget of **2,500 tokens per Brain**. After role parsing is hardened deny-by-default, protect both always-loaded files (`00_loader.md` and `NOW.md`) with a fail-closed store-layer `admin`/`owner` write allowlist. Improve and instrument structured search before changing the load interface. The proposed `task`/`max_tokens` context compiler is deferred to trigger-gated spec 014 and defaults to **do not build** unless post-slim evidence demonstrates a material residual routing or follow-up-read gap; if the slim baseline meets the agreed sufficiency target, record the no-build result and archive the stub.
+
+**Why:** Fable 5's independent review confirmed the loader/context problem and endorsed the progressive-disclosure content, lint and role layers, but found the bundled compiler premature and unmeasured. The existing shallow hub graph already resolves most content; the immediate defects are excessive bootstrap content, an edge parser that contradicts the Brains' graph convention, auto-fixes that write structural content, unranked search and fail-open roles. Splitting the compiler prevents a measured, reversible correction from being coupled to a new retrieval subsystem. Named destinations for every evicted loader block, a precise edge grammar, shadow-mode graph lint, instrumented acceptance criteria and a sync-aware rollback make the approved direction operationally testable.
+
+**Alternatives rejected:** A flat comprehensive loader (permanent token tax and multi-user write contention); a deep manual hierarchy (unnecessary hops and extra staleness surfaces for the current corpus); pure search-first retrieval (cannot reliably push authority, policy and safety markers at cold start); and the original bundled shallow-graph-plus-compiler proposal (coupled a justified content fix to an unmeasured subsystem). The shallow core of the hierarchy option and the search improvements are retained. Search-first may be reconsidered if corpus scale measurably degrades hub routing; the compiler may be reconsidered only under spec 014's activation trigger and is killed under its no-gap criterion.
+
+**Related:** `docs/specs/013-brain-context-architecture.md`; `docs/specs/014-task-context-compiler.md`; `docs/specs/reviews/013-review1-architecture.md`; `docs/specs/008-brain-routing-evals.md`; 2026-07-01 lint-apply decision below (fixes A and C superseded); 2026-07-06 Brain Platform Review decision below (distinct schemas preserved).
+
+---
+
 ## 2026-07-16 — ERS Brain deployment fork executes through a mandatory private tag-tracking mirror
 
 **Decision:** The ERS Brain migration authorized on 2026-07-13 proceeds now; ELT comments inform the rollout gate beyond the John+Cillian pilot, not whether the migration may begin. This entry amends the 2026-07-06 topology wording: the ERS deployment uses a **mandatory private ERS-org mirror** of the public upstream, tracks **annotated upstream release tags only**, and carries only the ERS config/test/docs overlay. All source development remains upstream and `src/`, `db/`, and `scripts/` never diverge in the mirror.
