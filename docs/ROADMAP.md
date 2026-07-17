@@ -218,7 +218,7 @@ Recommended order:
 3. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
 4. Rehearse hosted recovery/reseed from local Markdown and a restored Supabase project; decide whether PITR is worth enabling for the pilot before removing Git as emergency history.
 5. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.
-6. After the JEM/ERS content contract stabilises, perform the separately tracked prototype/workspace pointer review, including Edge and the ERS onboarding prototype, without applying server-only controls to non-Brain workspaces.
+6. After the JEM/ERS content contract stabilises, complete the remaining downstream review: revise the public primer and review the ERS onboarding prototype without applying server-only controls to non-Brain surfaces. Edge pointer/source-of-truth reconciliation completed on 2026-07-17.
 
 ## Non-Goals For Now
 
