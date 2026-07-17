@@ -29,6 +29,22 @@ export function buildFlyDeployArgs({ app, sha, version }) {
   ];
 }
 
+const TEST_ENV_PREFIXES = [
+  "BRAIN_",
+  "MCP_",
+  "GITHUB_ALLOWED_",
+  "GITHUB_OAUTH_",
+  "SUPABASE_",
+];
+
+export function buildReleaseTestEnv(env = process.env) {
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([name]) => !TEST_ENV_PREFIXES.some((prefix) => name.startsWith(prefix))
+    )
+  );
+}
+
 export function buildProvenanceRecord({ app, tag, sha, deployedAt = new Date() }) {
   return {
     app,
