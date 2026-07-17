@@ -90,6 +90,14 @@ function byteLength(content: string): number {
   return Buffer.byteLength(content, "utf-8");
 }
 
+function isBloatExempt(filename: string): boolean {
+  const normalized = filename.replace(/\\/g, "/");
+  return (
+    BLOAT_EXEMPT.has(path.basename(normalized)) ||
+    /^archive\/(?:JOURNAL|LOG)-\d{4}-\d{2}\.md$/i.test(normalized)
+  );
+}
+
 function isFileMetadata(file: FileMetadata | string): file is FileMetadata {
   return typeof file !== "string";
 }
@@ -254,7 +262,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
     const { name, lines } = file;
     fileLinesMap.set(name, lines);
 
-    if (lines > LINE_LIMIT && !BLOAT_EXEMPT.has(path.basename(name))) {
+    if (lines > LINE_LIMIT && !isBloatExempt(name)) {
       bloat.push({ file: name, lines });
     }
 

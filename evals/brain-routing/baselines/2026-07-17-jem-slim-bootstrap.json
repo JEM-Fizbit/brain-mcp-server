@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-07-17",
+  "scope": "read-only local production-search evaluator against the post-spec-013 JEM migration draft plus unchanged ERS corpus",
+  "status": "pass",
+  "cases": {
+    "total": 27,
+    "passed": 27,
+    "failed": 0
+  },
+  "assertions": {
+    "policy_markers": {
+      "total": 17,
+      "passed": 17,
+      "failed": 0
+    },
+    "signposts": {
+      "total": 92,
+      "passed": 92,
+      "failed": 0
+    },
+    "search": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    }
+  },
+  "bootstrap": {
+    "ai-brain-jem": {
+      "bytes": 7403,
+      "estimated_tokens": 1851
+    },
+    "ers-brain": {
+      "bytes": 25850,
+      "estimated_tokens": 6463
+    }
+  },
+  "route_files": {
+    "total": 28,
+    "passed": 28,
+    "failed": 0
+  },
+  "follow_up_reads": {
+    "total": 28,
+    "average": 1.037
+  },
+  "evaluator_latency_ms": {
+    "p50": 11.234,
+    "p95": 40.591,
+    "max": 71.217
+  },
+  "graph_shadow": {
+    "ai-brain-jem": {
+      "legacy_orphans": 36,
+      "graph_orphans": 2,
+      "added_findings": 0,
+      "removed_findings": 34,
+      "diagnostics": 185,
+      "exempted_rotated_history_files": 2,
+      "enforced_orphans": 36
+    }
+  },
+  "fresh_pre_migration_comparison": {
+    "ai_brain_jem_bootstrap_bytes": 37059,
+    "ai_brain_jem_estimated_tokens": 9265,
+    "graph_orphans": 2,
+    "diagnostics": 327
+  },
+  "notes": [
+    "Bootstrap tokens use the documented four-bytes-per-token estimate.",
+    "The baseline contains metrics only; it does not persist prompts, queries, or retrieved snippets.",
+    "JEM routing, policy-marker, signpost, search, route-file, and follow-up-read results are unchanged from the fresh pre-migration pass while its bootstrap is 80 percent smaller.",
+    "The two graph findings are the previously adjudicated historical working artifacts; no new graph false-positive orphan was introduced.",
+    "Rotated JOURNAL and LOG segments are explicitly exempt from current graph parsing but remain reachable through archive/INDEX.md.",
+    "ERS content and lint mode were not changed."
+  ]
+}

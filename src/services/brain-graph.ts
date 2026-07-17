@@ -280,6 +280,9 @@ export function analyzeBrainGraph(
   const roots = Array.from(
     new Set([LOADER_FILE, NOW_FILE, ...(config.graph_roots || [])])
   );
+  const exemptMatchers = (config.exempt_globs || []).map(globToRegExp);
+  const isExempt = (filename: string) =>
+    exemptMatchers.some((matcher) => matcher.test(filename));
 
   for (const root of roots) {
     if (!files.has(root)) {
@@ -288,6 +291,10 @@ export function analyzeBrainGraph(
   }
 
   for (const [source, content] of contents) {
+    // Exempt files such as rotated history are outside graph adjudication.
+    // They remain valid edge targets, but their historical path-like text must
+    // not create current graph diagnostics or routing edges.
+    if (isExempt(source)) continue;
     for (const rawEdge of extractRawEdges(content, config)) {
       const target = resolveRawEdge(source, rawEdge, files, config, diagnostics);
       if (target) edges.push({ source, target, syntax: rawEdge.syntax });
@@ -311,9 +318,8 @@ export function analyzeBrainGraph(
     }
   }
 
-  const exemptMatchers = (config.exempt_globs || []).map(globToRegExp);
   const exempted = Array.from(files)
-    .filter((filename) => exemptMatchers.some((matcher) => matcher.test(filename)))
+    .filter(isExempt)
     .sort();
   const exemptSet = new Set(exempted);
   const unreachable = Array.from(files)

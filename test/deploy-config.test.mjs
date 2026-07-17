@@ -101,6 +101,14 @@ test("image-baked registry satisfies universal and profile expectations", async 
   assert.ok(registry.brains.every((brain) => brain.storage_backend === "postgres"));
   assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
 
+  const jem = registry.brains.find((brain) => brain.id === "ai-brain-jem");
+  assert.deepEqual(jem?.lint?.graph_roots, ["00_loader.md", "NOW.md"]);
+  assert.deepEqual(jem?.lint?.exempt_globs, [
+    "archive/JOURNAL-*.md",
+    "archive/LOG-*.md",
+  ]);
+  assert.equal(jem?.lint?.reachability_mode, undefined);
+
   assert.equal(registry.default_brain_id, expectations.registry.default_brain_id);
   assert.deepEqual(
     registry.brains.map((brain) => brain.id).sort(),
@@ -650,4 +658,26 @@ test("Brain recovery runbook keeps Git out of routine operations", async () => {
     /Deprecate GitHub repo backup from normal Brain operator workflows/
   );
   assert.doesNotMatch(ingestTool, /commit\/push status/);
+});
+
+test("MCP guidance uses the slim bootstrap and on-demand operations contract", async () => {
+  const [server, contextTool, ingestTool, ingestService, inboxTool] =
+    await Promise.all([
+      fs.readFile(path.join(repoRoot, "src", "mcp-server.ts"), "utf-8"),
+      fs.readFile(path.join(repoRoot, "src", "tools", "context.ts"), "utf-8"),
+      fs.readFile(path.join(repoRoot, "src", "tools", "ingest.ts"), "utf-8"),
+      fs.readFile(path.join(repoRoot, "src", "services", "ingest.ts"), "utf-8"),
+      fs.readFile(path.join(repoRoot, "src", "tools", "inbox.ts"), "utf-8"),
+    ]);
+
+  assert.match(server, /slim loader\/task router plus NOW\.md/);
+  assert.match(server, /on-demand operations guide/);
+  assert.doesNotMatch(server, /loader is the single source of truth/);
+  assert.match(contextTool, /operations guide/);
+  assert.match(ingestTool, /per-Brain operations guide/);
+  assert.match(ingestTool, /Common categories include bios, cv, career_history/);
+  assert.match(ingestService, /operations guide named by `brain_load_context`/);
+  assert.doesNotMatch(ingestService, /Desktop Commander write_file/);
+  assert.match(inboxTool, /Run `brain_lint` after the coordinated update/);
+  assert.doesNotMatch(inboxTool, /Call `brain_commit` when done/);
 });

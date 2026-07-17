@@ -11,6 +11,11 @@
       "storage_config": {},
       "vector_backend": null,
       "vector_scope": ["sources"],
+      "lint": {
+        "graph_roots": ["00_loader.md", "NOW.md"],
+        "relative_parent_scope": "disabled",
+        "exempt_globs": ["archive/JOURNAL-*.md", "archive/LOG-*.md"]
+      },
       "metadata": {
         "environment": "john-only-pilot",
         "local_first": true,

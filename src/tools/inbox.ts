@@ -62,13 +62,13 @@ export function registerInboxTools(server: McpServer): void {
           "",
           "### Processing instructions",
           "For each file:",
-          "1. Read the file content (use Desktop Commander for non-.md files)",
-          "2. Call `brain_ingest` with `dry_run=true` to get the analysis plan",
-          "3. Read relevant Brain files and determine what needs updating",
-          "4. Update Brain files via `brain_update_file`",
-          "5. Move the processed file to `sources/{category}/` via Desktop Commander",
-          "6. Call `brain_ingest_complete` to record provenance",
-          "7. Call `brain_commit` when done",
+          "1. Read the per-Brain operations guide named by `brain_load_context`",
+          "2. Inspect/extract the source with an appropriate filesystem or document tool",
+          "3. Call `brain_ingest` with `dry_run=true` when an inventory/analysis plan is useful",
+          "4. Read and update the relevant Brain files",
+          "5. Move the source and reviewed markdown companion to `sources/{category}/`",
+          "6. Call `brain_ingest_complete` to record provenance and clean up the inbox copy",
+          "7. Run `brain_lint` after the coordinated update",
         ].join("\n");
 
         return { content: [{ type: "text", text: result }] };
