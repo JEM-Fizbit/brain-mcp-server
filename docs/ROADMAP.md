@@ -38,7 +38,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
-- spec 013 server Phases 1–3 are implemented and locally verified: ranked structured search/evals, graph-shadow lint, bootstrap-budget/read-only lint, and fail-closed structural-file roles. They are not deployed; legacy lint remains the default and neither Brain has begun the spec 013 content migration;
+- spec 013 server Phases 1–3 are deployed in `v1.3.1`: ranked structured search/evals, the private Postgres FTS index, graph-shadow lint, bootstrap-budget/read-only lint, and fail-closed structural-file roles. Legacy remains the platform default; the pilot override runs `ai-brain-jem` in advisory `graph_shadow` and keeps `ers-brain` on `legacy`. Neither Brain has begun the spec 013 content migration, and the task-context compiler remains unbuilt;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
 - the recovery/export runbook records the current backup baseline: Supabase physical backups visible, PITR not enabled, Storage objects outside database backups, and restore/export rehearsal still required before deleting Git as emergency history;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.

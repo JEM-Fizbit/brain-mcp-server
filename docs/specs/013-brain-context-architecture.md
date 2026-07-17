@@ -1,6 +1,6 @@
 # 013 — Brain Context Architecture
 
-**Status:** approved; server Phases 1–3 implemented 2026-07-17, not deployed; Brain-content migration and compiler decision not started
+**Status:** approved; server Phases 1–3 deployed in `v1.3.1` on 2026-07-17 with JEM graph-shadow and ERS legacy; Brain-content migration and compiler decision not started
 **Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
@@ -21,6 +21,8 @@ Adopt a **shallow content graph plus ranked search**, without a server-side task
 The optional `task`/`max_tokens` compiler is deferred to [spec 014](014-task-context-compiler.md). It may activate only if the post-slimming evidence meets that spec's trigger; it is killed if the slim architecture already meets the agreed sufficiency target.
 
 Implementation approval for server Phases 1–3 was given on 2026-07-17. That approval did not include Brain-content changes, deployment, release, JEM/ERS migration, or the task-context compiler.
+
+Release A was approved separately later on 2026-07-17. The FTS migration and security recheck passed, and `v1.3.1` was deployed with `ai-brain-jem=graph_shadow` and `ers-brain=legacy`. The first guarded `v1.3.0` attempt correctly stopped before Fly after its test subprocess inherited live `.env.local` runtime configuration; the resulting test-only JEM revisions were identified by their exact time window, rolled back to the verified pre-test heads in Postgres and the local mirror, and removed completely. `v1.3.1` adds regression-tested test-environment isolation to the guarded deploy. Final verification found no surviving incident-window revisions, 35 JEM and 46 ERS live files, zero open conflicts, and clean local sync cycles. No Brain-content migration or compiler work was performed.
 
 ## Why this work exists
 
