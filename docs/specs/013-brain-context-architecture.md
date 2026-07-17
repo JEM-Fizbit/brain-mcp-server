@@ -1,6 +1,7 @@
 # 013 — Brain Context Architecture
 
-**Status:** draft — independent architecture review required before approval
+**Status:** draft — Fable 5 independent review complete 2026-07-17 (verdict: **revise** — approve content/lint/roles layer with 10 revisions; defer the task compiler to a successor spec behind a measured gap). Spec revision pending.
+**Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, independent four-way comparison — content layer endorsed, compiler deferred, edge grammar/eval instrument/role sequencing mandated)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
 **Decisions impact:** would supersede the 2026-07-01 decision that lint may index orphans directly into `00_loader.md`; would refine, not reverse, the 2026-07-06 decision to retain the distinct JEM and ERS content schemas
