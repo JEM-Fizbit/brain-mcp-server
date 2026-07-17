@@ -109,6 +109,14 @@ test("image-baked registry satisfies universal and profile expectations", async 
   ]);
   assert.equal(jem?.lint?.reachability_mode, undefined);
 
+  const ers = registry.brains.find((brain) => brain.id === "ers-brain");
+  assert.deepEqual(ers?.lint?.graph_roots, ["00_loader.md", "NOW.md"]);
+  assert.deepEqual(ers?.lint?.exempt_globs, [
+    "archive/JOURNAL-*.md",
+    "archive/LOG-*.md",
+  ]);
+  assert.equal(ers?.lint?.reachability_mode, undefined);
+
   assert.equal(registry.default_brain_id, expectations.registry.default_brain_id);
   assert.deepEqual(
     registry.brains.map((brain) => brain.id).sort(),
