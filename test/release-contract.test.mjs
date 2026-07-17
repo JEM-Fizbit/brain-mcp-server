@@ -37,6 +37,109 @@ test("release state requires a clean, annotated, version-matching tag", () => {
   );
 });
 
+test("release state accepts a clean overlay on an annotated version-matching upstream tag", () => {
+  const overlay = {
+    upstreamTag: "v1.2.0",
+    upstreamTagType: "tag",
+    upstreamIsAncestor: true,
+    changes: [
+      { status: "A", path: "config/brain-platform.example.json" },
+      { status: "M", path: "fly.toml" },
+      { status: "M", path: "test/deploy-expectations.json" },
+      { status: "A", path: "docs/example-deploy.md" },
+    ],
+  };
+
+  assert.equal(
+    assertReleaseState({
+      porcelain: "",
+      exactTag: "",
+      tagType: "",
+      packageVersion: "1.2.0",
+      overlay,
+    }),
+    "v1.2.0"
+  );
+
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: { ...overlay, upstreamTagType: "commit" },
+      }),
+    /annotated tag/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: { ...overlay, upstreamTag: "v1.2.1" },
+      }),
+    /package version/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: { ...overlay, upstreamIsAncestor: false },
+      }),
+    /ancestor/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: {
+          ...overlay,
+          changes: [...overlay.changes, { status: "M", path: "src/index.ts" }],
+        },
+      }),
+    /overlay path/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: {
+          ...overlay,
+          changes: overlay.changes.map((change) =>
+            change.path === "docs/example-deploy.md" ? { ...change, status: "D" } : change
+          ),
+        },
+      }),
+    /change status/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: {
+          ...overlay,
+          changes: overlay.changes.filter((change) => change.path !== "fly.toml"),
+        },
+      }),
+    /fly\.toml/i
+  );
+});
+
 test("guarded deploy passes release identity as OCI build arguments", () => {
   assert.deepEqual(buildFlyDeployArgs({ app: "example-brain-mcp", sha: "abc123", version: "1.2.0" }), [
     "deploy",
@@ -81,6 +184,27 @@ test("deploy provenance records app, tag, sha, and date", () => {
       tag: "v1.2.0",
       sha: "abc123",
       deployed_at: "2026-07-16T12:00:00.000Z",
+    }
+  );
+});
+
+test("overlay deploy provenance records upstream and overlay identities", () => {
+  assert.deepEqual(
+    buildProvenanceRecord({
+      app: "example-brain-mcp",
+      tag: "v1.2.0",
+      sha: "overlay123",
+      upstreamSha: "upstream456",
+      overlaySha: "overlay123",
+      deployedAt: new Date("2026-07-17T12:00:00.000Z"),
+    }),
+    {
+      app: "example-brain-mcp",
+      tag: "v1.2.0",
+      sha: "overlay123",
+      upstream_sha: "upstream456",
+      overlay_sha: "overlay123",
+      deployed_at: "2026-07-17T12:00:00.000Z",
     }
   );
 });

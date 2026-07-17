@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertUniversalLintProfile } from "./lib/deploy-profile-contract.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const expectations = JSON.parse(
@@ -101,21 +103,7 @@ test("image-baked registry satisfies universal and profile expectations", async 
   assert.ok(registry.brains.every((brain) => brain.storage_backend === "postgres"));
   assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
 
-  const jem = registry.brains.find((brain) => brain.id === "ai-brain-jem");
-  assert.deepEqual(jem?.lint?.graph_roots, ["00_loader.md", "NOW.md"]);
-  assert.deepEqual(jem?.lint?.exempt_globs, [
-    "archive/JOURNAL-*.md",
-    "archive/LOG-*.md",
-  ]);
-  assert.equal(jem?.lint?.reachability_mode, undefined);
-
-  const ers = registry.brains.find((brain) => brain.id === "ers-brain");
-  assert.deepEqual(ers?.lint?.graph_roots, ["00_loader.md", "NOW.md"]);
-  assert.deepEqual(ers?.lint?.exempt_globs, [
-    "archive/JOURNAL-*.md",
-    "archive/LOG-*.md",
-  ]);
-  assert.equal(ers?.lint?.reachability_mode, undefined);
+  assertUniversalLintProfile(registry);
 
   assert.equal(registry.default_brain_id, expectations.registry.default_brain_id);
   assert.deepEqual(
