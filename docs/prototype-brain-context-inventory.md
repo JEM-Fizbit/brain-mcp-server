@@ -26,7 +26,7 @@ The JEM corpus still contains references to an older standalone Edge Brain locat
 
 ## Update order
 
-1. Release and observe the graph-parser correction without changing enforcement.
+1. Observe the deployed `v1.3.2` graph-parser correction without changing enforcement.
 2. Complete the approved JEM content migration and observation gate.
 3. Complete the separately gated ERS migration and observation gate.
 4. Update the public primer to the proven final contract.
