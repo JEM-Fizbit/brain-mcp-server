@@ -7,6 +7,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 const goldenPath = path.join(repoRoot, "evals", "brain-routing", "golden.json");
+const fixturePath = path.join(
+  repoRoot,
+  "evals",
+  "brain-routing",
+  "fixtures",
+  "server-foundation.json"
+);
 
 test("brain routing golden set covers diverse Brain behavior surfaces", async () => {
   const golden = JSON.parse(await fs.readFile(goldenPath, "utf-8"));
@@ -53,7 +60,22 @@ test("brain routing eval command is wired as a read-only script", async () => {
     "utf-8"
   );
 
-  assert.equal(packageJson.scripts["eval:brain:routing"], "node scripts/eval-brain-routing.mjs");
+  assert.equal(
+    packageJson.scripts["eval:brain:routing"],
+    "npm run build && node scripts/eval-brain-routing.mjs"
+  );
   assert.match(runner, /evaluateBrainRoutingGolden/);
+  assert.match(runner, /--fixtures/);
   assert.doesNotMatch(runner, /writeFile|appendFile|brain_update_file|brain_log|brain_commit/);
+});
+
+test("frozen server-foundation fixture separates policy, signpost, and production-search assertions", async () => {
+  const fixture = JSON.parse(await fs.readFile(fixturePath, "utf-8"));
+  assert.ok(fixture.cases.length >= 3);
+  assert.ok(fixture.brains["ai-brain-jem"]);
+  assert.ok(fixture.brains["ers-brain"]);
+  assert.ok(
+    fixture.cases.some((testCase) => testCase.expected.refuse_secret_storage)
+  );
+  assert.ok(fixture.cases.some((testCase) => testCase.expected.search));
 });

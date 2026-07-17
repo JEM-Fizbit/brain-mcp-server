@@ -149,7 +149,7 @@ async function setupHarness(name, brainConfig = {}) {
           provider: "github",
           provider_user_id: "123",
           login: "johnemilad",
-          roles: { "ai-brain-jem": "owner" },
+          roles: { "ai-brain-jem": brainConfig.role || "owner" },
         },
       ],
     }),
@@ -409,7 +409,7 @@ test("HTTP MCP hosted inbox scan does not require a server brain_dir", async () 
   assert.match(result, /Postgres-backed Brain/);
 });
 
-test("HTTP MCP lint reads and logs through revision store harness", async () => {
+test("HTTP MCP detection-only lint is read-only through revision store harness", async () => {
   const harness = await setupHarness("lint");
   const lint = await callTool(harness, "brain_lint");
 
@@ -417,14 +417,48 @@ test("HTTP MCP lint reads and logs through revision store harness", async () => 
   assert.doesNotMatch(lint, /ENOENT/);
 
   const store = new FileRevisionStore(harness.storeFile);
-  const hosted = await store.readFile("ai-brain-jem", "LOG.md");
-  assert.match(hosted.content, /Health check:/);
-  assert.equal(hosted.origin, "hosted_mcp");
-  assert.deepEqual(hosted.actor, {
-    provider: "github",
-    id: "123",
-    name: "johnemilad",
+  await assert.rejects(
+    () => store.readFile("ai-brain-jem", "LOG.md"),
+    /not found/i
+  );
+});
+
+test("reader can run read-only lint but cannot request fixes", async () => {
+  const harness = await setupHarness("lint-reader", { role: "reader" });
+  const lint = await callTool(harness, "brain_lint");
+  assert.match(lint, /# Brain Lint Report/);
+
+  const denied = await callTool(harness, "brain_lint", { fix: true });
+  assert.match(denied, /Write access denied/);
+  const store = new FileRevisionStore(harness.storeFile);
+  await assert.rejects(
+    () => store.readFile("ai-brain-jem", "LOG.md"),
+    /not found/i
+  );
+});
+
+test("hosted structural writes require owner or admin while ordinary member writes remain allowed", async () => {
+  const member = await setupHarness("structural-member", { role: "member" });
+  const denied = await callTool(member, "brain_update_file", {
+    filename: "NOW.md",
+    content: "member overwrite",
+    mode: "replace",
   });
+  assert.match(denied, /owner or admin role required/i);
+  const ordinary = await callTool(member, "brain_update_file", {
+    filename: "member-note.md",
+    content: "member content",
+    mode: "replace",
+  });
+  assert.match(ordinary, /Updated member-note\.md/);
+
+  const admin = await setupHarness("structural-admin", { role: "admin" });
+  const allowed = await callTool(admin, "brain_update_file", {
+    filename: "NOW.md",
+    content: "admin overwrite",
+    mode: "replace",
+  });
+  assert.match(allowed, /Updated NOW\.md/);
 });
 
 test("HTTP MCP exposes hosted sync status and conflict listing", async () => {

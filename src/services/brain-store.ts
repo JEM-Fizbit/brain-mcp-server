@@ -7,6 +7,8 @@ import type {
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
+import type { BrainRole } from "./registry.js";
+import type { SearchResult } from "../search-ranking.js";
 
 export type ReadScope = "brain" | "sources";
 export type SearchScope = "brain" | "sources" | "all";
@@ -20,8 +22,14 @@ export interface FileMetadata {
   staleDays: number | null;
 }
 
-export interface SearchResult {
-  text: string;
+export type { SearchResult } from "../search-ranking.js";
+
+export interface BrainSearchOptions {
+  scope?: SearchScope;
+  maxResults?: number;
+  includeOperational?: boolean;
+  /** Future per-file ACL seam; filtering occurs before deterministic ranking. */
+  visibleFiles?: ReadonlySet<string>;
 }
 
 export interface CommitResult {
@@ -41,8 +49,23 @@ export interface SyncStatus {
  */
 const PROTECTED_FILES = new Set<string>([LOADER_FILE, NOW_FILE]);
 
+export function isProtectedStructuralFile(filename: string): boolean {
+  return PROTECTED_FILES.has(filename);
+}
+
+export function assertStructuralWriteAllowed(
+  filename: string,
+  role: unknown
+): void {
+  if (!isProtectedStructuralFile(filename)) return;
+  if (role === "owner" || role === "admin") return;
+  throw new Error(
+    `Structural write access denied for ${filename}: owner or admin role required.`
+  );
+}
+
 export function assertNotProtected(filename: string, action: string): void {
-  if (PROTECTED_FILES.has(filename)) {
+  if (isProtectedStructuralFile(filename)) {
     throw new Error(
       `Cannot ${action} the protected structural file ${filename} — the server requires ${LOADER_FILE} and ${NOW_FILE}.`
     );
@@ -57,16 +80,16 @@ export interface BrainStore {
   searchFiles(
     brainId: string,
     query: string,
-    scope?: SearchScope,
-    maxResults?: number
-  ): Promise<string>;
+    options?: BrainSearchOptions
+  ): Promise<SearchResult[]>;
   writeFile(
     brainId: string,
     filename: string,
     content: string,
     mode: WriteMode,
     oldContent?: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string>;
   deleteFile(
     brainId: string,
@@ -77,12 +100,14 @@ export interface BrainStore {
     brainId: string,
     from: string,
     to: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string>;
   restoreFile(
     brainId: string,
     filename: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string>;
   appendLog(
     brainId: string,
@@ -107,7 +132,8 @@ export interface BrainStore {
     brainId: string,
     conflictId: string,
     content: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<ConflictResolutionResult>;
 }
 
@@ -140,10 +166,9 @@ export class FilesystemBrainStore implements BrainStore {
   searchFiles(
     brainId: string,
     query: string,
-    scope: SearchScope = "brain",
-    maxResults?: number
-  ): Promise<string> {
-    return brain.search(query, scope, maxResults, brainId);
+    options: BrainSearchOptions = {}
+  ): Promise<SearchResult[]> {
+    return brain.searchStructured(query, options, brainId);
   }
 
   writeFile(
@@ -152,7 +177,8 @@ export class FilesystemBrainStore implements BrainStore {
     content: string,
     mode: WriteMode,
     oldContent?: string,
-    _actor?: RevisionActor
+    _actor?: RevisionActor,
+    _role?: BrainRole
   ): Promise<string> {
     return brain.updateFile(filename, content, mode, oldContent, brainId);
   }
@@ -170,13 +196,19 @@ export class FilesystemBrainStore implements BrainStore {
     brainId: string,
     from: string,
     to: string,
-    _actor?: RevisionActor
+    _actor?: RevisionActor,
+    _role?: BrainRole
   ): Promise<string> {
     assertNotProtected(from, "rename");
     return brain.renameFile(from, to, brainId);
   }
 
-  async restoreFile(): Promise<string> {
+  async restoreFile(
+    _brainId: string,
+    _filename: string,
+    _actor?: RevisionActor,
+    _role?: BrainRole
+  ): Promise<string> {
     throw new Error(
       "Restore is only available on the hosted revision Brain store (the filesystem Brain keeps no deletion history)."
     );
@@ -220,7 +252,13 @@ export class FilesystemBrainStore implements BrainStore {
     return [];
   }
 
-  async resolveConflict(): Promise<ConflictResolutionResult> {
+  async resolveConflict(
+    _brainId: string,
+    _conflictId: string,
+    _content: string,
+    _actor?: RevisionActor,
+    _role?: BrainRole
+  ): Promise<ConflictResolutionResult> {
     throw new Error("Filesystem Brain store has no hosted sync conflicts to resolve.");
   }
 }

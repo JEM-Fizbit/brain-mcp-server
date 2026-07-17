@@ -17,7 +17,7 @@ export const LintSchema = BrainIdSchema.extend({
     .boolean()
     .optional()
     .describe(
-      "When true, apply the mechanical, non-fabricating fixes after reporting: index orphaned files into the loader, relocate completed [x] tasks into Done (stamped with today's date), archive Done items stamped more than 30 days ago into archive/tasks-done.md, and bump the loader's Last reviewed date. Writes are revision-tracked. Defaults to false (report only)."
+      "When true, apply the remaining ordinary-content mechanical fixes after reporting: relocate completed [x] tasks into Done (stamped with today's date) and archive Done items stamped more than 30 days ago into archive/tasks-done.md. Lint never auto-edits 00_loader.md or NOW.md. Writes are revision-tracked. Defaults to false (read-only report)."
     ),
   dry_run: z
     .boolean()
@@ -52,7 +52,7 @@ export const ReadFileSchema = BrainIdSchema.extend({
 export const UpdateFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
-    .describe("The filename to update. Must end in .md."),
+    .describe("The filename to update. Must end in .md. Hosted writes to 00_loader.md or NOW.md require owner/admin role."),
   content: z
     .string()
     .describe("The new content to write to the file."),
@@ -116,6 +116,12 @@ export const SearchSchema = BrainIdSchema.extend({
     .default(50)
     .describe(
       "Maximum number of matches to return. Default 50, ceiling 500. Raise when a default search hits the truncation footer and you need more coverage."
+    ),
+  include_operational: z
+    .boolean()
+    .default(false)
+    .describe(
+      "Include operational/history paths (LOG.md, JOURNAL.md, archive/**, working/**). Defaults to false so ranked knowledge search is not dominated by history."
     ),
 });
 

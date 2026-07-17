@@ -26,6 +26,13 @@ const runtimeRolePath = path.join(
   "migrations",
   "2026-06-14_003_brain_runtime_role.sql"
 );
+const revisionFtsPath = path.join(
+  __dirname,
+  "..",
+  "db",
+  "migrations",
+  "2026-07-17_001_brain_revision_fts.sql"
+);
 const oauthStatePath = path.join(
   __dirname,
   "..",
@@ -82,6 +89,15 @@ test("advisor hardening indexes nullable foreign keys", async () => {
   for (const index of indexes) {
     assert.match(sql, new RegExp(`create index if not exists ${index}`, "i"));
   }
+});
+
+test("revision FTS migration adds a private tombstone-filtered GIN index", async () => {
+  const sql = await fs.readFile(revisionFtsPath, "utf-8");
+  assert.match(sql, /create index if not exists brain_file_revisions_current_content_fts_idx/i);
+  assert.match(sql, /using gin/i);
+  assert.match(sql, /to_tsvector\s*\(/i);
+  assert.match(sql, /where deleted = false/i);
+  assert.doesNotMatch(sql, /grant\s+.*\s+to\s+(anon|authenticated|public)/i);
 });
 
 test("production schema enables RLS on private Brain tables", async () => {

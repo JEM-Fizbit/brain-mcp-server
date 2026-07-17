@@ -41,7 +41,8 @@ export function registerUpdateTools(server: McpServer): void {
           content,
           mode,
           old_content,
-          revisionActor(ctx)
+          revisionActor(ctx),
+          ctx.role
         );
         const sync = revisionStoreModeEnabled()
           ? ""
@@ -107,20 +108,25 @@ export function registerUpdateTools(server: McpServer): void {
           ctx.brainId,
           from,
           to,
-          revisionActor(ctx)
+          revisionActor(ctx),
+          ctx.role
         );
         const rewrite = await rewriteLinksAfterRename(
           store,
           ctx.brainId,
           from,
           to,
-          revisionActor(ctx)
+          revisionActor(ctx),
+          ctx.role
         );
         const linkNote = rewrite.updated
           ? ` Updated ${rewrite.updated} inbound link(s).`
           : "";
         const ambigNote = rewrite.ambiguous
           ? ` Some [[basename]] links were ambiguous (name shared by another file) and left unchanged — review manually.`
+          : "";
+        const protectedNote = rewrite.protectedSkipped.length
+          ? ` ${rewrite.protectedSkipped.join(", ")} contains inbound links but requires owner/admin review; no structural file was auto-edited.`
           : "";
         const sync = revisionStoreModeEnabled()
           ? ""
@@ -130,7 +136,7 @@ export function registerUpdateTools(server: McpServer): void {
               authorIdentity(ctx)
             );
         return {
-          content: [{ type: "text", text: result + linkNote + ambigNote + sync }],
+          content: [{ type: "text", text: result + linkNote + ambigNote + protectedNote + sync }],
         };
       } catch (error) {
         return { content: [{ type: "text", text: String(error) }], isError: true };
@@ -149,7 +155,8 @@ export function registerUpdateTools(server: McpServer): void {
         const result = await activeBrainStore().restoreFile(
           ctx.brainId,
           filename,
-          revisionActor(ctx)
+          revisionActor(ctx),
+          ctx.role
         );
         const sync = revisionStoreModeEnabled()
           ? ""

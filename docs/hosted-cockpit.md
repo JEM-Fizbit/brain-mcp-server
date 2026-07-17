@@ -367,12 +367,13 @@ conflicts, and never performs admin mutations; it stays local-bound. This is a
 deliberate, narrow relaxation of the read-only contract — see
 `docs/DECISIONS.md` (2026-07-01) and `docs/specs/009-brain-lint-apply-mode.md`.
 
-The fixes are mechanical and non-fabricating: index orphaned files into the
-loader, relocate completed `[x]` tasks into Done (stamped `(done YYYY-MM-DD)`),
-archive Done items older than 30 days into `archive/tasks-done.md` (moved, never
-deleted), and bump the loader "Last reviewed" date when a change lands. Dates are
+The remaining fixes are mechanical and non-fabricating: relocate completed
+`[x]` tasks into Done (stamped `(done YYYY-MM-DD)`) and archive Done items older
+than 30 days into `archive/tasks-done.md` (moved, never deleted). Dates are
 handled stamp-forward — undated Done items are tagged the first time the tool
-sees them; no history is reconstructed.
+sees them; no history is reconstructed. Spec 013 removed orphan-to-loader and
+loader-reviewed-date fixes. No lint plan or apply path may modify `00_loader.md`
+or `NOW.md`.
 
 Operator usage from the repo (dry run is the default; nothing is written without
 `--apply`):
@@ -386,7 +387,7 @@ The action always runs a dry run first and requires explicit confirmation before
 the apply. There are three surfaces:
 
 - **Cockpit Fixes tab (primary).** The cockpit's **Fixes** tab lists each atomic
-  fix — each orphan, each archived/stamped task, the date bump — with its own
+  fix — each relocated, archived, or stamped task — with its own
   checkbox plus an "Approve all" control, and applies only what you approve. It
   is backed by `GET /api/fixes/plan` (read-only, live per-item plan) and
   `POST /api/fixes/apply` (the one write endpoint). Apply re-reads current Brain

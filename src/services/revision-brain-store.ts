@@ -3,11 +3,12 @@ import { LOG_FILE, type SourceCategory, type LogOpType } from "../constants.js";
 import {
   MAX_SEARCH_RESULTS,
   MAX_SEARCH_RESULTS_CEILING,
-  SEARCH_LINE_CHAR_LIMIT,
 } from "../constants.js";
 import {
   assertNotProtected,
+  assertStructuralWriteAllowed,
   type BrainStore,
+  type BrainSearchOptions,
   type CommitResult,
   type FileMetadata,
   type ReadScope,
@@ -15,6 +16,13 @@ import {
   type SyncStatus,
   type WriteMode,
 } from "./brain-store.js";
+import type { BrainRole } from "./registry.js";
+import {
+  rankSearchCandidates,
+  sortSearchResults,
+  type SearchCandidate,
+  type SearchResult,
+} from "../search-ranking.js";
 import { FileRevisionStore } from "../sync/file-revision-store.js";
 import type {
   ConflictRecord,
@@ -175,50 +183,49 @@ export class RevisionBrainStore implements BrainStore {
   async searchFiles(
     brainId: string,
     query: string,
-    scope: SearchScope = "brain",
-    maxResults?: number
-  ): Promise<string> {
-    const cap = clampMaxResults(maxResults);
-    const lines: string[] = [];
+    options: BrainSearchOptions = {}
+  ): Promise<SearchResult[]> {
+    const scope: SearchScope = options.scope ?? "brain";
+    const cap = clampMaxResults(options.maxResults);
+    const ranked: SearchResult[] = [];
+    const sourceCandidates: SearchCandidate[] = [];
 
     if (scope === "brain" || scope === "all") {
       const results = await this.revisionStore.searchFiles(brainId, query, {
         maxResults: cap,
+        includeOperational: options.includeOperational,
+        visibleFiles: options.visibleFiles
+          ? Array.from(options.visibleFiles)
+          : undefined,
       });
-      lines.push(
-        ...results.map((result) => {
-          const rawLine =
-            result.line.length > SEARCH_LINE_CHAR_LIMIT
-              ? `${result.line.slice(0, SEARCH_LINE_CHAR_LIMIT)}...`
-              : result.line;
-          return `${result.filename}:${result.lineNumber}: ${rawLine}`;
-        })
+      ranked.push(
+        ...results.map((result) => ({
+          ...result,
+          scope: "brain" as const,
+        }))
       );
     }
 
     if (
-      lines.length < cap &&
       this.sourceStore &&
       (scope === "sources" || scope === "all")
     ) {
       const textMatches = await this.sourceStore.searchArtifactText(
         brainId,
         query,
-        cap - lines.length
+        cap
       );
-      lines.push(
-        ...textMatches.map((result) => {
-          const rawLine =
-            result.line.length > SEARCH_LINE_CHAR_LIMIT
-              ? `${result.line.slice(0, SEARCH_LINE_CHAR_LIMIT)}...`
-              : result.line;
-          return `sources:${result.path}:${result.lineNumber}: ${rawLine}`;
-        })
+      sourceCandidates.push(
+        ...textMatches.map((result) => ({
+          filename: `sources/${result.path}`,
+          lineNumber: result.lineNumber,
+          line: result.line,
+          scope: "sources" as const,
+        }))
       );
     }
 
     if (
-      lines.length < cap &&
       this.sourceStore &&
       (scope === "sources" || scope === "all")
     ) {
@@ -226,13 +233,23 @@ export class RevisionBrainStore implements BrainStore {
       const paths = await this.sourceStore.listSourcePaths(brainId);
       for (const sourcePath of paths) {
         if (!sourcePath.toLowerCase().includes(lowerQuery)) continue;
-        lines.push(`sources:${sourcePath}`);
-        if (lines.length >= cap) break;
+        sourceCandidates.push({
+          filename: `sources/${sourcePath}`,
+          lineNumber: 0,
+          line: sourcePath,
+          scope: "sources",
+        });
+        if (sourceCandidates.length >= cap * 2) break;
       }
     }
 
-    if (lines.length === 0) return "No matches found.";
-    return lines.join("\n");
+    ranked.push(
+      ...rankSearchCandidates(sourceCandidates, query, {
+        maxResults: cap,
+        visibleFiles: options.visibleFiles,
+      })
+    );
+    return sortSearchResults(ranked, cap);
   }
 
   async writeFile(
@@ -241,9 +258,11 @@ export class RevisionBrainStore implements BrainStore {
     content: string,
     mode: WriteMode,
     oldContent?: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string> {
     validateFilename(filename);
+    assertStructuralWriteAllowed(filename, role);
     const current = await this.revisionStore.getHead(brainId, filename);
     let nextContent = content;
 
@@ -320,11 +339,13 @@ export class RevisionBrainStore implements BrainStore {
     brainId: string,
     from: string,
     to: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string> {
     validateFilename(from);
     validateFilename(to);
     assertNotProtected(from, "rename");
+    assertStructuralWriteAllowed(to, role);
     const current = await this.revisionStore.getHead(brainId, from);
     if (!current || current.deleted === true) {
       throw new Error(`File not found: ${from}`);
@@ -348,9 +369,11 @@ export class RevisionBrainStore implements BrainStore {
   async restoreFile(
     brainId: string,
     filename: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<string> {
     validateFilename(filename);
+    assertStructuralWriteAllowed(filename, role);
     const current = await this.revisionStore.getHead(brainId, filename);
     if (!current || current.deleted !== true) {
       throw new Error(`File is not deleted (nothing to restore): ${filename}`);
@@ -459,12 +482,18 @@ export class RevisionBrainStore implements BrainStore {
     return this.revisionStore.listConflicts(brainId, status);
   }
 
-  resolveConflict(
+  async resolveConflict(
     brainId: string,
     conflictId: string,
     content: string,
-    actor?: RevisionActor
+    actor?: RevisionActor,
+    role?: BrainRole
   ): Promise<ConflictResolutionResult> {
+    const conflict = (await this.revisionStore.listConflicts(brainId)).find(
+      (candidate) => candidate.conflictId === conflictId
+    );
+    if (!conflict) throw new Error(`Conflict not found: ${conflictId}`);
+    assertStructuralWriteAllowed(conflict.filename, role);
     return this.revisionStore.resolveConflict({
       brainId,
       conflictId,

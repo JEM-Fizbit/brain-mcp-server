@@ -366,3 +366,38 @@ test("revision-store lint does not scan BRAIN_DIR", async () => {
     await fs.rm(revisionRoot, { recursive: true, force: true });
   }
 });
+
+test("graph shadow reports graph deltas without changing legacy orphan enforcement", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `NOW.md`, `01_hub.md`\n",
+    "NOW.md": "# NOW\n",
+    "01_hub.md": "# Hub\n\n[[02_detail]]\n",
+    "02_detail.md": "# Detail\n",
+  });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph_shadow",
+  });
+  try {
+    const report = await runLint();
+    assert.equal(report.orphanMode, "graph_shadow");
+    assert.ok(report.orphans.includes("02_detail.md"));
+    assert.deepEqual(report.graphReachability.unreachable, []);
+    assert.ok(report.graphReachability.removedFindings.includes("02_detail.md"));
+    assert.deepEqual(report.graphReachability.addedFindings, []);
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});
+
+test("legacy lint remains the default and bootstrap budget excess is review-only", async () => {
+  await writeFixture({
+    "00_loader.md": `# Loader\n\n${"x".repeat(10_100)}\n`,
+    "NOW.md": "# NOW\n",
+  });
+  const report = await runLint();
+  assert.equal(report.orphanMode, "legacy");
+  assert.equal(report.graphReachability, null);
+  assert.equal(report.bootstrapBudget.exceeded, true);
+  assert.ok(report.bootstrapBudget.estimatedTokens > 2_500);
+  assert.match(formatLintReport(report), /Review required:.*budget exceeded/i);
+});

@@ -1,6 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { lineMatchesSearchQuery } from "../search-match.js";
+import {
+  isDefaultKnowledgeSearchPath,
+  rankSearchCandidates,
+  type SearchCandidate,
+  type SearchResult,
+} from "../search-ranking.js";
+import type { BrainSearchOptions } from "./brain-store.js";
 import {
   LOADER_FILE,
   NOW_FILE,
@@ -9,8 +15,6 @@ import {
   IDENTITY_PATTERNS,
   MAX_SEARCH_RESULTS,
   MAX_SEARCH_RESULTS_CEILING,
-  SEARCH_LINE_CHAR_LIMIT,
-  SEARCH_TOTAL_CHAR_LIMIT,
   LINT_NUDGE_DAYS,
   type SourceCategory,
 } from "../constants.js";
@@ -358,15 +362,33 @@ export async function search(
   maxResults: number = MAX_SEARCH_RESULTS,
   brainId?: string
 ): Promise<string> {
+  const results = await searchStructured(
+    query,
+    { scope, maxResults },
+    brainId
+  );
+  const matches = results.map(
+    (result) => `${result.filename}:${result.lineNumber}: ${result.line.trim()}`
+  );
+  const scopeLabel =
+    scope === "brain" ? "Brain" : scope === "sources" ? "sources" : "Brain + sources";
+  return matches.length > 0
+    ? `Found ${matches.length} matches for "${query}" in ${scopeLabel}:\n\n${matches.join("\n")}`
+    : `No matches found for "${query}" in ${scopeLabel}`;
+}
+
+export async function searchStructured(
+  query: string,
+  options: BrainSearchOptions = {},
+  brainId?: string
+): Promise<SearchResult[]> {
   const { brainDir, sourcesRoot } = await getBrainPaths(brainId);
-  const matches: string[] = [];
+  const scope = options.scope ?? "brain";
   const cap = Math.min(
-    Math.max(1, Math.floor(maxResults)),
+    Math.max(1, Math.floor(options.maxResults ?? MAX_SEARCH_RESULTS)),
     MAX_SEARCH_RESULTS_CEILING
   );
-  let totalChars = 0;
-  let linesTruncated = 0;
-  let stoppedByBudget = false;
+  const candidates: SearchCandidate[] = [];
 
   const searchRoots: { root: string; prefix: string; files: string[] }[] = [];
   if (scope === "brain" || scope === "all") {
@@ -384,54 +406,30 @@ export async function search(
     });
   }
 
-  outer: for (const { root, prefix, files } of searchRoots) {
+  for (const { root, prefix, files } of searchRoots) {
     for (const name of files) {
-      if (matches.length >= cap) break outer;
+      if (
+        prefix === "" &&
+        !options.includeOperational &&
+        !isDefaultKnowledgeSearchPath(name)
+      ) {
+        continue;
+      }
       const filePath = path.join(root, name);
       const content = await fs.readFile(filePath, "utf-8").catch(() => "");
       const lines = content.split("\n");
       for (let i = 0; i < lines.length; i++) {
-        if (matches.length >= cap) break outer;
-        const line = lines[i];
-        if (!lineMatchesSearchQuery(line, query)) continue;
-        let trimmed = line.trim();
-        if (trimmed.length > SEARCH_LINE_CHAR_LIMIT) {
-          trimmed = trimmed.slice(0, SEARCH_LINE_CHAR_LIMIT) + "…";
-          linesTruncated++;
-        }
-        const entry = `${prefix}${name}:${i + 1}: ${trimmed}`;
-        if (totalChars + entry.length + 1 > SEARCH_TOTAL_CHAR_LIMIT) {
-          stoppedByBudget = true;
-          break outer;
-        }
-        matches.push(entry);
-        totalChars += entry.length + 1;
+        candidates.push({
+          filename: `${prefix}${name}`,
+          lineNumber: i + 1,
+          line: lines[i],
+          scope: prefix ? "sources" : "brain",
+        });
       }
     }
   }
-
-  const result = matches.join("\n");
-  const notes: string[] = [];
-  if (stoppedByBudget) {
-    notes.push(
-      `Results truncated at ${Math.round(SEARCH_TOTAL_CHAR_LIMIT / 1000)}KB total size — narrow your query for full coverage.`
-    );
-  } else if (matches.length >= cap) {
-    notes.push(
-      `Results truncated at ${cap} matches — raise max_results (ceiling ${MAX_SEARCH_RESULTS_CEILING}) or narrow your query.`
-    );
-  }
-  if (linesTruncated > 0) {
-    notes.push(
-      `${linesTruncated} line${linesTruncated === 1 ? "" : "s"} trimmed at ${SEARCH_LINE_CHAR_LIMIT} chars (ends with …) — read the file for full content.`
-    );
-  }
-  const footer = notes.length > 0 ? `\n\n(${notes.join(" ")})` : "";
-
-  const scopeLabel =
-    scope === "brain" ? "Brain" : scope === "sources" ? "sources" : "Brain + sources";
-
-  return matches.length > 0
-    ? `Found ${matches.length} matches for "${query}" in ${scopeLabel}:\n\n${result}${footer}`
-    : `No matches found for "${query}" in ${scopeLabel}`;
+  return rankSearchCandidates(candidates, query, {
+    maxResults: cap,
+    visibleFiles: options.visibleFiles,
+  });
 }

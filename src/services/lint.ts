@@ -16,6 +16,7 @@ import {
   JOURNAL_ARCHIVE_INDEX,
   JOURNAL_LINE_LIMIT,
   JOURNAL_BYTE_LIMIT,
+  BOOTSTRAP_TOKEN_LIMIT,
 } from "../constants.js";
 import { getStalenessThreshold } from "./brain.js";
 import {
@@ -23,7 +24,16 @@ import {
   revisionStoreModeEnabled,
 } from "./active-brain-store.js";
 import type { BrainStore, FileMetadata } from "./brain-store.js";
-import { getBrainPaths, resolveBrain, stdioPrincipal } from "./registry.js";
+import {
+  getBrainPaths,
+  resolveBrain,
+  stdioPrincipal,
+  type BrainLintReachabilityMode,
+} from "./registry.js";
+import {
+  analyzeBrainGraph,
+  type BrainGraphAnalysis,
+} from "./brain-graph.js";
 import {
   summarizeCaptureQueue,
   type CaptureQueueStatus,
@@ -53,6 +63,21 @@ export interface LintReport {
       }
     | null;
   captureQueue: CaptureQueueStatus | null;
+  bootstrapBudget: {
+    limitTokens: number;
+    estimatedTokens: number;
+    bytes: number;
+    exceeded: boolean;
+  };
+  graphReachability:
+    | (BrainGraphAnalysis & {
+        mode: Exclude<BrainLintReachabilityMode, "legacy">;
+        legacyOrphans: string[];
+        addedFindings: string[];
+        removedFindings: string[];
+      })
+    | null;
+  orphanMode: BrainLintReachabilityMode;
   suggestedSemanticChecks: string[];
   warnings: string[];
 }
@@ -89,12 +114,6 @@ async function listBrainMarkdownFiles(
     })
   );
   return files.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-async function resolveLintBrainId(brainId?: string): Promise<string> {
-  if (brainId) return brainId;
-  const { brain } = await resolveBrain(undefined, stdioPrincipal());
-  return brain.id;
 }
 
 function extractFileReferencesFromContent(content: string): Set<string> {
@@ -218,7 +237,8 @@ function resolveProjectsFile(allFiles: string[]): string | undefined {
 }
 
 export async function runLint(brainId?: string): Promise<LintReport> {
-  const resolvedBrainId = await resolveLintBrainId(brainId);
+  const { brain: lintBrain } = await resolveBrain(brainId, stdioPrincipal());
+  const resolvedBrainId = lintBrain.id;
   const store = activeBrainStore();
   const files = await listBrainMarkdownFiles(store, resolvedBrainId);
   const allFiles = files.map((file) => file.name);
@@ -252,7 +272,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
   const loaderRefs = loaderContent
     ? extractFileReferencesFromContent(loaderContent)
     : new Set<string>();
-  const orphans: string[] = [];
+  const legacyOrphans: string[] = [];
   const warnings: string[] = [];
   if (!loaderContent) {
     warnings.push(`Orphan check skipped: ${LOADER_FILE} was not found.`);
@@ -271,9 +291,49 @@ export async function runLint(brainId?: string): Promise<LintReport> {
       (dir !== "." && loaderRefs.has(dir + "/"));
 
     if (!isReferenced) {
-      orphans.push(name);
+      legacyOrphans.push(name);
     }
   }
+
+  const orphanMode = lintBrain.lint?.reachability_mode ?? "legacy";
+  const graphMode: "graph_shadow" | "graph" | null =
+    orphanMode === "legacy" ? null : orphanMode;
+  const graph =
+    graphMode === null
+      ? null
+      : analyzeBrainGraph(fileContentMap, lintBrain.lint);
+  const graphReachability = graph
+    ? {
+        ...graph,
+        mode: graphMode!,
+        legacyOrphans,
+        addedFindings: graph.unreachable.filter(
+          (filename) => !legacyOrphans.includes(filename)
+        ),
+        removedFindings: legacyOrphans.filter(
+          (filename) => !graph.unreachable.includes(filename)
+        ),
+      }
+    : null;
+  const orphans =
+    orphanMode === "graph" && graphReachability
+      ? graphReachability.unreachable
+      : legacyOrphans;
+
+  const bootstrapContent = [
+    fileContentMap.get(LOADER_FILE),
+    fileContentMap.get(NOW_FILE),
+  ]
+    .filter((content): content is string => content !== undefined)
+    .join("\n");
+  const bootstrapBytes = byteLength(bootstrapContent);
+  const bootstrapEstimatedTokens = Math.ceil(bootstrapBytes / 4);
+  const bootstrapBudget: LintReport["bootstrapBudget"] = {
+    limitTokens: BOOTSTRAP_TOKEN_LIMIT,
+    estimatedTokens: bootstrapEstimatedTokens,
+    bytes: bootstrapBytes,
+    exceeded: bootstrapEstimatedTokens > BOOTSTRAP_TOKEN_LIMIT,
+  };
 
   // Drift detection: check NOW.md mentions against Active project sections
   const drift: string[] = [];
@@ -383,12 +443,11 @@ export async function runLint(brainId?: string): Promise<LintReport> {
       `Triage TASKS.md Capture / Triage Queue: ${captureQueue.openCount} open item(s), ${captureQueue.staleCount} stale.`
     );
   }
-  suggestedSemanticChecks.push(
-    "Cross-check key facts in 01_identity.md against REF_extracted_facts.md for contradictions"
-  );
-  suggestedSemanticChecks.push(
-    "Verify active roles in 04_active_roles.md match current state in NOW.md"
-  );
+  if (bootstrapBudget.exceeded) {
+    suggestedSemanticChecks.push(
+      `Review ${LOADER_FILE} and ${NOW_FILE} for progressive-disclosure moves; the combined bootstrap exceeds ${BOOTSTRAP_TOKEN_LIMIT} estimated tokens.`
+    );
+  }
 
   return {
     bloat,
@@ -399,6 +458,9 @@ export async function runLint(brainId?: string): Promise<LintReport> {
     unindexedWorkingBinaries,
     journalRotation,
     captureQueue,
+    bootstrapBudget,
+    graphReachability,
+    orphanMode,
     suggestedSemanticChecks,
     warnings,
   };
@@ -416,7 +478,9 @@ export function formatLintReport(report: LintReport): string {
     report.largeDomainPacks.length +
     report.unindexedWorkingBinaries.length +
     (report.journalRotation ? 1 : 0) +
-    (report.captureQueue ? 1 : 0);
+    (report.captureQueue ? 1 : 0) +
+    (report.bootstrapBudget.exceeded ? 1 : 0) +
+    (report.graphReachability?.diagnostics.length || 0);
 
   sections.push(
     issueCount === 0
@@ -451,11 +515,55 @@ export function formatLintReport(report: LintReport): string {
     sections.push("");
   }
 
+  // Bootstrap budget
+  sections.push("## Bootstrap budget");
+  sections.push(
+    `- ${LOADER_FILE} + ${NOW_FILE}: ${report.bootstrapBudget.estimatedTokens} estimated tokens (${report.bootstrapBudget.bytes} bytes); limit ${report.bootstrapBudget.limitTokens}.`
+  );
+  sections.push(
+    report.bootstrapBudget.exceeded
+      ? "- **Review required:** budget exceeded; lint never auto-fixes structural files."
+      : "- Within the provisional budget."
+  );
+  sections.push("");
+
   // Orphans
   if (report.orphans.length > 0) {
-    sections.push("## Orphans (not referenced in loader)");
+    sections.push(
+      report.orphanMode === "graph"
+        ? "## Orphans (graph-unreachable)"
+        : "## Orphans (legacy loader-reference check)"
+    );
     for (const file of report.orphans) {
       sections.push(`- ${file}`);
+    }
+    sections.push("");
+  }
+
+  if (report.graphReachability) {
+    const graph = report.graphReachability;
+    sections.push(
+      graph.mode === "graph_shadow"
+        ? "## Graph reachability shadow"
+        : "## Graph reachability"
+    );
+    sections.push(`- Roots: ${graph.roots.join(", ")}`);
+    sections.push(`- Legacy orphans: ${graph.legacyOrphans.length}`);
+    sections.push(`- Graph-unreachable: ${graph.unreachable.length}`);
+    sections.push(`- Added findings: ${graph.addedFindings.length}`);
+    for (const filename of graph.addedFindings) sections.push(`  - ${filename}`);
+    sections.push(`- Removed findings: ${graph.removedFindings.length}`);
+    for (const filename of graph.removedFindings) sections.push(`  - ${filename}`);
+    sections.push(`- Exemptions used: ${graph.exempted.length}`);
+    for (const filename of graph.exempted) sections.push(`  - ${filename}`);
+    sections.push(`- Edge diagnostics: ${graph.diagnostics.length}`);
+    for (const diagnostic of graph.diagnostics) {
+      sections.push(
+        `  - ${diagnostic.code}: ${diagnostic.source} -> ${diagnostic.target} (${diagnostic.syntax})`
+      );
+    }
+    if (graph.mode === "graph_shadow") {
+      sections.push("- Shadow mode is advisory: legacy orphans remain the enforced report set and graph findings cannot alter fix plans.");
     }
     sections.push("");
   }

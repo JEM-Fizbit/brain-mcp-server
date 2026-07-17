@@ -1,6 +1,6 @@
 # 013 — Brain Context Architecture
 
-**Status:** draft — revised after Fable 5 review; architecture direction recorded, implementation approval still required
+**Status:** approved; server Phases 1–3 implemented 2026-07-17, not deployed; Brain-content migration and compiler decision not started
 **Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
@@ -20,7 +20,7 @@ Adopt a **shallow content graph plus ranked search**, without a server-side task
 
 The optional `task`/`max_tokens` compiler is deferred to [spec 014](014-task-context-compiler.md). It may activate only if the post-slimming evidence meets that spec's trigger; it is killed if the slim architecture already meets the agreed sufficiency target.
 
-This spec authorises no code or Brain-content changes until separately approved.
+Implementation approval for server Phases 1–3 was given on 2026-07-17. That approval did not include Brain-content changes, deployment, release, JEM/ERS migration, or the task-context compiler.
 
 ## Why this work exists
 

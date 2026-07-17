@@ -36,7 +36,7 @@
     "deploy:guarded": "node scripts/deploy-guarded.mjs",
     "brain:lint:fix": "node scripts/brain-lint-fix.mjs",
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
-    "eval:brain:routing": "node scripts/eval-brain-routing.mjs",
+    "eval:brain:routing": "npm run build && node scripts/eval-brain-routing.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",
     "hosted:cockpit:launchd:plist": "node scripts/write-cockpit-launchd-plist.mjs",
     "hosted:cockpit:launcher:install": "node scripts/install-cockpit-launcher.mjs",

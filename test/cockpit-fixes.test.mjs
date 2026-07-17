@@ -109,9 +109,10 @@ test("GET /api/fixes/plan returns per-item plan and writes nothing", async () =>
   assert.equal(res.status, 200);
   assert.equal(res.json.ok, true);
   const kinds = new Set(res.json.items.map((i) => i.kind));
-  assert.ok(kinds.has("orphan_index"));
   assert.ok(kinds.has("done_archive"));
   assert.ok(kinds.has("done_stamp"));
+  assert.ok(!kinds.has("orphan_index"));
+  assert.ok(!kinds.has("reviewed_date"));
   // read-only
   assert.equal(await fs.readFile(path.join(tmpDir, "TASKS.md"), "utf-8"), before);
 });

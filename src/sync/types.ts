@@ -127,12 +127,16 @@ export interface ConflictResolutionResult {
 
 export interface SearchOptions {
   maxResults?: number;
+  includeOperational?: boolean;
+  visibleFiles?: readonly string[];
 }
 
 export interface SearchResult {
   filename: string;
   lineNumber: number;
   line: string;
+  score: number;
+  mechanism: "exact_phrase" | "normalized_phrase" | "compact_phrase" | "token_match" | "path_match" | "fts";
 }
 
 export interface ChangeRecord {

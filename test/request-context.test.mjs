@@ -19,6 +19,25 @@ after(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
+test("write-role authorization allows known writers and rejects reader or unknown roles", () => {
+  const base = {
+    brainId: "ai-brain-jem",
+    brain: {},
+    principal: { provider: "github", providerUserId: "123" },
+  };
+  for (const role of ["owner", "admin", "member"]) {
+    assert.doesNotThrow(() => requestContext.assertWriteRole({ ...base, role }));
+  }
+  assert.throws(
+    () => requestContext.assertWriteRole({ ...base, role: "reader" }),
+    /write access denied/i
+  );
+  assert.throws(
+    () => requestContext.assertWriteRole({ ...base, role: "editor" }),
+    /unknown role editor/i
+  );
+});
+
 test("listBrainsForExtra exposes registry authority metadata for accessible Brains", async () => {
   await fs.writeFile(
     registryFile,

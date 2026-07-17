@@ -172,10 +172,12 @@ test("RevisionBrainStore searches hosted source paths from metadata", async () =
     })
   );
 
-  assert.equal(
-    await store.searchFiles("ai-brain-jem", "headshot", "sources", 5),
-    "sources:photos/headshot.jpg"
-  );
+  const results = await store.searchFiles("ai-brain-jem", "headshot", {
+    scope: "sources",
+    maxResults: 5,
+  });
+  assert.equal(results[0].filename, "sources/photos/headshot.jpg");
+  assert.ok(results[0].score > 0);
 });
 
 test("RevisionBrainStore searches hosted source extracted text before path metadata", async () => {
@@ -187,10 +189,13 @@ test("RevisionBrainStore searches hosted source extracted text before path metad
     })
   );
 
-  assert.equal(
-    await store.searchFiles("ai-brain-jem", "greenhouse", "sources", 5),
-    "sources:assessments/profile.pdf:12: The profile mentions greenhouse governance and risk controls."
-  );
+  const results = await store.searchFiles("ai-brain-jem", "greenhouse", {
+    scope: "sources",
+    maxResults: 5,
+  });
+  assert.equal(results[0].filename, "sources/assessments/profile.pdf");
+  assert.equal(results[0].lineNumber, 12);
+  assert.match(results[0].line, /greenhouse governance/);
 });
 
 test("RevisionBrainStore reads hosted source manifests from metadata", async () => {
@@ -243,4 +248,148 @@ test("RevisionBrainStore keeps LOG.md ordering isolated by brain_id", async () =
   assert.doesNotMatch(await store.readLog("ai-brain-jem", 1), /ERS log entry/);
   assert.match(await store.readLog("ers-brain", 1), /ERS log entry/);
   assert.doesNotMatch(await store.readLog("ers-brain", 1), /JEM log entry/);
+});
+
+test("RevisionBrainStore protects always-loaded files at the store boundary", async () => {
+  const revisionStore = new MemoryRevisionStore();
+  for (const filename of ["00_loader.md", "NOW.md"]) {
+    await revisionStore.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename,
+      baseRevisionId: null,
+      origin: "local_agent",
+      content: `# ${filename}\n`,
+    });
+  }
+  const store = new RevisionBrainStore(revisionStore);
+
+  for (const role of ["member", "reader", "editor", undefined]) {
+    await assert.rejects(
+      () =>
+        store.writeFile(
+          "ai-brain-jem",
+          "00_loader.md",
+          "# changed\n",
+          "replace",
+          undefined,
+          undefined,
+          role
+        ),
+      /owner or admin role required/i
+    );
+  }
+
+  await assert.doesNotReject(() =>
+    store.writeFile(
+      "ai-brain-jem",
+      "00_loader.md",
+      "# admin changed\n",
+      "replace",
+      undefined,
+      undefined,
+      "admin"
+    )
+  );
+  await assert.doesNotReject(() =>
+    store.writeFile(
+      "ai-brain-jem",
+      "NOW.md",
+      "# owner changed\n",
+      "replace",
+      undefined,
+      undefined,
+      "owner"
+    )
+  );
+  await assert.doesNotReject(() =>
+    store.writeFile(
+      "ai-brain-jem",
+      "ordinary.md",
+      "# member content\n",
+      "replace",
+      undefined,
+      undefined,
+      "member"
+    )
+  );
+});
+
+test("RevisionBrainStore protects structural conflict resolution at the store boundary", async () => {
+  const revisionStore = new MemoryRevisionStore();
+  const seeded = await revisionStore.proposeRevision({
+    brainId: "ai-brain-jem",
+    filename: "NOW.md",
+    baseRevisionId: null,
+    origin: "local_agent",
+    content: "# NOW\n",
+  });
+  assert.equal(seeded.ok, true);
+  const conflict = await revisionStore.recordConflict({
+    brainId: "ai-brain-jem",
+    filename: "NOW.md",
+    localBaseRevisionId: seeded.head.revisionId,
+    remoteHeadRevisionId: seeded.head.revisionId,
+    localContentHash: "b".repeat(64),
+    remoteContentHash: seeded.head.contentHash,
+    localOrigin: "local_agent",
+    remoteOrigin: "hosted_mcp",
+  });
+  const store = new RevisionBrainStore(revisionStore);
+
+  for (const role of ["member", "reader", "editor", undefined]) {
+    await assert.rejects(
+      () =>
+        store.resolveConflict(
+          "ai-brain-jem",
+          conflict.conflictId,
+          "# member resolution\n",
+          undefined,
+          role
+        ),
+      /owner or admin role required/i
+    );
+  }
+
+  await assert.doesNotReject(() =>
+    store.resolveConflict(
+      "ai-brain-jem",
+      conflict.conflictId,
+      "# admin resolution\n",
+      undefined,
+      "admin"
+    )
+  );
+});
+
+test("RevisionBrainStore protects structural rename targets at the store boundary", async () => {
+  const revisionStore = new MemoryRevisionStore();
+  await revisionStore.proposeRevision({
+    brainId: "rename-brain",
+    filename: "ordinary.md",
+    baseRevisionId: null,
+    origin: "local_agent",
+    content: "# Ordinary\n",
+  });
+  const store = new RevisionBrainStore(revisionStore);
+
+  await assert.rejects(
+    () =>
+      store.renameFile(
+        "rename-brain",
+        "ordinary.md",
+        "NOW.md",
+        undefined,
+        "member"
+      ),
+    /owner or admin role required/i
+  );
+  await assert.doesNotReject(() =>
+    store.renameFile(
+      "rename-brain",
+      "ordinary.md",
+      "NOW.md",
+      undefined,
+      "owner"
+    )
+  );
 });

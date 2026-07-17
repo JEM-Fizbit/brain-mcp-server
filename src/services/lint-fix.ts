@@ -16,11 +16,9 @@
  */
 
 export type FixKind =
-  | "orphan_index"
   | "task_relocate"
   | "done_stamp"
-  | "done_archive"
-  | "reviewed_date";
+  | "done_archive";
 
 export interface FixItem {
   id: string;
@@ -75,11 +73,6 @@ export interface ArchiveResult {
   appliedIds: string[];
 }
 
-export interface BumpResult {
-  content: string;
-  bumped: boolean;
-}
-
 /** Extract the `(done YYYY-MM-DD)` date from a line, or null if unstamped. */
 export function parseDoneDate(line: string): string | null {
   const match = line.match(DONE_DATE);
@@ -120,32 +113,6 @@ function annotateLines(content: string): {
 
 function isDoneSection(section: string | null): boolean {
   return section !== null && /^done$/i.test(section);
-}
-
-function headingLevel(line: string): number | null {
-  const match = line.match(/^(#{1,6})\s/);
-  return match ? match[1].length : null;
-}
-
-/**
- * Index at the end of the section that starts at `headingIdx` — i.e. just
- * before the next heading of the same or higher level (or EOF), skipping
- * trailing blank lines so the entry stays inside the section.
- */
-function sectionInsertIndex(lines: string[], headingIdx: number): number {
-  const level = headingLevel(lines[headingIdx]) ?? 6;
-  let insertAt = lines.length;
-  for (let i = headingIdx + 1; i < lines.length; i += 1) {
-    const lvl = headingLevel(lines[i]);
-    if (lvl !== null && lvl <= level) {
-      insertAt = i;
-      break;
-    }
-  }
-  while (insertAt > headingIdx + 1 && lines[insertAt - 1].trim() === "") {
-    insertAt -= 1;
-  }
-  return insertAt;
 }
 
 /** Stamp dateless Done-section list items with `(done <today>)`. */
@@ -270,71 +237,4 @@ export function archiveOldDoneItems(
   const base = archiveContent.replace(/\s*$/, "");
   const nextArchive = `${base}\n${archived.join("\n")}\n`;
   return { tasksContent: kept.join("\n"), archiveContent: nextArchive, items, appliedIds };
-}
-
-/** Map an orphan filename to its loader "All Files" subheading. */
-function orphanHeading(name: string): string {
-  const base = name.split("/").pop() || name;
-  if (name.includes("/")) return "Domain-Specific";
-  if (/^(JOURNAL|TASKS|LOG)\.md$/i.test(base)) return "Operations";
-  if (/^REF_/i.test(base)) return "Reference Data";
-  if (/^\d{2}_/.test(base)) return "Core Context";
-  return "Core Context";
-}
-
-/** Append loader entries for orphaned files under their category heading. */
-/**
- * Resolve where an orphan's loader entry should go, portable across loader
- * structures: prefer the mapped `### <category>` subheading when it exists (JEM
- * loaders), else fall back to the "## All files" H2 section itself (loaders with
- * a flat inventory, e.g. the ERS Brain). Returns -1 when neither exists, so the
- * orphan is left unplaced rather than fabricating structure.
- */
-function orphanInsertHeadingIndex(lines: string[], orphan: string): number {
-  const category = orphanHeading(orphan);
-  const subIdx = lines.findIndex(
-    (line) => /^###\s/.test(line) && line.replace(/^###\s/, "").trim() === category
-  );
-  if (subIdx !== -1) return subIdx;
-  return lines.findIndex((line) => /^##\s+all files\b/i.test(line));
-}
-
-export function indexOrphans(
-  loaderContent: string,
-  orphans: string[],
-  approved?: Set<string>
-): TransformResult {
-  const items: FixItem[] = [];
-  const appliedIds: string[] = [];
-  if (orphans.length === 0) return { content: loaderContent, items, appliedIds };
-
-  const lines = loaderContent.split("\n");
-
-  for (const orphan of orphans) {
-    const id = makeId("orphan_index", orphan);
-    items.push({
-      id,
-      kind: "orphan_index",
-      file: "00_loader.md",
-      summary: `Index \`${orphan}\` into the loader`,
-      detail: `Add \`${orphan}\` to the loader inventory as (description pending review).`,
-    });
-    if (!isApproved(approved, id)) continue;
-
-    const headingIdx = orphanInsertHeadingIndex(lines, orphan);
-    if (headingIdx === -1) continue; // no place to put it → leave unplaced, not applied
-
-    const insertAt = sectionInsertIndex(lines, headingIdx);
-    lines.splice(insertAt, 0, `- \`${orphan}\` — (description pending review)`);
-    appliedIds.push(id);
-  }
-
-  return { content: lines.join("\n"), items, appliedIds };
-}
-
-/** Bump the loader "Last reviewed" line to today. */
-export function bumpReviewedDate(loaderContent: string, today: string): BumpResult {
-  const pattern = /(\*\*Last reviewed:\*\*\s*)\d{4}-\d{2}-\d{2}/;
-  if (!pattern.test(loaderContent)) return { content: loaderContent, bumped: false };
-  return { content: loaderContent.replace(pattern, `$1${today}`), bumped: true };
 }

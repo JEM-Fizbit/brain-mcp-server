@@ -163,3 +163,87 @@ test("pathsForBrain resolves on a filesystem backend", () => {
   assert.equal(paths.brainDir, brainDir);
   assert.equal(paths.sourcesRoot, sourcesDir);
 });
+
+test("registry rejects unknown roles fail-closed", async () => {
+  await writeRegistry({
+    version: 1,
+    brains: [
+      {
+        id: "ai-brain-jem",
+        type: "personal",
+        template_used: "personal",
+        integration_mode: "vertical",
+        storage_backend: "filesystem",
+        storage_config: { brain_dir: brainDir },
+      },
+    ],
+    principals: [
+      {
+        provider: "github",
+        provider_user_id: "123",
+        roles: { "ai-brain-jem": "editor" },
+      },
+    ],
+  });
+  await assert.rejects(() => registry.loadRegistry(), /unsupported brain role/i);
+});
+
+test("per-Brain lint override is validated and leaves other Brains legacy", async () => {
+  await writeRegistry({
+    version: 1,
+    brains: [
+      {
+        id: "ai-brain-jem",
+        type: "personal",
+        template_used: "personal",
+        integration_mode: "vertical",
+        storage_backend: "filesystem",
+        storage_config: { brain_dir: brainDir },
+      },
+      {
+        id: "ers-brain",
+        type: "shared",
+        template_used: "ers",
+        integration_mode: "vertical",
+        storage_backend: "filesystem",
+        storage_config: { brain_dir: path.join(tmpDir, "ers", "brain") },
+      },
+    ],
+  });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph_shadow",
+    "ers-brain": "legacy",
+  });
+  try {
+    const loaded = await registry.loadRegistry();
+    assert.equal(loaded.brains[0].lint.reachability_mode, "graph_shadow");
+    assert.equal(loaded.brains[1].lint.reachability_mode, "legacy");
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});
+
+test("lint override fails startup on malformed JSON, unknown modes, and unknown Brains", async () => {
+  await writeRegistry({
+    version: 1,
+    brains: [
+      {
+        id: "ai-brain-jem",
+        type: "personal",
+        template_used: "personal",
+        integration_mode: "vertical",
+        storage_backend: "filesystem",
+        storage_config: { brain_dir: brainDir },
+      },
+    ],
+  });
+  for (const [value, pattern] of [
+    ["{", /valid json/i],
+    [JSON.stringify({ "ai-brain-jem": "shadow" }), /unsupported mode/i],
+    [JSON.stringify({ "missing-brain": "legacy" }), /unknown brain_id/i],
+  ]) {
+    process.env.BRAIN_LINT_MODE_OVERRIDES = value;
+    await assert.rejects(() => registry.loadRegistry(), pattern);
+  }
+  delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+});
