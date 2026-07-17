@@ -1,7 +1,7 @@
 # Hosted Brain Supabase Security Gate
 
 **Status:** passed for pilot use
-**Checked:** 2026-06-22
+**Checked:** 2026-07-17
 **Project:** `brain-platform-pilot`
 **Supabase project ref:** `omnwbcdtmtvxasgdmvwr`
 **Organization:** `ERSG Prototypes`
@@ -24,6 +24,8 @@ This gate does not approve broad client-side access, public API access, or produ
 - The `public.rls_auto_enable()` helper no longer grants execute privileges to `public`, `anon`, or `authenticated`.
 - Supabase security advisors showed no active WARN or ERROR findings after the 2026-06-14 hardening pass.
 - Remaining 2026-06-14 security advisor notices were expected INFO findings for RLS-enabled private tables with no policies.
+- The 2026-07-17 spec 013 recheck followed application of the private, tombstone-filtered Brain-revision GIN full-text index. The index is valid and ready with predicate `deleted = false`; it added no grants or policies. All 15 `brain` tables retained RLS, public/client Brain grants remained zero, all Brain policies remained scoped to `brain_runtime`, the runtime role remained no-login/non-bypass, the artifact bucket remained private, and `public.rls_auto_enable()` remained unavailable to client/public roles.
+- The 2026-07-17 Supabase security advisor returned no findings. Performance advisors returned INFO only (existing unused-index notices plus the Auth connection-strategy notice), and `supabase db lint --schema brain --fail-on error` found no schema errors. Dedicated runtime-role smokes connected for both `ai-brain-jem` and `ers-brain` with zero public grants.
 - The pilot `ai-brain-jem` registry row has been bootstrapped without adding grants, RLS policies, or public Storage access.
 - Durable OAuth connector state now lives in private `brain.oauth_state` with RLS enabled, a `brain_runtime`-only policy, and zero grants to `anon`, `authenticated`, or `public`. The 2026-06-22 migration check reported `rowsecurity=true`, `public_grants=0`, and `runtime_policies=1`.
 - A temporary Postgres smoke test Brain completed local push, hosted revision read, fresh local pull, content verification, and cleanup on 2026-06-14.
@@ -36,7 +38,7 @@ This gate does not approve broad client-side access, public API access, or produ
 - Source/original artifact upload completed for 70 local files on 2026-06-14. Supabase Storage now contains 70 private objects in `brain-artifacts`; Postgres manifests are `active`, have distinct Storage paths, and have no missing hashes.
 - Hosted source discovery is available through Postgres-backed source manifest listing, filename/path metadata search, and extracted-text search when `brain.source_artifact_text` rows exist. OCR/text extraction population remains an ingestion concern; original binary bytes are still not exposed through hosted source reads.
 - Source text extraction populated 49 `brain.source_artifact_text` rows on 2026-06-14 from supported local Markdown/plain/text-like and PDF artifacts. The extractor skipped 21 unsupported binaries, with zero missing files, empty extractions, or failures. Hosted MCP smoke verification confirmed `brain_search` can find extracted source text through the private Postgres-backed runtime without exposing Storage object bytes.
-- The 2026-06-22 runtime-role smoke verified a dedicated runtime login can connect and read hosted file metadata while public/client grants remain zero (`hostedFiles=52`, `publicGrants=0`). Representative SQL-gate checks reported 15 `brain` tables, 0 Brain tables without RLS, 0 `anon`/`authenticated`/`public` grants, and 0 non-`brain_runtime` Brain policies. Supabase CLI advisor coverage was not rerun because the installed CLI is v2.67.1 and lacks the current advisor command path required by the Supabase skill guidance.
+- The 2026-06-22 runtime-role smoke verified a dedicated runtime login can connect and read hosted file metadata while public/client grants remain zero (`hostedFiles=52`, `publicGrants=0`). Representative SQL-gate checks reported 15 `brain` tables, 0 Brain tables without RLS, 0 `anon`/`authenticated`/`public` grants, and 0 non-`brain_runtime` Brain policies. The 2026-07-17 recheck supersedes the earlier advisor-coverage gap by calling the authenticated Management API advisor endpoints directly.
 
 ## Expected Supabase Surface
 

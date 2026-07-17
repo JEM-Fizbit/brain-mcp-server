@@ -1,7 +1,7 @@
 # Hosted Client Cutover Runbook
 
 **Status:** active operator guide
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-17
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 
@@ -28,6 +28,8 @@ The real hosted client shadow rehearsal also passed on 2026-06-16. Post-rehearsa
 - sync cycle: 1421;
 - sync conflicts: 0;
 - latest hosted update: 2026-06-16 17:13:57 Asia/Ho_Chi_Minh.
+
+The spec 013 server-foundation rollout passed on 2026-07-17 at release `v1.3.1`. `/health` reported version `1.3.1` with Postgres revisions, Supabase artifacts, Postgres OAuth state and the git hot path disabled. Hosted read-only checks reported 35 JEM files and 46 ERS files, zero open conflicts for both Brains, ranked search results for both Brains, JEM graph-shadow output, and no graph-shadow output for legacy-mode ERS. The rollout did not migrate either Brain's content or introduce the task-context compiler.
 
 ## Cutover Decision
 
