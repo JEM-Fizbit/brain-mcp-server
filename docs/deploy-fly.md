@@ -118,6 +118,18 @@ successful app/tag/SHA/date record to the ignored local file
 `.brain-deploy/provenance.jsonl` (override with
 `BRAIN_DEPLOY_PROVENANCE_FILE`).
 
+A private deployment mirror may carry a thin environment overlay while still
+pinning its source release to an annotated upstream tag. In that checkout, set
+`BRAIN_DEPLOY_UPSTREAM_TAG=v<version>` when running `deploy:guarded`. Overlay
+mode requires the upstream tag to match `package.json` and be an ancestor of
+`HEAD`; permits only added/modified `config/*.json`, `fly.toml`,
+`test/deploy-expectations.json`, and `docs/*.md`; requires all four overlay
+surfaces; and rejects every source, database, script, package, Dockerfile,
+deletion, or rename delta. Provenance records both the peeled upstream SHA and
+the overlay SHA, while the OCI revision label identifies the actual overlay
+commit used to build the image. Do not use overlay mode to deploy a source-code
+fork or to bypass a failing release gate.
+
 ## Runtime Smoke Tests
 
 ```bash

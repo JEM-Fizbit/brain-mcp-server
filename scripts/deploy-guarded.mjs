@@ -46,7 +46,45 @@ function releaseState() {
   } catch {
     // assertReleaseState returns the operator-facing refusal below.
   }
-  return { porcelain, exactTag, tagType };
+  const upstreamTag = process.env.BRAIN_DEPLOY_UPSTREAM_TAG?.trim();
+  if (!upstreamTag) return { porcelain, exactTag, tagType };
+
+  let upstreamTagType = "";
+  let upstreamSha = "";
+  let upstreamIsAncestor = false;
+  let changes = [];
+  try {
+    const upstreamRef = `refs/tags/${upstreamTag}`;
+    upstreamTagType = run("git", ["cat-file", "-t", upstreamRef], { capture: true });
+    upstreamSha = run("git", ["rev-parse", `${upstreamRef}^{}`], { capture: true });
+    run("git", ["merge-base", "--is-ancestor", upstreamRef, "HEAD"], { capture: true });
+    upstreamIsAncestor = true;
+    const changeOutput = run(
+      "git",
+      ["diff", "--name-status", "--no-renames", `${upstreamRef}..HEAD`],
+      { capture: true }
+    );
+    changes = changeOutput
+      ? changeOutput.split("\n").map((line) => {
+          const [status, ...pathParts] = line.split("\t");
+          return { status, path: pathParts.join("\t") };
+        })
+      : [];
+  } catch {
+    // assertReleaseState returns the operator-facing refusal below.
+  }
+  return {
+    porcelain,
+    exactTag,
+    tagType,
+    overlay: {
+      upstreamTag,
+      upstreamTagType,
+      upstreamSha,
+      upstreamIsAncestor,
+      changes,
+    },
+  };
 }
 
 const initial = releaseState();
@@ -54,13 +92,22 @@ const tag = assertReleaseState({ ...initial, packageVersion: packageJson.version
 const sha = run("git", ["rev-parse", "HEAD"], { capture: true });
 const flyDeployArgs = buildFlyDeployArgs({ app: flyApp, sha, version: packageJson.version });
 
-console.log(`[deploy-guarded] Verifying ${tag} (${sha}) for ${flyApp || "<unset app>"}`);
+const releaseDescription = initial.overlay
+  ? `${tag} (${initial.overlay.upstreamSha}) + overlay ${sha}`
+  : `${tag} (${sha})`;
+console.log(`[deploy-guarded] Verifying ${releaseDescription} for ${flyApp || "<unset app>"}`);
 run("npm", ["test"], { env: buildReleaseTestEnv(process.env) });
 
 assertReleaseState({ ...releaseState(), packageVersion: packageJson.version });
 run(flyBin, flyDeployArgs);
 
-const record = buildProvenanceRecord({ app: flyApp, tag, sha });
+const record = buildProvenanceRecord({
+  app: flyApp,
+  tag,
+  sha,
+  upstreamSha: initial.overlay?.upstreamSha,
+  overlaySha: initial.overlay ? sha : undefined,
+});
 fs.mkdirSync(path.dirname(provenanceFile), { recursive: true });
 fs.appendFileSync(provenanceFile, `${JSON.stringify(record)}\n`, { mode: 0o600 });
 console.log(JSON.stringify(record, null, 2));
