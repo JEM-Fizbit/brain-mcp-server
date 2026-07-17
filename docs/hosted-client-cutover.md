@@ -33,6 +33,8 @@ The spec 013 server-foundation rollout and fenced-example graph-parser correctio
 
 The separately approved JEM content release passed on 2026-07-17 at `v1.4.0` (`0115afb`). JEM now has 39 hosted files, zero open conflicts and a 1,851-token bootstrap, with all routing, policy, signpost and search evaluations unchanged from the pre-migration baseline. Its local mirror hash-matched the migrated payloads after sync resumed. JEM remains in advisory `graph_shadow` for real-use observation; ERS remains unmodified at 46 hosted files, zero open conflicts and `legacy` mode. No schema, compiler, ERS migration or hosted-principal change was included.
 
+After a bounded JEM content/health audit and all four ERS gates passed, the separately approved ERS content migration shipped in `v1.4.1` (`23c209d`) on 2026-07-17. ERS now has 50 hosted files, zero open conflicts, a 1,600-token bootstrap, zero graph-unreachable files and three deliberate rotated-history exemptions. Its local OneDrive mirror matches the hosted content after clean sync convergence. Fly machine version 49 serves `1.4.1`; both JEM and ERS remain in advisory `graph_shadow`. No schema, compiler, team-access, hosted-principal or dedicated-infrastructure change was included.
+
 An optional interactive read-only test-drive was deliberately stopped after Chrome supplied the unregistered `jemilad-ers` GitHub session and the server rejected it. For this personal-owned John-only pilot, complete GitHub OAuth as `JEM-Fizbit`, including when John accesses `ers-brain`; an ERS work-account principal is not currently registered. Do not widen the principal registry as connector troubleshooting.
 
 ## Cutover Decision

@@ -1,7 +1,7 @@
 # ERS Brain Hosted Pilot
 
 **Status:** John-only pilot active
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-17
 
 This runbook covers the first multi-Brain rollout: serving the ERS Brain through the hosted Brain MCP while John remains the only user.
 
@@ -55,6 +55,17 @@ Hosted Supabase pilot state created on 2026-06-24:
 - 0 missing source files and 0 extraction failures.
 
 The raw local source file count may be one higher than the hosted inventory because inventory intentionally ignores operational cruft such as `.DS_Store` and `.gitkeep`.
+
+Spec 013 content migration state as of 2026-07-17:
+
+- the July content-state audit and P0 correction batch are landed;
+- the spec 011 A3-7 delete-propagation gate is closed;
+- a 46-file local/hosted hash-matched rollback snapshot precedes the migration;
+- the slim loader, one-screen NOW, human map, operations guide and lossless history rotation are live;
+- hosted and local Brain views contain the same 50 Markdown files with zero open conflicts;
+- bootstrap context is 1,600 estimated tokens;
+- graph shadow reports zero unreachable files and three deliberate rotated-history exemptions; and
+- ERS remains in advisory `graph_shadow`. Graph enforcement, team access, schema/compiler work and dedicated ERS infrastructure remain separately gated.
 
 ## Local Sync
 
