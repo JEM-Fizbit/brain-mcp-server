@@ -45,6 +45,43 @@ interface RawEdge {
   directory: boolean;
 }
 
+/**
+ * Route examples inside fenced code blocks are documentation, not graph
+ * edges. Removing them also prevents a triple-backtick fence from consuming
+ * later inline-code spans in the backtick-reference matcher.
+ */
+function withoutFencedCodeBlocks(content: string): string {
+  let fence: { marker: "`" | "~"; length: number } | null = null;
+
+  return content
+    .split("\n")
+    .map((line) => {
+      if (fence) {
+        const closing = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+        if (
+          closing &&
+          closing[1][0] === fence.marker &&
+          closing[1].length >= fence.length
+        ) {
+          fence = null;
+        }
+        return "";
+      }
+
+      const opening = line.match(/^ {0,3}(`{3,}|~{3,})(?:[^`~].*)?$/);
+      if (opening) {
+        fence = {
+          marker: opening[1][0] as "`" | "~",
+          length: opening[1].length,
+        };
+        return "";
+      }
+
+      return line;
+    })
+    .join("\n");
+}
+
 function decodeTarget(raw: string): string | null {
   try {
     return decodeURIComponent(raw);
@@ -71,6 +108,7 @@ function extractRawEdges(
   content: string,
   config: BrainLintConfig
 ): RawEdge[] {
+  const graphContent = withoutFencedCodeBlocks(content);
   const found: RawEdge[] = [];
   const seen = new Set<string>();
   const add = (edge: RawEdge) => {
@@ -80,7 +118,7 @@ function extractRawEdges(
     found.push(edge);
   };
 
-  for (const match of content.matchAll(/\[\[([^\]]+?)\]\]/g)) {
+  for (const match of graphContent.matchAll(/\[\[([^\]]+?)\]\]/g)) {
     const inner = match[1].replace(/\\\|/g, "|");
     const target = inner.split("|", 1)[0].split("#", 1)[0].trim();
     if (target) {
@@ -88,7 +126,7 @@ function extractRawEdges(
     }
   }
 
-  for (const match of content.matchAll(/!?\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+['"][^'"]*['"])?\)/g)) {
+  for (const match of graphContent.matchAll(/!?\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+['"][^'"]*['"])?\)/g)) {
     const target = (match[1] || match[2] || "").trim();
     if (!target) continue;
     if (/^https:\/\//i.test(target)) {
@@ -113,7 +151,7 @@ function extractRawEdges(
     });
   }
 
-  for (const match of content.matchAll(/`([^`]+)`/g)) {
+  for (const match of graphContent.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
     const target = match[1].trim();
     if (target.endsWith(".md")) {
       add({ raw: target, syntax: "backtick_file", resolution: "root_or_source", directory: false });
@@ -122,7 +160,7 @@ function extractRawEdges(
     }
   }
 
-  for (const match of content.matchAll(/https:\/\/[^\s)>\]`"']+/g)) {
+  for (const match of graphContent.matchAll(/https:\/\/[^\s)>\]`"']+/g)) {
     const url = match[0];
     for (const mapping of config.sharepoint_url_mappings || []) {
       if (!url.startsWith(mapping.url_prefix)) continue;

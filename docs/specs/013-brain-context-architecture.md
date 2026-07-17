@@ -5,7 +5,7 @@
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
 **Decisions impact:** supersedes the 2026-07-01 decision that lint may index orphans or bump review dates directly in `00_loader.md`; preserves the 2026-07-06 decision to retain distinct JEM and ERS content schemas
-**Related:** [`008-brain-routing-evals.md`](008-brain-routing-evals.md); [`009-brain-lint-apply-mode.md`](009-brain-lint-apply-mode.md); [`010-cockpit-fixes-tab.md`](010-cockpit-fixes-tab.md); [`014-task-context-compiler.md`](014-task-context-compiler.md); [review 1](reviews/013-review1-architecture.md); [`../DECISIONS.md`](../DECISIONS.md); [`../OWNERSHIP_AND_LIFECYCLE.md`](../OWNERSHIP_AND_LIFECYCLE.md); `~/Projects/claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md`
+**Related:** [`008-brain-routing-evals.md`](008-brain-routing-evals.md); [`009-brain-lint-apply-mode.md`](009-brain-lint-apply-mode.md); [`010-cockpit-fixes-tab.md`](010-cockpit-fixes-tab.md); [`014-task-context-compiler.md`](014-task-context-compiler.md); [review 1](reviews/013-review1-architecture.md); [`../prototype-brain-context-inventory.md`](../prototype-brain-context-inventory.md); [`../DECISIONS.md`](../DECISIONS.md); [`../OWNERSHIP_AND_LIFECYCLE.md`](../OWNERSHIP_AND_LIFECYCLE.md); `~/Projects/claude-ops/plans/brain-platform-review-2026-07/01_target-architecture-and-roadmap.md`
 
 ## Decision
 
@@ -23,6 +23,8 @@ The optional `task`/`max_tokens` compiler is deferred to [spec 014](014-task-con
 Implementation approval for server Phases 1–3 was given on 2026-07-17. That approval did not include Brain-content changes, deployment, release, JEM/ERS migration, or the task-context compiler.
 
 Release A was approved separately later on 2026-07-17. The FTS migration and security recheck passed, and `v1.3.1` was deployed with `ai-brain-jem=graph_shadow` and `ers-brain=legacy`. The first guarded `v1.3.0` attempt correctly stopped before Fly after its test subprocess inherited live `.env.local` runtime configuration; the resulting test-only JEM revisions were identified by their exact time window, rolled back to the verified pre-test heads in Postgres and the local mirror, and removed completely. `v1.3.1` adds regression-tested test-environment isolation to the guarded deploy. Final verification found no surviving incident-window revisions, 35 JEM and 46 ERS live files, zero open conflicts, and clean local sync cycles. No Brain-content migration or compiler work was performed.
+
+The first shadow-observation pass later on 2026-07-17 found that fenced code blocks could desynchronise the inline-backtick matcher and hide valid references appearing later in a file. This made JEM's explicitly listed `archive/tasks-done.md` look graph-unreachable. The parser now removes fenced examples before extracting any edge syntax, with a regression test proving that fenced pseudo-routes stay non-edges while later inline references remain visible. A read-only run of the patched build against both hosted corpora leaves only adjudicated true positives: two obsolete JEM working artifacts and the intentionally unreachable ERS fork-signoff file; both ERS template descriptors are reachable. The deployed `v1.3.1` remains unchanged pending a separately approved parser-fix release. No Brain content was changed during observation.
 
 ## Why this work exists
 
@@ -246,6 +248,7 @@ Paths are normalised case-sensitively after URL decoding. Fragments do not affec
 
 ### Non-edges and failures
 
+- links and path snippets inside fenced code examples;
 - bare prose mentions and unformatted filenames;
 - external URLs outside an approved SharePoint mapping;
 - absolute local filesystem paths;

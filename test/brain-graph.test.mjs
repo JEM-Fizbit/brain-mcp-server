@@ -105,3 +105,29 @@ test("directory references prefer README and Markdown links stay source-relative
   assert.ok(!result.reachable.includes("child.md"));
   assert.equal(result.diagnostics.length, 0);
 });
+
+test("fenced examples are ignored without hiding later inline backtick edges", () => {
+  const result = analyzeBrainGraph(
+    new Map([
+      [
+        "00_loader.md",
+        [
+          "```markdown",
+          "[[example-only]]",
+          "`example-only.md`",
+          "```",
+          "",
+          "`archive/tasks-done.md`",
+        ].join("\n"),
+      ],
+      ["NOW.md", "# now"],
+      ["archive/tasks-done.md", "# Done"],
+      ["example-only.md", "# Example only"],
+    ])
+  );
+
+  assert.ok(result.reachable.includes("archive/tasks-done.md"));
+  assert.ok(!result.reachable.includes("example-only.md"));
+  assert.deepEqual(result.unreachable, ["example-only.md"]);
+  assert.equal(result.diagnostics.length, 0);
+});
