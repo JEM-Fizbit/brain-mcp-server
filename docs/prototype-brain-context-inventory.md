@@ -1,6 +1,6 @@
 # Prototype Brain Context Inventory
 
-**Status:** read-only inventory complete; JEM/ERS `v1.4.1` graph-primary beta active with inverse legacy comparison through 2026-07-24; downstream updates remain deferred until the shared spec 013 content contract stabilises
+**Status:** read-only inventory complete; JEM/ERS `v1.4.1` graph-primary beta active with inverse legacy comparison through 2026-07-24; Edge pointer reconciliation completed; public-primer and ERS-onboarding updates remain deferred until the shared spec 013 content contract stabilises
 **Last checked:** 2026-07-17
 **Related:** [`specs/013-brain-context-architecture.md`](specs/013-brain-context-architecture.md); [`../BACKLOG.md`](../BACKLOG.md)
 
@@ -22,14 +22,15 @@ Prevent spec 013 from being copied mechanically into every folder that happens t
 
 Edge is currently a project document archive, not another operational Brain. Its stable contract routes strategy and durable personal context back to JEM Brain while keeping working documents and project state in the project workspace. The follow-up is therefore pointer reconciliation, not a second server-backed Brain migration.
 
-The initial JEM content migration deliberately did not widen into non-Brain workspace reconciliation. References to an older standalone Edge Brain location therefore remain a later pointer review: update the canonical Edge hub and project-home wording together, then test the resulting JEM route through the routing evaluator. Keep this coupled to the broader downstream review rather than treating Edge as another server-backed Brain.
+The pointer reconciliation completed on 2026-07-17. The Edge workspace now assigns durable strategy and John's opportunity context to hosted JEM Brain `ai-brain-jem`, live state/actions/deliverables to the Edge workspace, and shared source documents to SharePoint. The obsolete immediate `ai-brain-edge` stdio/GitHub plan was retired; a separately served Edge Brain is trigger-gated on a future collaborator-access or governance need. No loader, schema, server role or migration control was added to Edge.
 
 ## Update order
 
 1. Observe the deployed `v1.3.2` graph-parser correction without changing enforcement. Completed before JEM migration approval.
 2. Complete the approved JEM content migration and bounded gate review. The migration shipped in `v1.4.0`; graph reachability is now the primary beta path with legacy inverse comparison.
 3. Complete the separately gated ERS migration and observation gate. The migration shipped in `v1.4.1`; graph reachability is now the primary beta path with legacy inverse comparison through 2026-07-24.
-4. Update the public primer to the proven final contract.
-5. Review the ERS onboarding prototype and Cowork project pointers, including Edge, without imposing server-only controls on non-Brain workspaces.
+4. Reconcile Edge workspace and hosted JEM pointers without creating another served Brain. Completed on 2026-07-17.
+5. Update the public primer to the proven final contract.
+6. Review the ERS onboarding prototype and any remaining Cowork project pointers without imposing server-only controls on non-Brain workspaces.
 
 The task-context compiler remains outside this inventory and stays governed by spec 014's trigger.
