@@ -1,6 +1,6 @@
 # 013 — Brain Context Architecture
 
-**Status:** approved; server Phases 1–3 deployed in `v1.3.1` on 2026-07-17 with JEM graph-shadow and ERS legacy; Brain-content migration and compiler decision not started
+**Status:** approved; server Phases 1–3 and the graph-parser correction deployed in `v1.3.2` on 2026-07-17 with JEM graph-shadow and ERS legacy; Brain-content migration and compiler decision not started
 **Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
@@ -24,7 +24,9 @@ Implementation approval for server Phases 1–3 was given on 2026-07-17. That ap
 
 Release A was approved separately later on 2026-07-17. The FTS migration and security recheck passed, and `v1.3.1` was deployed with `ai-brain-jem=graph_shadow` and `ers-brain=legacy`. The first guarded `v1.3.0` attempt correctly stopped before Fly after its test subprocess inherited live `.env.local` runtime configuration; the resulting test-only JEM revisions were identified by their exact time window, rolled back to the verified pre-test heads in Postgres and the local mirror, and removed completely. `v1.3.1` adds regression-tested test-environment isolation to the guarded deploy. Final verification found no surviving incident-window revisions, 35 JEM and 46 ERS live files, zero open conflicts, and clean local sync cycles. No Brain-content migration or compiler work was performed.
 
-The first shadow-observation pass later on 2026-07-17 found that fenced code blocks could desynchronise the inline-backtick matcher and hide valid references appearing later in a file. This made JEM's explicitly listed `archive/tasks-done.md` look graph-unreachable. The parser now removes fenced examples before extracting any edge syntax, with a regression test proving that fenced pseudo-routes stay non-edges while later inline references remain visible. A read-only run of the patched build against both hosted corpora leaves only adjudicated true positives: two obsolete JEM working artifacts and the intentionally unreachable ERS fork-signoff file; both ERS template descriptors are reachable. The deployed `v1.3.1` remains unchanged pending a separately approved parser-fix release. No Brain content was changed during observation.
+The first shadow-observation pass later on 2026-07-17 found that fenced code blocks could desynchronise the inline-backtick matcher and hide valid references appearing later in a file. This made JEM's explicitly listed `archive/tasks-done.md` look graph-unreachable. The parser now removes fenced examples before extracting any edge syntax, with a regression test proving that fenced pseudo-routes stay non-edges while later inline references remain visible.
+
+The correction was released as `v1.3.2` (`f80fbe1`) on 2026-07-17 without changing the JEM-shadow/ERS-legacy override. Fly machine version 45 passed its health check; `/health` reported `1.3.2` with Postgres revisions, Supabase artifacts, Postgres OAuth state and the git hot path disabled. Read-only checks executed against the deployed artifact reported 35 JEM and 46 ERS files, zero open conflicts, and only the two adjudicated JEM working-artifact findings. A one-off read-only ERS graph calculation left only `governance/brain-mcp-fork-signoff.md` unreachable and confirmed both template descriptors reachable. No Brain content, schema, task-context compiler or migration changed.
 
 ## Why this work exists
 
