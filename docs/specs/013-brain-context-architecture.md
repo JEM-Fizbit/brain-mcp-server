@@ -1,6 +1,6 @@
 # 013 — Brain Context Architecture
 
-**Status:** approved; server Phases 1–3 and the JEM/ERS content migrations are deployed through `v1.4.1` on 2026-07-17; both Brains are in advisory `graph_shadow` observation, while the private-mirror cutover and compiler decision remain pending
+**Status:** approved; server Phases 1–3 and the JEM/ERS content migrations are deployed through `v1.4.1`; both Brains use graph-primary lint in beta with legacy inverse comparison through 2026-07-24, while the private-mirror cutover and compiler decision remain pending
 **Reviews:** [`reviews/013-review1-architecture.md`](reviews/013-review1-architecture.md) (Fable 5 ultracode, 2026-07-17; verdict **revise**, reconciled in this revision)
 **Source:** conversation request, 2026-07-17, after repeated root-loader bloat and a first-principles review of Brain retrieval architecture
 **Roadmap link:** Milestone 2 (multi-Brain routing) and Milestone 4 (ERS multi-user access)
@@ -39,6 +39,10 @@ John then delegated the detailed JEM review and conditionally approved the ERS c
 Before ERS writes, the sync stack was paused and 46-file local and hosted snapshots were hash-matched at `~/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/snapshots/spec013-phase5-pre-migration-20260717T142000Z`. The coordinated migration preserved the foldered ERS schema, collapsed project-specific loader routes behind `projects/README.md`, added the human map and operations guide, and rotated all JOURNAL/LOG history losslessly. One stale sync-state base treated the new root `README.md` as a simultaneous local deletion and hosted edit; the watcher was paused again, the reviewed file was placed locally, all 13 duplicate conflict records were resolved to that exact content, and the full 50-file local/hosted trees then matched with zero open conflicts.
 
 The ERS lint profile and content contract were released as `v1.4.1` (`23c209d`) and the two-Brain shadow override became active on Fly machine version 49. `/health` reports `1.4.1` with Postgres revisions, Supabase artifacts, Postgres OAuth state and the git hot path disabled. ERS now has 50 hosted files, a 1,600-token bootstrap, zero graph-unreachable files and three deliberate rotated-history exemptions. The post-migration evaluator remains 27/27 routing cases, 17/17 policy markers, 92/92 signposts and 10/10 search cases. JEM remains unchanged in `graph_shadow`. This release did not change schema, build the task-context compiler, add team access, change the hosted principal or perform the dedicated ERS infrastructure/private-mirror cutover.
+
+John then approved accelerated beta promotion rather than production-style gate sequencing. On 2026-07-17, the existing `graph` mode became primary for both Brains on Fly machine version 50. This inverts the comparison without a new runtime release: `report.orphans` now uses graph reachability, while the legacy loader-reference set and added/removed deltas remain visible as the comparator. The live result is two already-adjudicated JEM historical working artefacts and zero ERS graph-unreachable files; both hosted sync states remain conflict-free.
+
+The inverse-comparison window runs through 2026-07-24. During it, graph remains the beta baseline and the active `Brain graph-primary beta monitor` automation performs a daily read-only check of hosted health, sync conflicts, bootstrap budget, graph findings, legacy deltas and routing/policy results. Any new adjudicated false-positive graph orphan, known-route or policy regression, mode-related operational failure, or unresolved conflict triggers immediate reversion to `graph_shadow` while investigated. If the window closes cleanly, retain `graph` as the baseline and retire routine legacy comparison in a small cleanup release; keep `legacy` mode only as an explicit rollback path.
 
 ## Why this work exists
 
@@ -164,7 +168,7 @@ The default is `legacy`. `graph_shadow` computes and reports old and new orphan 
 Because the registry is currently baked into the deployment image, add an environment override:
 
 ```text
-BRAIN_LINT_MODE_OVERRIDES={"ai-brain-jem":"graph_shadow","ers-brain":"legacy"}
+BRAIN_LINT_MODE_OVERRIDES={"ai-brain-jem":"graph","ers-brain":"graph"}
 ```
 
 The server parses and validates this JSON map at startup. Unknown Brain IDs, unknown modes or malformed JSON fail startup rather than silently falling back. The override changes only `reachability_mode`; edge mappings and exemptions remain typed registry content. This allows a secrets/config change plus restart without rebuilding and preserves independent per-Brain rollout.
@@ -416,7 +420,7 @@ The ERS private mirror stays pinned to the pre-013 upstream tag until its conten
 5. Run the before/after evaluator and policy-marker checks.
 6. Observe real use before proceeding.
 
-Steps 1–5 were released in `v1.4.0`; the bounded step-6 audit closed the JEM gate for the separately approved ERS content migration. JEM remains in `graph_shadow`; this does not approve graph enforcement.
+Steps 1–5 were released in `v1.4.0`; the bounded step-6 audit closed the JEM gate for the separately approved ERS content migration. JEM now uses graph-primary lint with inverse legacy comparison during the beta window.
 
 ### Phase 5 — ERS migration
 
@@ -425,7 +429,7 @@ Steps 1–5 were released in `v1.4.0`; the bounded step-6 audit closed the JEM g
 3. Run graph shadow and content migration in a quiet window.
 4. Verify and observe before graph enforcement.
 
-The John-only hosted pilot completed steps 1 and 3 and entered step 4 in `v1.4.1`. Step 2 remains part of the separately governed dedicated ERS deployment cutover rather than a prerequisite for validating the content contract in the current pilot. Keep ERS in advisory `graph_shadow` until its observation gate closes.
+The John-only hosted pilot completed steps 1 and 3 in `v1.4.1` and promoted graph reachability to the primary beta path on 2026-07-17. Step 2 remains part of the separately governed dedicated ERS deployment cutover rather than a prerequisite for validating the content contract in the current pilot. Legacy comparison remains active only for the bounded inverse-observation window.
 
 ### Phase 6 — compiler decision
 
@@ -442,7 +446,7 @@ Evaluate the measured residual gap against spec 014. Record either activation of
 7. The post-slim JEM golden set is at least as good as the recorded pre-slim baseline on retargeted routing, with policy markers at 100%.
 8. `brain_load_context({ brain_id })` retains byte-identical assembly/envelope behaviour for unchanged fixture content and existing callers; content migration is the only intended payload change.
 9. Search returns structured scored results and excludes operational/history paths by default.
-10. Per-Brain lint mode defaults to `legacy`; the validated environment override can place either or both Brains in shadow without enabling graph enforcement.
+10. Per-Brain lint mode defaults to `legacy`; the validated environment override can independently place each Brain in `graph_shadow` or graph-primary mode, with graph-primary retaining legacy deltas during the bounded inverse-comparison window.
 11. All evicted loader blocks have the named destination and replacement pointer defined above.
 12. Telemetry contains no task text, query text or retrieved snippets.
 
@@ -491,7 +495,7 @@ Completed for the JEM and ERS content releases:
 - lossless ERS history rotation and exact 50-file local/hosted convergence; and
 - post-release ERS graph shadow with zero unreachable files and three deliberate history exemptions.
 
-Still required: bounded ERS real-use observation before any graph enforcement; separate governance for the private ERS mirror/dedicated infrastructure; and the independent spec 014 compiler decision.
+Still required: close the graph-primary inverse-comparison window; separate governance for the private ERS mirror/dedicated infrastructure; and the independent spec 014 compiler decision.
 
 ## Assumptions and proof gaps
 
@@ -500,4 +504,4 @@ Still required: bounded ERS real-use observation before any graph enforcement; s
 - Hosted latency evidence is based on small samples.
 - Client-surface variance must be measured by the rebuilt evaluator.
 - Per-file ACLs remain out of scope unless rollout requirements change.
-- The JEM/ERS content releases do not imply authority for graph enforcement, schema changes, the task-context compiler, hosted-principal changes or dedicated ERS infrastructure.
+- Graph-primary beta promotion does not imply authority for schema changes, the task-context compiler, hosted-principal changes or dedicated ERS infrastructure.
