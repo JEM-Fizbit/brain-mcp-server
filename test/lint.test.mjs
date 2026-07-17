@@ -398,6 +398,32 @@ test("graph shadow reports graph deltas without changing legacy orphan enforceme
   }
 });
 
+test("graph mode enforces graph reachability while retaining the legacy comparison", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `NOW.md`, `01_hub.md`\n",
+    "NOW.md": "# NOW\n",
+    "01_hub.md": "# Hub\n\n[[02_detail]]\n",
+    "02_detail.md": "# Detail\n",
+    "03_isolated.md": "# Isolated\n",
+  });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph",
+  });
+  try {
+    const report = await runLint();
+    assert.equal(report.orphanMode, "graph");
+    assert.deepEqual(report.orphans, ["03_isolated.md"]);
+    assert.ok(report.graphReachability.legacyOrphans.includes("02_detail.md"));
+    assert.ok(report.graphReachability.legacyOrphans.includes("03_isolated.md"));
+    assert.ok(report.graphReachability.removedFindings.includes("02_detail.md"));
+    assert.match(formatLintReport(report), /Orphans \(graph-unreachable\)/);
+    assert.match(formatLintReport(report), /Legacy orphans: 2/);
+    assert.doesNotMatch(formatLintReport(report), /Shadow mode is advisory/);
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});
+
 test("legacy lint remains the default and bootstrap budget excess is review-only", async () => {
   await writeFixture({
     "00_loader.md": `# Loader\n\n${"x".repeat(10_100)}\n`,

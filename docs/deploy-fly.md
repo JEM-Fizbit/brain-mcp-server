@@ -1,6 +1,6 @@
 # Fly Deployment
 
-> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback. Release `v1.4.1` (`23c209d`, Fly machine version 49) is deployed as of 2026-07-17, with JEM and ERS both in advisory `graph_shadow` observation.
+> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback. Release `v1.4.1` (`23c209d`) is deployed; Fly machine version 50 runs both JEM and ERS in graph-primary beta with legacy inverse comparison through 2026-07-24.
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
@@ -77,7 +77,7 @@ fly secrets set \
   BRAIN_SUPABASE_URL="https://<project-ref>.supabase.co" \
   BRAIN_SUPABASE_STORAGE_BUCKET="brain-artifacts" \
   BRAIN_HTTP_TIMING_LOGS="1" \
-  BRAIN_LINT_MODE_OVERRIDES='{"ai-brain-jem":"graph_shadow","ers-brain":"graph_shadow"}' \
+  BRAIN_LINT_MODE_OVERRIDES='{"ai-brain-jem":"graph","ers-brain":"graph"}' \
   --app jem-brain-mcp
 ```
 

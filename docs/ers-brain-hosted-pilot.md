@@ -64,8 +64,8 @@ Spec 013 content migration state as of 2026-07-17:
 - the slim loader, one-screen NOW, human map, operations guide and lossless history rotation are live;
 - hosted and local Brain views contain the same 50 Markdown files with zero open conflicts;
 - bootstrap context is 1,600 estimated tokens;
-- graph shadow reports zero unreachable files and three deliberate rotated-history exemptions; and
-- ERS remains in advisory `graph_shadow`. Graph enforcement, team access, schema/compiler work and dedicated ERS infrastructure remain separately gated.
+- graph lint reports zero unreachable files and three deliberate rotated-history exemptions; and
+- ERS uses graph reachability as the primary beta lint path while legacy deltas remain the inverse comparator through 2026-07-24. Team access, schema/compiler work and dedicated ERS infrastructure remain separately gated.
 
 ## Local Sync
 

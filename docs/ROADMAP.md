@@ -38,7 +38,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
-- spec 013 server Phases 1–3 and both Brain-content migrations are deployed through `v1.4.1`: ranked structured search/evals, the private Postgres FTS index, graph-shadow lint, bootstrap-budget/read-only lint, fail-closed structural-file roles, a 1,851-token JEM bootstrap and a 1,600-token ERS bootstrap. Both Brains are in advisory `graph_shadow`; ERS has 50/50 graph-reachable files and three deliberate history exemptions. The task-context compiler remains unbuilt;
+- spec 013 server Phases 1–3 and both Brain-content migrations are deployed through `v1.4.1`: ranked structured search/evals, the private Postgres FTS index, graph lint, bootstrap-budget/read-only lint, fail-closed structural-file roles, a 1,851-token JEM bootstrap and a 1,600-token ERS bootstrap. Both Brains use graph reachability as the primary beta path while legacy deltas remain the inverse comparator through 2026-07-24; ERS has 50/50 graph-reachable files and three deliberate history exemptions. The task-context compiler remains unbuilt;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
 - the recovery/export runbook records the current backup baseline: Supabase physical backups visible, PITR not enabled, Storage objects outside database backups, and restore/export rehearsal still required before deleting Git as emergency history;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
@@ -213,7 +213,7 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Complete bounded real-use observation of the `v1.4.1` JEM/ERS content contract while keeping both Brains in advisory `graph_shadow`; do not start graph enforcement or the task-context compiler from this release.
+1. Complete the graph-primary inverse-comparison window through 2026-07-24. Revert either Brain to `graph_shadow` on a new adjudicated graph false positive, routing/policy regression, mode-related operational failure or unresolved conflict; if clean, retire routine legacy comparison and retain `legacy` only as rollback.
 2. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI. First slice: local LaunchAgent + stable loopback URL; hosted persistent admin website deferred until multi-user auth and local-first sync visibility are redesigned.
 3. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
 4. Rehearse hosted recovery/reseed from local Markdown and a restored Supabase project; decide whether PITR is worth enabling for the pilot before removing Git as emergency history.

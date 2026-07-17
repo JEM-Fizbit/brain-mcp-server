@@ -35,6 +35,8 @@ The separately approved JEM content release passed on 2026-07-17 at `v1.4.0` (`0
 
 After a bounded JEM content/health audit and all four ERS gates passed, the separately approved ERS content migration shipped in `v1.4.1` (`23c209d`) on 2026-07-17. ERS now has 50 hosted files, zero open conflicts, a 1,600-token bootstrap, zero graph-unreachable files and three deliberate rotated-history exemptions. Its local OneDrive mirror matches the hosted content after clean sync convergence. Fly machine version 49 serves `1.4.1`; both JEM and ERS remain in advisory `graph_shadow`. No schema, compiler, team-access, hosted-principal or dedicated-infrastructure change was included.
 
+Accelerated beta promotion moved both Brains to graph-primary mode on Fly machine version 50 later on 2026-07-17. Graph findings now drive the orphan report while legacy loader-reference findings remain visible as the inverse comparator through 2026-07-24. Initial live verification retained the two adjudicated JEM historical findings, zero ERS graph-unreachable files, zero open conflicts and the existing bootstrap budgets.
+
 An optional interactive read-only test-drive was deliberately stopped after Chrome supplied the unregistered `jemilad-ers` GitHub session and the server rejected it. For this personal-owned John-only pilot, complete GitHub OAuth as `JEM-Fizbit`, including when John accesses `ers-brain`; an ERS work-account principal is not currently registered. Do not widen the principal registry as connector troubleshooting.
 
 ## Cutover Decision
