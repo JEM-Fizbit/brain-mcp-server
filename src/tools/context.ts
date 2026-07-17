@@ -9,7 +9,7 @@ import { resolveToolBrain } from "../services/request-context.js";
 export function registerContextTools(server: McpServer): void {
   server.tool(
     "brain_load_context",
-    "Load the Brain loader (navigation table) and NOW.md — the entry point for every session. Returns the minimum context needed to orient and determine which additional files to request.",
+    "Load a Brain's slim bootstrap: its loader/task router plus NOW.md. Use this when the task needs that Brain's context, then follow the smallest relevant intent route. The loader also names the on-demand operations guide to read before ingestion, output capture, maintenance, or writes.",
     LoadContextSchema.shape,
     async ({ brain_id }, extra) => {
       try {

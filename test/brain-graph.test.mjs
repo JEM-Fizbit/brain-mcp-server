@@ -29,7 +29,10 @@ test("graph reachability resolves the spec 013 edge grammar", () => {
     ["references/sharepoint.md", "# SharePoint mapped"],
     ["cycle/a.md", "[[cycle/b]]"],
     ["cycle/b.md", "[[cycle/a]]"],
-    ["archive/JOURNAL-2026-01.md", "# rotated"],
+    [
+      "archive/JOURNAL-2026-01.md",
+      "# rotated\nHistorical external pointer: `/tmp/no-longer-current.md`",
+    ],
   ]);
 
   const result = analyzeBrainGraph(files, {

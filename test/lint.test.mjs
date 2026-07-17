@@ -31,20 +31,29 @@ async function writeFixture(files) {
 
 const longBody = (lines) => Array.from({ length: lines }, (_, i) => `- line ${i + 1}`).join("\n");
 
-test("bloat check exempts LOG.md and SOURCES.md", async () => {
+test("bloat check exempts active and rotated operational history", async () => {
   await writeFixture({
-    "00_loader.md": "# Loader\n\nReferences: `01_identity.md`\n",
+    "00_loader.md": "# Loader\n\nReferences: `01_identity.md`, `archive/INDEX.md`\n",
     "NOW.md": "# NOW\n",
+    "JOURNAL.md": longBody(250),
     "LOG.md": longBody(250),
     "SOURCES.md": longBody(250),
+    "archive/INDEX.md": "# Archive\n",
+    "archive/JOURNAL-2026-01.md": longBody(250),
+    "archive/LOG-2026-01.md": longBody(250),
+    "archive/tasks-done.md": longBody(250),
     "01_identity.md": longBody(250),
   });
 
   const report = await runLint();
   const bloated = report.bloat.map((b) => b.file);
 
+  assert.ok(!bloated.includes("JOURNAL.md"), "JOURNAL.md must use its rotation threshold");
   assert.ok(!bloated.includes("LOG.md"), "LOG.md must not be flagged for bloat");
   assert.ok(!bloated.includes("SOURCES.md"), "SOURCES.md must not be flagged for bloat");
+  assert.ok(!bloated.includes("archive/JOURNAL-2026-01.md"));
+  assert.ok(!bloated.includes("archive/LOG-2026-01.md"));
+  assert.ok(!bloated.includes("archive/tasks-done.md"));
   assert.ok(bloated.includes("01_identity.md"), "content files must still be flagged");
 });
 

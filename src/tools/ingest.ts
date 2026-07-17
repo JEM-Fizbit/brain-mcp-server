@@ -21,17 +21,19 @@ import {
 export function registerIngestTools(server: McpServer): void {
   server.tool(
     "brain_ingest",
-    `Process a new source into the Brain. Use this whenever new substantive information surfaces — role changes, career updates, attached documents, factual corrections.
+    `Process a new substantive source into the selected Brain. First call brain_load_context and read the per-Brain operations guide named by its loader. Use formal ingestion for durable factual changes, attached documents, and reusable reference material.
 
 LARGE DOCUMENTS (over 500 words or non-text files):
-1. Save the original file to sources/{category}/{YYYY-MM-DD}_{slug}.{ext} using Desktop Commander write_file
-2. Save a markdown conversion alongside it as .md using Desktop Commander write_file
-3. Call this tool with dry_run=true (NO content params) to get the analysis plan
-4. Update Brain files, then call brain_ingest_complete with both file paths
+1. Use the deployment's documented operator workflow to save the original under sources/{category}/{YYYY-MM-DD}_{slug}.{ext}
+2. Save a reviewed markdown conversion alongside it as .md
+3. Call this tool with dry_run=true (no large content parameter) when an inventory/analysis plan is useful
+4. Update Brain files, then call brain_ingest_complete with source paths and files touched
 
 SHORT TEXT (under 500 words): Pass source_content directly with dry_run=false.
 
-NEVER pass large text as source_content — it will timeout the MCP transport.`,
+Common categories include bios, cv, career_history, assessments, writing_samples, analysis, meeting_notes, correspondence, personal, research, travel, favourites, photos, and other. Follow the Brain's operations guide for category meaning, source authority, backlinks, output capture, and inbox cleanup.
+
+NEVER pass large text, raw binary, base64, or hex as source_content.`,
     IngestSchema.shape,
     async ({ brain_id, source_content, source_path, source_label, category, dry_run }, extra) => {
       try {
