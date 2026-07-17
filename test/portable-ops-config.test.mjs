@@ -13,6 +13,12 @@ test("hosted doctor selects Fly app from BRAIN_FLY_APP", () => {
   assert.doesNotMatch(script, /\["status", "--app", "jem-brain-mcp"\]/);
 });
 
+test("local operator template configures the hosted doctor target", () => {
+  const template = read(".env.local.example");
+  assert.match(template, /^BRAIN_HOSTED_BASE_URL=https:\/\/.+$/m);
+  assert.match(template, /^BRAIN_FLY_APP=\S+$/m);
+});
+
 test("source pipeline requires an explicit repository root", () => {
   for (const relativePath of [
     "scripts/inventory-source-artifacts-postgres.mjs",
