@@ -32,6 +32,8 @@ Apply the Supabase migrations and security gate before deploying the hosted MCP 
 db/migrations/2026-06-14_001_hosted_brain_postgres.sql
 db/migrations/2026-06-14_002_harden_hosted_brain_advisors.sql
 db/migrations/2026-06-14_003_brain_runtime_role.sql
+db/migrations/2026-06-22_001_durable_oauth_state.sql
+db/migrations/2026-07-08_001_brain_file_tombstones.sql
 db/migrations/2026-07-17_001_brain_revision_fts.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql
@@ -40,7 +42,7 @@ docs/security/hosted-brain-supabase-security-gate.md
 
 Migration `003` creates a no-login `brain_runtime` role with Brain-schema table grants and matching RLS policies. Create a separate login role/user for the hosted runtime, grant it membership in `brain_runtime`, and use that login in `BRAIN_REVISION_DATABASE_URL`. For Supabase pooler URLs, preserve the tenant suffix in the username format, for example `brain_runtime_user.<project-ref>`. Keep the database owner and Supabase service-role database credentials for administration only.
 
-The 2026-07-17 migration adds only a tombstone-filtered GIN full-text index over private revision content. It grants no new access. It was applied to the pilot as part of the approved `v1.3.1` release and the security gate was rerun; apply and recheck it separately on every future deployment database.
+The six migrations above are the complete current sequence and must be applied in filename order. The 2026-07-17 migration adds only a tombstone-filtered GIN full-text index over private revision content. It grants no new access. It was applied to the pilot as part of the approved `v1.3.1` release and the security gate was rerun; apply and recheck it separately on every future deployment database.
 
 > **`BRAIN_REVISION_DATABASE_URL` must use the Supabase _transaction_ pooler (port `6543`), not the _session_ pooler (port `5432`).** The runtime is a long-running server with a `pg.Pool`, and it shares the project's pooler client budget with the always-on local sync daemon and operator scripts. Session mode has a hard client cap (`pool_size`, ~15) and exhausts under that combined load with `EMAXCONNSESSION: max clients reached in session mode` (user-visible as failed Brain writes). The transaction pooler multiplexes short-lived clients and removes the ceiling; the code is compatible (client-scoped `begin`/`commit`, no named prepared statements / session GUCs / advisory locks / `LISTEN`). A secret reset that reverts this to `:5432` will re-trigger the outage — keep it on `:6543`. Also keep `BRAIN_PG_POOL_MAX` (default 4) modest so the hosted runtime pool + telemetry pool + local sync pool sum well under the budget. Owned Postgres pools for the hosted runtime/source metadata, OAuth state, and local sync bound network stalls with `BRAIN_PG_CONNECTION_TIMEOUT_MS` (default `5000`), `BRAIN_PG_QUERY_TIMEOUT_MS` (default `30000`), `BRAIN_PG_STATEMENT_TIMEOUT_MS` (defaults to query timeout), and `BRAIN_PG_IDLE_TIMEOUT_MS` (default `10000`); OAuth state uses `BRAIN_OAUTH_STATE_PG_POOL_MAX` (default 2) for its pool size. Background and rationale: `ai-knowledge/protocols/SUPABASE_BEST_PRACTICES.md` § Connection Pooler Configuration.
 

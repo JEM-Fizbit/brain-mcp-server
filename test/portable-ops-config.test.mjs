@@ -40,3 +40,32 @@ test("source upload requires an explicit Supabase project URL", () => {
     assert.doesNotMatch(script, /omnwbcdtmtvxasgdmvwr/);
   }
 });
+
+test("fresh-stack docs list every database migration in file order", () => {
+  const migrations = fs
+    .readdirSync(path.join(repoRoot, "db", "migrations"))
+    .filter((filename) => filename.endsWith(".sql"))
+    .sort();
+
+  for (const relativePath of [
+    "docs/deploy-fly.md",
+    "docs/specs/012-ers-mcp-fork.md",
+  ]) {
+    const document = read(relativePath);
+    const positions = migrations.map((filename) => {
+      const position = document.indexOf(filename);
+      assert.notEqual(
+        position,
+        -1,
+        `${relativePath} must list db/migrations/${filename}`
+      );
+      return position;
+    });
+
+    assert.deepEqual(
+      positions,
+      [...positions].sort((left, right) => left - right),
+      `${relativePath} must list migrations in filename order`
+    );
+  }
+});
