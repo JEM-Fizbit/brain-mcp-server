@@ -108,6 +108,8 @@ BRAIN_FLY_APP=jem-brain-mcp npm run deploy:guarded
 
 The guarded deploy refuses a dirty tree, a non-exact or non-annotated tag, and a
 tag that does not match `package.json`. It runs `npm test` before calling Fly,
+with hosted-runtime and credential environment variables removed from the test
+subprocess so `.env.local` cannot redirect isolated tests to the live database,
 passes the commit SHA and package version into OCI image labels, and appends the
 successful app/tag/SHA/date record to the ignored local file
 `.brain-deploy/provenance.jsonl` (override with

@@ -8,6 +8,7 @@ import {
   assertReleaseState,
   buildFlyDeployArgs,
   buildProvenanceRecord,
+  buildReleaseTestEnv,
 } from "./lib/release-contract.mjs";
 
 loadLocalEnv();
@@ -25,6 +26,7 @@ function run(command, args, options = {}) {
   const output = execFileSync(command, args, {
     cwd: repoRoot,
     encoding: "utf8",
+    env: options.env || process.env,
     stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
   });
   return typeof output === "string" ? output.trim() : "";
@@ -53,7 +55,7 @@ const sha = run("git", ["rev-parse", "HEAD"], { capture: true });
 const flyDeployArgs = buildFlyDeployArgs({ app: flyApp, sha, version: packageJson.version });
 
 console.log(`[deploy-guarded] Verifying ${tag} (${sha}) for ${flyApp || "<unset app>"}`);
-run("npm", ["test"]);
+run("npm", ["test"], { env: buildReleaseTestEnv(process.env) });
 
 assertReleaseState({ ...releaseState(), packageVersion: packageJson.version });
 run(flyBin, flyDeployArgs);

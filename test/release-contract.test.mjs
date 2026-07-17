@@ -8,6 +8,7 @@ import {
   assertReleaseState,
   buildFlyDeployArgs,
   buildProvenanceRecord,
+  buildReleaseTestEnv,
 } from "../scripts/lib/release-contract.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +47,25 @@ test("guarded deploy passes release identity as OCI build arguments", () => {
     "--build-arg",
     "APP_VERSION=1.2.0",
   ]);
+});
+
+test("guarded deploy isolates tests from local hosted-runtime configuration", () => {
+  assert.deepEqual(
+    buildReleaseTestEnv({
+      PATH: "/bin",
+      HOME: "/tmp/home",
+      BRAIN_REVISION_DATABASE_URL: "postgresql://live.example/brain",
+      BRAIN_ID: "ai-brain-jem",
+      MCP_OAUTH_SIGNING_SECRET: "secret",
+      GITHUB_ALLOWED_LOGINS: "example",
+      GITHUB_OAUTH_CLIENT_ID: "client",
+      SUPABASE_ACCESS_TOKEN: "token",
+    }),
+    {
+      PATH: "/bin",
+      HOME: "/tmp/home",
+    }
+  );
 });
 
 test("deploy provenance records app, tag, sha, and date", () => {
