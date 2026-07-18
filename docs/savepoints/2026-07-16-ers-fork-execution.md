@@ -24,21 +24,21 @@ Execution is **paused before importing annotated tag `v1.4.5` into the private m
 - Accounts: separate ERS Fly account + ERS Supabase org under `john.milad@ersgenomics.com`; Cillian McGorman = second admin/break-glass (provisioned at stand-up) and first pilot colleague (after the cross-tenant isolation test passes).
 - PITR deferred; region lhr + eu-west-2; `BRAIN_DATE_TIME_ZONE=Europe/Dublin`; image-baked registry v1; operator-local guarded deploys; Slack alerting ON at cutover (rotated jembot token, explicit channel/DM env); personal stack goes alert-less; single-operator ingestion at launch (automated Graph-API pipeline is a captured BACKLOG fast-follower); `GITHUB_ALLOWED_*` hard-gated in code; release tags anchor mirror updates.
 
-## Verified state at pause (2026-07-17)
+## Verified state at pause (2026-07-18)
 
 | Check | Result |
 |---|---|
 | Spec 012 | Approved; all §9 decisions resolved; Phase 0 header and decision-record tidy complete |
-| Public upstream | `v1.4.5` is the exact annotated overlay-capable corrective mirror candidate; closeout requires clean `main`, `origin/main`, and tag convergence |
+| Public upstream | `v1.4.5` (`806117b`) is the exact annotated overlay-capable corrective mirror candidate; `main` and `origin/main` include only its documentation closeout beyond the tag |
 | §1 upstream hardening | Complete at `v1.2.0`; inherited unchanged by the current release line |
 | Structural integration | Spec 013 server/content work deployed through `v1.4.1`; 39 JEM + 50 ERS hosted files, zero conflicts, bootstraps within budget, routing/policy/search evaluations unchanged; all changes from `v1.4.1` to `v1.4.2` are documentation, tests, examples, or release metadata, including the fork reconciliation and migration-manifest regression test |
 | Supabase manifest | Six tenant-neutral migrations, in filename order; fresh-stack docs now include durable OAuth state, tombstones, and the private revision-FTS index; advisors after each and full security gate after the sequence |
-| Release gate | Supported Node 22 build passed; `npm test` = 334 pass, 4 intentional skips, 0 fail; targeted profile/release-contract tests = 29/29 |
+| Release gate | Supported Node 22 build passed; `npm test` = 341 pass, 4 intentional skips, 0 fail; live Postgres compare-and-swap/tombstone/rename integration = 3/3; routing = 27/27 with 17/17 policy, 92/92 signposts and 10/10 search |
 | ERS mirror repository | Created under ERS custody; verified `PRIVATE`, `jemilad-ers` admin, no branch/default branch, and exactly one imported ref: annotated tag `v1.4.2` (`5e726fa` → `c67387e`); no overlay or secrets pushed |
 | Other ERS infra | No Fly, Supabase, OAuth, DNS, database, deployment, migration, seed, or asset-register action performed |
 | Phase 2 approval | The approved `v1.4.2` Step 3 preflight exhausted without a push because its mandatory gates failed; the next ask-first action is exact `v1.4.5` intake plus the four-surface private overlay |
 | Private overlay draft | Local only: ERS registry, `fly.toml`, deployment expectations, and ERS deploy/ops runbook; no private commit or branch has been pushed |
-| Personal stack | Structural runtime/content work remains deployed through `v1.4.1`; `v1.4.3` changes release tooling, tests, and docs only and performs no personal hosted mutation |
+| Personal stack | Corrective runtime `v1.4.5` is deployed; JEM is 39 hosted files/0 conflicts and ERS is 50/0; both parity-rebased local watchers report zero conflicts and zero deletion skips; graph-primary remains active |
 | GitHub transport | `github-work` SSH authenticates as `jemilad-ers`; the isolated mirror checkout uses private `origin`, a version-tag-only public `upstream`, disabled upstream pushes, and private-origin default pushes; the public checkout still has only its personal `origin` |
 | CLI diagnostic | Live `gh auth status` recognizes both accounts; GraphQL/repository inspection and the `github-work` SSH alias independently verify the work identity and custody without relying on global active-account state |
 | Gate-0 stragglers | OAuth-row purge predicate remains unwritten; the 28 Jul MCP milestone is verified and no longer an open fact-check |
