@@ -462,6 +462,26 @@ export class MemoryRevisionStore implements RevisionStore {
   }
 
   async recordConflict(input: ConflictInput): Promise<ConflictRecord> {
+    const existing = this.conflicts.find(
+      (candidate) =>
+        candidate.status === "open" &&
+        candidate.brainId === input.brainId &&
+        candidate.filename === input.filename &&
+        candidate.localBaseRevisionId === input.localBaseRevisionId &&
+        candidate.remoteHeadRevisionId === input.remoteHeadRevisionId &&
+        candidate.localContentHash === input.localContentHash &&
+        candidate.remoteContentHash === input.remoteContentHash &&
+        candidate.localOrigin === input.localOrigin &&
+        (candidate.remoteOrigin ?? null) === (input.remoteOrigin ?? null) &&
+        (candidate.localActor?.provider ?? null) ===
+          (input.localActor?.provider ?? null) &&
+        (candidate.localActor?.id ?? null) === (input.localActor?.id ?? null) &&
+        (candidate.remoteActor?.provider ?? null) ===
+          (input.remoteActor?.provider ?? null) &&
+        (candidate.remoteActor?.id ?? null) === (input.remoteActor?.id ?? null)
+    );
+    if (existing) return existing;
+
     const conflict: ConflictRecord = {
       ...input,
       conflictId: `conflict_${++this.conflictSeq}`,

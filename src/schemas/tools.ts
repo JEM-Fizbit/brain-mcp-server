@@ -52,7 +52,7 @@ export const ReadFileSchema = BrainIdSchema.extend({
 export const UpdateFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
-    .describe("The filename to update. Must end in .md. Hosted writes to 00_loader.md or NOW.md require owner/admin role."),
+    .describe("The Brain-vault filename to update. Must end in .md. External namespaces sources/, inbox/, and .brain-sync/ are reserved for their dedicated workflows. Hosted writes to 00_loader.md or NOW.md require owner/admin role."),
   content: z
     .string()
     .describe("The new content to write to the file."),
@@ -69,21 +69,21 @@ export const DeleteFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
     .describe(
-      "The Brain file to delete (must end in .md). Soft-delete: recoverable via brain_restore_file. The structural files 00_loader.md and NOW.md cannot be deleted."
+      "The Brain-vault file to delete (must end in .md; external namespaces are reserved). Soft-delete: recoverable via brain_restore_file. The structural files 00_loader.md and NOW.md cannot be deleted."
     ),
 });
 
 export const RenameFileSchema = BrainIdSchema.extend({
-  from: z.string().describe("The current filename (must end in .md)."),
+  from: z.string().describe("The current Brain-vault filename (must end in .md; external namespaces are reserved)."),
   to: z
     .string()
-    .describe("The new filename (must end in .md; must not already exist as a live file)."),
+    .describe("The new Brain-vault filename (must end in .md; must not already exist as a live file; external namespaces are reserved)."),
 });
 
 export const RestoreFileSchema = BrainIdSchema.extend({
   filename: z
     .string()
-    .describe("A previously-deleted Brain file to restore to its last content (hosted Brain only)."),
+    .describe("A previously-deleted Brain-vault file to restore to its last content (hosted Brain only; external namespaces are reserved)."),
 });
 
 export const CommitSchema = BrainIdSchema.extend({

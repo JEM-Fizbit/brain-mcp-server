@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { assertBrainVaultPath } from "../services/brain-path.js";
 import { contentHash } from "./hash.js";
 import type {
   ConflictRecord,
@@ -96,6 +97,7 @@ function safeMarkdownPath(root: string, filename: string): string {
   if (!filename.endsWith(".md")) {
     throw new Error(`Only Markdown files can be synced: ${filename}`);
   }
+  assertBrainVaultPath(filename);
   const fullPath = path.resolve(root, filename);
   const resolvedRoot = path.resolve(root);
   if (!fullPath.startsWith(resolvedRoot + path.sep) && fullPath !== resolvedRoot) {

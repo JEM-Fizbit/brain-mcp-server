@@ -136,6 +136,30 @@ test("hosted MCP write pulls to clean local Markdown tree", async () => {
   assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote first\n");
 });
 
+test("local sync rejects hosted heads in external namespaces", async () => {
+  const store = new MemoryRevisionStore();
+  const { brainDir, stateFile } = dirs("reserved-hosted-head");
+  await accept(
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "sources/brand/guidelines.md",
+      baseRevisionId: null,
+      content: "Should remain outside the Brain vault\n",
+      origin: "hosted_mcp",
+    })
+  );
+
+  await assert.rejects(
+    makeAgent(store, { brainDir, stateFile }).pullHostedChanges(),
+    /Reserved external Brain path/
+  );
+  await assert.rejects(
+    () => readBrainFile(brainDir, "sources/brand/guidelines.md"),
+    /ENOENT/
+  );
+  assert.equal((await store.listConflicts("ai-brain-jem", "open")).length, 0);
+});
+
 test("pull does not resurrect a tracked file that is missing locally (spec 011: absence is owned by guarded push, not pull-side inference)", async () => {
   const store = new MemoryRevisionStore();
   const { brainDir, stateFile } = dirs("restore-missing-tracked-local");

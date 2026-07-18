@@ -80,3 +80,17 @@ test("hosted append to an empty file adds no leading newline", async () => {
   const result = await store.readFile("ai-brain-jem", "APPEND_HOSTED.md");
   assert.equal(result, "first entry\n");
 });
+
+test("filesystem Brain writes cannot create files in external namespaces", async () => {
+  for (const filename of [
+    "sources/brand/guidelines.md",
+    "inbox/pending.md",
+    ".brain-sync/operator.md",
+  ]) {
+    await assert.rejects(
+      () => brain.updateFile(filename, "# Wrong namespace\n", "replace"),
+      /Reserved external Brain path/
+    );
+    await assert.rejects(fs.stat(path.join(brainDir, filename)), /ENOENT/);
+  }
+});

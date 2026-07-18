@@ -277,6 +277,22 @@ test("HTTP MCP update writes to revision store harness", async () => {
   assert.equal(readBack, "Hosted update through MCP\n");
 });
 
+test("HTTP MCP update rejects external namespaces", async () => {
+  const harness = await setupHarness("reserved-write");
+  const result = await callTool(harness, "brain_update_file", {
+    filename: "sources/brand/guidelines.md",
+    mode: "replace",
+    content: "Should not become a Brain head\n",
+  });
+  assert.match(result, /Reserved external Brain path/);
+
+  const store = new FileRevisionStore(harness.storeFile);
+  await assert.rejects(
+    store.readFile("ai-brain-jem", "sources/brand/guidelines.md"),
+    /File not found/
+  );
+});
+
 test("HTTP MCP log writes through revision store with actor metadata", async () => {
   const harness = await setupHarness("log-write");
   const result = await callTool(harness, "brain_log", {

@@ -16,6 +16,7 @@ import {
   type SyncStatus,
   type WriteMode,
 } from "./brain-store.js";
+import { assertBrainVaultPath } from "./brain-path.js";
 import type { BrainRole } from "./registry.js";
 import {
   rankSearchCandidates,
@@ -53,6 +54,7 @@ function validateFilename(filename: string): void {
   if (!filename.endsWith(".md")) {
     throw new Error("Only .md files are supported");
   }
+  assertBrainVaultPath(filename);
 }
 
 function lineCount(content: string): number {
