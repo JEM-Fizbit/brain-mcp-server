@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-07-17
+**Last updated:** 2026-07-18
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -38,7 +38,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
-- spec 013 server Phases 1–3 and both Brain-content migrations are deployed through `v1.4.1`: ranked structured search/evals, the private Postgres FTS index, graph lint, bootstrap-budget/read-only lint, fail-closed structural-file roles, a 1,851-token JEM bootstrap and a 1,600-token ERS bootstrap. Both Brains use graph reachability as the primary beta path while legacy deltas remain the inverse comparator through 2026-07-24; ERS has 50/50 graph-reachable files and three deliberate history exemptions. The task-context compiler remains unbuilt;
+- spec 013 server Phases 1–3 and both Brain-content migrations are deployed, with the corrective runtime current at `v1.4.5`: ranked structured search/evals, the private Postgres FTS index, graph lint, bootstrap-budget/read-only lint, fail-closed structural-file roles, reserved external-namespace guards, idempotent conflict recording, and a parity-gated local state-rebase procedure. Both Brains use graph reachability as the primary beta path while legacy deltas remain the inverse comparator through 2026-07-24; JEM has 39 hosted files and a 1,863-token bootstrap, ERS has 50/50 graph-reachable files, a 1,600-token bootstrap and three deliberate history exemptions, and both hosted/local sync paths are conflict-free with zero deletion skips. The task-context compiler remains unbuilt;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
 - the recovery/export runbook records the current backup baseline: Supabase physical backups visible, PITR not enabled, Storage objects outside database backups, and restore/export rehearsal still required before deleting Git as emergency history;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
