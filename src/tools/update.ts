@@ -29,7 +29,7 @@ import {
 export function registerUpdateTools(server: McpServer): void {
   server.tool(
     "brain_update_file",
-    "Update a Brain file. Hosted deployments may auto-commit and push after successful writes; otherwise call brain_commit separately after edits.",
+    "Update a Brain-vault file. External sources/, inbox/, and .brain-sync/ paths are reserved for their dedicated workflows. Hosted deployments may auto-commit and push after successful writes; otherwise call brain_commit separately after edits.",
     UpdateFileSchema.shape,
     async ({ brain_id, filename, content, mode, old_content }, extra) => {
       try {

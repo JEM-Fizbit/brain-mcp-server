@@ -217,6 +217,51 @@ test("RevisionBrainStore reads hosted source manifests from metadata", async () 
   assert.match(manifest, /metadata only/);
 });
 
+test("RevisionBrainStore rejects external namespaces at the Brain-vault boundary", async () => {
+  const revisionStore = new MemoryRevisionStore();
+  const store = new RevisionBrainStore(revisionStore);
+
+  for (const filename of [
+    "sources/brand/guidelines.md",
+    "inbox/pending.md",
+    ".brain-sync/operator.md",
+    "./SOURCES/brand/guidelines.md",
+  ]) {
+    await assert.rejects(
+      () => store.writeFile("ers-brain", filename, "# Wrong namespace\n", "replace"),
+      /Reserved external Brain path/
+    );
+    assert.equal(await revisionStore.getHead("ers-brain", filename), null);
+  }
+});
+
+test("MemoryRevisionStore deduplicates identical open conflicts", async () => {
+  const revisionStore = new MemoryRevisionStore();
+  const input = {
+    brainId: "ers-brain",
+    filename: "NOW.md",
+    localBaseRevisionId: null,
+    remoteHeadRevisionId: "revision_remote",
+    localContentHash: "a".repeat(64),
+    remoteContentHash: "b".repeat(64),
+    localOrigin: "local_agent",
+    remoteOrigin: "hosted_mcp",
+    localActor: { provider: "test", id: "watcher" },
+    remoteActor: { provider: "github", id: "123" },
+  };
+
+  const first = await revisionStore.recordConflict(input);
+  const duplicate = await revisionStore.recordConflict(input);
+  const distinct = await revisionStore.recordConflict({
+    ...input,
+    localContentHash: "c".repeat(64),
+  });
+
+  assert.equal(duplicate.conflictId, first.conflictId);
+  assert.notEqual(distinct.conflictId, first.conflictId);
+  assert.equal((await revisionStore.listConflicts("ers-brain", "open")).length, 2);
+});
+
 test("RevisionBrainStore appends LOG.md entries newest-first below the preamble", async () => {
   const store = new RevisionBrainStore(new MemoryRevisionStore());
 

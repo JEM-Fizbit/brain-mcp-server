@@ -7,6 +7,7 @@ import {
   type SearchResult,
 } from "../search-ranking.js";
 import type { BrainSearchOptions } from "./brain-store.js";
+import { assertBrainVaultPath } from "./brain-path.js";
 import {
   LOADER_FILE,
   NOW_FILE,
@@ -45,6 +46,7 @@ function validateFilename(filename: string): void {
 
 function resolveFilePath(root: string, filename: string): string {
   validateFilename(filename);
+  assertBrainVaultPath(filename);
   const resolved = path.resolve(root, filename);
   if (!resolved.startsWith(path.resolve(root))) {
     throw new Error("Path traversal detected");

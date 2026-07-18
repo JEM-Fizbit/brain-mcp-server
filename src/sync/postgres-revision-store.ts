@@ -973,6 +973,51 @@ export class PostgresRevisionStore implements RevisionStore {
     client: PoolClient,
     input: ConflictInput
   ): Promise<ConflictRecord> {
+    // Serialize conflict creation per Brain path. This makes the read-before-
+    // insert dedupe safe even when multiple clients observe the same conflict.
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2, 0))`,
+      [input.brainId, input.filename]
+    );
+
+    const values = [
+      input.brainId,
+      input.filename,
+      input.localBaseRevisionId,
+      input.remoteHeadRevisionId,
+      input.localContentHash,
+      input.remoteContentHash,
+      input.localOrigin,
+      input.remoteOrigin || null,
+      input.localActor?.provider || null,
+      input.localActor?.id || null,
+      input.remoteActor?.provider || null,
+      input.remoteActor?.id || null,
+    ];
+    const existing = await client.query<ConflictRow>(
+      `
+        select *
+        from brain.sync_conflicts
+        where status = 'open'
+          and brain_id = $1
+          and filename = $2
+          and local_base_revision_id is not distinct from $3
+          and remote_head_revision_id is not distinct from $4
+          and local_content_sha256 = $5
+          and remote_content_sha256 is not distinct from $6
+          and local_origin = $7
+          and remote_origin is not distinct from $8
+          and local_actor_provider is not distinct from $9
+          and local_actor_id is not distinct from $10
+          and remote_actor_provider is not distinct from $11
+          and remote_actor_id is not distinct from $12
+        order by created_at
+        limit 1
+      `,
+      values
+    );
+    if (existing.rows[0]) return conflictFromRow(existing.rows[0]);
+
     const result = await client.query<ConflictRow>(
       `
         insert into brain.sync_conflicts (
@@ -992,20 +1037,7 @@ export class PostgresRevisionStore implements RevisionStore {
         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         returning *
       `,
-      [
-        input.brainId,
-        input.filename,
-        input.localBaseRevisionId,
-        input.remoteHeadRevisionId,
-        input.localContentHash,
-        input.remoteContentHash,
-        input.localOrigin,
-        input.remoteOrigin || null,
-        input.localActor?.provider || null,
-        input.localActor?.id || null,
-        input.remoteActor?.provider || null,
-        input.remoteActor?.id || null,
-      ]
+      values
     );
     return conflictFromRow(result.rows[0]);
   }

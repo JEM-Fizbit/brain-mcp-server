@@ -91,6 +91,21 @@ test("PostgresRevisionStore compare-and-swap flow", async (t) => {
     assert.equal(conflicts.length, 1);
     assert.equal(conflicts[0].filename, "NOW.md");
 
+    const duplicate = await store.recordConflict({
+      brainId: conflicts[0].brainId,
+      filename: conflicts[0].filename,
+      localBaseRevisionId: conflicts[0].localBaseRevisionId,
+      remoteHeadRevisionId: conflicts[0].remoteHeadRevisionId,
+      localContentHash: conflicts[0].localContentHash,
+      remoteContentHash: conflicts[0].remoteContentHash,
+      localOrigin: conflicts[0].localOrigin,
+      remoteOrigin: conflicts[0].remoteOrigin,
+      localActor: conflicts[0].localActor,
+      remoteActor: conflicts[0].remoteActor,
+    });
+    assert.equal(duplicate.conflictId, conflicts[0].conflictId);
+    assert.equal((await store.listConflicts(brainId, "open")).length, 1);
+
     const resolved = await store.resolveConflict({
       brainId,
       conflictId: conflicts[0].conflictId,
@@ -157,11 +172,20 @@ test("PostgresRevisionStore delete/tombstone flow (spec 011)", async (t) => {
     });
     assert.equal(created.status, "accepted");
 
+    const updated = await store.proposeRevision({
+      brainId,
+      filename: "note.md",
+      baseRevisionId: created.head.revisionId,
+      content: "# newer\n",
+      origin: "hosted_mcp",
+    });
+    assert.equal(updated.status, "accepted");
+
     // Stale-base delete conflicts (never silent).
     const staleDelete = await store.proposeDeletion({
       brainId,
       filename: "note.md",
-      baseRevisionId: "does-not-exist",
+      baseRevisionId: created.head.revisionId,
       origin: "local_agent",
     });
     assert.equal(staleDelete.ok, false);
@@ -171,7 +195,7 @@ test("PostgresRevisionStore delete/tombstone flow (spec 011)", async (t) => {
     const del = await store.proposeDeletion({
       brainId,
       filename: "note.md",
-      baseRevisionId: created.head.revisionId,
+      baseRevisionId: updated.head.revisionId,
       origin: "local_agent",
     });
     assert.equal(del.status, "accepted");
@@ -308,7 +332,7 @@ test("PostgresRevisionStore atomic rename flow (spec 011)", async (t) => {
       brainId,
       from: "new.md",
       to: "newer.md",
-      baseRevisionId: "stale",
+      baseRevisionId: created.head.revisionId,
       origin: "local_agent",
     });
     assert.equal(stale.ok, false);
