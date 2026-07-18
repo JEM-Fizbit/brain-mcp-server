@@ -41,8 +41,8 @@ async function readBrainFile(brainDir, filename) {
   return fs.readFile(path.join(brainDir, filename), "utf-8");
 }
 
-async function runCli(command, config) {
-  const { stdout } = await exec(process.execPath, [cliPath, command], {
+async function runCli(command, config, args = []) {
+  const { stdout } = await exec(process.execPath, [cliPath, command, ...args], {
     env: {
       ...process.env,
       BRAIN_ID: "ai-brain-jem",
@@ -175,6 +175,46 @@ test("sync CLI summary reports compact counts without file payloads", async () =
   assert.equal(output.openConflicts, 0);
   assert.equal(typeof output.latestHostedCursor, "string");
   assert.equal("files" in output.state, false);
+});
+
+test("sync CLI safely rebases stale local metadata after proving exact parity", async () => {
+  const config = dirs("rebase-state");
+  await writeBrainFile(config.brainDir, "NOW.md", "Exact parity\n");
+  await runCli("push", config);
+
+  const state = JSON.parse(await fs.readFile(config.stateFile, "utf-8"));
+  state.files["sources/old.md"] = {
+    revisionId: "stale",
+    contentHash: "stale",
+    localHash: "stale",
+  };
+  state.pendingDeletions = ["sources/old.md"];
+  await fs.writeFile(config.stateFile, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
+
+  const dryRun = await runCli("rebase-state", config);
+  assert.equal(dryRun.result.applied, false);
+  assert.equal(dryRun.result.previousTrackedFiles, 2);
+  assert.equal(dryRun.result.nextTrackedFiles, 1);
+  assert.deepEqual(dryRun.result.forgottenFiles, ["sources/old.md"]);
+  assert.equal(
+    Object.keys(JSON.parse(await fs.readFile(config.stateFile, "utf-8")).files)
+      .length,
+    2
+  );
+
+  const applied = await runCli("rebase-state", config, ["--apply"]);
+  assert.equal(applied.result.applied, true);
+  assert.equal(applied.result.pendingDeletionsCleared, 1);
+  assert.ok(applied.result.backupFile);
+  const rebased = JSON.parse(await fs.readFile(config.stateFile, "utf-8"));
+  assert.deepEqual(Object.keys(rebased.files), ["NOW.md"]);
+  assert.deepEqual(rebased.pendingDeletions, []);
+  assert.equal(
+    JSON.parse(await fs.readFile(applied.result.backupFile, "utf-8")).files[
+      "sources/old.md"
+    ].revisionId,
+    "stale"
+  );
 });
 
 test("sync CLI loads local env files before reading config", async () => {

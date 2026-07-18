@@ -167,6 +167,8 @@ Next step: review local Markdown versus hosted head, then choose the final conte
 
 For stale sync health:
 
+- If a Brain-root correction leaves the state inventory tracking out-of-root paths, stop the watcher and run `npm run sync:rebase-state` first. Dry-run proves zero open conflicts, exact local/hosted paths, and exact hashes without writing. Then run `npm run sync:rebase-state -- --apply`; it backs up the old state, rebuilds only local metadata from current hosted revision ids, clears stale pending deletions, and leaves hosted heads, tombstones, revisions, and conflict history untouched. Restart the watcher and require a clean zero-conflict cycle.
+
 ```text
 Brain sync health is stale.
 Hosted is still reachable, but the local sync loop has not reported a recent successful cycle.
