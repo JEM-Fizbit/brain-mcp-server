@@ -8,7 +8,14 @@ import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import { summarizeReport } from "./report-summary.js";
 import type { RevisionStore } from "./types.js";
 
-type SyncCommand = "push" | "pull" | "once" | "status" | "summary" | "watch";
+type SyncCommand =
+  | "push"
+  | "pull"
+  | "once"
+  | "status"
+  | "summary"
+  | "watch"
+  | "rebase-state";
 type RevisionStoreProvider = "file" | "postgres";
 
 interface SyncCliConfig {
@@ -70,7 +77,9 @@ function loadLocalEnv(rootDir = process.cwd()): void {
 
 function usage(): string {
   return [
-    "Usage: node dist/sync/cli.js <push|pull|once|status|summary|watch>",
+    "Usage: node dist/sync/cli.js <push|pull|once|status|summary|watch|rebase-state> [--apply]",
+    "",
+    "rebase-state is dry-run by default. --apply atomically backs up and rebuilds local sync metadata only after exact local/hosted parity and zero open conflicts are proven.",
     "",
     "Environment:",
     "  BRAIN_ID                  Brain id (default: ai-brain-jem)",
@@ -330,14 +339,15 @@ async function withLock<T>(
   }
 }
 
-async function run(command: SyncCommand): Promise<void> {
+async function run(command: SyncCommand, apply = false): Promise<void> {
   const config = readConfig();
-  await withLock(config.lockFile, () => runWithConfig(command, config));
+  await withLock(config.lockFile, () => runWithConfig(command, config, apply));
 }
 
 async function runWithConfig(
   command: SyncCommand,
-  config: SyncCliConfig
+  config: SyncCliConfig,
+  apply = false
 ): Promise<void> {
   const storeHandle = createStore(config);
   const store = storeHandle.store;
@@ -355,6 +365,15 @@ async function runWithConfig(
   });
 
   try {
+    if (command === "rebase-state") {
+      writeJson({
+        command,
+        config: outputConfig(config),
+        result: await agent.rebaseState(apply),
+      });
+      return;
+    }
+
     if (command === "push") {
       writeJson({
         command,
@@ -470,16 +489,28 @@ async function runWithConfig(
 async function main(): Promise<void> {
   loadLocalEnv();
   const command = process.argv[2] as SyncCommand | undefined;
+  const extraArgs = process.argv.slice(3);
+  const apply = extraArgs.includes("--apply");
   if (
     !command ||
-    !["push", "pull", "once", "status", "summary", "watch"].includes(command)
+    ![
+      "push",
+      "pull",
+      "once",
+      "status",
+      "summary",
+      "watch",
+      "rebase-state",
+    ].includes(command) ||
+    extraArgs.some((arg) => arg !== "--apply") ||
+    (apply && command !== "rebase-state")
   ) {
     process.stderr.write(`${usage()}\n`);
     process.exitCode = 2;
     return;
   }
 
-  await run(command);
+  await run(command, apply);
 }
 
 main().catch((error) => {

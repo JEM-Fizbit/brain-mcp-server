@@ -1,7 +1,7 @@
 # 2026-07-16 ERS Fork Execution Savepoint
 
-**Status:** overlay-preflight checkpoint — Phase 0/1 and Phase 2 Steps 1–2 complete at `v1.4.2`; overlay blockers repaired at `v1.4.3` and Brain-vault/sync incident root cause repaired at `v1.4.4`; paused before private `v1.4.4` intake and overlay push
-**Repo:** `/Users/johnemilad/Projects/brain-mcp-server` (public; branch `main`; private baseline `v1.4.2`; next exact mirror candidate `v1.4.4`)
+**Status:** overlay-preflight checkpoint — Phase 0/1 and Phase 2 Steps 1–2 complete at `v1.4.2`; overlay blockers repaired at `v1.4.3`, Brain-vault/sync incident root cause at `v1.4.4`, and local-state maintenance at `v1.4.5`; paused before private `v1.4.5` intake and overlay push
+**Repo:** `/Users/johnemilad/Projects/brain-mcp-server` (public; branch `main`; private baseline `v1.4.2`; next exact mirror candidate `v1.4.5`)
 **Plan of record:** [`docs/specs/012-ers-mcp-fork.md`](../specs/012-ers-mcp-fork.md) — read it in full before acting; this savepoint is the state snapshot, the spec is the plan
 **Governance record:** `governance/brain-mcp-fork-signoff.md` in the ERS Brain (hosted `brain_id: ers-brain`; SharePoint mirror `…/01_ers-brain/brain/governance/`)
 **Evidence base:** `~/Projects/claude-ops/plans/brain-platform/2026-07-12-ers-fork-dependency-audit.md` (13-surface audit, file:line refs — local-only, do NOT copy into this public repo)
@@ -10,9 +10,9 @@ Read this first if you are a fresh session executing the ERS Brain MCP fork (spe
 
 ## TL;DR
 
-Planning remains complete and all 16 decisions are resolved (spec §9 table + register). Phase 0 and Phase 1 remain complete at the historical `v1.2.0` anchor. The subsequent spec 013 structural server/content work shipped through `v1.4.1`, was deployed and verified on the personal pilot, and was reconciled into the fork plan at `v1.4.2`. Phase 2 Steps 1–2 imported only that annotated tag into the private mirror. The first Step 3 overlay preflight then proved that `v1.4.2` could not satisfy its own zero-test-divergence or guarded-deploy acceptance criteria; `v1.4.3` fixed those generic blockers. The 2026-07-18 beta incident then exposed a Brain-vault namespace and conflict-idempotency defect, fixed in `v1.4.4`; the private repository still contains only `v1.4.2` and has no branch, default branch, overlay, or secret.
+Planning remains complete and all 16 decisions are resolved (spec §9 table + register). Phase 0 and Phase 1 remain complete at the historical `v1.2.0` anchor. The subsequent spec 013 structural server/content work shipped through `v1.4.1`, was deployed and verified on the personal pilot, and was reconciled into the fork plan at `v1.4.2`. Phase 2 Steps 1–2 imported only that annotated tag into the private mirror. The first Step 3 overlay preflight then proved that `v1.4.2` could not satisfy its own zero-test-divergence or guarded-deploy acceptance criteria; `v1.4.3` fixed those generic blockers. The 2026-07-18 beta incident exposed a Brain-vault namespace and conflict-idempotency defect, fixed in `v1.4.4`; the related stale local-state inventories were safely rebased with the `v1.4.5` maintenance command. The private repository still contains only `v1.4.2` and has no branch, default branch, overlay, or secret.
 
-Execution is **paused before importing annotated tag `v1.4.4` into the private mirror and pushing the Phase 2 Step 3 overlay for explicit approval**. A local uncommitted overlay draft exists only in the isolated private checkout; do not push it, create further ERS infrastructure, deploy, migrate, seed, or change either hosted stack without the individual approval required below. Never mirror `main` HEAD.
+Execution is **paused before importing annotated tag `v1.4.5` into the private mirror and pushing the Phase 2 Step 3 overlay for explicit approval**. A local uncommitted overlay draft exists only in the isolated private checkout; do not push it, create further ERS infrastructure, deploy, migrate, seed, or change either hosted stack without the individual approval required below. Never mirror `main` HEAD.
 
 **Clock:** ELT comments due 22 Jul feed the rollout-beyond-pilot gate, not this migration. The graph-primary inverse-comparison window runs through 24 Jul but does not block mirror population, M1 stand-up, or M2 reseeding. The reported 28 Jul MCP milestone was verified on 2026-07-16 from the official draft changelog and TypeScript SDK: it is the expected full-spec/stable-SDK-v2 release, not a same-day v1 shutdown (spec §12 risk 1).
 
@@ -29,14 +29,14 @@ Execution is **paused before importing annotated tag `v1.4.4` into the private m
 | Check | Result |
 |---|---|
 | Spec 012 | Approved; all §9 decisions resolved; Phase 0 header and decision-record tidy complete |
-| Public upstream | `v1.4.4` is the exact annotated overlay-capable corrective mirror candidate; closeout requires clean `main`, `origin/main`, and tag convergence |
+| Public upstream | `v1.4.5` is the exact annotated overlay-capable corrective mirror candidate; closeout requires clean `main`, `origin/main`, and tag convergence |
 | §1 upstream hardening | Complete at `v1.2.0`; inherited unchanged by the current release line |
 | Structural integration | Spec 013 server/content work deployed through `v1.4.1`; 39 JEM + 50 ERS hosted files, zero conflicts, bootstraps within budget, routing/policy/search evaluations unchanged; all changes from `v1.4.1` to `v1.4.2` are documentation, tests, examples, or release metadata, including the fork reconciliation and migration-manifest regression test |
 | Supabase manifest | Six tenant-neutral migrations, in filename order; fresh-stack docs now include durable OAuth state, tombstones, and the private revision-FTS index; advisors after each and full security gate after the sequence |
 | Release gate | Supported Node 22 build passed; `npm test` = 334 pass, 4 intentional skips, 0 fail; targeted profile/release-contract tests = 29/29 |
 | ERS mirror repository | Created under ERS custody; verified `PRIVATE`, `jemilad-ers` admin, no branch/default branch, and exactly one imported ref: annotated tag `v1.4.2` (`5e726fa` → `c67387e`); no overlay or secrets pushed |
 | Other ERS infra | No Fly, Supabase, OAuth, DNS, database, deployment, migration, seed, or asset-register action performed |
-| Phase 2 approval | The approved `v1.4.2` Step 3 preflight exhausted without a push because its mandatory gates failed; the next ask-first action is exact `v1.4.4` intake plus the four-surface private overlay |
+| Phase 2 approval | The approved `v1.4.2` Step 3 preflight exhausted without a push because its mandatory gates failed; the next ask-first action is exact `v1.4.5` intake plus the four-surface private overlay |
 | Private overlay draft | Local only: ERS registry, `fly.toml`, deployment expectations, and ERS deploy/ops runbook; no private commit or branch has been pushed |
 | Personal stack | Structural runtime/content work remains deployed through `v1.4.1`; `v1.4.3` changes release tooling, tests, and docs only and performs no personal hosted mutation |
 | GitHub transport | `github-work` SSH authenticates as `jemilad-ers`; the isolated mirror checkout uses private `origin`, a version-tag-only public `upstream`, disabled upstream pushes, and private-origin default pushes; the public checkout still has only its personal `origin` |
@@ -46,7 +46,7 @@ Execution is **paused before importing annotated tag `v1.4.4` into the private m
 
 ## Structural-update gate, Phase 2 Step 2, and overlay preflight — complete
 
-The first imported post-structural mirror target was `v1.4.2`, not the historical `v1.2.0` anchor and not `main` HEAD. The private overlay must now move to annotated `v1.4.4` because it includes both the `v1.4.3` release-contract fixes and the reserved-namespace/conflict-idempotency correction required by the 2026-07-18 beta incident.
+The first imported post-structural mirror target was `v1.4.2`, not the historical `v1.2.0` anchor and not `main` HEAD. The private overlay must now move to annotated `v1.4.5` because it includes the `v1.4.3` release-contract fixes, the `v1.4.4` reserved-namespace/conflict-idempotency correction, and the parity-gated local-state maintenance command.
 
 Evidence used to approve and execute Phase 2 Step 2:
 
@@ -62,9 +62,9 @@ Evidence used to approve and execute Phase 2 Step 2:
 
 **Phase 0 — complete:** spec 012 header/decision wording and DECISIONS.md were reconciled.
 
-**Phase 1 + structural integration — complete:** §1 P0/P1 upstream hardening shipped test-first at `v1.2.0`; spec 013 runtime/content changes were deployed through `v1.4.1`; `v1.4.2` was the first imported tag; `v1.4.4` is the overlay-capable corrective release candidate.
+**Phase 1 + structural integration — complete:** §1 P0/P1 upstream hardening shipped test-first at `v1.2.0`; spec 013 runtime/content changes were deployed through `v1.4.1`; `v1.4.2` was the first imported tag; `v1.4.5` is the overlay-capable corrective release candidate.
 
-**Phase 2 — paused after Step 3 preflight:** the private remote still contains only annotated tag `v1.4.2` and its reachable history. Importing exact tag `v1.4.4`, rebasing the local four-surface overlay onto it, running the full private gates, and pushing the release branch is the next individually ask-first action. Every M1 step remains separately ask-first.
+**Phase 2 — paused after Step 3 preflight:** the private remote still contains only annotated tag `v1.4.2` and its reachable history. Importing exact tag `v1.4.5`, rebasing the local four-surface overlay onto it, running the full private gates, and pushing the release branch is the next individually ask-first action. Every M1 step remains separately ask-first.
 
 **Phase 3 — M2/M3 (spec §§4–6, checklist §10):** pre-flight `pg_dump` checkpoint (needs a PG17-compatible dump path or Docker — currently uninstalled), re-seed (current md baseline = 50 but the live SharePoint count on the day is authoritative; sources `BRAIN_EXPECTED_SOURCE_COUNT=125`, never 128), parity + restore rehearsal on the ERS project, sync re-point (atomic with connector flip), enrollment (ChatGPT Business delete/recreate first, Codex last), 2–3-day soak, then the purge — **CEO sign-off on the verification evidence first** (register item 10); write the OAuth-row purge predicate before cutover day.
 
@@ -77,4 +77,4 @@ Evidence used to approve and execute Phase 2 Step 2:
 
 ## Verification commands
 
-Node 22: `npm run build` · `npm test` · `npm run eval:brain:routing`; verify package/tag agreement and, after the private overlay exists, `git diff v1.4.4..<overlay> -- src db scripts package.json package-lock.json Dockerfile` is empty; per-phase gates are embedded in spec §§3–7; docs checks include `git diff --check` and Markdown-link verification.
+Node 22: `npm run build` · `npm test` · `npm run eval:brain:routing`; verify package/tag agreement and, after the private overlay exists, `git diff v1.4.5..<overlay> -- src db scripts package.json package-lock.json Dockerfile` is empty; per-phase gates are embedded in spec §§3–7; docs checks include `git diff --check` and Markdown-link verification.

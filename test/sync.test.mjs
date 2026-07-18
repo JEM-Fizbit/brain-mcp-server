@@ -160,6 +160,35 @@ test("local sync rejects hosted heads in external namespaces", async () => {
   assert.equal((await store.listConflicts("ai-brain-jem", "open")).length, 0);
 });
 
+test("state rebase refuses content divergence and leaves metadata unchanged", async () => {
+  const store = new MemoryRevisionStore();
+  const { brainDir, stateFile } = dirs("rebase-mismatch");
+  await writeBrainFile(brainDir, "NOW.md", "Local differs\n");
+  await accept(
+    await store.proposeRevision({
+      brainId: "ai-brain-jem",
+      filename: "NOW.md",
+      baseRevisionId: null,
+      content: "Hosted canonical\n",
+      origin: "hosted_mcp",
+    })
+  );
+  const original = {
+    version: 1,
+    clientId: "test-client",
+    cursor: null,
+    files: {},
+  };
+  await fs.mkdir(path.dirname(stateFile), { recursive: true });
+  await fs.writeFile(stateFile, `${JSON.stringify(original, null, 2)}\n`, "utf-8");
+
+  await assert.rejects(
+    makeAgent(store, { brainDir, stateFile }).rebaseState(true),
+    /content hash mismatch/
+  );
+  assert.deepEqual(JSON.parse(await fs.readFile(stateFile, "utf-8")), original);
+});
+
 test("pull does not resurrect a tracked file that is missing locally (spec 011: absence is owned by guarded push, not pull-side inference)", async () => {
   const store = new MemoryRevisionStore();
   const { brainDir, stateFile } = dirs("restore-missing-tracked-local");

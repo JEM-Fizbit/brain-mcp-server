@@ -23,6 +23,16 @@ export interface LocalSyncAgentOptions {
   includeFiles?: string[];
 }
 
+export interface LocalSyncStateRebaseResult {
+  applied: boolean;
+  backupFile: string | null;
+  previousTrackedFiles: number;
+  nextTrackedFiles: number;
+  forgottenFiles: string[];
+  pendingDeletionsCleared: number;
+  hostedTombstones: string[];
+}
+
 const BRAIN_LOADER_FILENAME = "00_loader.md";
 const NESTED_BRAIN_DIRNAME = "brain";
 
@@ -236,6 +246,96 @@ export class LocalSyncAgent {
     const tmpPath = `${this.options.stateFile}.tmp`;
     await fs.writeFile(tmpPath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
     await fs.rename(tmpPath, this.options.stateFile);
+  }
+
+  /**
+   * Rebuild local sync metadata only after proving that every live hosted head
+   * has an exact local hash match and no local-only Markdown or open conflict
+   * exists. Hosted heads, tombstones, revisions, and conflicts are read-only.
+   */
+  async rebaseState(apply = false): Promise<LocalSyncStateRebaseResult> {
+    if (this.options.includeFiles?.length) {
+      throw new Error(
+        "State rebase requires a full Brain inventory; BRAIN_SYNC_INCLUDE_FILES must be unset."
+      );
+    }
+
+    const [state, filenames, heads, openConflicts] = await Promise.all([
+      this.loadState(),
+      includedMarkdownFiles(this.options),
+      this.options.store.listFiles(this.options.brainId, { includeDeleted: true }),
+      this.options.store.listConflicts(this.options.brainId, "open"),
+    ]);
+    if (openConflicts.length > 0) {
+      throw new Error(
+        `State rebase refused: ${openConflicts.length} open conflict(s) require resolution first.`
+      );
+    }
+
+    const liveHeads = new Map(
+      heads.filter((head) => head.deleted !== true).map((head) => [head.filename, head])
+    );
+    const localSet = new Set(filenames);
+    const localOnly = filenames.filter((filename) => !liveHeads.has(filename));
+    const hostedOnly = [...liveHeads.keys()].filter((filename) => !localSet.has(filename));
+    if (localOnly.length > 0 || hostedOnly.length > 0) {
+      throw new Error(
+        `State rebase refused: local/hosted paths differ ` +
+          `(local-only ${localOnly.length}, hosted-only ${hostedOnly.length}).`
+      );
+    }
+
+    const nextFiles: LocalSyncState["files"] = {};
+    const mismatches: string[] = [];
+    for (const filename of filenames) {
+      const head = liveHeads.get(filename)!;
+      const localHash = await readFileHash(
+        safeMarkdownPath(this.options.brainDir, filename)
+      );
+      if (localHash !== head.contentHash) {
+        mismatches.push(filename);
+        continue;
+      }
+      nextFiles[filename] = {
+        revisionId: head.revisionId,
+        contentHash: head.contentHash,
+        localHash,
+      };
+    }
+    if (mismatches.length > 0) {
+      throw new Error(
+        `State rebase refused: ${mismatches.length} local/hosted content hash mismatch(es): ${mismatches.join(", ")}`
+      );
+    }
+
+    const forgottenFiles = Object.keys(state.files)
+      .filter((filename) => !(filename in nextFiles))
+      .sort();
+    const nextState: LocalSyncState = {
+      ...state,
+      files: nextFiles,
+      pendingDeletions: [],
+    };
+    let backupFile: string | null = null;
+    if (apply) {
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      backupFile = `${this.options.stateFile}.pre-rebase-${stamp}`;
+      await fs.copyFile(this.options.stateFile, backupFile);
+      await this.saveState(nextState);
+    }
+
+    return {
+      applied: apply,
+      backupFile,
+      previousTrackedFiles: Object.keys(state.files).length,
+      nextTrackedFiles: Object.keys(nextFiles).length,
+      forgottenFiles,
+      pendingDeletionsCleared: state.pendingDeletions?.length ?? 0,
+      hostedTombstones: heads
+        .filter((head) => head.deleted === true)
+        .map((head) => head.filename)
+        .sort(),
+    };
   }
 
   async pushLocalChanges(): Promise<LocalSyncReport> {
