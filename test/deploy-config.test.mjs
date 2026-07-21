@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { X509Certificate } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -58,6 +59,15 @@ test("Fly image does not install or configure deploy-key SSH access", async () =
   assert.doesNotMatch(entrypoint, /ssh-keyscan/);
   assert.doesNotMatch(entrypoint, /brain_deploy_key/);
   assert.match(entrypoint, /exec "\$@"/);
+});
+
+test("Fly image carries the public Supabase root required by verify-full URLs", async () => {
+  const certificatePath = path.join(repoRoot, "config", "prod-ca-2021.crt");
+  const pem = await fs.readFile(certificatePath, "utf-8");
+  const certificate = new X509Certificate(pem);
+
+  assert.match(certificate.subject, /CN=Supabase Root 2021 CA/);
+  assert.equal(certificate.ca, true);
 });
 
 test("HTTP entrypoint refuses to start without an explicit existing registry", async () => {
