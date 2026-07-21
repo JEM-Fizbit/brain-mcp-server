@@ -1,4 +1,5 @@
 const OVERLAY_CONFIG_PATH = /^config\/[a-z0-9][a-z0-9._-]*\.json$/;
+const OVERLAY_PUBLIC_CA_PATH = /^config\/[a-z0-9][a-z0-9._-]*\.crt$/;
 const OVERLAY_DOC_PATH = /^docs\/.+\.md$/;
 
 function assertOverlayChanges(changes) {
@@ -16,6 +17,7 @@ function assertOverlayChanges(changes) {
       change.path === "fly.toml" ||
       change.path === "test/deploy-expectations.json" ||
       OVERLAY_CONFIG_PATH.test(change.path) ||
+      OVERLAY_PUBLIC_CA_PATH.test(change.path) ||
       OVERLAY_DOC_PATH.test(change.path);
     if (!allowed) {
       throw new Error(`Guarded deploy refused: overlay path is not allowed: ${change.path}`);

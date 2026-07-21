@@ -44,6 +44,7 @@ test("release state accepts a clean overlay on an annotated version-matching ups
     upstreamIsAncestor: true,
     changes: [
       { status: "A", path: "config/brain-platform.example.json" },
+      { status: "A", path: "config/prod-ca-2021.crt" },
       { status: "M", path: "fly.toml" },
       { status: "M", path: "test/deploy-expectations.json" },
       { status: "A", path: "docs/example-deploy.md" },
@@ -104,6 +105,20 @@ test("release state accepts a clean overlay on an annotated version-matching ups
         overlay: {
           ...overlay,
           changes: [...overlay.changes, { status: "M", path: "src/index.ts" }],
+        },
+      }),
+    /overlay path/i
+  );
+  assert.throws(
+    () =>
+      assertReleaseState({
+        porcelain: "",
+        exactTag: "",
+        tagType: "",
+        packageVersion: "1.2.0",
+        overlay: {
+          ...overlay,
+          changes: [...overlay.changes, { status: "A", path: "config/runtime-private.key" }],
         },
       }),
     /overlay path/i
