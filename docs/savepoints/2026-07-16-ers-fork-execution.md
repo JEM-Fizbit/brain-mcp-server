@@ -1,6 +1,6 @@
 # 2026-07-16 ERS Fork Execution Savepoint
 
-**Status:** execution checkpoint — Phase 0/1 complete; dedicated ERS prototype live on guarded private `v1.4.7`; ERS-side live isolation passed; personal `jem-brain-mcp` live on public `v1.4.9` against the JEM-only personal Supabase clone; two-way Brain isolation passed; connector cleanup, Cillian onboarding, soak/recovery evidence, and Entra production identity remain
+**Status:** execution checkpoint — Phase 0/1 complete; dedicated ERS prototype live on guarded private `v1.4.7`; personal `jem-brain-mcp` live on public `v1.4.9` against the JEM-only clone; two-way Brain isolation and Claude Code `brain-ers` verification passed; connector cleanup, Cillian onboarding, soak/recovery evidence, and Entra production identity remain
 **Repo:** `/Users/johnemilad/Projects/brain-mcp-server` (public `main` at `v1.4.9`; private mirror branch `ers/v1.4.7`, based on exact annotated upstream `v1.4.7`)
 **Plan of record:** [`docs/specs/012-ers-mcp-fork.md`](../specs/012-ers-mcp-fork.md) — read it in full before acting; this savepoint is the state snapshot, the spec is the plan
 **Governance record:** `governance/brain-mcp-fork-signoff.md` in the ERS Brain (hosted `brain_id: ers-brain`; SharePoint mirror `…/01_ers-brain/brain/governance/`)
@@ -84,15 +84,16 @@ Evidence used to approve and execute Phase 2 Step 2:
 
 Stop state: no hosted action is running. Public `main`/`v1.4.9` and private `ers/v1.4.7` are the two deployed release lines. The personal runtime is healthy on the JEM-only personal clone; the ERS runtime is healthy on its ERS-only stack. Positive routing and both negative Brain-boundary checks pass. The personal Codex connector has been freshly re-enrolled. All temporary credential, rollback, and helper files used for the personal cutover were removed.
 
+Claude Code is logged into the ERS Genomics team account and now has both user-scope hosted entries: `brain` for JEM and `brain-ers` for ERS. The dedicated ERS entry is connected and its read-only smoke returned `ers-brain`, revision provider, 50 hosted files, zero conflicts, and cursor `2026-07-20T13:20:50.054Z` without reading Brain content.
+
 The next session must:
 
 1. Read this savepoint first, then spec 012 in full; do not reopen §9.
 2. Verify public/private cleanliness and current live health without changing either runtime.
 3. Reconcile the remaining user-facing connector names/descriptions at their supported account/organization surfaces.
-4. Add `brain-ers` to Claude Code at user scope if still absent and run its read-only status smoke.
-5. Obtain Cillian's exact numeric GitHub identity, then present the private-registry commit and guarded ERS redeploy for approval before inviting him.
-6. Complete Cillian's read-only smoke, soak/restore evidence, and the remaining cleanup/sign-off gates.
-7. Implement Microsoft Entra ID before onboarding anyone beyond John and Cillian.
+4. Obtain Cillian's exact numeric GitHub identity, then present the private-registry commit and guarded ERS redeploy for approval before inviting him.
+5. Complete Cillian's read-only smoke, soak/restore evidence, and the remaining cleanup/sign-off gates.
+6. Implement Microsoft Entra ID before onboarding anyone beyond John and Cillian.
 
 Fresh-session kickoff prompt:
 
