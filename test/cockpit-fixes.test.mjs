@@ -47,6 +47,7 @@ async function seed() {
 
 let child;
 let basePort;
+let childStderr = "";
 
 function request(method, pathname, { headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
@@ -94,8 +95,16 @@ before(async () => {
         resolve(Number(m[1]));
       }
     });
-    child.stderr.on("data", () => {});
-    child.on("exit", (code) => reject(new Error("cockpit exited early: " + code)));
+    child.stderr.on("data", (buf) => {
+      childStderr = (childStderr + String(buf)).slice(-4000);
+    });
+    child.on("exit", (code) =>
+      reject(
+        new Error(
+          `cockpit exited early: ${code}${childStderr ? `\n${childStderr.trim()}` : ""}`
+        )
+      )
+    );
   });
 });
 
