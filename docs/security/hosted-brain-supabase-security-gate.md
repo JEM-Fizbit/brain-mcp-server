@@ -19,7 +19,7 @@ This gate does not approve broad client-side access, public API access, addition
 - All `brain.*` tables have Row Level Security enabled.
 - The `brain.*` tables have server-side RLS policies only for the no-login `brain_runtime` database role; web/client roles still have no row access.
 - The `brain_runtime` role is a no-login group role for private MCP runtime database connections. Dedicated login roles may inherit it, but `anon`, `authenticated`, and `public` must not.
-- The ERS-owned `brain_runtime_user` login exists, has a user-generated Dashlane-custodied password, inherits `brain_runtime`, and has no superuser, role-creation, database-creation, replication, or RLS-bypass privilege. Direct pooler authentication remains a deployment preflight because the password is never exposed to the agent.
+- The ERS-owned `brain_runtime_user` login exists, has a user-generated Dashlane-custodied password, inherits `brain_runtime`, and has no superuser, role-creation, database-creation, replication, or RLS-bypass privilege. Direct read-only authentication through the shared transaction pooler on `:6543` passed with `verify-full` against Supabase's published CA; the password and encoded runtime URL were never exposed to the agent.
 - The `brain-artifacts` Storage bucket exists and is private.
 - Storage has no public policies granting object access.
 - The `public.rls_auto_enable()` helper no longer grants execute privileges to `public`, `anon`, or `authenticated`.
@@ -65,7 +65,7 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - [x] Move the project into ERS-owned Supabase organization custody.
 - [x] Re-run this gate against the ERS project and record the project ref.
 - [x] Create an ERS-owned dedicated database login that inherits `brain_runtime`.
-- [ ] Verify the dedicated login through the transaction pooler and use it for `BRAIN_REVISION_DATABASE_URL`.
+- [x] Verify the dedicated login through the transaction pooler and prepare its strictly validated `BRAIN_REVISION_DATABASE_URL` for Fly secret loading.
 - Define the end-user access model before adding RLS policies.
 - Decide the narrower artifact download model before exposing original bytes through hosted MCP.
 - Confirm backup, retention, audit, and artifact deletion requirements for ERS-owned data.
