@@ -1,17 +1,17 @@
 # Hosted Brain Supabase Security Gate
 
-**Status:** passed for pilot use
-**Checked:** 2026-07-17
+**Status:** passed for ERS M1 stand-up; runtime deployment still pending
+**Checked:** 2026-07-21
 **Project:** `brain-platform-pilot`
 **Supabase project ref:** `omnwbcdtmtvxasgdmvwr`
-**Organization:** `ERSG Prototypes`
-**Scope:** Hosted Brain pilot database and private artifact bucket before importing or syncing sensitive Brain content.
+**Organization:** `ERS Genomics`
+**Scope:** ERS-owned hosted Brain database, dedicated runtime role, and private artifact bucket before the first ERS Fly deployment.
 
 ## Gate Decision
 
-The hosted Brain Supabase pilot may continue with sensitive pilot data, provided credentials remain in a password manager or secret store and the `brain` schema remains private until the hosted access model is explicitly designed.
+The ERS-owned hosted Brain database may proceed through M1 deployment, provided credentials remain in a password manager or deployment secret store and the `brain` schema remains private until the hosted access model is explicitly designed.
 
-This gate does not approve broad client-side access, public API access, or production ERS use. ERS production still requires migration to an ERS-owned Supabase account/project.
+This gate does not approve broad client-side access, public API access, additional users, or the later irreversible cross-tenant purge. Those remain governed by spec 012's separate rollout and cutover gates.
 
 ## Verified Controls
 
@@ -19,6 +19,7 @@ This gate does not approve broad client-side access, public API access, or produ
 - All `brain.*` tables have Row Level Security enabled.
 - The `brain.*` tables have server-side RLS policies only for the no-login `brain_runtime` database role; web/client roles still have no row access.
 - The `brain_runtime` role is a no-login group role for private MCP runtime database connections. Dedicated login roles may inherit it, but `anon`, `authenticated`, and `public` must not.
+- The ERS-owned `brain_runtime_user` login exists, has a user-generated Dashlane-custodied password, inherits `brain_runtime`, and has no superuser, role-creation, database-creation, replication, or RLS-bypass privilege. Direct pooler authentication remains a deployment preflight because the password is never exposed to the agent.
 - The `brain-artifacts` Storage bucket exists and is private.
 - Storage has no public policies granting object access.
 - The `public.rls_auto_enable()` helper no longer grants execute privileges to `public`, `anon`, or `authenticated`.
@@ -26,6 +27,7 @@ This gate does not approve broad client-side access, public API access, or produ
 - Remaining 2026-06-14 security advisor notices were expected INFO findings for RLS-enabled private tables with no policies.
 - The 2026-07-17 spec 013 recheck followed application of the private, tombstone-filtered Brain-revision GIN full-text index. The index is valid and ready with predicate `deleted = false`; it added no grants or policies. All 15 `brain` tables retained RLS, public/client Brain grants remained zero, all Brain policies remained scoped to `brain_runtime`, the runtime role remained no-login/non-bypass, the artifact bucket remained private, and `public.rls_auto_enable()` remained unavailable to client/public roles.
 - The 2026-07-17 Supabase security advisor returned no findings. Performance advisors returned INFO only (existing unused-index notices plus the Auth connection-strategy notice), and `supabase db lint --schema brain --fail-on error` found no schema errors. Dedicated runtime-role smokes connected for both `ai-brain-jem` and `ers-brain` with zero public grants.
+- The 2026-07-21 ERS re-gate again reported 15/15 Brain tables with RLS, zero public/client Brain grants, 15/15 Brain policies scoped only to `brain_runtime`, a private `brain-artifacts` bucket, zero Storage policies, and no client/public execute privilege on `public.rls_auto_enable()`. Security advisors returned no findings before and after the dedicated login was created; performance advisors remained INFO-only.
 - The pilot `ai-brain-jem` registry row has been bootstrapped without adding grants, RLS policies, or public Storage access.
 - Durable OAuth connector state now lives in private `brain.oauth_state` with RLS enabled, a `brain_runtime`-only policy, and zero grants to `anon`, `authenticated`, or `public`. The 2026-06-22 migration check reported `rowsecurity=true`, `public_grants=0`, and `runtime_policies=1`.
 - A temporary Postgres smoke test Brain completed local push, hosted revision read, fresh local pull, content verification, and cleanup on 2026-06-14.
@@ -60,9 +62,10 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 
 ## Before Production Cutover
 
-- Move from the private pilot organization to an ERS-owned Supabase account/project.
-- Re-run this gate against the ERS project and record the project ref.
-- Create an ERS-owned dedicated database login that inherits `brain_runtime`, and use it for `BRAIN_REVISION_DATABASE_URL`.
+- [x] Move the project into ERS-owned Supabase organization custody.
+- [x] Re-run this gate against the ERS project and record the project ref.
+- [x] Create an ERS-owned dedicated database login that inherits `brain_runtime`.
+- [ ] Verify the dedicated login through the transaction pooler and use it for `BRAIN_REVISION_DATABASE_URL`.
 - Define the end-user access model before adding RLS policies.
 - Decide the narrower artifact download model before exposing original bytes through hosted MCP.
 - Confirm backup, retention, audit, and artifact deletion requirements for ERS-owned data.
