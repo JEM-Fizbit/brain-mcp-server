@@ -221,3 +221,68 @@ test("github callback allows a registered principal with access to multiple brai
     restoreEnv();
   }
 });
+
+test("github callback rejects an unregistered identity without issuing an auth code", async (t) => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "brain-oauth-isolation-"));
+  t.after(() => fs.rm(tempDir, { recursive: true, force: true }));
+
+  const registryFile = path.join(tempDir, "registry.json");
+  await fs.writeFile(
+    registryFile,
+    JSON.stringify({
+      version: 1,
+      default_brain_id: "tenant-brain",
+      brains: [
+        {
+          id: "tenant-brain",
+          type: "shared",
+          template_used: "company",
+          integration_mode: "vertical",
+          storage_backend: "postgres",
+          storage_config: {},
+        },
+      ],
+      principals: [
+        {
+          provider: "github",
+          provider_user_id: "registered-user",
+          roles: { "tenant-brain": "member" },
+        },
+      ],
+    })
+  );
+
+  const state = makeState();
+  await state.put("oauth_states", "oauth-state", {
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: CODE_CHALLENGE,
+    code_challenge_method: "S256",
+    resource: RESOURCE_URI,
+    scope: "mcp:tools",
+    state: "client-state",
+  });
+
+  const restoreEnv = setEnv({
+    BRAIN_PLATFORM_CONFIG: registryFile,
+    GITHUB_ALLOWED_LOGINS: undefined,
+    GITHUB_ALLOWED_EMAILS: undefined,
+    GITHUB_OAUTH_MOCK_ID: "unregistered-user",
+    GITHUB_OAUTH_MOCK_LOGIN: "unregistered-user",
+    GITHUB_OAUTH_MOCK_EMAIL: "unregistered@example.com",
+  });
+
+  try {
+    const result = await handleGitHubCallback(
+      new URLSearchParams({ code: "mock-code", state: "oauth-state" }),
+      config,
+      state
+    );
+
+    assert.equal(result.status, 403);
+    assert.match(result.body, /not allowed to access this Brain server/i);
+    assert.deepEqual(await state.listAll("auth_codes"), {});
+  } finally {
+    restoreEnv();
+  }
+});

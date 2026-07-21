@@ -191,6 +191,77 @@ async function setupHarness(name, brainConfig = {}) {
   return { baseUrl, token, config, storeFile, brainDir, stateFile };
 }
 
+async function setupScopedTenantHarness(name) {
+  const root = path.join(tmpRoot, name);
+  const registryFile = path.join(root, "registry.json");
+  const storeFile = path.join(root, "revision-store.json");
+  const tenantABrainDir = path.join(root, "tenant-a", "brain");
+  const tenantBBrainDir = path.join(root, "tenant-b", "brain");
+  await fs.mkdir(tenantABrainDir, { recursive: true });
+  await fs.mkdir(tenantBBrainDir, { recursive: true });
+  await fs.writeFile(
+    registryFile,
+    JSON.stringify({
+      version: 1,
+      default_brain_id: "tenant-a-brain",
+      brains: [
+        {
+          id: "tenant-a-brain",
+          type: "personal",
+          template_used: "personal",
+          integration_mode: "vertical",
+          storage_backend: "filesystem",
+          storage_config: { brain_dir: tenantABrainDir },
+        },
+        {
+          id: "tenant-b-brain",
+          type: "shared",
+          template_used: "company",
+          integration_mode: "vertical",
+          storage_backend: "filesystem",
+          storage_config: { brain_dir: tenantBBrainDir },
+        },
+      ],
+      principals: [
+        {
+          provider: "github",
+          provider_user_id: "tenant-b-user",
+          roles: { "tenant-b-brain": "member" },
+        },
+      ],
+    }),
+    "utf-8"
+  );
+
+  process.env.BRAIN_DIR = tenantABrainDir;
+  process.env.BRAIN_PLATFORM_CONFIG = registryFile;
+  process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE = storeFile;
+
+  const store = new FileRevisionStore(storeFile);
+  for (const brainId of ["tenant-a-brain", "tenant-b-brain"]) {
+    await store.proposeRevision({
+      brainId,
+      filename: "NOW.md",
+      baseRevisionId: null,
+      content: `${brainId} private content\n`,
+      origin: "hosted_mcp",
+    });
+  }
+
+  const baseUrl = "http://127.0.0.1:1234";
+  const config = oauthConfig(baseUrl);
+  const token = issueAccessToken(config, {
+    sub: "github:tenant-b-user",
+    clientId: "test-client",
+    scope: "mcp:tools",
+    provider: "github",
+    providerUserId: "tenant-b-user",
+    githubLogin: "tenant-b-user",
+  }).token;
+
+  return { baseUrl, token, config, storeFile };
+}
+
 async function writeBrainFile(brainDir, filename, content) {
   const fullPath = path.join(brainDir, filename);
   await fs.mkdir(path.dirname(fullPath), { recursive: true });
@@ -251,6 +322,46 @@ test("HTTP MCP reads and loads context from revision store harness", async () =>
   assert.match(context, /Loader table/);
   assert.match(context, /--- FILE: NOW\.md ---/);
   assert.match(context, /Hosted now/);
+});
+
+test("HTTP MCP denies cross-tenant reads and writes for a Brain-scoped principal", async () => {
+  const harness = await setupScopedTenantHarness("cross-tenant-isolation");
+
+  const visible = await callTool(harness, "brain_list_brains");
+  assert.match(visible, /tenant-b-brain/);
+  assert.doesNotMatch(visible, /tenant-a-brain/);
+
+  const deniedRead = await callTool(harness, "brain_read_file", {
+    brain_id: "tenant-a-brain",
+    filename: "NOW.md",
+  });
+  assert.match(deniedRead, /Brain not accessible: tenant-a-brain/i);
+  assert.match(deniedRead, /Accessible Brains: tenant-b-brain/i);
+  assert.doesNotMatch(deniedRead, /tenant-a-brain private content/);
+
+  const deniedWrite = await callTool(harness, "brain_update_file", {
+    brain_id: "tenant-a-brain",
+    filename: "breach.md",
+    mode: "replace",
+    content: "cross-tenant write must not land\n",
+  });
+  assert.match(deniedWrite, /Brain not accessible: tenant-a-brain/i);
+
+  const allowedRead = await callTool(harness, "brain_read_file", {
+    brain_id: "tenant-b-brain",
+    filename: "NOW.md",
+  });
+  assert.equal(allowedRead, "tenant-b-brain private content\n");
+
+  const store = new FileRevisionStore(harness.storeFile);
+  assert.equal(
+    (await store.readFile("tenant-a-brain", "NOW.md")).content,
+    "tenant-a-brain private content\n"
+  );
+  await assert.rejects(
+    () => store.readFile("tenant-a-brain", "breach.md"),
+    /File not found/i
+  );
 });
 
 test("HTTP MCP update writes to revision store harness", async () => {
