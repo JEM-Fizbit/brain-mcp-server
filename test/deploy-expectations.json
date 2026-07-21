@@ -2,10 +2,7 @@
   "version": 1,
   "registry": {
     "default_brain_id": "ai-brain-jem",
-    "brain_ids": [
-      "ai-brain-jem",
-      "ers-brain"
-    ],
+    "brain_ids": ["ai-brain-jem"],
     "brain_metadata": {
       "ai-brain-jem": {
         "owner_scope": "personal",
@@ -15,33 +12,14 @@
           "personal-operations"
         ],
         "authority_tier": "canonical"
-      },
-      "ers-brain": {
-        "owner_scope": "company",
-        "canonical_for": [
-          "ers-genomics",
-          "ers-company-context",
-          "ers-work-context"
-        ],
-        "authority_tier": "canonical"
       }
     },
     "principal": {
       "provider": "github",
       "provider_user_id": "220941196",
       "roles": {
-        "ai-brain-jem": "owner",
-        "ers-brain": "owner"
+        "ai-brain-jem": "owner"
       }
     }
-  },
-  "pilot_seed": {
-    "path": "db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql",
-    "brain_id": "ers-brain",
-    "markers": [
-      "'shared'",
-      "john-only-pilot",
-      "production_cutover_requires_ers_owned_project"
-    ]
   }
 }

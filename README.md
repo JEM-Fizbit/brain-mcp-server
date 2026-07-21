@@ -76,7 +76,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 | `GITHUB_ALLOWED_LOGINS` | Comma-separated GitHub login allowlist for fallback owner access | unset |
 | `GITHUB_ALLOWED_EMAILS` | Comma-separated email allowlist for fallback owner access | unset |
 | `BRAIN_PLATFORM_CONFIG` | Registry JSON path for hosted/multi-Brain mode | `~/.config/brain-platform/registry.json` |
-| `BRAIN_LINT_MODE_OVERRIDES` | Validated per-Brain JSON mode map, e.g. `{"ai-brain-jem":"graph_shadow","ers-brain":"legacy"}`. Malformed JSON, unknown Brains, and unknown modes fail startup | unset; registry/default `legacy` |
+| `BRAIN_LINT_MODE_OVERRIDES` | Validated per-Brain JSON mode map, e.g. `{"ai-brain-jem":"graph_shadow"}`. Malformed JSON, unknown Brains, and unknown modes fail startup | unset; registry/default `legacy` |
 | `BRAIN_PLATFORM_STATE_ROOT` | File-backed OAuth state root for local/dev fallback | `~/.config/brain-platform/state` |
 | `BRAIN_OAUTH_STATE_STORE` | OAuth client/session state store: `file` or `postgres`. Hosted should use `postgres` so connector enrollment survives Fly machine replacement | `file` |
 | `MCP_OAUTH_REFRESH_REUSE_GRACE_SEC` | Optional short refresh-token reuse window for cloud-synced client refresh races. Hosted uses `15`; local/dev defaults to strict one-time rotation | `0` |
@@ -100,7 +100,7 @@ This repo includes:
 - `fly.toml` for the first Supabase-backed Fly.io target, `jem-brain-mcp`
 - [`docs/deploy-fly.md`](./docs/deploy-fly.md) for the deployment runbook
 - [`docs/hosted-client-cutover.md`](./docs/hosted-client-cutover.md) for the JEM hosted client shadow rehearsal and promotion gate
-- [`docs/ers-brain-hosted-pilot.md`](./docs/ers-brain-hosted-pilot.md) for the John-only ERS Brain hosted pilot
+- [`docs/ers-brain-hosted-pilot.md`](./docs/ers-brain-hosted-pilot.md) for the historical John-only ERS Brain pilot and migration context
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the staged JEM cutover, ERS migration, and multi-tenant roadmap
 
 Hosted endpoint shape:
@@ -113,7 +113,7 @@ For hosted client cutover, add the HTTP endpoint as a separate `brain-hosted` co
 
 After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint through Settings -> Connectors -> Create.
 
-The current hosted registry is John-only and contains `ai-brain-jem` plus the pilot `ers-brain`. When more than one Brain is visible, pass `brain_id` explicitly in tool calls.
+The personal hosted registry is John-only and contains only `ai-brain-jem`. `ers-brain` is served by a separately owned ERS deployment; clients that use both should install two connectors and pass `brain_id` explicitly.
 
 For local operator visibility, run `npm run hosted:cockpit`. It opens on `127.0.0.1:8787` by default and automatically tries the next local port if that port is already occupied. For a user-launchable local operator surface, generate the reviewable macOS LaunchAgent with `npm run hosted:cockpit:launchd:plist`; see [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md).
 

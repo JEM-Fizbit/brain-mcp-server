@@ -1,6 +1,6 @@
 # Fly Deployment
 
-> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. Hosted MCP is the normal remote Brain path for the current John-only pilot; local stdio `brain` remains the local-filesystem fallback. Release `v1.4.1` (`23c209d`) is deployed; Fly machine version 50 runs both JEM and ERS in graph-primary beta with legacy inverse comparison through 2026-07-24.
+> Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. The personal hosted MCP serves only `ai-brain-jem`; local stdio `brain-local` remains the local-filesystem fallback. The ERS Brain runs on a separately owned deployment.
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
@@ -79,7 +79,7 @@ fly secrets set \
   BRAIN_SUPABASE_URL="https://<project-ref>.supabase.co" \
   BRAIN_SUPABASE_STORAGE_BUCKET="brain-artifacts" \
   BRAIN_HTTP_TIMING_LOGS="1" \
-  BRAIN_LINT_MODE_OVERRIDES='{"ai-brain-jem":"graph","ers-brain":"graph"}' \
+  BRAIN_LINT_MODE_OVERRIDES='{"ai-brain-jem":"graph"}' \
   --app jem-brain-mcp
 ```
 
@@ -87,15 +87,15 @@ Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source me
 
 Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for the Supabase-backed hosted runtime. Those belong to the retired git hot path.
 
-The image-bundled registry is the current access authority for the two-Brain pilot and matches John by stable GitHub provider id. `GITHUB_ALLOWED_LOGINS` and `GITHUB_ALLOWED_EMAILS` are fallback controls for the default Brain only; do not use them as the ERS Brain access model.
+The image-bundled registry is the access authority for the personal JEM-only deployment and matches John by stable GitHub provider id. `GITHUB_ALLOWED_LOGINS` and `GITHUB_ALLOWED_EMAILS` are fallback controls for the default Brain only; do not use them as an organisational access model.
 
 Hosted OAuth client registration, auth-code, OAuth-state, and refresh-token metadata should use `BRAIN_OAUTH_STATE_STORE=postgres`. File-backed OAuth state is acceptable for local harnesses only; on Fly it can be lost with machine replacement and leave Claude/ChatGPT connectors holding stale credentials. `MCP_OAUTH_REFRESH_REUSE_GRACE_SEC=15` preserves normal refresh-token rotation while tolerating short cloud-client refresh races across web, desktop, and mobile surfaces.
 
 When migrating an already-enrolled connector from file-backed OAuth state to Postgres-backed OAuth state, expect one re-enrollment per client account. Existing Claude-held refresh tokens cannot be migrated from the server side because the server only stores their hash. After re-enrollment, future redeploys and Fly machine replacement should not require reconnecting solely because the server lost OAuth state.
 
-The current pilot Supabase project is John's private-org project `brain-platform-pilot` (`omnwbcdtmtvxasgdmvwr`). ERS production must use an ERS-owned Supabase project with the same migrations and environment contract.
+The personal deployment must point only to a personal-owned, JEM-only Supabase project. The ERS deployment uses a separate ERS-owned project with the same migrations and environment contract.
 
-The Fly runtime reads the non-secret hosted registry from `/app/config/brain-platform.john-ers-pilot.json`. Do not depend on `/data/config/registry.json` for the current deployment; volume state can lag the committed two-Brain registry.
+The Fly runtime reads the non-secret JEM-only registry from `/app/config/brain-platform.john-ers-pilot.json`. The filename is retained for deployment compatibility; its contents, not its historical name, define the current single-Brain registry. Do not depend on `/data/config/registry.json` for the current deployment.
 
 For local operator scripts, copy `.env.local.example` to `.env.local` and fill the secret values once. The Postgres/Supabase smoke, seed, verify, inventory, and upload scripts load `.env.local` automatically; deployment still uses the hosting secret manager.
 

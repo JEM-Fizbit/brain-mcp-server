@@ -13,9 +13,9 @@ Keep this file aligned with `CLAUDE.md`. Global/user-level operating rules live 
 - Supabase Postgres as the hosted revision, sync, source metadata, and operational telemetry store;
 - Supabase Storage for source/artifact bytes.
 
-Hosted Brain is the normal remote path for `ai-brain-jem` and the John-only `ers-brain` pilot; local stdio remains the recovery and local-filesystem fallback.
+The personal hosted Brain is the normal remote path for `ai-brain-jem`; the dedicated ERS deployment serves `ers-brain`. Local stdio remains the recovery and local-filesystem fallback.
 
-**Ownership & lifecycle:** the hosted MCP is **personal-owned and ERS beta-shared** (John sole user). See [`docs/OWNERSHIP_AND_LIFECYCLE.md`](docs/OWNERSHIP_AND_LIFECYCLE.md) for ownership boundaries and the fork-to-dedicated-ERS-MCP plan at multi-tenant cutover.
+**Ownership & lifecycle:** this public codebase remains personal-owned and reusable, while the personal and ERS deployments are permanently isolated by owner. See [`docs/OWNERSHIP_AND_LIFECYCLE.md`](docs/OWNERSHIP_AND_LIFECYCLE.md).
 
 ## Runtime And Tooling
 
@@ -35,7 +35,7 @@ Hosted Brain is the normal remote path for `ai-brain-jem` and the John-only `ers
 
 For Brain context, status, file reads, searches, lint, log reads, and narrow Brain writes, reach for the hosted Brain MCP first. Treat `brain-local`, direct filesystem reads, and OneDrive/CloudStorage mirrors as fallback paths only.
 
-- Use explicit `brain_id` whenever more than one Brain is visible or the request could touch both. `ai-brain-jem` is permitted for JEM/personal Brain context; `ers-brain` is permitted for ERS/company Brain context. Platform work that affects both Brains should check both explicitly.
+- Use explicit `brain_id` whenever more than one Brain connector is available or the request could touch both. Use the personal deployment for `ai-brain-jem` and the dedicated ERS deployment for `ers-brain`. Platform work that affects both should check both explicitly without crossing their data or credentials.
 - Read-only hosted tools are pre-approved for normal project work: sync status, context load, file read, search, file/source listing, log read, and lint/doctor once the relevant hosted tool is known to work for that Brain.
 - Hosted writes remain governed by the normal Brain write rule: write only when the user explicitly asks to save/update/log, or when the task clearly requires a narrow project-memory update. Use the hosted tool path for the write unless it is unavailable and the user has approved fallback.
 - If the hosted connector appears to expose only part of the tool surface, run tool discovery again before falling back. If hosted access is still unavailable or insufficient, say exactly which hosted call failed or was missing before using `brain-local` or local files.

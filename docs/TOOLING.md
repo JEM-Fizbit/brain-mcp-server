@@ -66,7 +66,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 
 ## Hosted/Local State Boundaries
 
-- Hosted MCP is the normal remote path for `ai-brain-jem` and the John-only `ers-brain` pilot.
+- The personal hosted MCP is the normal remote path for `ai-brain-jem`; the dedicated ERS deployment serves `ers-brain`.
 - Local stdio Brain and local Markdown remain fallback/recovery surfaces.
 - Supabase Postgres owns hosted revisions, OAuth state, conflicts, cursors, source metadata, and telemetry.
 - Supabase Storage owns private source/artifact bytes.
