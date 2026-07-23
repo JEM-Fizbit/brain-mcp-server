@@ -243,8 +243,10 @@ For one operator app that supervises both JEM and ERS, pass
 `healthFile`, `logDir`, `cockpitUrl`, and an optional `env` object. The profile
 environment allow-list is `BRAIN_REVISION_STORE`,
 `BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, and `BRAIN_FLY_APP`;
-these values are passed only to that profile's sync, cockpit, and doctor
-processes. This lets two profiles target different hosted stacks from one app.
+`FLY_CONFIG_DIR` may also be supplied when different profiles use isolated Fly
+CLI identities. These values are passed only to that profile's sync, cockpit,
+and doctor processes. This lets two profiles target different hosted stacks
+and Fly organizations from one app without switching the global Fly login.
 The generated config is owner-readable only (`0600`) because a database URL is
 a credential; never commit or print the profiles JSON:
 

@@ -144,6 +144,7 @@ const profileEnvKeys = new Set([
   "BRAIN_REVISION_DATABASE_URL",
   "BRAIN_HOSTED_BASE_URL",
   "BRAIN_FLY_APP",
+  "FLY_CONFIG_DIR",
 ]);
 
 function parseUrl(value) {
