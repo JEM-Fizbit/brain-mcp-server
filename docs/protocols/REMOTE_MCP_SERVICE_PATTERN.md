@@ -1,10 +1,10 @@
 # Protocol — Remote MCP Service Pattern (cloud-hosted MCP server with MCP-spec OAuth 2.1)
 
-> Reusable canonical pattern for building a cloud-hosted MCP server with full MCP-spec OAuth 2.1 authorization. Extracted 2026-05-15 from the [slack-mcp-server](https://github.com/JEM-Fizbit/slack-mcp-server) reference implementation (v0.4.1, ~13-15 hours operator+LLM build time across 2026-05-08 to 2026-05-15). Designed so the next MCP server build (planned ERS Brain MCP, JEM Brain Platform, any future service) lifts the auth + transport + attribution layers wholesale rather than re-deriving from spec.
+> Reusable canonical pattern for building a cloud-hosted MCP server with full MCP-spec OAuth 2.1 authorization. Extracted 2026-05-15 from the [slack-mcp-server](https://github.com/JEM-Fizbit/slack-mcp-server) reference implementation (v0.4.1, ~13-15 hours operator+LLM build time across 2026-05-08 to 2026-05-15). The pattern is now proven by owner-isolated hosted Brain deployments and remains the starting point for future remote MCP services, so their auth, transport, and attribution layers are not re-derived from the specification.
 
-**Last Updated:** 2026-07-03
-**Version:** 1.7
-**Status:** v1.7 — folds in the stale-connector-downgrade classification pattern proven on brain-mcp-server (conservative benign-case downgrade shared between health check and alerter); corrects the slack-mcp-server reference implementation description (ported to Cloudflare Workers at v0.5.0, now v0.8.5+, file inventory below is v0.4.1-era); points to the new `MCP_SERVER_OPERATIONAL_TELEMETRY.md` protocol for the general (non-auth) telemetry shape; retires a stale forward-pointer to a superseded roadmap doc. (v1.6 added the OpenAI operator-facing recovery companion protocol for ChatGPT/Codex connector state after hosted MCP updates. v1.5 added brokered-DCR recovery lessons from ChatGPT hosted Brain enrollment.)
+**Last Updated:** 2026-07-23
+**Version:** 1.8
+**Status:** v1.8 — records the hosted Brain pattern as proven across owner-isolated deployments rather than describing the ERS deployment as future work. (v1.7 added the conservative stale-connector downgrade, corrected the Workers-era reference implementation, linked the general operational-telemetry protocol, and retired a superseded roadmap pointer.)
 
 **Reference implementations:**
 - [`~/Projects/slack-mcp-server/`](https://github.com/JEM-Fizbit/slack-mcp-server) — originally a standalone always-on Node process behind a Cloudflare tunnel (v0.4.1, the version this protocol was extracted from); **ported to Cloudflare Workers at v0.5.0** (2026-05-15, LaunchAgent + named tunnel decommissioned) and now at **v0.8.5+**. Production at `https://slack.ersgenomics.online/`. Treat the file-inventory and effort estimates below as v0.4.1-era; re-derive from the Workers-era layout before reusing verbatim.
@@ -457,6 +457,7 @@ When any of these land, bump the protocol with the new evidence folded in.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.8 | 2026-07-23 | Reframed the hosted Brain reference as a proven owner-isolated deployment pattern; removed the stale description of the ERS deployment as future work. |
 | 1.7 | 2026-07-03 | Stale-connector-downgrade classification pattern (conservative benign-case downgrade shared between health check and alerter, proven on brain-mcp-server); corrected slack-mcp-server reference description (Cloudflare Workers since v0.5.0, now v0.8.5+); cross-reference to new `MCP_SERVER_OPERATIONAL_TELEMETRY.md` protocol; brain-mcp-server reference bullet updated for its now-shipped multi-tenant/`brain_id`/semantic-search tool surface; retired a forward-pointer to a superseded roadmap doc. |
 | 1.6 | 2026-06-25 | Added companion OpenAI MCP connector recovery protocol link. Keeps provider-specific ChatGPT/Codex delete/recreate, workspace-app, fresh-session, and Codex CLI approval procedures out of the architecture pattern while making them discoverable from this canonical MCP protocol. |
 | 1.5 | 2026-06-23 | ChatGPT hosted Brain enrollment lesson: accept documented broker callback URI classes by narrow pattern; `unknown_client_id` at `/token` means stale broker-side DCR state when no durable `clients` row exists; recovery is full connector/app removal + reinstall/recreate, followed by verification of DCR row, token exchange, real tool call, and no fresh auth events. |
