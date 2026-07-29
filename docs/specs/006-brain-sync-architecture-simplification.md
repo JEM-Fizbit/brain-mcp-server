@@ -23,6 +23,27 @@ The current John-only ERS pilot now works, but it has accumulated too many opera
 
 This is acceptable as a controlled single-operator pilot, but it is not acceptable as the default ERS production model. It is especially weak for Windows/PC colleagues, because the current helper is macOS-specific and requires Full Disk Access, local app install, per-user state paths, and launchd. A Windows equivalent is possible, but it would create a second support surface rather than simplifying the architecture.
 
+### Availability: the operator laptop is a correctness dependency, not just an ergonomics one
+
+The surface count above understates the problem. The local sync agent is the **only** component that moves bytes between the two planes: the hosted server never reaches into SharePoint, and SharePoint knows nothing about the revision store. Sync is a 5-second poll loop (`BRAIN_SYNC_INTERVAL_MS`, default 5000) running `syncOnce()` — push, then pull — under the operator's menu-bar supervisor. There is no filesystem watcher, no Graph subscription, and no server-side trigger.
+
+So whenever the operator laptop is asleep, offline, or has the agent stopped:
+
+- SharePoint/Obsidian edits are invisible to every hosted client — Claude mobile, ChatGPT, Codex over HTTP, and any colleague on the hosted MCP;
+- hosted MCP writes are invisible in SharePoint/OneDrive and to anyone reading the files;
+- the two planes diverge silently for the whole interval, and **nothing surfaces the staleness to a reader** — a hosted read returns the last-synced content with no indication that a newer file-plane version exists (`brain_sync_status` reports health to an operator who goes looking, which is not the same thing).
+
+For a single operator who is also the only reader, this is an ergonomics annoyance: the divergence resolves the next time the machine wakes, and the operator knows when they were offline. It stops being ergonomics the moment there is a second participant. A second pilot user gets a Brain whose freshness depends on whether *another individual's laptop happens to be open* — an availability model that is hard to defend at the ELT rollout gate (`01_ers-brain/brain/governance/brain-mcp-fork-signoff.md` item 14), independent of any Windows-portability or app-packaging argument.
+
+This reframes the local-helper options below. Option A does not merely inherit "hard to guarantee always-on behavior on laptops" as a con; it makes an individual's device uptime a load-bearing part of a shared company system's correctness. Options B and E both remove that dependency by moving the sync trigger server-side, which is a stronger argument for them than the surface-count reduction on its own.
+
+Two adjacent consequences worth carrying into the decision:
+
+- **Attribution.** The agent pushes with `origin: "local_agent"` and the sync profile's single configured actor, so every file-plane edit is recorded as the operator regardless of who made it. A server-side Graph adapter (Option B) gets `driveItem` `lastModifiedBy` for free and closes that gap as a side effect; Option E closes it by removing the unattributed write path entirely. Tracked as its own BACKLOG item.
+- **Write controls.** The hosted role gate (`reader` read-only, exact `owner`/`admin` on structural files) is only enforceable on the hosted path, so any library member can walk around it via the file plane. Whichever option is chosen has to state whether the file plane keeps unrestricted write access. Tracked as its own BACKLOG item.
+
+Both collapse into the same Phase 1 question — whether SharePoint remains a human *editing* surface — which is a further reason to decide Phase 1 before building anything.
+
 The menu-bar app remains urgent for John/operator ergonomics and should proceed as a consolidated **operator pilot app** for John's own platform. It should not be positioned as the ERS colleague rollout architecture until the colleague human surface is decided.
 
 ## Recommendation
@@ -102,6 +123,7 @@ Each user runs a local sync app: macOS menu-bar app plus LaunchAgent; Windows tr
 - Platform split: macOS Full Disk Access and LaunchAgents vs Windows tray/service/task scheduler.
 - Every colleague becomes part of the sync topology.
 - Hard to guarantee always-on behavior on laptops.
+- **An individual's device uptime becomes load-bearing for a shared system's correctness.** With the sync trigger only on a laptop, both planes diverge silently whenever that machine sleeps and no reader is told (see [Availability](#availability-the-operator-laptop-is-a-correctness-dependency-not-just-an-ergonomics-one)). This is the strongest single argument against the option, and it is not fixed by better packaging.
 - More likely to produce divergent states and support tickets.
 
 **Verdict:** Keep as John/operator fallback. Do not make this the ERS colleague default unless Option B fails.
@@ -398,6 +420,7 @@ Exit criterion: a real ERS Markdown edit through OneDrive appears in hosted MCP,
 - macOS helper/menu-bar scope is classified as John/operator-only or colleague product.
 - Windows support is addressed before any colleague-facing local helper plan is approved.
 - SharePoint/Graph adapter feasibility is tested before rejecting it.
+- The chosen path states explicitly whether Brain freshness may depend on an individual operator's device being awake, and if it may, whether readers are told when the two planes have diverged. No option is accepted for more than one participant while that dependency is undeclared.
 - Doctor/cockpit/local automation responsibilities are assigned to either local operator tooling or cloud operations.
 - ERS production path includes ERS-owned Supabase/project ownership before multi-user rollout.
 
