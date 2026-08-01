@@ -34,6 +34,7 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 
 - OpenAI/ChatGPT/Codex custom MCP connector auth, stale Dynamic Client Registration, `unknown_client_id`, OAuth callback, or tool-surface recovery work: read [`docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md) before planning or editing.
 - Hosted remote MCP server, OAuth 2.1, Dynamic Client Registration, callback allow-list, JWT/session state, or connector-enrollment work: read [`docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md`](docs/protocols/REMOTE_MCP_SERVICE_PATTERN.md) before planning or editing.
+- Transport switch (`src/index.ts`), storage-backend selection (`activeBrainStore`/`BrainStore`), or local-vs-hosted client-naming/promotion-gate work: read [`docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md`](docs/protocols/DUAL_TRANSPORT_MCP_SERVER.md) before planning or editing.
 
 ---
 
@@ -137,6 +138,7 @@ brain-mcp-server/
 │   ├── mcp-server.ts     # MCP server construction + tool registration wiring
 │   ├── constants.ts      # Paths, limits, config
 │   ├── search-match.ts   # Shared search/match helper
+│   ├── search-ranking.ts # Search result ranking
 │   ├── http/             # Cloud (HTTP) transport
 │   │   ├── server.ts     # HTTP MCP server
 │   │   └── mcp-auth.ts   # Per-request auth for the HTTP transport
@@ -144,7 +146,7 @@ brain-mcp-server/
 │   │   ├── config.ts · metadata.ts · register.ts     # discovery + dynamic client registration
 │   │   ├── github.ts · pkce.ts · crypto.ts · jwt.ts · token.ts  # auth-code/PKCE/token flow
 │   │   └── state.ts · postgres-state.ts              # in-memory + Postgres-backed OAuth state
-│   ├── services/         # Core logic (26 modules). Highlights:
+│   ├── services/         # Core logic (32 modules). Highlights:
 │   │   ├── brain.ts · brain-store.ts · active-brain-store.ts · revision-brain-store.ts  # Brain access + multi-tenant store abstractions
 │   │   ├── git.ts · log.ts · task-intake.ts          # git ops, change log, TASKS capture/triage
 │   │   ├── lint.ts · lint-fix.ts · lint-apply.ts     # health checks + autofix
