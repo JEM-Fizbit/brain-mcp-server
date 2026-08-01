@@ -176,7 +176,7 @@ In `~/.claude/settings.json`, add to the `permissions.allow` array:
 }
 ```
 
-The `mcp__brain` prefix matches all Brain tools (22 total). You can verify with `/permissions` in Claude Code.
+The `mcp__brain` prefix matches all Brain tools (25 total). You can verify with `/permissions` in Claude Code.
 
 ### Step 2: Conditional auto-load directive (Claude Code / Cowork)
 
