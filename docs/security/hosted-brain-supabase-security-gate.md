@@ -1,11 +1,11 @@
 # Hosted Brain Supabase Security Gate
 
-**Status:** passed for ERS M1 stand-up; runtime deployment still pending
-**Checked:** 2026-07-21
+**Status:** passed for the live ERS hosted runtime
+**Checked:** 2026-08-19
 **Project:** `brain-platform-pilot`
 **Supabase project ref:** `omnwbcdtmtvxasgdmvwr`
 **Organization:** `ERS Genomics`
-**Scope:** ERS-owned hosted Brain database, dedicated runtime role, and private artifact bucket before the first ERS Fly deployment.
+**Scope:** ERS-owned hosted Brain database, dedicated runtime role, private artifact bucket, and bounded operational-observability schema for the live ERS deployment.
 
 ## Gate Decision
 
@@ -28,6 +28,7 @@ This gate does not approve broad client-side access, public API access, addition
 - The 2026-07-17 spec 013 recheck followed application of the private, tombstone-filtered Brain-revision GIN full-text index. The index is valid and ready with predicate `deleted = false`; it added no grants or policies. All 15 `brain` tables retained RLS, public/client Brain grants remained zero, all Brain policies remained scoped to `brain_runtime`, the runtime role remained no-login/non-bypass, the artifact bucket remained private, and `public.rls_auto_enable()` remained unavailable to client/public roles.
 - The 2026-07-17 Supabase security advisor returned no findings. Performance advisors returned INFO only (existing unused-index notices plus the Auth connection-strategy notice), and `supabase db lint --schema brain --fail-on error` found no schema errors. Dedicated runtime-role smokes connected for both `ai-brain-jem` and `ers-brain` with zero public grants.
 - The 2026-07-21 ERS re-gate again reported 15/15 Brain tables with RLS, zero public/client Brain grants, 15/15 Brain policies scoped only to `brain_runtime`, a private `brain-artifacts` bucket, zero Storage policies, and no client/public execute privilege on `public.rls_auto_enable()`. Security advisors returned no findings before and after the dedicated login was created; performance advisors remained INFO-only.
+- The 2026-08-19 bounded-observability migration added `brain.sync_heartbeats` and the partial `sync_events_hosted_observability_idx`. The post-migration gate reported 16/16 Brain tables with RLS, zero `anon`/`authenticated`/`public` Brain grants, one `brain_runtime`-only policy and no other policy on `sync_heartbeats`, and a valid/ready partial index. The dedicated ERS runtime login could select, insert, and update the table through RLS. A fresh Supabase Security Advisor run returned 0 errors, 0 warnings, and 0 suggestions; Performance Advisor returned 0 errors and 0 warnings, with six INFO-only unused-index/Auth-connection notices. No historical telemetry was deleted.
 - The pilot `ai-brain-jem` registry row has been bootstrapped without adding grants, RLS policies, or public Storage access.
 - Durable OAuth connector state now lives in private `brain.oauth_state` with RLS enabled, a `brain_runtime`-only policy, and zero grants to `anon`, `authenticated`, or `public`. The 2026-06-22 migration check reported `rowsecurity=true`, `public_grants=0`, and `runtime_policies=1`.
 - A temporary Postgres smoke test Brain completed local push, hosted revision read, fresh local pull, content verification, and cleanup on 2026-06-14.

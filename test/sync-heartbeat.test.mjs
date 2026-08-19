@@ -32,7 +32,7 @@ test("each sync cycle emits one metadata-only heartbeat", async () => {
   assert.equal(heartbeats[0].report, report);
 });
 
-test("Postgres heartbeat persists counts but no filenames or content", async () => {
+test("Postgres heartbeat upserts bounded state and coalesces rapid cycles", async () => {
   const calls = [];
   const pool = {
     async query(sql, params) {
@@ -40,8 +40,8 @@ test("Postgres heartbeat persists counts but no filenames or content", async () 
       return { rows: [] };
     },
   };
-  const store = new PostgresRevisionStore(pool);
-  await store.recordSyncHeartbeat({
+  const store = new PostgresRevisionStore(pool, { heartbeatIntervalMs: 60_000 });
+  const heartbeat = {
     brainId: "example-brain",
     report: {
       pushed: ["secret.md"],
@@ -53,15 +53,49 @@ test("Postgres heartbeat persists counts but no filenames or content", async () 
       deletionsSkipped: [],
     },
     completedAt: "2026-07-16T12:00:00.000Z",
-  });
+  };
+  await store.recordSyncHeartbeat(heartbeat);
+  await store.recordSyncHeartbeat(heartbeat);
 
   assert.equal(calls.length, 1);
-  assert.match(calls[0].sql, /insert into brain\.sync_events/);
-  assert.equal(calls[0].params[1], "sync_heartbeat");
-  const heartbeatMetadata = JSON.parse(calls[0].params[3]);
+  assert.match(calls[0].sql, /insert into brain\.sync_heartbeats/);
+  assert.match(calls[0].sql, /on conflict \(brain_id\) do update/);
+  const heartbeatMetadata = JSON.parse(calls[0].params[2]);
   assert.equal(heartbeatMetadata.counts.pushed, 1);
   const serialized = JSON.stringify(heartbeatMetadata);
   assert.doesNotMatch(serialized, /secret\.md|NOW\.md|content/);
+});
+
+test("Postgres heartbeat falls back safely before the state-table migration", async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (calls.length === 1) {
+        const error = new Error('relation "brain.sync_heartbeats" does not exist');
+        error.code = "42P01";
+        throw error;
+      }
+      return { rows: [] };
+    },
+  };
+  const store = new PostgresRevisionStore(pool);
+  await store.recordSyncHeartbeat({
+    brainId: "example-brain",
+    report: {
+      pushed: [],
+      pulled: [],
+      unchanged: [],
+      conflicts: [],
+      timings: [],
+      deleted: [],
+      deletionsSkipped: [],
+    },
+  });
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].sql, /insert into brain\.sync_events/);
+  assert.equal(calls[1].params[1], "sync_heartbeat");
 });
 
 test("heartbeat evaluation warns when missing or stale", () => {

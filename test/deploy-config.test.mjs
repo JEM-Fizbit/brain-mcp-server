@@ -248,7 +248,7 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /dbSpanTargets/);
   assert.match(script, /operationUsageRowsQuery/);
   assert.match(script, /eventLogWindowDays/);
-  assert.match(script, /event_type = any\(\$2::text\[\]\)/);
+  assert.match(script, /event_type in \('hosted_mcp_latency', 'hosted_mcp_auth'\)/);
   assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT/);
   assert.match(script, /BRAIN_HOSTED_MCP_EVENT_LOG_DAYS/);
   assert.match(script, /count_24h/);
@@ -472,6 +472,24 @@ test("hosted MCP server records tool latency without payload content", async () 
   assert.doesNotMatch(telemetry, /content:\s*input|input\.content|old_content|source_content/);
 });
 
+test("hosted doctor bounds database work and caches deep operation telemetry", async () => {
+  const doctor = await fs.readFile(
+    path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
+    "utf-8"
+  );
+
+  assert.match(doctor, /BRAIN_DOCTOR_DB_TIMEOUT_MS/);
+  assert.match(doctor, /connectionTimeoutMillis: doctorDbTimeoutMs/);
+  assert.match(doctor, /query_timeout: doctorDbTimeoutMs/);
+  assert.match(doctor, /statement_timeout: doctorDbTimeoutMs/);
+  assert.match(doctor, /BRAIN_DOCTOR_OPERATION_REFRESH_MS/);
+  assert.match(doctor, /15 \* 60 \* 1000/);
+  assert.match(doctor, /BRAIN_DOCTOR_FORCE_DEEP/);
+  assert.match(doctor, /from brain\.sync_heartbeats/);
+  assert.match(doctor, /event_type in \('hosted_mcp_latency', 'hosted_mcp_auth'\)/);
+  assert.equal((doctor.match(/new Pool\(/g) || []).length, 1);
+});
+
 test("hosted cockpit is local-only and read-only", async () => {
   const packageJson = JSON.parse(
     await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
@@ -505,6 +523,9 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /EADDRINUSE/);
   assert.match(script, /trying \$\{portToTry \+ 1\}/);
   assert.match(script, /hosted-doctor\.mjs/);
+  assert.match(script, /BRAIN_COCKPIT_DOCTOR_OUTPUT/);
+  assert.match(script, /source: "brain_monitor"/);
+  assert.match(script, /Standalone cockpit installs/);
   assert.match(script, /\/api\/doctor/);
   assert.match(script, /role="tablist"/);
   assert.match(script, /panel-overview/);

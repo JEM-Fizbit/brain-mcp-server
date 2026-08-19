@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-07-15
+**Last updated:** 2026-08-19
 
 Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
 
@@ -27,7 +27,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - primary cockpit tabs use a contained navigation strip, while nested Activity and Latency panel choices use compact secondary controls inside the selected tab panel;
 - Activity > Operation Log uses deliberate column classes and renders global timestamps as two-line cells, with date above time plus timezone, so the `When` column remains readable without making the whole table sparse;
 - the doctor treats `BRAIN_SYNC_SUPERVISOR=menubar` as the normal consolidated path and checks the per-profile Brain Monitor stack file for the expected Brain id plus live sync watcher and cockpit child processes, rather than warning only on the retired raw `com.jem.brain-sync` LaunchAgent;
-- the menu-bar app auto-refreshes each profile's hosted doctor output every 60 seconds by default, reads each profile's latest output, keeps the top-level dropdown compact, and nests each Brain's `Overview`, `Actions`, `Controls`, and `Diagnostics` under that Brain's submenu;
+- the menu-bar app is the sole automatic doctor owner in the consolidated stack: it refreshes each profile every 60 seconds, while Cockpit reloads that last-good report rather than launching a duplicate doctor; historical operation telemetry is cached for 15 minutes, but health, sync, auth, and other lightweight checks remain on the one-minute cadence;
 - the top-level menu includes `Open Cockpit` for the default/first configured Brain so the operator can reach the browser cockpit immediately, then switch profiles from the cockpit selector if needed;
 - `Open Cockpit` is the supported entrypoint: Brain Monitor starts and supervises the local cockpit server itself, checks whether the cockpit script changed before opening the page, and restarts stale cockpit child processes automatically during the normal stack heartbeat;
 - the top-level `Last monitor action` is app-wide across the consolidated Brain Monitor process, not per-Brain and not doctor-only; it includes the timestamp and latest monitor-recorded action from either configured Brain on separate indented rows so the dropdown stays narrow;
@@ -314,15 +314,25 @@ relying on ambiguous browser tabs or display names alone.
 The monitor also runs `scripts/hosted-doctor.mjs` automatically for each
 configured profile. Override the polling interval with
 `BRAIN_MENUBAR_DOCTOR_INTERVAL_MS`; values below 60000 are clamped to 60
-seconds so the local menu does not create avoidable hosted-check churn. Manual
-`Refresh Doctor` remains available for immediate operator checks.
+seconds so the local menu does not create avoidable hosted-check churn. Each
+run uses one Postgres pool capped at two connections and applies a five-second
+connection, query, and statement timeout (`BRAIN_DOCTOR_DB_TIMEOUT_MS`). The
+Monitor terminates a doctor after 45 seconds by default
+(`BRAIN_MENUBAR_DOCTOR_TIMEOUT_MS`) and retains the previous valid report.
+Historical operation telemetry is reused for 15 minutes by default
+(`BRAIN_DOCTOR_OPERATION_REFRESH_MS`); manual `Refresh Doctor` bypasses that
+cache for an immediate deep check.
 
-For Postgres-backed profiles, every successful sync cycle writes a
-metadata-only `brain.sync_events` row with `event_type = 'sync_heartbeat'`.
-The row contains counts, duration, and guard status only—never filenames,
-content, database URLs, or credentials. `hosted:doctor` warns when the latest
-heartbeat is older than five minutes; override the threshold with
-`BRAIN_SYNC_HEARTBEAT_MAX_AGE_MS` for a deliberately slower watcher cadence.
+For Postgres-backed profiles, the five-second sync loop coalesces successful
+liveness into one metadata-only `brain.sync_heartbeats` row per Brain, upserted
+at most once per minute (`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`). The row contains
+counts, duration, and guard status only—never filenames, content, database
+URLs, or credentials. Append-only `brain.sync_events` remains the historical
+store for real operations and transitions, not routine liveness. The doctor
+warns when `last_seen_at` is older than five minutes; override the threshold
+with `BRAIN_SYNC_HEARTBEAT_MAX_AGE_MS` for a deliberately slower watcher
+cadence. Code deployed before the migration falls back to a coalesced legacy
+`sync_heartbeat` event, so migration/runtime ordering does not interrupt sync.
 
 ## Operator Contract
 
@@ -407,7 +417,7 @@ no CORS is ever sent), and a JSON-only content-type. See `docs/DECISIONS.md`
 
 ## Latency Trend Semantics
 
-The cockpit does not run hidden writes just to refresh charts. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls. The telemetry write is best-effort and non-blocking by default, so recording a sample should not add response latency. Set `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only when deliberately diagnosing the telemetry write path itself.
+The cockpit does not run hidden writes or a second doctor just to refresh charts. Under Brain Monitor it reloads the Monitor-owned last-good JSON report once per minute. User-facing latency normally comes from real hosted MCP server tool calls. The hosted server records one latency sample per tool invocation after the handler finishes, including successful and failed read, write, and operational calls. The telemetry write is best-effort and non-blocking by default, so recording a sample should not add response latency. Set `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only when deliberately diagnosing the telemetry write path itself.
 
 Hosted tool calls write user-facing latency samples to Supabase Postgres `brain.sync_events` with event type `hosted_mcp_latency` and metadata source `hosted_mcp_server`. Server rows use `timingLayer = "server_tool"` and `durationType = "server_tool_handler"`. The telemetry row records tool name, operation kind, safe target metadata such as filename or category, latency, success/failure state, and a bounded DB summary when Postgres work occurred. DB spans record sanitized operation/table names, duration, row count, status, and bounded error text. They do not record SQL text, SQL parameters, file content, patch text, source content, or search query text. The cockpit reads server-emitted Postgres rows first when `BRAIN_REVISION_DATABASE_URL` is configured.
 

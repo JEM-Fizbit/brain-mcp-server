@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Bound observability IO with current-state heartbeats and one doctor owner
+
+**Decision:** Keep the five-second local sync loop and five-minute hosted stale-heartbeat threshold, but represent normal sync liveness as one upserted `brain.sync_heartbeats` row per Brain, written at most once per minute. Reserve append-only `brain.sync_events` for real hosted operations, auth events, transitions, and other historical events. Brain Monitor remains the sole automatic doctor owner in the consolidated local stack; Cockpit reloads Monitor's last-good report instead of launching a duplicate doctor. The doctor uses one two-connection pool with five-second connection/query/statement limits, refreshes historical operation telemetry at most every 15 minutes, and retains a manual force-deep path. Monitor terminates a doctor that exceeds 45 seconds and keeps the previous valid report.
+
+**Why:** Pre-production monitoring had become the database's dominant workload: a successful five-second sync cycle appended a new heartbeat event, duplicate Monitor/Cockpit doctors repeatedly scanned the same append-only table, and unbounded doctor processes could overlap or remain stuck. This consumed Supabase Disk IO despite light product use. Liveness is state, not history; coalescing it preserves the one-minute/five-minute detection contract while removing write amplification. Cached deep telemetry and a single doctor owner preserve operator visibility without paying for the same historical scan every browser refresh.
+
+**Alternatives rejected:** Move immediately to a larger Supabase compute package (masks self-inflicted IO and raises recurring cost); slow or disable the sync watcher (degrades local-first freshness); remove monitoring or extend stale thresholds (degrades observability); automatically delete historical telemetry in the migration (unnecessary data loss and a high-IO rollout); introduce a new metrics service or daemon (extra infrastructure for a load created by the existing monitor).
+
+**Related:** `db/migrations/2026-08-19_001_bounded_sync_observability.sql`; `src/sync/postgres-revision-store.ts`; `scripts/hosted-doctor.mjs`; `scripts/hosted-cockpit.mjs`; `scripts/install-brain-menubar-app.mjs`; `docs/hosted-cockpit.md`.
+
+---
+
 ## 2026-07-17 — Adopt shallow Brain content graph; defer task-context compiler pending evidence
 
 **Decision:** Adopt a shallow L0/L1/L2 Brain content architecture plus ranked search: a slim `00_loader.md` contract, one-screen `NOW.md`, one directly selected substantive hub and a terminal canonical-source pointer. Replace loader-direct orphan detection with convention-aware graph reachability, remove the `orphan_index` and loader-writing `reviewed_date` auto-fixes, and enforce a provisional combined bootstrap budget of **2,500 tokens per Brain**. After role parsing is hardened deny-by-default, protect both always-loaded files (`00_loader.md` and `NOW.md`) with a fail-closed store-layer `admin`/`owner` write allowlist. Improve and instrument structured search before changing the load interface. The proposed `task`/`max_tokens` context compiler is deferred to trigger-gated spec 014 and defaults to **do not build** unless post-slim evidence demonstrates a material residual routing or follow-up-read gap; if the slim baseline meets the agreed sufficiency target, record the no-build result and archive the stub.

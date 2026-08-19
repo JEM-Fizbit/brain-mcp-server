@@ -1,4 +1,5 @@
 import http from "node:http";
+import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFile } from "node:child_process";
@@ -13,6 +14,7 @@ const repoRoot = path.join(__dirname, "..");
 const doctorScriptPath =
   process.env.BRAIN_COCKPIT_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
+const doctorOutputPath = process.env.BRAIN_COCKPIT_DOCTOR_OUTPUT || "";
 const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
@@ -66,6 +68,44 @@ async function readJsonBody(request, limitBytes = 256 * 1024) {
 }
 
 async function runDoctor() {
+  if (doctorOutputPath) {
+    try {
+      const payload = JSON.parse(await fs.readFile(doctorOutputPath, "utf-8"));
+      const checkedAtMs = Date.parse(payload.checkedAt || "");
+      return {
+        ...payload,
+        cockpitCache: {
+          source: "brain_monitor",
+          path: doctorOutputPath,
+          checkedAt: payload.checkedAt || null,
+          ageMs: Number.isFinite(checkedAtMs)
+            ? Math.max(0, Date.now() - checkedAtMs)
+            : null,
+        },
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        status: "warn",
+        checkedAt: new Date().toISOString(),
+        checks: [
+          {
+            name: "doctor_cache",
+            status: "warn",
+            details: {
+              state: "unavailable",
+              path: doctorOutputPath,
+              error: String(error?.message || error),
+            },
+          },
+        ],
+      };
+    }
+  }
+
+  // Standalone cockpit installs have no Monitor-owned report path. Preserve
+  // their explicit on-demand doctor behavior without creating a second poller
+  // in the consolidated Brain Monitor stack.
   try {
     const { stdout } = await exec(
       process.execPath,
@@ -1265,7 +1305,7 @@ const page = String.raw`<!doctype html>
         <div class="toolbar">
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
-          <button id="refresh" type="button" title="Refresh status">Refresh</button>
+          <button id="refresh" type="button" title="Reload the Brain Monitor's last doctor report">Reload</button>
         </div>
       </header>
 
@@ -2873,7 +2913,7 @@ const page = String.raw`<!doctype html>
       async function refresh() {
         const button = document.getElementById("refresh");
         button.disabled = true;
-        button.textContent = "Refreshing";
+        button.textContent = "Reloading";
         try {
           const response = await fetch("/api/doctor", { cache: "no-store" });
           render(await response.json());
@@ -2886,7 +2926,7 @@ const page = String.raw`<!doctype html>
           });
         } finally {
           button.disabled = false;
-          button.textContent = "Refresh";
+          button.textContent = "Reload";
         }
       }
 

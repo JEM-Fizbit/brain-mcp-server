@@ -126,6 +126,10 @@ const doctorInitialDelayMs = Math.max(
   5_000,
   Number(process.env.BRAIN_MENUBAR_DOCTOR_INITIAL_DELAY_MS || 10_000)
 );
+const doctorTimeoutMs = Math.max(
+  10_000,
+  Number(process.env.BRAIN_MENUBAR_DOCTOR_TIMEOUT_MS || 45_000)
+);
 const stackStatusFile =
   process.env.BRAIN_MONITOR_STACK_FILE ||
   path.join(logDir, "brain-monitor-stack.json");
@@ -144,6 +148,9 @@ const profileEnvKeys = new Set([
   "BRAIN_REVISION_DATABASE_URL",
   "BRAIN_HOSTED_BASE_URL",
   "BRAIN_FLY_APP",
+  "BRAIN_SYNC_HEARTBEAT_INTERVAL_MS",
+  "BRAIN_DOCTOR_OPERATION_REFRESH_MS",
+  "BRAIN_DOCTOR_DB_TIMEOUT_MS",
   "FLY_CONFIG_DIR",
 ]);
 
@@ -260,6 +267,10 @@ function normalizeProfile(rawProfile, index) {
     BRAIN_SYNC_SUPERVISOR: "menubar",
     BRAIN_MONITOR_STACK_FILE: profileStackStatusFile,
     BRAIN_COCKPIT_URL: resolvedCockpitUrl,
+    BRAIN_DOCTOR_OPERATION_CACHE_FILE: path.join(
+      profileLogDir,
+      "hosted-doctor-operation-cache.json"
+    ),
     PATH: runtimePath,
   };
 
@@ -309,6 +320,7 @@ function normalizeProfile(rawProfile, index) {
         BRAIN_COCKPIT_HOST: profileCockpitHost,
         BRAIN_COCKPIT_PORT: String(profileCockpitPort),
         BRAIN_COCKPIT_PORT_FALLBACK: "0",
+        BRAIN_COCKPIT_DOCTOR_OUTPUT: profileDoctorOutputPath,
       },
     },
   };
@@ -446,6 +458,7 @@ const config = {
   doctorErrorPath: primaryProfile.doctorErrorPath,
   doctorIntervalMs,
   doctorInitialDelayMs,
+  doctorTimeoutMs,
   stackStatusFile: primaryProfile.stackStatusFile,
   syncProcess: primaryProfile.syncProcess,
   cockpitProcess: primaryProfile.cockpitProcess,
@@ -466,6 +479,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 @property (strong) NSMutableDictionary *cockpitScriptFingerprints;
 @property (strong) NSMutableSet *intentionalStops;
 @property (strong) NSMutableSet *runningDoctorProfiles;
+@property (strong) NSMutableDictionary *runningDoctorTasks;
 @property (strong) NSMutableSet *pendingCockpitOpens;
 @property (strong) NSTimer *stackHeartbeatTimer;
 @property (strong) NSTimer *doctorPollTimer;
@@ -486,6 +500,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.cockpitScriptFingerprints = [NSMutableDictionary dictionary];
   self.intentionalStops = [NSMutableSet set];
   self.runningDoctorProfiles = [NSMutableSet set];
+  self.runningDoctorTasks = [NSMutableDictionary dictionary];
   self.pendingCockpitOpens = [NSMutableSet set];
   [self recordLastAction:@"Ready"];
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
@@ -504,6 +519,11 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   (void)notification;
   [self.stackHeartbeatTimer invalidate];
   [self.doctorPollTimer invalidate];
+  for (NSTask *task in [self.runningDoctorTasks allValues]) {
+    if (task.running) {
+      [task terminate];
+    }
+  }
   [self stopManagedProcesses:nil];
 }
 
@@ -1567,6 +1587,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       }
     }
   }
+  environment[@"BRAIN_DOCTOR_FORCE_DEEP"] = automatic ? @"0" : @"1";
   task.environment = environment;
   task.standardOutput = stdoutHandle;
   task.standardError = stderrHandle;
@@ -1580,6 +1601,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
       BOOL promoted = [weakSelf promoteDoctorOutputFromPath:outputTempPath toPath:outputPath];
       [weakSelf promoteDoctorErrorFromPath:errorTempPath toPath:errorPath];
       [weakSelf.runningDoctorProfiles removeObject:brainId];
+      if (weakSelf.runningDoctorTasks[brainId] == finishedTask) {
+        [weakSelf.runningDoctorTasks removeObjectForKey:brainId];
+      }
       if (!promoted) {
         [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ doctor output invalid; previous report kept", displayName]];
       } else if (!automatic || finishedTask.terminationStatus != 0) {
@@ -1590,7 +1614,20 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   };
 
   @try {
+    self.runningDoctorTasks[brainId] = task;
     [task launch];
+    double timeoutSeconds = [self numberConfig:@"doctorTimeoutMs" fallback:45000.0] / 1000.0;
+    dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeoutSeconds * NSEC_PER_SEC)),
+      dispatch_get_main_queue(),
+      ^{
+        NSTask *runningTask = weakSelf.runningDoctorTasks[brainId];
+        if (runningTask == task && runningTask.running) {
+          [weakSelf recordLastAction:[NSString stringWithFormat:@"%@ doctor timed out; previous report kept", displayName]];
+          [runningTask terminate];
+        }
+      }
+    );
     if (!automatic) {
       [self recordLastAction:[NSString stringWithFormat:@"%@ doctor running", displayName]];
     }
@@ -1600,6 +1637,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     [[NSFileManager defaultManager] removeItemAtPath:outputTempPath error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:errorTempPath error:nil];
     [self.runningDoctorProfiles removeObject:brainId];
+    [self.runningDoctorTasks removeObjectForKey:brainId];
     [self recordLastAction:[NSString stringWithFormat:@"Doctor failed: %@", exception.name]];
   }
 }

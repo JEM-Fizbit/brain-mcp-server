@@ -40,6 +40,13 @@ const oauthStatePath = path.join(
   "migrations",
   "2026-06-22_001_durable_oauth_state.sql"
 );
+const boundedObservabilityPath = path.join(
+  __dirname,
+  "..",
+  "db",
+  "migrations",
+  "2026-08-19_001_bounded_sync_observability.sql"
+);
 const pilotSeedPath = path.join(
   __dirname,
   "..",
@@ -149,6 +156,28 @@ test("durable OAuth state stays private and runtime-only", async () => {
   assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to public/i);
   assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to anon/i);
   assert.doesNotMatch(executableSql, /grant .*brain\.oauth_state.* to authenticated/i);
+});
+
+test("bounded sync observability keeps liveness private and current-state only", async () => {
+  const sql = await fs.readFile(boundedObservabilityPath, "utf-8");
+  const executableSql = sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+
+  assert.match(sql, /create table if not exists brain\.sync_heartbeats/i);
+  assert.match(sql, /brain_id text primary key references brain\.brains\(id\)/i);
+  assert.match(sql, /last_seen_at timestamptz not null/i);
+  assert.match(sql, /alter table brain\.sync_heartbeats enable row level security/i);
+  assert.match(sql, /grant select, insert, update, delete on brain\.sync_heartbeats to brain_runtime/i);
+  assert.match(sql, /create policy brain_runtime_all_sync_heartbeats/i);
+  assert.match(sql, /create index if not exists sync_events_hosted_observability_idx/i);
+  assert.match(sql, /where event_type in/i);
+  assert.match(executableSql, /revoke all on table brain\.sync_heartbeats from public/i);
+  assert.match(executableSql, /revoke all on table brain\.sync_heartbeats from anon/i);
+  assert.match(executableSql, /revoke all on table brain\.sync_heartbeats from authenticated/i);
+  assert.doesNotMatch(executableSql, /grant .*brain\.sync_heartbeats.* to (public|anon|authenticated)/i);
+  assert.doesNotMatch(sql, /delete from brain\.sync_events/i);
 });
 
 test("pilot seed bootstraps Brain registry without public grants", async () => {
