@@ -492,7 +492,7 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await expect(page.getByRole("heading", { name: "Brain Lint", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Safe Mechanical Fixes", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run lint now", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh lint assessment", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Scan inbox", exact: true })).toBeVisible();
   const selectAll = page.getByRole("checkbox", { name: "Select all fixes", exact: true });
   const applySelected = page.getByRole("button", { name: "Apply selected", exact: true });

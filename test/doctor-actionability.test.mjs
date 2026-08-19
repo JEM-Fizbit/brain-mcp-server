@@ -5,8 +5,24 @@ import {
   enforceOperatorAlarmContract,
   classifyFlyStatusError,
   classifyFlyStatusOutput,
+  classifyLintFindings,
   OPERATOR_ALARM_CHECKS,
 } from "../scripts/lib/doctor-actionability.mjs";
+
+test("lint alarms distinguish actionable fixes from review-only findings", () => {
+  assert.deepEqual(
+    classifyLintFindings({ issueCount: 0, automaticFixCount: 0 }),
+    { status: "pass", state: "clear" }
+  );
+  assert.deepEqual(
+    classifyLintFindings({ issueCount: 685, automaticFixCount: 0 }),
+    { status: "info", state: "review_only" }
+  );
+  assert.deepEqual(
+    classifyLintFindings({ issueCount: 685, automaticFixCount: 34 }),
+    { status: "warn", state: "actionable_fixes" }
+  );
+});
 
 test("missing Fly authentication is informational and directly resolvable", () => {
   const result = classifyFlyStatusError(

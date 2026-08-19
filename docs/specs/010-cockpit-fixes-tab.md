@@ -18,6 +18,13 @@
 > contract below is unchanged. Both POST routes share the Host allowlist,
 > per-process nonce, JSON-only, and no-CORS controls.
 
+> 2026-08-19 actionability correction: **Refresh lint assessment** is explicitly
+> detection-only. `lint_findings` warns only when safe mechanical fixes are
+> available; findings without an automatic fix are informational review notes.
+> Explicit lint refresh and mechanical apply each request one fresh doctor run
+> so the Cockpit does not wait for the Monitor cache cycle to update its action
+> state.
+
 ## Problem
 
 Spec 009 shipped the fix engine plus two apply surfaces: the CLI and a menubar "Apply Lint Fixes..." button whose confirmation is a cramped native modal, all-or-nothing. Operators want to *see* each pending fix and approve/skip them individually, in the cockpit they already have open.

@@ -205,8 +205,8 @@ async function readJsonBody(request, limitBytes = 256 * 1024) {
   return JSON.parse(Buffer.concat(chunks).toString("utf-8"));
 }
 
-async function runDoctor() {
-  if (doctorOutputPath) {
+async function runDoctor({ fresh = false } = {}) {
+  if (doctorOutputPath && !fresh) {
     try {
       const payload = JSON.parse(await fs.readFile(doctorOutputPath, "utf-8"));
       const checkedAtMs = Date.parse(payload.checkedAt || "");
@@ -1793,9 +1793,9 @@ const page = String.raw`<!doctype html>
           <div class="maintenance-grid">
             <section class="maintenance-card" aria-labelledby="maintenance-lint-heading">
               <h2 id="maintenance-lint-heading">Brain Lint</h2>
-              <p class="muted">Run the canonical lint check here. A completed run records a narrow receipt, updates this report, and clears the stale-lint nudge on the next Monitor refresh.</p>
+              <p class="muted">Refresh the canonical lint assessment here. This updates the report and clears a stale-lint nudge; it does not change Brain content. Any safe mechanical fixes appear below.</p>
               <div class="fixes-toolbar">
-                <button id="lint-run" type="button">Run lint now</button>
+                <button id="lint-run" type="button">Refresh lint assessment</button>
                 <span id="lint-status" class="muted">Loading latest report…</span>
               </div>
               <div id="lint-summary"></div>
@@ -3115,12 +3115,13 @@ const page = String.raw`<!doctype html>
         renderLatencies(payload);
       }
 
-      async function refresh() {
+      async function refresh(options = {}) {
         const button = document.getElementById("refresh");
         button.disabled = true;
         button.textContent = "Reloading";
         try {
-          const response = await fetch("/api/doctor", { cache: "no-store" });
+          const doctorPath = options && options.fresh ? "/api/doctor?fresh=1" : "/api/doctor";
+          const response = await fetch(doctorPath, { cache: "no-store" });
           render(await response.json());
         } catch (error) {
           render({
@@ -3180,13 +3181,16 @@ const page = String.raw`<!doctype html>
           lint.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
         );
         const automaticFixCount = Number(lint.automaticFixCount || 0);
+        const reviewOnly = issueCount > 0 && automaticFixCount === 0;
         const checkedAt = lint.checkedAt ? new Date(lint.checkedAt).toLocaleString() : "unknown time";
-        document.getElementById("lint-status").textContent = "Last run " + checkedAt + ".";
+        document.getElementById("lint-status").textContent = "Last refreshed " + checkedAt + ".";
         summary.innerHTML =
-          "<div class='maintenance-summary'><strong>" + escapeHtml(String(primaryIssueCount)) +
-          " primary lint finding(s)</strong>" +
+          "<div class='maintenance-summary'>" +
+          (reviewOnly ? "<span class='pill info'>info</span>" : "") +
+          "<strong>" + escapeHtml(String(primaryIssueCount)) +
+          (reviewOnly ? " review note(s)</strong>" : " primary lint finding(s)</strong>") +
           (diagnosticCount > 0
-            ? "<span class='muted'>" + escapeHtml(String(diagnosticCount)) + " graph edge diagnostic(s)</span>"
+            ? "<span class='muted'>" + escapeHtml(String(diagnosticCount)) + " grouped graph diagnostic(s)</span>"
             : "") +
           "<span class='muted'>" + escapeHtml(String(automaticFixCount)) +
           " safe mechanical fix(es)</span></div>";
@@ -3213,7 +3217,7 @@ const page = String.raw`<!doctype html>
           const item = document.createElement("div");
           item.className = "maintenance-item";
           const title = document.createElement("strong");
-          title.textContent = "Lint warning";
+          title.textContent = "Coverage note";
           const detail = document.createElement("p");
           detail.className = "muted";
           detail.textContent = String(warning);
@@ -3240,7 +3244,7 @@ const page = String.raw`<!doctype html>
       async function runLintNow() {
         const button = document.getElementById("lint-run");
         button.disabled = true;
-        document.getElementById("lint-status").textContent = "Running canonical lint…";
+        document.getElementById("lint-status").textContent = "Refreshing canonical lint assessment…";
         try {
           const response = await fetch("/api/lint/run", {
             method: "POST",
@@ -3252,7 +3256,7 @@ const page = String.raw`<!doctype html>
           if (!data.ok) throw new Error(data.error || "lint failed");
           renderLint(data.lint);
           await loadFixes();
-          refresh();
+          await refresh({ fresh: true });
         } catch (error) {
           document.getElementById("lint-status").textContent = "Lint failed: " + error.message;
         } finally {
@@ -3315,7 +3319,7 @@ const page = String.raw`<!doctype html>
           if (!latestLint) {
             container.innerHTML = "<p class='muted'>No safe mechanical fixes detected. Run lint for the complete assessment.</p>";
           } else if (Number(latestLint.issueCount || 0) > 0) {
-            container.innerHTML = "<p class='muted'>No safe automatic fixes. The current lint findings above require review.</p>";
+            container.innerHTML = "<p class='muted'>No automatic action is required. Informational review notes remain visible above.</p>";
           } else {
             container.innerHTML = "<p class='muted'>No safe mechanical fixes are needed; the latest lint report found no issues.</p>";
           }
@@ -3421,7 +3425,7 @@ const page = String.raw`<!doctype html>
             fixesStatus(document.getElementById("fixes-status").textContent + " Lint refresh failed: " + data.lintRefreshError);
           }
           await loadFixes();
-          refresh();
+          await refresh({ fresh: true });
         } catch (error) {
           fixesStatus("Apply failed: " + error.message);
         } finally {
@@ -3516,7 +3520,7 @@ function createCockpitServer() {
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/doctor") {
-      sendJson(response, 200, await runDoctor());
+      sendJson(response, 200, await runDoctor({ fresh: url.searchParams.get("fresh") === "1" }));
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/lint/report") {

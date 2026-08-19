@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Separate lint refresh, actionable fixes, and review-only notes
+
+**Decision:** The Cockpit action is named **Refresh lint assessment** and is explicitly detection-only: it refreshes the structured report and clears a stale-lint nudge, but it does not claim to fix current findings. `lint_findings` is an operator warning only while the report contains safe mechanical fixes that can be applied in Maintenance. When findings remain but no automatic fixes are available, the check is `info` with state `review_only`; the findings and grouped graph diagnostics stay visible in Maintenance without changing overall readiness or entering Operator Queue. An explicit lint refresh or mechanical apply requests one fresh doctor run so the Cockpit reflects the new classification immediately instead of waiting for the Monitor-owned cache cycle.
+
+**Why:** A successful ERS lint run left the Cockpit in warning state with five judgement-only findings, 680 grouped graph diagnostics, and zero automatic fixes. Re-running the detector could never clear that condition, so the alarm violated the project's actionability contract and taught the operator that the button was ineffective. Freshness, fixability, and advisory review are different states and must not share one warning treatment.
+
+**Alternatives rejected:** Keep all non-zero lint results as warnings (not resolvable from Cockpit); add a dismiss button (hides regenerated findings without changing their meaning); claim a successful run means the Brain is clean (false); remove review-only findings entirely (loses useful quality evidence); rerun the full doctor on every routine Cockpit refresh (duplicates the Monitor and recreates avoidable observability load).
+
+**Related:** `scripts/lib/doctor-actionability.mjs`; `scripts/hosted-doctor.mjs`; `scripts/hosted-cockpit.mjs`; `test/doctor-actionability.test.mjs`; `test/cockpit-fixes.test.mjs`; `docs/hosted-cockpit.md`; 2026-08-19 operator-alarm and Maintenance decisions below.
+
+---
+
 ## 2026-08-19 — Remove Raw Output from the operator cockpit
 
 **Decision:** Remove the **Raw Output** top-level tab from Brain Cockpit. The supported operator interface is Overview, Activity, Latency, Checks, and Maintenance. Exact doctor JSON remains available to developers through the loopback `/api/doctor` endpoint and each profile's `hosted-doctor.out.json` file, but it is not promoted as a permanent user-facing destination.

@@ -403,15 +403,20 @@ Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not ma
 The **Maintenance** tab keeps detection and governed repair in the operator
 surface instead of forcing a switch to an MCP client or CLI:
 
-- **Run lint now** invokes the canonical `runLint` implementation for the active
-  Brain. A successful explicit run writes one narrow `LINT` receipt through the
-  configured Brain store and atomically refreshes the per-profile
-  `hosted-lint-report.json` cache. The doctor reads that cache first so
-  `lint_nudge` represents freshness while the separate `lint_findings` check
-  represents the current result. The UI shows every primary finding, groups
-  high-volume graph edge diagnostics into one bounded review signal, and keeps
-  the safe mechanical plan separate; an empty mechanical plan never claims the
-  whole Brain is clean.
+- **Refresh lint assessment** invokes the canonical `runLint` implementation for
+  the active Brain. A successful explicit run writes one narrow `LINT` receipt
+  through the configured Brain store and atomically refreshes the per-profile
+  `hosted-lint-report.json` cache. The action is detection-only and does not
+  change Brain content. The doctor reads that cache first so `lint_nudge`
+  represents freshness while the separate `lint_findings` check represents the
+  current result. Safe mechanical fixes make `lint_findings` an actionable
+  warning until applied; findings with no automatic fix are `info` review notes
+  that remain visible without changing readiness. High-volume graph edge
+  diagnostics stay grouped into one bounded review signal, and an empty
+  mechanical plan never claims the whole Brain is clean. After an explicit lint
+  refresh or mechanical apply, Cockpit requests one fresh doctor run so the
+  action state updates immediately; routine reloads still use the Monitor-owned
+  last-good report and do not duplicate polling.
 - **Scan inbox** lists pending source filenames, sizes, and modification times.
   It does not ingest, classify, summarize, move, or delete content; those steps
   remain review-required.
