@@ -176,7 +176,9 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.equal(page.status, 200);
   assert.match(page.text, />Maintenance</);
   assert.match(page.text, /Refresh lint assessment/);
-  assert.match(page.text, /Scan inbox/);
+  assert.match(page.text, /Refresh inbox scan/);
+  assert.match(page.text, /Copy Claude ingestion prompt/);
+  assert.match(page.text, /inbox_file set to/);
   assert.match(page.text, /id="fixes-select-all"[^>]*aria-label="Select all fixes"[^>]*disabled/);
   assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
   assert.doesNotMatch(page.text, /Approve all/);

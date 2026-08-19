@@ -1570,14 +1570,16 @@ function buildOperatorActions(status) {
       reason: "inbox_unreadable",
       title: "Restore access to the Brain inbox.",
       detail:
-        "Check the inbox path and local filesystem or OneDrive availability shown in Checks, then use Maintenance > Scan inbox to verify access.",
+        "Check the inbox path and local filesystem or OneDrive availability shown in Checks, then use Maintenance > Refresh inbox scan to verify access.",
     });
   } else if ((inbox?.details?.pendingFiles || 0) > 0) {
+    const pendingFiles = Number(inbox.details.pendingFiles || 0);
     actions.push({
       level: "warn",
       reason: "pending_inbox",
-      title: "Review pending Brain inbox files.",
-      detail: "Open Cockpit Maintenance > Inbox, then process or intentionally defer the pending source files.",
+      title: `Process ${pendingFiles} pending Brain inbox file(s) in an interactive Claude session.`,
+      detail:
+        "Open Cockpit Maintenance > Inbox and copy the prepared Claude ingestion handoff. The item clears only after reviewed ingestion removes it from inbox; refreshing the scan is detection-only.",
     });
   }
 
