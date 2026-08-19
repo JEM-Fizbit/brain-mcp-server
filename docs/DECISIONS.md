@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Remove Raw Output from the operator cockpit
+
+**Decision:** Remove the **Raw Output** top-level tab from Brain Cockpit. The supported operator interface is Overview, Activity, Latency, Checks, and Maintenance. Exact doctor JSON remains available to developers through the loopback `/api/doctor` endpoint and each profile's `hosted-doctor.out.json` file, but it is not promoted as a permanent user-facing destination.
+
+**Why:** Raw Output was a direct serialization of the same payload already rendered into the other cockpit views. It offered no distinct operator task, exposed implementation structure without interpretation, and made the navigation look less deliberate. Keeping developer diagnostics behind the existing endpoint and file preserves troubleshooting evidence without asking users to interpret internal JSON.
+
+**Alternatives rejected:** Retain the tab as a generic troubleshooting escape hatch (duplicates Checks and shifts interpretation burden to the user); hide it behind an “advanced” toggle (adds state and complexity for a developer-only path already available elsewhere); remove raw diagnostic access entirely (unnecessarily weakens debugging).
+
+**Related:** `scripts/hosted-cockpit.mjs`; `e2e/cockpit.playwright.mjs`; `test/deploy-config.test.mjs`; `docs/hosted-cockpit.md`; `docs/specs/007-brain-cockpit-ux-redesign.md`.
+
+---
+
 ## 2026-08-19 — Reserve operator alarms for actionable conditions
 
 **Decision:** Brain Monitor and Cockpit use four check states: `pass`, `info`, `warn`, and `fail`. `warn` and `fail` are reserved for current, meaningful conditions with a defined operator action; only those states can enter Operator Queue or change the overall readiness verdict. Optional or unavailable diagnostics remain visible as `info` and do not raise an alarm. In particular, missing or expired local Fly CLI authentication is `info`: hosted health and sync remain authoritative, Checks explains that the control-plane probe was skipped, and it offers the optional `fly auth login` command. An authenticated Fly result with no passing Machine, or another real control-plane error, remains an actionable warning. The doctor carries an explicit alarm-capable check registry and suppresses any future diagnostic that lacks an action contract. Cockpit no longer invents generic “needs review” or “inspect details” fallback alarms.
