@@ -302,6 +302,7 @@ const page = String.raw`<!doctype html>
         --muted: #646a70;
         --line: #d8d9d4;
         --pass: #147d4f;
+        --info: #356a8a;
         --warn: #a76100;
         --fail: #b42318;
         --unknown: #667085;
@@ -784,6 +785,7 @@ const page = String.raw`<!doctype html>
       }
 
       .pill.pass { background: var(--pass); }
+      .pill.info { background: var(--info); }
       .pill.warn { background: var(--warn); }
       .pill.fail { background: var(--fail); }
 
@@ -1858,8 +1860,8 @@ const page = String.raw`<!doctype html>
       let previousSnapshot = null;
 
       const statusCopy = {
-        pass: ["Safe to use hosted", "Hosted health, local sync, conflict count, daemon, and Fly checks are currently passing."],
-        warn: ["Needs attention", "Nothing is hard-failing, but one or more checks needs review before this is boring."],
+        pass: ["Safe to use hosted", "Core hosted health, local sync, conflict count, and supervisor checks are currently acceptable."],
+        warn: ["Action needed", "One or more current checks has a specific operator action below."],
         fail: ["Blocked", "A critical hosted Brain check failed. Fix this before relying on hosted Brain."],
       };
 
@@ -1895,6 +1897,9 @@ const page = String.raw`<!doctype html>
         "pendingFiles",
         "checkedAt",
         "state",
+        "optional",
+        "message",
+        "resolution",
         "cycle",
         "pushed",
         "pulled",
@@ -2138,7 +2143,6 @@ const page = String.raw`<!doctype html>
         }
 
         const items = [];
-        const checks = payload.checks || [];
         const openConflicts = byName(payload, "postgres_summary")?.details?.openConflicts || 0;
         const syncHealth = byName(payload, "sync_health");
         const launchd = byName(payload, "launchd");
@@ -2207,19 +2211,6 @@ const page = String.raw`<!doctype html>
           });
         }
 
-        for (const check of checks.filter((check) => check.status === "fail")) {
-          if (check.name !== "sync_health") {
-            items.push({
-              status: "fail",
-              brain_id: payload.profile?.brainId || "",
-              reason: "check_failed",
-              urgency: "now",
-              title: check.name + " failed.",
-              next_action: "Inspect the details in the checks table and raw doctor output.",
-            });
-          }
-        }
-
         const seen = new Set();
         return items.filter((item) => {
           const key = [item.status, item.reason, item.title, item.next_action].join("|");
@@ -2277,7 +2268,7 @@ const page = String.raw`<!doctype html>
       function actionableItems(payload) {
         return actionItems(payload).filter((action) => {
           const status = (action.status || action.level || "").toLowerCase();
-          return status !== "pass" && action.reason !== "none";
+          return (status === "warn" || status === "fail") && action.reason !== "none";
         });
       }
 

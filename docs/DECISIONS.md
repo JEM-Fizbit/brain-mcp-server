@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Reserve operator alarms for actionable conditions
+
+**Decision:** Brain Monitor and Cockpit use four check states: `pass`, `info`, `warn`, and `fail`. `warn` and `fail` are reserved for current, meaningful conditions with a defined operator action; only those states can enter Operator Queue or change the overall readiness verdict. Optional or unavailable diagnostics remain visible as `info` and do not raise an alarm. In particular, missing or expired local Fly CLI authentication is `info`: hosted health and sync remain authoritative, Checks explains that the control-plane probe was skipped, and it offers the optional `fly auth login` command. An authenticated Fly result with no passing Machine, or another real control-plane error, remains an actionable warning. The doctor carries an explicit alarm-capable check registry and suppresses any future diagnostic that lacks an action contract. Cockpit no longer invents generic “needs review” or “inspect details” fallback alarms.
+
+**Why:** An alarm without a relevant consequence and concrete next step trains the operator to ignore the monitor. Local Fly CLI login is an optional diagnostic capability, not evidence that the hosted Brain is unhealthy; the independent hosted-health and sync checks already establish service readiness. Condition-derived status also makes manual dismissal unnecessary: fixing the condition and reloading clears the warning, while informational limitations remain honestly visible.
+
+**Alternatives rejected:** Keep missing Fly login as a warning (false alarm); add a dismiss/clear button (hides a regenerating condition without fixing it); hide Fly diagnostics entirely (loses useful Machine/release evidence when the CLI is available); expose Fly authentication inside Cockpit (unnecessary credential-bearing admin surface); retain a generic warning fallback for unknown checks (cannot promise a useful operator response).
+
+**Related:** `scripts/lib/doctor-actionability.mjs`; `scripts/hosted-doctor.mjs`; `scripts/hosted-cockpit.mjs`; `test/doctor-actionability.test.mjs`; `e2e/cockpit.playwright.mjs`; `docs/hosted-cockpit.md`.
+
+---
+
 ## 2026-08-19 — Make Cockpit Maintenance the executable lint and inbox surface
 
 **Decision:** Rename the Cockpit **Fixes** tab to **Maintenance** and make it the primary operator surface for detection plus governed repair. **Run lint now** calls the canonical `runLint` implementation, records one narrow `LINT` receipt through the active Brain store, and atomically writes a per-profile `hosted-lint-report.json`. The doctor reads that cache first and reports freshness (`lint_nudge`) separately from current results (`lint_findings`). Each Monitor profile must carry the same explicit `BRAIN_LINT_MODE_OVERRIDES` promotion mode as its hosted deployment; synthesized local registries carry the standard graph roots and rotated-history exemptions so that promotion remains meaningful. Primary lint findings stay individually visible, while high-volume graph edge diagnostics are counted and grouped into one bounded review signal rather than flooding the action surface. The same tab exposes a visibility-only inbox scan and retains per-item application of the safe mechanical task fixes. Mechanical fixes start unchecked, use a standard select-all header checkbox, and remain separate from the **Apply selected** action. Semantic and structural lint findings remain review-required; Inbox files are not ingested, classified, moved, or deleted. An empty mechanical plan must not be presented as a clean Brain. Mechanical apply reruns lint to refresh the cache without duplicating its existing receipt.
