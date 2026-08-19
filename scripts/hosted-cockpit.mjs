@@ -1405,6 +1405,25 @@ const page = String.raw`<!doctype html>
       .fixes-toolbar .fixes-apply {
         font-weight: 600;
       }
+      .fixes-selection-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        padding: 0.55rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+      }
+      .fixes-select-all {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        font-weight: 600;
+      }
+      .fixes-select-all input {
+        margin: 0;
+      }
       .fixes-group {
         margin-bottom: 1rem;
       }
@@ -1811,9 +1830,15 @@ const page = String.raw`<!doctype html>
             <p class="muted">Only task relocation, Done-date stamping, and non-destructive archiving are automatic. Review each proposed change; semantic and structural lint findings remain visible above for judgement.</p>
             <div class="fixes-toolbar">
               <button id="fixes-reload" type="button">Reload maintenance</button>
-              <button id="fixes-approve-all" type="button">Approve all</button>
-              <button id="fixes-apply" type="button" class="fixes-apply">Apply selected</button>
+              <button id="fixes-apply" type="button" class="fixes-apply" disabled>Apply selected</button>
               <span id="fixes-status" class="muted"></span>
+            </div>
+            <div class="fixes-selection-header">
+              <label class="fixes-select-all" for="fixes-select-all">
+                <input id="fixes-select-all" type="checkbox" aria-label="Select all fixes" disabled>
+                <span>Select all</span>
+              </label>
+              <span id="fixes-selection-status" class="muted">0 of 0 selected.</span>
             </div>
             <div id="fixes-list">Loading…</div>
           </section>
@@ -3324,6 +3349,7 @@ const page = String.raw`<!doctype html>
           } else {
             container.innerHTML = "<p class='muted'>No safe mechanical fixes are needed; the latest lint report found no issues.</p>";
           }
+          updateFixSelectionState();
           return;
         }
         const byKind = new Map();
@@ -3343,8 +3369,9 @@ const page = String.raw`<!doctype html>
             const box = document.createElement("input");
             box.type = "checkbox";
             box.className = "fixes-checkbox";
-            box.checked = true;
+            box.checked = false;
             box.value = item.id;
+            box.addEventListener("change", updateFixSelectionState);
             const text = document.createElement("span");
             text.textContent = item.summary;
             text.title = item.detail || "";
@@ -3354,6 +3381,7 @@ const page = String.raw`<!doctype html>
           }
           container.appendChild(section);
         }
+        updateFixSelectionState();
       }
 
       async function loadFixes() {
@@ -3371,8 +3399,22 @@ const page = String.raw`<!doctype html>
         }
       }
 
-      function setFixesApproveAll(checked) {
+      function setAllFixesSelected(checked) {
         for (const box of document.querySelectorAll(".fixes-checkbox")) box.checked = checked;
+        updateFixSelectionState();
+      }
+
+      function updateFixSelectionState() {
+        const boxes = Array.from(document.querySelectorAll(".fixes-checkbox"));
+        const selected = boxes.filter((box) => box.checked).length;
+        const selectAll = document.getElementById("fixes-select-all");
+        selectAll.disabled = boxes.length === 0;
+        selectAll.checked = boxes.length > 0 && selected === boxes.length;
+        selectAll.indeterminate = selected > 0 && selected < boxes.length;
+        document.getElementById("fixes-selection-status").textContent =
+          selected + " of " + boxes.length + " selected.";
+        const applyButton = document.getElementById("fixes-apply");
+        applyButton.disabled = selected === 0 || applyButton.dataset.busy === "true";
       }
 
       async function applyFixes() {
@@ -3384,6 +3426,7 @@ const page = String.raw`<!doctype html>
           return;
         }
         const button = document.getElementById("fixes-apply");
+        button.dataset.busy = "true";
         button.disabled = true;
         fixesStatus("Applying " + ids.length + " fix(es)…");
         try {
@@ -3412,7 +3455,8 @@ const page = String.raw`<!doctype html>
         } catch (error) {
           fixesStatus("Apply failed: " + error.message);
         } finally {
-          button.disabled = false;
+          button.dataset.busy = "false";
+          updateFixSelectionState();
         }
       }
 
@@ -3425,7 +3469,9 @@ const page = String.raw`<!doctype html>
         document.getElementById("lint-run").addEventListener("click", runLintNow);
         document.getElementById("inbox-scan").addEventListener("click", scanMaintenanceInbox);
         document.getElementById("fixes-reload").addEventListener("click", loadMaintenance);
-        document.getElementById("fixes-approve-all").addEventListener("click", () => setFixesApproveAll(true));
+        document.getElementById("fixes-select-all").addEventListener("change", (event) =>
+          setAllFixesSelected(event.currentTarget.checked)
+        );
         document.getElementById("fixes-apply").addEventListener("click", applyFixes);
       }
 

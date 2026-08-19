@@ -398,9 +398,12 @@ surface instead of forcing a switch to an MCP client or CLI:
   It does not ingest, classify, summarize, move, or delete content; those steps
   remain review-required.
 - **Safe Mechanical Fixes** lists each task relocation, Done-date stamp, and
-  non-destructive archive candidate with per-item approval. Apply re-reads the
-  current Brain, applies only still-valid selected ids, then reruns lint to
-  refresh the report without writing a duplicate receipt.
+  non-destructive archive candidate with an unchecked per-item checkbox. A
+  standard header checkbox selects or clears all current items; the separate
+  **Apply selected** button remains disabled until at least one item is
+  selected. Apply re-reads the current Brain, applies only still-valid selected
+  ids, then reruns lint to refresh the report without writing a duplicate
+  receipt.
 
 These are deliberate, narrow relaxations of the read-only default. They never
 resolve conflicts or perform source/admin mutations. See `docs/DECISIONS.md`
@@ -428,7 +431,8 @@ per-item selection or confirmation before apply. There are three surfaces:
 
 - **Cockpit Maintenance tab (primary).** The **Safe Mechanical Fixes** section lists each atomic
   fix — each relocated, archived, or stamped task — with its own
-  checkbox plus an "Approve all" control, and applies only what you approve. It
+  unchecked checkbox plus a select-all header checkbox, and applies only the
+  checked items when you press **Apply selected**. It
   is backed by `GET /api/fixes/plan` (read-only, live per-item plan) and
   `POST /api/fixes/apply`. Apply re-reads current Brain
   state and only applies still-valid approved ids, then refreshes the doctor.

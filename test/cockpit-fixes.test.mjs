@@ -162,6 +162,9 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.match(page.text, />Maintenance</);
   assert.match(page.text, /Run lint now/);
   assert.match(page.text, /Scan inbox/);
+  assert.match(page.text, /id="fixes-select-all"[^>]*aria-label="Select all fixes"[^>]*disabled/);
+  assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
+  assert.doesNotMatch(page.text, /Approve all/);
   assert.doesNotMatch(page.text, /Nothing to fix — the Brain is clean/);
 });
 
