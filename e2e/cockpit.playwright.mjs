@@ -66,7 +66,7 @@ async function writeDoctorStub(testInfo) {
         reason: "none",
         urgency: "none",
         title: "No operator action required.",
-        next_action: "Hosted health, local sync, conflicts, daemon, and Fly checks are acceptable.",
+        next_action: "Core hosted health, local sync, conflicts, and supervisor checks are acceptable.",
       },
     ],
     checks: [
@@ -117,6 +117,19 @@ async function writeDoctorStub(testInfo) {
         status: "pass",
         details: {
           latencyMs: 88,
+        },
+      },
+      {
+        name: "fly_status",
+        status: "info",
+        details: {
+          app: "jem-brain-mcp",
+          state: "auth_required",
+          optional: true,
+          message:
+            "Optional Fly control-plane check skipped because the local Fly CLI is not signed in. Hosted health and sync are checked separately.",
+          resolution:
+            "Optional: run `fly auth login`, then reload Brain Monitor to enable Machine and release diagnostics.",
         },
       },
       {
@@ -463,6 +476,16 @@ async function expectOperationLogTablePolish(page) {
   expect(tableLayout.noPageOverflow).toBe(true);
 }
 
+async function expectInformationalFlyCheck(page) {
+  await page.getByRole("tab", { name: "Checks", exact: true }).click();
+  const row = page.locator("#checks tr", { hasText: "fly_status" });
+  await expect(row).toBeVisible();
+  await expect(row.locator(".pill.info")).toHaveText("info");
+  await expect(row).toContainText("Optional Fly control-plane check skipped");
+  await expect(row).toContainText("fly auth login");
+  await expect(page.getByText(/fly_status needs review/i)).toHaveCount(0);
+}
+
 async function expectMaintenanceLayout(page, { desktop }) {
   await page.getByRole("tab", { name: "Maintenance", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Brain Lint", exact: true })).toBeVisible();
@@ -516,6 +539,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: true });
     await expectCockpitNavigationHierarchy(page, { desktop: true });
+    await expectInformationalFlyCheck(page);
     await expectOperationLogTablePolish(page);
     await expectMaintenanceLayout(page, { desktop: true });
 
@@ -525,6 +549,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: false });
     await expectCockpitNavigationHierarchy(page, { desktop: false });
+    await expectInformationalFlyCheck(page);
     await expectMaintenanceLayout(page, { desktop: false });
   } finally {
     await stopCockpit(child);

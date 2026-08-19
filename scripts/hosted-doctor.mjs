@@ -28,6 +28,12 @@ import {
 } from "./lib/latency-summary.mjs";
 import { classifyPoolerUrl } from "../dist/services/pooler.js";
 import { readAuthAlertThresholds } from "../dist/services/auth-alert.js";
+import {
+  enforceOperatorAlarmContract,
+  classifyFlyStatusError,
+  classifyFlyStatusOutput,
+  OPERATOR_ALARM_CHECKS,
+} from "./lib/doctor-actionability.mjs";
 
 loadLocalEnv();
 
@@ -148,6 +154,7 @@ const latencySloThresholds = normalizeLatencySloThresholds({
 });
 const CHECK_STATUS_RANK = {
   pass: 0,
+  info: 0,
   warn: 1,
   fail: 2,
 };
@@ -364,8 +371,23 @@ async function addFreshOperationCacheCheck() {
     ) {
       return false;
     }
-    addCheck(cache.check.name, cache.check.status, {
+    const cachedFindings = cache.check.details?.performanceFindings || [];
+    const hasCachedAlarm = cachedFindings.some(
+      (finding) => finding?.level === "warn" || finding?.level === "fail"
+    );
+    const cachedStatus =
+      (cache.check.status === "warn" || cache.check.status === "fail") &&
+      !hasCachedAlarm
+        ? "info"
+        : cache.check.status;
+    addCheck(cache.check.name, cachedStatus, {
       ...cache.check.details,
+      ...(cachedStatus === "info" && cache.check.status !== "info"
+        ? {
+            message:
+              "Cached latency telemetry is visible for context but has no current performance finding requiring operator action.",
+          }
+        : {}),
       telemetryCache: {
         state: "fresh",
         cachedAt: cache.cachedAt,
@@ -506,9 +528,11 @@ async function checkPostgresSummary() {
 
 async function checkRecentActivity() {
   if (!databaseUrl) {
-    addCheck("recent_activity", "warn", {
+    addCheck("recent_activity", "info", {
       brainId,
       databaseUrl: "missing",
+      state: "telemetry_unavailable",
+      message: "Recent activity telemetry is unavailable because no database URL is configured.",
       events: [],
     });
     return;
@@ -584,9 +608,11 @@ async function checkRecentActivity() {
       })),
     });
   } catch (error) {
-    addCheck("recent_activity", "warn", {
+    addCheck("recent_activity", "info", {
       brainId,
       databaseUrl: "set",
+      state: "telemetry_unavailable",
+      message: "Recent activity telemetry could not be read; core health checks continue separately.",
       error: error.message,
       events: [],
     });
@@ -752,7 +778,7 @@ async function checkUserOperationLatency() {
     const snapshot = await readJson(userOperationLatencyFile);
     const history = latencyHistoryFromSnapshot(snapshot);
     await cacheOperationCheck(addUserOperationLatencyCheck({
-      status: postgresFallback?.postgresState === "unreadable" ? "warn" : "pass",
+      status: postgresFallback?.postgresState === "unreadable" ? "info" : "pass",
       source: "local_json_cache",
       latencyFile: userOperationLatencyFile,
       checkedAt: snapshot.checkedAt || null,
@@ -769,10 +795,11 @@ async function checkUserOperationLatency() {
   } catch (error) {
     if (error?.code === "ENOENT") {
       if (postgresFallback?.postgresState === "unreadable") {
-        addCheck("user_operation_latency", "warn", {
+        addCheck("user_operation_latency", "info", {
           source: "postgres",
           latencyFile: userOperationLatencyFile,
           state: "unreadable",
+          message: "Latency telemetry is unavailable; hosted health and sync continue to determine readiness.",
           operations: [],
           ...postgresFallback,
         });
@@ -786,9 +813,10 @@ async function checkUserOperationLatency() {
       }
       return;
     }
-    addCheck("user_operation_latency", "warn", {
+    addCheck("user_operation_latency", "info", {
       latencyFile: userOperationLatencyFile,
       state: "unreadable",
+      message: "Latency telemetry is unavailable; hosted health and sync continue to determine readiness.",
       error: error.message,
       operations: [],
       ...postgresFallback,
@@ -1138,11 +1166,14 @@ async function checkLintNudge() {
 async function checkLintFindings() {
   const cachedReport = await readMaintenanceLintReport();
   if (!cachedReport) {
-    addCheck("lint_findings", maintenanceLintReportError ? "warn" : "pass", {
+    addCheck("lint_findings", maintenanceLintReportError ? "info" : "pass", {
       lintReportFile,
       state: maintenanceLintReportError ? "unreadable" : "unavailable",
       issueCount: null,
       note: "Run lint in Cockpit Maintenance to create a current structured report.",
+      ...(maintenanceLintReportError
+        ? { message: "The structured lint cache is unreadable; the separate lint freshness check provides the operator action." }
+        : {}),
       ...(maintenanceLintReportError ? { error: maintenanceLintReportError } : {}),
     });
     return;
@@ -1313,8 +1344,13 @@ async function checkLaunchd() {
 
 async function checkFlyStatus() {
   if (!flyApp) {
-    addCheck("fly_status", "warn", {
-      error: "BRAIN_FLY_APP is not set; Fly status check skipped.",
+    addCheck("fly_status", "info", {
+      state: "not_configured",
+      optional: true,
+      message:
+        "Optional Fly control-plane check skipped because BRAIN_FLY_APP is not configured. Hosted health and sync are checked separately.",
+      resolution:
+        "Optional: configure BRAIN_FLY_APP for this profile and reload Brain Monitor to enable Machine and release diagnostics.",
     });
     return;
   }
@@ -1323,19 +1359,11 @@ async function checkFlyStatus() {
       timeout: 20000,
       maxBuffer: 1024 * 1024,
     });
-    addCheck("fly_status", /1 passing/.test(stdout) ? "pass" : "warn", {
-      app: flyApp,
-      summary: stdout
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.includes(flyApp) || /started|passing|deployment-/.test(line))
-        .slice(0, 8),
-    });
+    const result = classifyFlyStatusOutput(stdout, flyApp);
+    addCheck("fly_status", result.status, result.details);
   } catch (error) {
-    addCheck("fly_status", "warn", {
-      app: flyApp,
-      error: error.stderr?.trim() || error.message,
-    });
+    const result = classifyFlyStatusError(error, flyApp);
+    addCheck("fly_status", result.status, result.details);
   }
 }
 
@@ -1418,6 +1446,10 @@ function buildOperatorActions(status) {
   const inbox = checkByName("inbox");
   const latency = checkByName("user_operation_latency");
   const heartbeat = checkByName("sync_heartbeat");
+  const localState = checkByName("local_sync_state");
+  const syncLock = checkByName("sync_lock");
+  const fly = checkByName("fly_status");
+  const pooler = checkByName("pooler_config");
 
   const openConflicts = postgres?.details?.openConflicts || 0;
   if (openConflicts > 0) {
@@ -1426,6 +1458,44 @@ function buildOperatorActions(status) {
       reason: "open_conflicts",
       title: "Resolve open sync conflicts before hosted writes.",
       detail: "Follow docs/conflict-resolution.md and resolve with reviewed Markdown content.",
+    });
+  }
+
+  if (postgres?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "postgres_diagnostics_unconfigured",
+      title: "Configure database diagnostics for this Brain profile.",
+      detail:
+        "Set BRAIN_REVISION_DATABASE_URL for the profile, restart its local stack, then reload Brain Monitor.",
+    });
+  } else if (postgres?.status === "fail") {
+    actions.push({
+      level: "fail",
+      reason: "postgres_diagnostics_failed",
+      title: "Restore Brain database diagnostic access.",
+      detail:
+        `The Postgres summary query failed${postgres.details?.error ? `: ${String(postgres.details.error).slice(0, 160)}` : "."} Verify the profile database URL and Supabase reachability, then reload Brain Monitor.`,
+    });
+  }
+
+  if (localState?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "local_sync_state_unreadable",
+      title: "Restore the local sync state file.",
+      detail:
+        "Restart this Brain's local stack from Brain Monitor. If the warning remains, inspect the profile sync log and state-file path shown in Checks.",
+    });
+  }
+
+  if (syncLock?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "sync_lock_invalid",
+      title: "Clear the stale or unreadable sync lock by restarting the local stack.",
+      detail:
+        "Use Brain Monitor to restart this Brain's local stack, then reload the Cockpit and confirm sync_lock passes.",
     });
   }
 
@@ -1501,7 +1571,15 @@ function buildOperatorActions(status) {
     });
   }
 
-  if ((inbox?.details?.pendingFiles || 0) > 0) {
+  if (inbox?.status === "warn" && inbox.details?.state === "unreadable") {
+    actions.push({
+      level: "warn",
+      reason: "inbox_unreadable",
+      title: "Restore access to the Brain inbox.",
+      detail:
+        "Check the inbox path and local filesystem or OneDrive availability shown in Checks, then use Maintenance > Scan inbox to verify access.",
+    });
+  } else if ((inbox?.details?.pendingFiles || 0) > 0) {
     actions.push({
       level: "warn",
       reason: "pending_inbox",
@@ -1518,6 +1596,38 @@ function buildOperatorActions(status) {
       title: "Local device cannot reach hosted Brain.",
       detail:
         "Check Wi-Fi, VPN, DNS, or local network access. Brain Monitor will auto-refresh doctor output when connectivity returns.",
+    });
+  } else if (hostedHealth?.status === "fail") {
+    actions.push({
+      level: "fail",
+      reason: "hosted_health_failed",
+      title: "Restore hosted Brain health before relying on remote clients.",
+      detail:
+        `The hosted health endpoint failed its runtime contract${hostedHealth.details?.httpStatus ? ` (HTTP ${hostedHealth.details.httpStatus})` : ""}. Inspect the Fly app logs and most recent release, restore a healthy runtime, then reload Brain Monitor.`,
+    });
+  }
+
+  if (fly?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "fly_control_plane",
+      title:
+        fly.details?.state === "no_passing_machines"
+          ? `Fly reports no passing Machine for ${fly.details?.app || "the hosted Brain app"}.`
+          : `Fly control-plane status could not be verified for ${fly.details?.app || "the hosted Brain app"}.`,
+      detail:
+        fly.details?.resolution ||
+        "Run flyctl status for the configured app, resolve the reported problem, then reload Brain Monitor.",
+    });
+  }
+
+  if (pooler?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "session_pooler",
+      title: "Move the Brain database connection to the transaction pooler.",
+      detail:
+        "Update the profile database URL to the Supabase transaction-pooler endpoint on port 6543, restart the local stack, then rerun the Supabase security gate and reload Brain Monitor.",
     });
   }
 
@@ -1536,7 +1646,17 @@ function buildOperatorActions(status) {
       lastFailure === null || lastFailure === undefined
         ? "no last-failure age available"
         : `last failure ${lastFailure}m ago`;
-    if (authFailures.details?.connectorState === "stale_connector") {
+    if (authFailures.details?.databaseUrl === "missing" || authFailures.details?.error) {
+      actions.push({
+        level: authFailures.status,
+        reason: "auth_telemetry_unavailable",
+        title: "Restore hosted authentication telemetry access.",
+        detail:
+          authFailures.details?.databaseUrl === "missing"
+            ? "Set BRAIN_REVISION_DATABASE_URL for this profile, restart its local stack, then reload Brain Monitor."
+            : `The auth telemetry query failed: ${String(authFailures.details.error).slice(0, 160)}. Verify database reachability and permissions, then reload Brain Monitor.`,
+      });
+    } else if (authFailures.details?.connectorState === "stale_connector") {
       const staleClientId = authFailures.details?.staleClientId;
       actions.push({
         level: authFailures.status,
@@ -1569,47 +1689,13 @@ function buildOperatorActions(status) {
     });
   }
 
-  const handledWarnings = new Set([
-    "sync_health",
-    "launchd",
-    "lint_nudge",
-    "lint_findings",
-    "inbox",
-    "hosted_mcp_auth_failures",
-    "sync_heartbeat",
-  ]);
-  if (latencyFinding) handledWarnings.add("user_operation_latency");
-  if (hostedHealth?.details?.faultDomain === "local_connectivity") {
-    handledWarnings.add("hosted_health");
-  }
-  for (const check of checks.filter((check) => check.status === "warn")) {
-    if (handledWarnings.has(check.name)) continue;
-    actions.push({
-      level: "warn",
-      reason: "check_warning",
-      title: `${check.name} needs review.`,
-      detail: "Inspect hosted:doctor details; this warning does not block hosted use unless it affects the current operation.",
-    });
-  }
-
-  for (const check of checks.filter((check) => check.status === "fail")) {
-    if (check.name === "sync_health") continue;
-    if (check.name === "hosted_mcp_auth_failures") continue;
-    if (check.name === "user_operation_latency" && latencyFinding) continue;
-    actions.push({
-      level: "fail",
-      reason: "check_failed",
-      title: `${check.name} failed.`,
-      detail: "Inspect hosted:doctor details and fix this before relying on hosted Brain.",
-    });
-  }
-
   if (actions.length === 0 && status === "pass") {
     actions.push({
       level: "pass",
       reason: "none",
       title: "No operator action required.",
-      detail: "Hosted health, local sync, conflicts, lint freshness, inbox, daemon, and Fly checks are currently acceptable.",
+      detail:
+        "Core hosted health, local sync, conflicts, lint freshness, inbox, and daemon checks are acceptable. Optional diagnostics may appear as informational checks.",
     });
   }
 
@@ -1710,6 +1796,8 @@ try {
 } finally {
   await doctorPool?.end().catch(() => undefined);
 }
+
+enforceOperatorAlarmContract(checks);
 
 const failed = checks.filter((check) => check.status === "fail");
 const warnings = checks.filter((check) => check.status === "warn");

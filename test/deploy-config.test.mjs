@@ -322,10 +322,16 @@ test("hosted doctor emits normalized user-action indicators", async () => {
   assert.match(doctor, /reason: "sync_health_failed"/);
   assert.match(doctor, /reason: "pending_inbox"/);
   assert.match(doctor, /reason: "hosted_auth_failures"/);
+  assert.match(doctor, /enforceOperatorAlarmContract\(checks\)/);
+  assert.match(doctor, /reason: "fly_control_plane"/);
   assert.match(cockpit, /renderActionItems/);
   assert.match(cockpit, /action\.next_action/);
   assert.match(cockpit, /action\.brain_id/);
   assert.match(cockpit, /action\.urgency/);
+  assert.match(cockpit, /\.pill\.info/);
+  assert.doesNotMatch(cockpit, /reason: "check_failed"/);
+  assert.doesNotMatch(cockpit, /needs review/i);
+  assert.doesNotMatch(cockpit, /Inspect the details in the checks table/i);
   assert.match(menuBar, /action\[@"next_action"\]/);
   assert.match(menuBar, /action\[@"reason"\]/);
   assert.match(menuBar, /action\[@"urgency"\]/);

@@ -15,6 +15,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the stable JEM local URL is `http://127.0.0.1:8787/`;
 - the stable ERS local URL is `http://127.0.0.1:8788/`;
 - checks continue to come from `npm run hosted:doctor`;
+- checks use `pass`/`info`/`warn`/`fail`: informational diagnostic limitations stay visible in Checks but do not enter Operator Queue or change readiness, while every warning or failure carries a concrete next action;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
 - the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
 - user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
@@ -350,7 +351,8 @@ cadence. Code deployed before the migration falls back to a coalesced legacy
 Green means hosted Brain is ready for normal use.
 
 Action means the latest hosted doctor output contains one or more non-pass
-operator actions that need human judgement. Each doctor action is normalized
+operator actions that need human judgement. Only `warn` and `fail` checks enter
+this queue; `info` checks are visibility-only. Each doctor action is normalized
 with `status`, `brain_id`, `reason`, `next_action`, and `urgency`, while keeping
 the legacy `level`, `title`, and `detail` fields for older menu readers. The
 cockpit first screen shows `Needs Action`; each Brain's menu shows `Action
@@ -362,7 +364,22 @@ This is reported separately from a Brain MCP stack fault: check Wi-Fi, VPN,
 DNS, or local network access first, then let Brain Monitor's next automatic
 doctor refresh clear the status.
 
-Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, current review-required lint findings, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
+Info means an optional diagnostic is unavailable or has context worth showing,
+but no operator intervention is required for readiness. Missing or expired local
+Fly CLI authentication is informational because hosted health and sync are
+checked independently. The Checks row explains the skipped capability and
+offers `fly auth login` as an optional way to restore Machine and release
+diagnostics. A missing `flyctl`, unconfigured `BRAIN_FLY_APP`, unavailable
+recent-activity telemetry, and unavailable latency telemetry follow the same
+visibility-without-alarm rule.
+
+Warn means use judgement and always includes a concrete next action. Typical
+examples are stale sync health, stale or missing Brain lint, current
+review-required lint findings, stale or oversized `TASKS.md` Capture / Triage
+Queue, pending inbox files, an authenticated Fly result with no passing
+Machine, or a latency SLO warning. Warnings are condition-derived rather than
+dismissible: perform the stated action and reload, and the next doctor result
+clears the queue item when the condition has recovered.
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
