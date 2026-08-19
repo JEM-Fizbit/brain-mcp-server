@@ -32,6 +32,7 @@ import {
   enforceOperatorAlarmContract,
   classifyFlyStatusError,
   classifyFlyStatusOutput,
+  classifyLintFindings,
   OPERATOR_ALARM_CHECKS,
 } from "./lib/doctor-actionability.mjs";
 
@@ -1188,14 +1189,16 @@ async function checkLintFindings() {
   const primaryIssueCount = Number(
     cachedReport.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
   );
-  addCheck("lint_findings", issueCount > 0 ? "warn" : "pass", {
+  const automaticFixCount = Number(cachedReport.automaticFixCount || 0);
+  const classification = classifyLintFindings({ issueCount, automaticFixCount });
+  addCheck("lint_findings", classification.status, {
     lintReportFile,
-    state: issueCount > 0 ? "findings" : "clear",
+    state: classification.state,
     checkedAt: cachedReport.checkedAt,
     issueCount,
     primaryIssueCount,
     diagnosticCount,
-    automaticFixCount: Number(cachedReport.automaticFixCount || 0),
+    automaticFixCount,
     reviewFindings: (cachedReport.reviewFindings || []).slice(0, 20),
     warnings: (cachedReport.warnings || []).slice(0, 20),
   });
@@ -1551,23 +1554,13 @@ function buildOperatorActions(status) {
   }
 
   if (lintFindings?.status === "warn") {
-    const issueCount = Number(lintFindings.details?.issueCount || 0);
-    const primaryIssueCount = Number(
-      lintFindings.details?.primaryIssueCount ?? issueCount
-    );
-    const diagnosticCount = Number(lintFindings.details?.diagnosticCount || 0);
     const automaticFixCount = Number(lintFindings.details?.automaticFixCount || 0);
     actions.push({
       level: "warn",
       reason: "lint_findings",
-      title:
-        diagnosticCount > 0
-          ? `Review ${primaryIssueCount} lint finding(s) and ${diagnosticCount} grouped graph diagnostic(s) in Cockpit Maintenance.`
-          : `Review ${issueCount} current lint finding(s) in Cockpit Maintenance.`,
+      title: `Review and apply ${automaticFixCount} safe mechanical lint fix(es) in Cockpit Maintenance.`,
       detail:
-        automaticFixCount > 0
-          ? `${automaticFixCount} safe mechanical fix(es) can be selected there; remaining findings require judgement.`
-          : "No safe automatic fixes are available; the findings require operator judgement.",
+        "Select the fixes you approve and use Apply selected. Refreshing the lint assessment only rechecks the Brain; remaining review-only notes are informational.",
     });
   }
 

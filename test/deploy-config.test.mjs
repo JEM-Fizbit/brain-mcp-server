@@ -616,7 +616,8 @@ test("hosted cockpit is local-only with narrowly guarded maintenance writes", as
   assert.match(script, /\/api\/lint\/report/);
   assert.match(script, /\/api\/lint\/run/);
   assert.match(script, /\/api\/inbox\/scan/);
-  assert.match(script, /Run lint now/);
+  assert.match(script, /Refresh lint assessment/);
+  assert.match(script, /Informational review notes remain visible above/);
   assert.match(script, /Safe Mechanical Fixes/);
   assert.match(script, /runMaintenanceLint/);
   assert.match(script, /countLintIssues/);

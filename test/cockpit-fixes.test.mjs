@@ -14,6 +14,7 @@ const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cockpit-fixes-"));
 const brainDir = path.join(tmpRoot, "brain");
 const inboxDir = path.join(tmpRoot, "inbox");
 const doctorOutputPath = path.join(tmpRoot, "hosted-doctor.out.json");
+const freshDoctorScriptPath = path.join(tmpRoot, "fresh-doctor.mjs");
 const lintReportPath = path.join(tmpRoot, "hosted-lint-report.json");
 
 const LOADER = [
@@ -60,6 +61,11 @@ async function seed() {
     })}\n`,
     "utf-8"
   );
+  await fs.writeFile(
+    freshDoctorScriptPath,
+    `console.log(JSON.stringify({ok:true,status:"pass",checkedAt:"2026-08-19T10:01:00.000Z",checks:[{name:"fresh_probe",status:"pass",details:{}}],actions:[]}));\n`,
+    "utf-8"
+  );
 }
 
 let child;
@@ -104,6 +110,7 @@ before(async () => {
       BRAIN_COCKPIT_PORT: "8811",
       BRAIN_COCKPIT_PORT_FALLBACK: "1",
       BRAIN_COCKPIT_DOCTOR_OUTPUT: doctorOutputPath,
+      BRAIN_COCKPIT_DOCTOR_SCRIPT: freshDoctorScriptPath,
       BRAIN_LINT_REPORT_FILE: lintReportPath,
     },
   });
@@ -142,6 +149,14 @@ test("GET /api/doctor reads the Brain Monitor last-good report", async () => {
   assert.equal(res.json.cockpitCache.path, doctorOutputPath);
 });
 
+test("GET /api/doctor?fresh=1 bypasses the Monitor cache after maintenance", async () => {
+  const res = await request("GET", "/api/doctor?fresh=1");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.status, "pass");
+  assert.equal(res.json.checks[0].name, "fresh_probe");
+  assert.equal(res.json.cockpitCache, undefined);
+});
+
 test("GET /api/fixes/plan returns per-item plan and writes nothing", async () => {
   const before = await fs.readFile(path.join(brainDir, "TASKS.md"), "utf-8");
   const res = await request("GET", "/api/fixes/plan");
@@ -160,7 +175,7 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   const page = await request("GET", "/");
   assert.equal(page.status, 200);
   assert.match(page.text, />Maintenance</);
-  assert.match(page.text, /Run lint now/);
+  assert.match(page.text, /Refresh lint assessment/);
   assert.match(page.text, /Scan inbox/);
   assert.match(page.text, /id="fixes-select-all"[^>]*aria-label="Select all fixes"[^>]*disabled/);
   assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
