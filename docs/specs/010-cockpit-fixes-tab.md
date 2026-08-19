@@ -29,7 +29,7 @@ A new **Fixes** tab in the cockpit (`scripts/hosted-cockpit.mjs`) backed by two 
 - `GET /api/fixes/plan` — returns the current per-item dry-run plan (read-only; recomputed live). No writes.
 - `POST /api/fixes/apply` — applies only the item ids the operator approved. The **one write endpoint**.
 
-The tab lists each item with a checkbox (default checked), grouped by kind, showing exactly what changes. "Apply Selected" POSTs the approved ids; the result (applied/failed per item) renders inline, then the doctor refreshes.
+The tab lists each item with an unchecked checkbox, grouped by kind, showing exactly what changes. A header checkbox selects or clears all items and reflects partial selection with the standard indeterminate state. The separate "Apply selected" button stays disabled until at least one item is checked, then POSTs only those ids; the result (applied/failed per item) renders inline, then the doctor refreshes.
 
 ### Per-item model
 
@@ -62,7 +62,7 @@ A write endpoint on a loopback server is reachable by other local processes and 
 
 - `GET /api/fixes/plan` returns the live per-item plan; never writes.
 - `POST /api/fixes/apply` applies only approved, still-valid ids, re-reading current state first; returns per-item outcomes; is rejected (403) without a valid nonce, a loopback Host, and JSON content-type.
-- The tab renders items grouped by kind with per-item checkboxes and an Apply Selected action; results render inline; the doctor refreshes after apply.
+- The tab renders items grouped by kind with unchecked per-item checkboxes, a select-all header checkbox, and a separate Apply selected action; results render inline; the doctor refreshes after apply.
 - Rules reuse `lint-fix.ts` — no duplicated logic.
 - The menubar button and CLI from spec 009 remain as the no-GUI paths.
 - `docs/DECISIONS.md` and `docs/hosted-cockpit.md` updated in the same change.
@@ -90,5 +90,5 @@ QA tier: **Full** (Brain-mutating + a new network write path). Gate: `npm test`,
 1. ✅ Refactor `lint-fix.ts` transforms to accept an approved-key filter + stable item ids (+ tests).
 2. ✅ Add `planLintFixes` / `applyLintFixSelection` to `lint-apply.ts` (+ tests).
 3. ✅ Add the two cockpit routes with the security posture (+ `test/cockpit-fixes.test.mjs`).
-4. ✅ Add the Fixes tab UI (client fetch/render/per-item checkboxes + **Approve all** + Apply selected).
+4. ✅ Add the Fixes tab UI (client fetch/render/per-item checkboxes + standard select-all header + Apply selected).
 5. ✅ Update `docs/DECISIONS.md`, `docs/hosted-cockpit.md`; menubar modal is now the secondary path.

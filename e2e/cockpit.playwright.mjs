@@ -165,10 +165,26 @@ async function writeDoctorStub(testInfo) {
 async function startCockpit(testInfo) {
   const port = await openPort();
   const doctorScript = await writeDoctorStub(testInfo);
+  const brainDir = testInfo.outputPath("brain");
+  await fs.mkdir(brainDir, { recursive: true });
+  await fs.writeFile(
+    path.join(brainDir, "00_loader.md"),
+    "# Loader\n\n- `NOW.md` — current context.\n- `TASKS.md` — task state.\n",
+    "utf8"
+  );
+  await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n", "utf8");
+  await fs.writeFile(
+    path.join(brainDir, "TASKS.md"),
+    "# TASKS\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n",
+    "utf8"
+  );
   const child = spawn(process.execPath, [path.join(repoRoot, "scripts", "hosted-cockpit.mjs")], {
     cwd: repoRoot,
     env: {
       ...process.env,
+      BRAIN_DIR: brainDir,
+      BRAIN_ID: "ai-brain-jem",
+      BRAIN_REVISION_STORE: "filesystem",
       BRAIN_COCKPIT_DOCTOR_SCRIPT: doctorScript,
       BRAIN_COCKPIT_HOST: "127.0.0.1",
       BRAIN_COCKPIT_PORT: String(port),
@@ -454,6 +470,30 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await expect(page.getByRole("heading", { name: "Safe Mechanical Fixes", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run lint now", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Scan inbox", exact: true })).toBeVisible();
+  const selectAll = page.getByRole("checkbox", { name: "Select all fixes", exact: true });
+  const applySelected = page.getByRole("button", { name: "Apply selected", exact: true });
+  const itemCheckboxes = page.locator(".fixes-checkbox");
+  await expect(selectAll).toBeVisible();
+  await expect(itemCheckboxes).toHaveCount(2);
+  await expect(selectAll).not.toBeChecked();
+  await expect(applySelected).toBeDisabled();
+  await expect(page.getByText("0 of 2 selected.", { exact: true })).toBeVisible();
+
+  await itemCheckboxes.first().check();
+  await expect(selectAll).toHaveJSProperty("indeterminate", true);
+  await expect(applySelected).toBeEnabled();
+  await expect(page.getByText("1 of 2 selected.", { exact: true })).toBeVisible();
+
+  await selectAll.check();
+  await expect(itemCheckboxes.nth(0)).toBeChecked();
+  await expect(itemCheckboxes.nth(1)).toBeChecked();
+  await expect(page.getByText("2 of 2 selected.", { exact: true })).toBeVisible();
+
+  await selectAll.uncheck();
+  await expect(itemCheckboxes.nth(0)).not.toBeChecked();
+  await expect(itemCheckboxes.nth(1)).not.toBeChecked();
+  await expect(applySelected).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Approve all", exact: true })).toHaveCount(0);
 
   const layout = await page.evaluate(() => {
     const grid = document.querySelector(".maintenance-grid");
