@@ -1280,19 +1280,6 @@ const page = String.raw`<!doctype html>
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
       }
 
-      pre {
-        margin: 0;
-        width: 100%;
-        max-width: 100%;
-        max-height: 280px;
-        overflow: auto;
-        background: #202124;
-        color: #f5f5f2;
-        border-radius: 6px;
-        padding: 12px;
-        font-size: 12px;
-      }
-
       @media (max-width: 860px) {
         main {
           width: min(100vw - 20px, 1180px);
@@ -1520,7 +1507,6 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
           <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Maintenance</button>
-          <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
         </div>
 
         <div class="tab-context-strip" id="tab-context-strip" hidden>
@@ -1843,12 +1829,6 @@ const page = String.raw`<!doctype html>
               <span id="fixes-selection-status" class="muted">0 of 0 selected.</span>
             </div>
             <div id="fixes-list">Loading…</div>
-          </section>
-        </div>
-        <div class="tab-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" hidden>
-          <section>
-            <h2>Raw Doctor Output</h2>
-            <pre id="raw">{}</pre>
           </section>
         </div>
       </div>
@@ -3133,7 +3113,6 @@ const page = String.raw`<!doctype html>
         renderOperationLog();
         renderUserOperationLatencies(payload);
         renderLatencies(payload);
-        document.getElementById("raw").textContent = JSON.stringify(payload, null, 2);
       }
 
       async function refresh() {

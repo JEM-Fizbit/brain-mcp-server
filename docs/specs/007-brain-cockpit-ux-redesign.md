@@ -3,8 +3,10 @@
 **Status:** in-progress
 **Source:** BACKLOG.md line "Audit and redesign the Brain Cockpit dashboard UX top to bottom into a polished, professional, intuitive, data-rich operator interface. Scope: reduce first-screen density, establish clearer visual hierarchy, make the left status/needs-action panels stand apart from metric grids, move secondary metric cards into their own lower section where appropriate, clarify what matters first, and apply modern dashboard UX/design principles across layout, spacing, grouping, responsive behavior, and scanability."
 **Roadmap link:** ad-hoc operator hardening
-**Decisions impact:** none yet
+**Decisions impact:** 2026-08-19 decision to remove Raw Output from the operator cockpit
 **Related:** `scripts/hosted-cockpit.mjs`; `e2e/cockpit.playwright.mjs`; `docs/hosted-cockpit.md`
+
+**2026-08-19 update:** The Raw Output tab was removed. It duplicated the same doctor payload already rendered in operator-focused views and had no distinct user job. Exact JSON remains available to developers through `/api/doctor` and the per-profile doctor output file.
 
 ## Problem
 
@@ -69,7 +71,7 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 ### Slice 4 - Tab-specific framing
 
 - Make the Overview tab own the full dashboard context: current status, needs-action panel, operational signals, operator queue, and usage snapshot.
-- Remove the full overview dashboard from the top of Activity, Latency, Checks, and Raw Output.
+- Remove the full overview dashboard from the top of Activity, Latency, Checks, and Maintenance.
 - Add a compact non-overview context strip with Brain, status, action count, last sync, and last doctor check.
 - Preserve existing refresh IDs and tab keyboard behavior.
 - Add Playwright checks that full dashboard blocks are descendants of `#panel-overview`, hidden on non-overview tabs, and replaced there by compact context.
@@ -83,7 +85,7 @@ The dashboard needs a top-to-bottom UX pass that keeps it data-rich while making
 
 ### Later slices
 
-- Continue auditing activity, latency, checks, and raw-output tabs for density and scan order.
+- Continue auditing Activity, Latency, Checks, and Maintenance for density and scan order.
 - Refine metric grouping if operator use shows any cluster still buries key signals.
 - Decide whether action-required state should also drive a persistent top-level banner.
 - Review color, typography, spacing, and empty/error states across all cockpit panels.

@@ -255,7 +255,8 @@ async function expectCockpitReady(page) {
   await expect(page.locator("#last-updated")).toContainText(
     /\d{4}-[A-Z][a-z]{2}-\d{2}; \d{2}:\d{2}:\d{2} UTC[+-]\d{2}:\d{2}/
   );
-  await expect(page.locator("#raw")).toContainText('"status": "pass"');
+  await expect(page.getByRole("tab", { name: "Raw Output", exact: true })).toHaveCount(0);
+  await expect(page.locator(".tab-button")).toHaveCount(5);
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth
   );

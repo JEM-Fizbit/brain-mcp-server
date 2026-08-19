@@ -542,7 +542,8 @@ test("hosted cockpit is local-only with narrowly guarded maintenance writes", as
   assert.match(script, /panel-activity/);
   assert.match(script, /panel-latency/);
   assert.match(script, /panel-checks/);
-  assert.match(script, /panel-raw/);
+  assert.doesNotMatch(script, /panel-raw/);
+  assert.doesNotMatch(script, /Raw Doctor Output/);
   assert.match(script, /profile-switcher/);
   assert.match(script, /profile-brain-id/);
   assert.match(script, /profile-state-file/);
