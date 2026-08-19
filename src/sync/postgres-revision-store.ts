@@ -39,6 +39,15 @@ const { Pool } = pg;
 type Pool = pg.Pool;
 type PoolClient = pg.PoolClient;
 
+function isUndefinedTableError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "42P01"
+  );
+}
+
 export function positiveNumberEnv(name: string, fallback: number): number {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -211,8 +220,14 @@ async function transaction<T>(
 
 export class PostgresRevisionStore implements RevisionStore {
   readonly pool: Pool;
+  private readonly heartbeatIntervalMs: number;
+  private readonly heartbeatWrites = new Map<string, Promise<void>>();
+  private readonly lastHeartbeatWriteAt = new Map<string, number>();
 
-  constructor(poolOrConnectionString: Pool | string) {
+  constructor(
+    poolOrConnectionString: Pool | string,
+    options: { heartbeatIntervalMs?: number } = {}
+  ) {
     this.pool =
       typeof poolOrConnectionString === "string"
         ? attachPoolErrorLogger(
@@ -220,6 +235,9 @@ export class PostgresRevisionStore implements RevisionStore {
             "revision_store"
           )
         : poolOrConnectionString;
+    this.heartbeatIntervalMs =
+      options.heartbeatIntervalMs ??
+      positiveNumberEnv("BRAIN_SYNC_HEARTBEAT_INTERVAL_MS", 60_000);
   }
 
   async close(): Promise<void> {
@@ -227,6 +245,23 @@ export class PostgresRevisionStore implements RevisionStore {
   }
 
   async recordSyncHeartbeat(input: SyncHeartbeatInput): Promise<void> {
+    const now = Date.now();
+    const lastWriteAt = this.lastHeartbeatWriteAt.get(input.brainId) ?? 0;
+    if (now - lastWriteAt < this.heartbeatIntervalMs) return;
+    if (this.heartbeatWrites.has(input.brainId)) return;
+
+    const write = this.writeSyncHeartbeat(input)
+      .then(() => {
+        this.lastHeartbeatWriteAt.set(input.brainId, Date.now());
+      })
+      .finally(() => {
+        this.heartbeatWrites.delete(input.brainId);
+      });
+    this.heartbeatWrites.set(input.brainId, write);
+    await write;
+  }
+
+  private async writeSyncHeartbeat(input: SyncHeartbeatInput): Promise<void> {
     const counts = {
       pushed: input.report.pushed.length,
       pulled: input.report.pulled.length,
@@ -251,23 +286,54 @@ export class PostgresRevisionStore implements RevisionStore {
     try {
       await this.pool.query(
         `
-          insert into brain.sync_events (
+          insert into brain.sync_heartbeats (
             brain_id,
-            event_type,
             duration_ms,
             metadata,
-            created_at
+            last_seen_at,
+            updated_at
           )
-          values ($1, $2, $3, $4::jsonb, now())
+          values ($1, $2, $3::jsonb, now(), now())
+          on conflict (brain_id) do update set
+            duration_ms = excluded.duration_ms,
+            metadata = excluded.metadata,
+            last_seen_at = excluded.last_seen_at,
+            updated_at = excluded.updated_at
         `,
         [
           input.brainId,
-          "sync_heartbeat",
           durationMs,
           JSON.stringify(metadata),
         ]
       );
     } catch (error) {
+      // Deploy-safe fallback: code can roll before the migration without
+      // interrupting sync. The fallback is still coalesced to one row/minute.
+      if (isUndefinedTableError(error)) {
+        try {
+          await this.pool.query(
+            `
+              insert into brain.sync_events (
+                brain_id,
+                event_type,
+                duration_ms,
+                metadata,
+                created_at
+              )
+              values ($1, $2, $3, $4::jsonb, now())
+            `,
+            [
+              input.brainId,
+              "sync_heartbeat",
+              durationMs,
+              JSON.stringify(metadata),
+            ]
+          );
+          return;
+        } catch (fallbackError) {
+          error = fallbackError;
+        }
+      }
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[sync-heartbeat] Could not record heartbeat: ${message.slice(0, 180)}`);
     }

@@ -428,12 +428,17 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.doctorErrorPath, path.join(logDir, "hosted-doctor.err.log"));
   assert.equal(config.doctorIntervalMs, 60000);
   assert.equal(config.doctorInitialDelayMs, 10000);
+  assert.equal(config.doctorTimeoutMs, 45000);
   assert.equal(config.stackStatusFile, path.join(logDir, "brain-monitor-stack.json"));
   assert.equal(config.env.BRAIN_SYNC_SUPERVISOR, "menubar");
   assert.equal(config.env.BRAIN_PROFILE_NAME, "ers-brain");
   assert.equal(config.env.BRAIN_COCKPIT_URL, "http://127.0.0.1:8798/");
   assert.equal(config.env.BRAIN_SYNC_LOG_DIR, logDir);
   assert.equal(config.env.BRAIN_MONITOR_STACK_FILE, path.join(logDir, "brain-monitor-stack.json"));
+  assert.equal(
+    config.env.BRAIN_DOCTOR_OPERATION_CACHE_FILE,
+    path.join(logDir, "hosted-doctor-operation-cache.json")
+  );
   assert.deepEqual(JSON.parse(config.env.BRAIN_COCKPIT_PROFILES_JSON), [
     {
       brainId: "ers-brain",
@@ -455,6 +460,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.cockpitProcess.stdoutPath, path.join(logDir, "monitor-cockpit.out.log"));
   assert.equal(config.cockpitProcess.stderrPath, path.join(logDir, "monitor-cockpit.err.log"));
   assert.equal(config.cockpitProcess.env.BRAIN_COCKPIT_PORT, "8798");
+  assert.equal(
+    config.cockpitProcess.env.BRAIN_COCKPIT_DOCTOR_OUTPUT,
+    path.join(logDir, "hosted-doctor.out.json")
+  );
   assert.match(source, /NSStatusBar/);
   assert.match(source, /startManagedProcesses/);
   assert.match(source, /scheduleManagedProcessRestartNamed/);
@@ -505,6 +514,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /NSDataWritingAtomic/);
   assert.match(source, /outputTempPath/);
   assert.match(source, /previous report kept/);
+  assert.match(source, /runningDoctorTasks/);
+  assert.match(source, /doctorTimeoutMs/);
+  assert.match(source, /doctor timed out; previous report kept/);
+  assert.match(source, /BRAIN_DOCTOR_FORCE_DEEP/);
   assert.match(source, /actionItemsForDoctorReport/);
   assert.match(source, /Brain Action/);
   assert.match(source, /sawChecking && !sawAction && !sawWarn && !sawKnown/);

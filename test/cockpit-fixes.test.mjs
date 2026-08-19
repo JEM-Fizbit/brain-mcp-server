@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 
 const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cockpit-fixes-"));
+const doctorOutputPath = path.join(tmpDir, "hosted-doctor.out.json");
 
 const LOADER = [
   "# Loader",
@@ -43,6 +44,16 @@ async function seed() {
   await fs.writeFile(path.join(tmpDir, "NOW.md"), "# NOW\n", "utf-8");
   await fs.writeFile(path.join(tmpDir, "TASKS.md"), TASKS, "utf-8");
   await fs.writeFile(path.join(tmpDir, "07_orphan.md"), "# Orphan\n", "utf-8");
+  await fs.writeFile(
+    doctorOutputPath,
+    `${JSON.stringify({
+      ok: true,
+      status: "pass",
+      checkedAt: "2026-08-19T10:00:00.000Z",
+      checks: [{ name: "cached_probe", status: "pass", details: {} }],
+    })}\n`,
+    "utf-8"
+  );
 }
 
 let child;
@@ -84,6 +95,7 @@ before(async () => {
       BRAIN_ID: "ai-brain-jem",
       BRAIN_COCKPIT_PORT: "8811",
       BRAIN_COCKPIT_PORT_FALLBACK: "1",
+      BRAIN_COCKPIT_DOCTOR_OUTPUT: doctorOutputPath,
     },
   });
   basePort = await new Promise((resolve, reject) => {
@@ -110,6 +122,15 @@ before(async () => {
 
 after(() => {
   if (child) child.kill("SIGKILL");
+});
+
+test("GET /api/doctor reads the Brain Monitor last-good report", async () => {
+  const res = await request("GET", "/api/doctor");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.status, "pass");
+  assert.equal(res.json.checks[0].name, "cached_probe");
+  assert.equal(res.json.cockpitCache.source, "brain_monitor");
+  assert.equal(res.json.cockpitCache.path, doctorOutputPath);
 });
 
 test("GET /api/fixes/plan returns per-item plan and writes nothing", async () => {

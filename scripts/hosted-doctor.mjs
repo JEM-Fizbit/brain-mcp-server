@@ -61,6 +61,14 @@ const profileName =
 const userOperationLatencyFile =
   process.env.BRAIN_HOSTED_MCP_LATENCY_FILE ||
   path.resolve(brainDir, "..", ".brain-sync", "hosted-mcp-latency.json");
+const userOperationTelemetryCacheFile =
+  process.env.BRAIN_DOCTOR_OPERATION_CACHE_FILE ||
+  path.join(path.dirname(healthFile), "hosted-doctor-operation-cache.json");
+const userOperationTelemetryRefreshMs = Math.max(
+  60_000,
+  Number(process.env.BRAIN_DOCTOR_OPERATION_REFRESH_MS || 15 * 60 * 1000)
+);
+const forceDeepOperationRefresh = process.env.BRAIN_DOCTOR_FORCE_DEEP === "1";
 const userOperationLatencyHistoryLimit = Math.max(
   1,
   Number(process.env.BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT || 240)
@@ -99,6 +107,20 @@ const monitorStackMaxAgeMs = Number(
 );
 const launchdLabel = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
 const databaseUrl = process.env.BRAIN_REVISION_DATABASE_URL;
+const doctorConnectionString = databaseUrl;
+const doctorDbTimeoutMs = Math.max(
+  1_000,
+  Number(process.env.BRAIN_DOCTOR_DB_TIMEOUT_MS || 5_000)
+);
+const doctorPool = databaseUrl
+  ? new Pool({
+      max: 2,
+      connectionString: doctorConnectionString,
+      connectionTimeoutMillis: doctorDbTimeoutMs,
+      query_timeout: doctorDbTimeoutMs,
+      statement_timeout: doctorDbTimeoutMs,
+    })
+  : null;
 const maxSyncHealthAgeMs = Number(
   process.env.BRAIN_SYNC_HEALTH_MAX_AGE_MS || 2 * 60 * 1000
 );
@@ -130,7 +152,9 @@ const CHECK_STATUS_RANK = {
 const checks = [];
 
 function addCheck(name, status, details = {}) {
-  checks.push({ name, status, details });
+  const check = { name, status, details };
+  checks.push(check);
+  return check;
 }
 
 function numericEnv(name) {
@@ -296,6 +320,53 @@ async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf-8"));
 }
 
+async function addFreshOperationCacheCheck() {
+  if (forceDeepOperationRefresh) return false;
+  try {
+    const cache = await readJson(userOperationTelemetryCacheFile);
+    const cachedAtMs = Date.parse(cache.cachedAt || "");
+    const ageMs = Number.isFinite(cachedAtMs) ? Date.now() - cachedAtMs : Infinity;
+    if (
+      cache.version !== 1 ||
+      cache.brainId !== brainId ||
+      cache.check?.name !== "user_operation_latency" ||
+      ageMs < 0 ||
+      ageMs > userOperationTelemetryRefreshMs
+    ) {
+      return false;
+    }
+    addCheck(cache.check.name, cache.check.status, {
+      ...cache.check.details,
+      telemetryCache: {
+        state: "fresh",
+        cachedAt: cache.cachedAt,
+        ageMs,
+        refreshMs: userOperationTelemetryRefreshMs,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function cacheOperationCheck(check) {
+  if (!check) return;
+  const cachedAt = new Date().toISOString();
+  const tempPath = `${userOperationTelemetryCacheFile}.${process.pid}.next`;
+  try {
+    await fs.mkdir(path.dirname(userOperationTelemetryCacheFile), { recursive: true });
+    await fs.writeFile(
+      tempPath,
+      `${JSON.stringify({ version: 1, brainId, cachedAt, check }, null, 2)}\n`,
+      "utf-8"
+    );
+    await fs.rename(tempPath, userOperationTelemetryCacheFile);
+  } catch {
+    await fs.rm(tempPath, { force: true }).catch(() => undefined);
+  }
+}
+
 function hostedHealthFailureDetails(error) {
   const cause = error?.cause || {};
   const code = cause.code || error?.code || "";
@@ -374,7 +445,7 @@ async function checkPostgresSummary() {
     return;
   }
 
-  const pool = new Pool({ max: 2, connectionString: databaseUrl });
+  const pool = doctorPool;
   try {
     const result = await pool.query(
       `
@@ -401,8 +472,6 @@ async function checkPostgresSummary() {
       databaseUrl: "set",
       error: error.message,
     });
-  } finally {
-    await pool.end().catch(() => undefined);
   }
 }
 
@@ -416,7 +485,7 @@ async function checkRecentActivity() {
     return;
   }
 
-  const pool = new Pool({ max: 2, connectionString: databaseUrl });
+  const pool = doctorPool;
   try {
     const result = await pool.query(
       `
@@ -492,8 +561,6 @@ async function checkRecentActivity() {
       error: error.message,
       events: [],
     });
-  } finally {
-    await pool.end().catch(() => undefined);
   }
 }
 
@@ -592,23 +659,25 @@ async function checkSyncHealth() {
 }
 
 async function checkUserOperationLatency() {
+  if (await addFreshOperationCacheCheck()) return;
+
   let postgresFallback = null;
   if (databaseUrl) {
     try {
-      const pool = new Pool({ max: 2, connectionString: databaseUrl });
-      try {
-        const primarySourceFilter =
-          "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')";
-        const clientSourceFilter =
-          "and metadata->>'source' in ('hosted_mcp_client_e2e', 'smoke-hosted-oauth')";
-        const serverTelemetry = await readPostgresOperationTelemetry(
-          pool,
-          primarySourceFilter
-        );
-        const clientTelemetry = await readPostgresOperationTelemetry(pool, clientSourceFilter);
-        const history = serverTelemetry.history;
-        const clientHistory = clientTelemetry.history;
-        if (history.length > 0 || clientHistory.length > 0) {
+      const pool = doctorPool;
+      const primarySourceFilter =
+        "and (metadata->>'source' = 'hosted_mcp_server' or metadata->>'kind' = 'sync_wait')";
+      const clientSourceFilter =
+        "and metadata->>'source' in ('hosted_mcp_client_e2e', 'smoke-hosted-oauth')";
+      const serverTelemetry = await readPostgresOperationTelemetry(
+        pool,
+        primarySourceFilter
+      );
+      const clientTelemetry = await readPostgresOperationTelemetry(pool, clientSourceFilter);
+      const history = serverTelemetry.history;
+      const clientHistory = clientTelemetry.history;
+      if (history.length > 0 || clientHistory.length > 0) {
+        await cacheOperationCheck(
           addUserOperationLatencyCheck({
             source: "postgres",
             telemetrySource: "hosted_mcp_server_plus_sync_wait_plus_client_e2e",
@@ -618,13 +687,15 @@ async function checkUserOperationLatency() {
             operationCount: history.length,
             usageStats: serverTelemetry.usageStats,
             eventLog: mergeEventLogs(serverTelemetry.eventLog, clientTelemetry.eventLog),
-          });
-          return;
-        }
+          })
+        );
+        return;
+      }
 
-        const legacyTelemetry = await readPostgresOperationTelemetry(pool, "");
-        const legacyHistory = legacyTelemetry.history;
-        if (legacyHistory.length > 0) {
+      const legacyTelemetry = await readPostgresOperationTelemetry(pool, "");
+      const legacyHistory = legacyTelemetry.history;
+      if (legacyHistory.length > 0) {
+        await cacheOperationCheck(
           addUserOperationLatencyCheck({
             source: "postgres",
             telemetrySource: "legacy_client_or_unspecified",
@@ -634,14 +705,12 @@ async function checkUserOperationLatency() {
             operationCount: legacyHistory.length,
             usageStats: legacyTelemetry.usageStats,
             eventLog: legacyTelemetry.eventLog,
-          });
-          return;
-        }
-
-        postgresFallback = { postgresState: "empty" };
-      } finally {
-        await pool.end().catch(() => undefined);
+          })
+        );
+        return;
       }
+
+      postgresFallback = { postgresState: "empty" };
     } catch (error) {
       postgresFallback = {
         postgresState: "unreadable",
@@ -653,7 +722,7 @@ async function checkUserOperationLatency() {
   try {
     const snapshot = await readJson(userOperationLatencyFile);
     const history = latencyHistoryFromSnapshot(snapshot);
-    addUserOperationLatencyCheck({
+    await cacheOperationCheck(addUserOperationLatencyCheck({
       status: postgresFallback?.postgresState === "unreadable" ? "warn" : "pass",
       source: "local_json_cache",
       latencyFile: userOperationLatencyFile,
@@ -667,7 +736,7 @@ async function checkUserOperationLatency() {
       usageStats: summarizeOperationUsage(history),
       eventLog: eventLogFromHistory(history, "local_json_cache"),
       ...postgresFallback,
-    });
+    }));
   } catch (error) {
     if (error?.code === "ENOENT") {
       if (postgresFallback?.postgresState === "unreadable") {
@@ -707,18 +776,31 @@ async function checkSyncHeartbeat() {
     return;
   }
 
-  const pool = new Pool({ max: 1, connectionString: databaseUrl });
+  const pool = doctorPool;
   try {
-    const result = await pool.query(
-      `
-        select created_at, duration_ms, metadata
-        from brain.sync_events
-        where brain_id = $1 and event_type = $2
-        order by created_at desc
-        limit 1
-      `,
-      [brainId, SYNC_HEARTBEAT_EVENT_TYPE]
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `
+          select last_seen_at as created_at, duration_ms, metadata
+          from brain.sync_heartbeats
+          where brain_id = $1
+        `,
+        [brainId]
+      );
+    } catch (error) {
+      if (error?.code !== "42P01") throw error;
+      result = await pool.query(
+        `
+          select created_at, duration_ms, metadata
+          from brain.sync_events
+          where brain_id = $1 and event_type = $2
+          order by created_at desc
+          limit 1
+        `,
+        [brainId, SYNC_HEARTBEAT_EVENT_TYPE]
+      );
+    }
     const evaluation = evaluateSyncHeartbeat(
       result.rows[0] || null,
       Date.now(),
@@ -731,8 +813,6 @@ async function checkSyncHeartbeat() {
       maxAgeMs: maxSyncHeartbeatAgeMs,
       error: String(error?.message || error).slice(0, 180),
     });
-  } finally {
-    await pool.end().catch(() => undefined);
   }
 }
 
@@ -741,10 +821,10 @@ function latencyRowsQuery(sourceFilter) {
     select event_type, filename, duration_ms, metadata, created_at
     from brain.sync_events
     where brain_id = $1
-      and event_type = $2
+      and event_type = 'hosted_mcp_latency'
       ${sourceFilter}
     order by created_at desc
-    limit $3
+    limit $2
   `;
 }
 
@@ -766,7 +846,7 @@ function operationUsageRowsQuery(sourceFilter) {
       )::int as failed_7d
     from brain.sync_events
     where brain_id = $1
-      and event_type = any($2::text[])
+      and event_type in ('hosted_mcp_latency', 'hosted_mcp_auth')
       ${sourceFilter}
     group by kind
     order by kind
@@ -778,11 +858,11 @@ function operationLogRowsQuery(sourceFilter) {
     select event_type, filename, duration_ms, metadata, created_at
     from brain.sync_events
     where brain_id = $1
-      and event_type = any($2::text[])
+      and event_type in ('hosted_mcp_latency', 'hosted_mcp_auth')
       ${sourceFilter}
-      and created_at >= $3::timestamptz
+      and created_at >= $2::timestamptz
     order by created_at desc
-    limit $4
+    limit $3
   `;
 }
 
@@ -810,16 +890,11 @@ async function readPostgresOperationTelemetry(pool, sourceFilter) {
   const [latencyResult, usageResult, eventLogResult] = await Promise.all([
     pool.query(latencyRowsQuery(sourceFilter), [
       brainId,
-      HOSTED_MCP_LATENCY_EVENT_TYPE,
       userOperationLatencyHistoryLimit,
     ]),
-    pool.query(operationUsageRowsQuery(sourceFilter), [
-      brainId,
-      [HOSTED_MCP_LATENCY_EVENT_TYPE, HOSTED_MCP_AUTH_EVENT_TYPE],
-    ]),
+    pool.query(operationUsageRowsQuery(sourceFilter), [brainId]),
     pool.query(operationLogRowsQuery(sourceFilter), [
       brainId,
-      [HOSTED_MCP_LATENCY_EVENT_TYPE, HOSTED_MCP_AUTH_EVENT_TYPE],
       eventLogCutoff,
       userOperationEventLogLimit,
     ]),
@@ -934,7 +1009,7 @@ function addUserOperationLatencyCheck({
     thresholds: latencySloThresholds,
   });
 
-  addCheck("user_operation_latency", combineCheckStatuses(status, performance.status), {
+  return addCheck("user_operation_latency", combineCheckStatuses(status, performance.status), {
     source,
     telemetrySource,
     latencyFile,
@@ -1189,19 +1264,19 @@ async function checkAuthFailures() {
     return;
   }
 
-  const pool = new Pool({ max: 2, connectionString: databaseUrl });
+  const pool = doctorPool;
   try {
     const result = await pool.query(
       `
         select event_type, filename, duration_ms, metadata, created_at
         from brain.sync_events
         where brain_id = $1
-          and event_type = $2
-          and created_at >= now() - make_interval(mins => ($3::int * 2))
+          and event_type = 'hosted_mcp_auth'
+          and created_at >= now() - make_interval(mins => ($2::int * 2))
         order by created_at desc
-        limit $4
+        limit $3
       `,
-      [brainId, HOSTED_MCP_AUTH_EVENT_TYPE, windowMinutes, authFailureEventLimit]
+      [brainId, windowMinutes, authFailureEventLimit]
     );
     // Registered client ids let the summary tell a benign stale-connector loop
     // (an unrecognized client id retrying refresh) apart from a real incident.
@@ -1237,8 +1312,6 @@ async function checkAuthFailures() {
       error: String(error?.message || error).slice(0, 180),
       windowMinutes,
     });
-  } finally {
-    await pool.end().catch(() => undefined);
   }
 }
 
@@ -1465,7 +1538,7 @@ async function checkPoolerConfig() {
   // holds across all clients. max:1 so this probe adds at most one connection.
   let activeConnections = null;
   let connectionError = null;
-  const pool = new Pool({ max: 1, connectionString: databaseUrl });
+  const pool = doctorPool;
   try {
     const result = await pool.query(
       "select count(*)::int as n from pg_stat_activity where usename = current_user"
@@ -1473,8 +1546,6 @@ async function checkPoolerConfig() {
     activeConnections = result.rows[0]?.n ?? null;
   } catch (error) {
     connectionError = error.message;
-  } finally {
-    await pool.end().catch(() => undefined);
   }
 
   // Warn only on the deterministic session-mode config. activeConnections is
@@ -1502,22 +1573,26 @@ async function checkPoolerConfig() {
 
 const doctorStartedAt = Date.now();
 
-await Promise.all([
-  timedCheck("hosted_health", checkHostedHealth),
-  timedCheck("postgres_summary", checkPostgresSummary),
-  timedCheck("recent_activity", checkRecentActivity),
-  timedCheck("local_sync_state", checkLocalState),
-  timedCheck("sync_lock", checkSyncLock),
-  timedCheck("sync_health", checkSyncHealth),
-  timedCheck("sync_heartbeat", checkSyncHeartbeat),
-  timedCheck("user_operation_latency", checkUserOperationLatency),
-  timedCheck("hosted_mcp_auth_failures", checkAuthFailures),
-  timedCheck("lint_nudge", checkLintNudge),
-  timedCheck("inbox", checkInbox),
-  timedCheck("launchd", checkLaunchd),
-  timedCheck("fly_status", checkFlyStatus),
-  timedCheck("pooler_config", checkPoolerConfig),
-]);
+try {
+  await Promise.all([
+    timedCheck("hosted_health", checkHostedHealth),
+    timedCheck("postgres_summary", checkPostgresSummary),
+    timedCheck("recent_activity", checkRecentActivity),
+    timedCheck("local_sync_state", checkLocalState),
+    timedCheck("sync_lock", checkSyncLock),
+    timedCheck("sync_health", checkSyncHealth),
+    timedCheck("sync_heartbeat", checkSyncHeartbeat),
+    timedCheck("user_operation_latency", checkUserOperationLatency),
+    timedCheck("hosted_mcp_auth_failures", checkAuthFailures),
+    timedCheck("lint_nudge", checkLintNudge),
+    timedCheck("inbox", checkInbox),
+    timedCheck("launchd", checkLaunchd),
+    timedCheck("fly_status", checkFlyStatus),
+    timedCheck("pooler_config", checkPoolerConfig),
+  ]);
+} finally {
+  await doctorPool?.end().catch(() => undefined);
+}
 
 const failed = checks.filter((check) => check.status === "fail");
 const warnings = checks.filter((check) => check.status === "warn");
