@@ -255,6 +255,10 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /count_7d/);
   assert.match(script, /summarizeLatencyHistory/);
   assert.match(script, /lint_nudge/);
+  assert.match(script, /lint_findings/);
+  assert.match(script, /BRAIN_LINT_REPORT_FILE/);
+  assert.match(script, /maintenance_cache/);
+  assert.match(script, /Cockpit Maintenance/);
   assert.match(script, /BRAIN_LINT_NUDGE_DAYS/);
   assert.match(script, /lastLintAt/);
   assert.match(script, /inbox/);
@@ -490,7 +494,7 @@ test("hosted doctor bounds database work and caches deep operation telemetry", a
   assert.equal((doctor.match(/new Pool\(/g) || []).length, 1);
 });
 
-test("hosted cockpit is local-only and read-only", async () => {
+test("hosted cockpit is local-only with narrowly guarded maintenance writes", async () => {
   const packageJson = JSON.parse(
     await fs.readFile(path.join(repoRoot, "package.json"), "utf-8")
   );
@@ -601,6 +605,14 @@ test("hosted cockpit is local-only and read-only", async () => {
   assert.match(script, /Cockpit Watch/);
   assert.match(script, /localDateTime/);
   assert.match(script, /operationLog/);
+  assert.match(script, /BRAIN_LINT_REPORT_FILE/);
+  assert.match(script, /\/api\/lint\/report/);
+  assert.match(script, /\/api\/lint\/run/);
+  assert.match(script, /\/api\/inbox\/scan/);
+  assert.match(script, /Run lint now/);
+  assert.match(script, /Safe Mechanical Fixes/);
+  assert.match(script, /runMaintenanceLint/);
+  assert.match(script, /countLintIssues/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });
 

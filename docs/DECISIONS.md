@@ -8,6 +8,20 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Make Cockpit Maintenance the executable lint and inbox surface
+
+**Decision:** Rename the Cockpit **Fixes** tab to **Maintenance** and make it the primary operator surface for detection plus governed repair. **Run lint now** calls the canonical `runLint` implementation, records one narrow `LINT` receipt through the active Brain store, and atomically writes a per-profile `hosted-lint-report.json`. The doctor reads that cache first and reports freshness (`lint_nudge`) separately from current results (`lint_findings`). Each Monitor profile must carry the same explicit `BRAIN_LINT_MODE_OVERRIDES` promotion mode as its hosted deployment; synthesized local registries carry the standard graph roots and rotated-history exemptions so that promotion remains meaningful. Primary lint findings stay individually visible, while high-volume graph edge diagnostics are counted and grouped into one bounded review signal rather than flooding the action surface. The same tab exposes a visibility-only inbox scan and retains per-item application of the safe mechanical task fixes. Semantic and structural lint findings remain review-required; Inbox files are not ingested, classified, moved, or deleted. An empty mechanical plan must not be presented as a clean Brain. Mechanical apply reruns lint to refresh the cache without duplicating its existing receipt.
+
+**Why:** The previous operator journey detected lint and Inbox warnings in Brain Monitor but required a different client or CLI to rerun the detector, while the misleading Fixes empty state could say the Brain was clean merely because no automatic task edits existed. Keeping detection, current findings, and the narrow repair plan together preserves observability and makes warnings actionable without turning Cockpit into a general editing or admin surface. The report cache also lets routine doctor polling render current findings without rerunning lint or adding database load.
+
+**Security posture:** `POST /api/lint/run` uses the same loopback Host allowlist, per-process nonce, JSON-only content type, and no-CORS posture as `POST /api/fixes/apply`. `GET /api/lint/report`, `GET /api/inbox/scan`, and `GET /api/fixes/plan` are loopback-only reads. Lint runs are explicit and single-flight per Cockpit process; routine refresh stays read-only. This extends, rather than removes, the narrow localhost-write decision from 2026-07-01.
+
+**Alternatives rejected:** Keep warnings detection-only in Cockpit (surface switching remains); run lint on every refresh (unnecessary local/hosted load and write amplification if receipts are recorded); auto-apply all findings (semantic corruption risk); auto-ingest Inbox files (classification and source metadata require judgement); treat an empty mechanical plan as an all-clear result (conflates fixability with lint health).
+
+**Related:** `scripts/hosted-cockpit.mjs`; `scripts/hosted-doctor.mjs`; `scripts/install-brain-menubar-app.mjs`; `src/services/lint.ts`; `test/cockpit-fixes.test.mjs`; `docs/hosted-cockpit.md`; `docs/specs/010-cockpit-fixes-tab.md`; 2026-07-01 localhost write and mechanical lint-fix decisions below.
+
+---
+
 ## 2026-08-19 — Bound observability IO with current-state heartbeats and one doctor owner
 
 **Decision:** Keep the five-second local sync loop and five-minute hosted stale-heartbeat threshold, but represent normal sync liveness as one upserted `brain.sync_heartbeats` row per Brain, written at most once per minute. Reserve append-only `brain.sync_events` for real hosted operations, auth events, transitions, and other historical events. Brain Monitor remains the sole automatic doctor owner in the consolidated local stack; Cockpit reloads Monitor's last-good report instead of launching a duplicate doctor. The doctor uses one two-connection pool with five-second connection/query/statement limits, refreshes historical operation telemetry at most every 15 minutes, and retains a manual force-deep path. Monitor terminates a doctor that exceeds 45 seconds and keeps the previous valid report.

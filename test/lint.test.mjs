@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "brain-lint-test-"));
 process.env.BRAIN_DIR = tmpDir;
 
-const { runLint, formatLintReport } = await import(
+const { runLint, formatLintReport, countLintIssues } = await import(
   path.join(__dirname, "..", "dist", "services", "lint.js")
 );
 const { FileRevisionStore } = await import(
@@ -434,5 +434,9 @@ test("legacy lint remains the default and bootstrap budget excess is review-only
   assert.equal(report.graphReachability, null);
   assert.equal(report.bootstrapBudget.exceeded, true);
   assert.ok(report.bootstrapBudget.estimatedTokens > 2_500);
-  assert.match(formatLintReport(report), /Review required:.*budget exceeded/i);
+  const issueCount = countLintIssues(report);
+  const formatted = formatLintReport(report);
+  assert.ok(issueCount >= 1);
+  assert.match(formatted, new RegExp(`\\*\\*${issueCount} issue\\(s\\) found`));
+  assert.match(formatted, /Review required:.*budget exceeded/i);
 });

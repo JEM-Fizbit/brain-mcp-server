@@ -82,6 +82,26 @@ export interface LintReport {
   warnings: string[];
 }
 
+/**
+ * Count actionable lint findings from the canonical report shape. Presentation
+ * layers use this helper so Cockpit, MCP output, and receipts cannot drift on
+ * what "issues found" means.
+ */
+export function countLintIssues(report: LintReport): number {
+  return (
+    report.bloat.length +
+    report.stale.length +
+    report.orphans.length +
+    report.drift.length +
+    report.largeDomainPacks.length +
+    report.unindexedWorkingBinaries.length +
+    (report.journalRotation ? 1 : 0) +
+    (report.captureQueue ? 1 : 0) +
+    (report.bootstrapBudget.exceeded ? 1 : 0) +
+    (report.graphReachability?.diagnostics.length || 0)
+  );
+}
+
 function countLines(content: string): number {
   return content.split("\n").length;
 }
@@ -478,17 +498,7 @@ export function formatLintReport(report: LintReport): string {
   const sections: string[] = ["# Brain Lint Report\n"];
 
   // Summary
-  const issueCount =
-    report.bloat.length +
-    report.stale.length +
-    report.orphans.length +
-    report.drift.length +
-    report.largeDomainPacks.length +
-    report.unindexedWorkingBinaries.length +
-    (report.journalRotation ? 1 : 0) +
-    (report.captureQueue ? 1 : 0) +
-    (report.bootstrapBudget.exceeded ? 1 : 0) +
-    (report.graphReachability?.diagnostics.length || 0);
+  const issueCount = countLintIssues(report);
 
   sections.push(
     issueCount === 0

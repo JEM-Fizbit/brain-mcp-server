@@ -48,6 +48,9 @@ const stateFile =
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE || `${stateFile}.lock`;
 const healthFile =
   process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
+const lintReportFile =
+  process.env.BRAIN_LINT_REPORT_FILE ||
+  path.join(path.dirname(healthFile), "hosted-lint-report.json");
 const syncLogDir =
   process.env.BRAIN_SYNC_LOG_DIR ||
   process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR ||
@@ -150,6 +153,8 @@ const CHECK_STATUS_RANK = {
 };
 
 const checks = [];
+let maintenanceLintReportPromise = null;
+let maintenanceLintReportError = null;
 
 function addCheck(name, status, details = {}) {
   const check = { name, status, details };
@@ -318,6 +323,30 @@ function isProcessAlive(pid) {
 
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf-8"));
+}
+
+function readMaintenanceLintReport() {
+  if (!maintenanceLintReportPromise) {
+    maintenanceLintReportPromise = readJson(lintReportFile)
+      .then((payload) => {
+        const checkedAtMs = Date.parse(payload?.checkedAt || "");
+        if (
+          payload?.version !== 1 ||
+          payload?.brainId !== brainId ||
+          !Number.isFinite(checkedAtMs)
+        ) {
+          maintenanceLintReportError = "invalid or mismatched lint report cache";
+          return null;
+        }
+        return payload;
+      })
+      .catch((error) => {
+        if (error?.code === "ENOENT") return null;
+        maintenanceLintReportError = String(error?.message || error).slice(0, 180);
+        return null;
+      });
+  }
+  return maintenanceLintReportPromise;
 }
 
 async function addFreshOperationCacheCheck() {
@@ -1044,6 +1073,26 @@ function addUserOperationLatencyCheck({
 }
 
 async function checkLintNudge() {
+  const cachedReport = await readMaintenanceLintReport();
+  if (cachedReport) {
+    const checkedAtMs = Date.parse(cachedReport.checkedAt);
+    const ageDays = Math.floor((Date.now() - checkedAtMs) / 86400000);
+    addCheck("lint_nudge", ageDays > lintNudgeDays ? "warn" : "pass", {
+      lintReportFile,
+      source: "maintenance_cache",
+      state: ageDays > lintNudgeDays ? "stale" : "fresh",
+      lastLintAt: cachedReport.checkedAt,
+      ageDays,
+      maxAgeDays: lintNudgeDays,
+      issueCount: cachedReport.issueCount || 0,
+      primaryIssueCount:
+        cachedReport.primaryIssueCount ?? cachedReport.issueCount ?? 0,
+      diagnosticCount: cachedReport.diagnosticCount || 0,
+      automaticFixCount: cachedReport.automaticFixCount || 0,
+    });
+    return;
+  }
+
   const logFile = path.join(brainDir, "LOG.md");
   try {
     const content = await fs.readFile(logFile, "utf-8");
@@ -1054,6 +1103,9 @@ async function checkLintNudge() {
         state: "never_run",
         lastLintAt: null,
         maxAgeDays: lintNudgeDays,
+        ...(maintenanceLintReportError
+          ? { lintReportFile, lintReportError: maintenanceLintReportError }
+          : {}),
       });
       return;
     }
@@ -1066,6 +1118,9 @@ async function checkLintNudge() {
       lastLintAt: match[1],
       ageDays,
       maxAgeDays: lintNudgeDays,
+      ...(maintenanceLintReportError
+        ? { lintReportFile, lintReportError: maintenanceLintReportError }
+        : {}),
     });
   } catch (error) {
     addCheck("lint_nudge", "warn", {
@@ -1073,8 +1128,46 @@ async function checkLintNudge() {
       state: "unreadable",
       error: error.message,
       maxAgeDays: lintNudgeDays,
+      ...(maintenanceLintReportError
+        ? { lintReportFile, lintReportError: maintenanceLintReportError }
+        : {}),
     });
   }
+}
+
+async function checkLintFindings() {
+  const cachedReport = await readMaintenanceLintReport();
+  if (!cachedReport) {
+    addCheck("lint_findings", maintenanceLintReportError ? "warn" : "pass", {
+      lintReportFile,
+      state: maintenanceLintReportError ? "unreadable" : "unavailable",
+      issueCount: null,
+      note: "Run lint in Cockpit Maintenance to create a current structured report.",
+      ...(maintenanceLintReportError ? { error: maintenanceLintReportError } : {}),
+    });
+    return;
+  }
+
+  const issueCount = Number(cachedReport.issueCount || 0);
+  const diagnosticCount = Number(
+    cachedReport.diagnosticCount ??
+      cachedReport.report?.graphReachability?.diagnostics?.length ??
+      0
+  );
+  const primaryIssueCount = Number(
+    cachedReport.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
+  );
+  addCheck("lint_findings", issueCount > 0 ? "warn" : "pass", {
+    lintReportFile,
+    state: issueCount > 0 ? "findings" : "clear",
+    checkedAt: cachedReport.checkedAt,
+    issueCount,
+    primaryIssueCount,
+    diagnosticCount,
+    automaticFixCount: Number(cachedReport.automaticFixCount || 0),
+    reviewFindings: (cachedReport.reviewFindings || []).slice(0, 20),
+    warnings: (cachedReport.warnings || []).slice(0, 20),
+  });
 }
 
 async function checkInbox() {
@@ -1321,6 +1414,7 @@ function buildOperatorActions(status) {
   const sync = checkByName("sync_health");
   const launchd = checkByName("launchd");
   const lint = checkByName("lint_nudge");
+  const lintFindings = checkByName("lint_findings");
   const inbox = checkByName("inbox");
   const latency = checkByName("user_operation_latency");
   const heartbeat = checkByName("sync_heartbeat");
@@ -1381,8 +1475,29 @@ function buildOperatorActions(status) {
     actions.push({
       level: "warn",
       reason: "stale_lint",
-      title: "Run brain_lint before accuracy-sensitive Brain work.",
-      detail: "The last lint pass is missing, stale, or unreadable from the local Brain log.",
+      title: "Run lint from Cockpit Maintenance before accuracy-sensitive Brain work.",
+      detail: "The last lint pass is missing, stale, or unreadable. Maintenance records the receipt and refreshes the structured findings.",
+    });
+  }
+
+  if (lintFindings?.status === "warn") {
+    const issueCount = Number(lintFindings.details?.issueCount || 0);
+    const primaryIssueCount = Number(
+      lintFindings.details?.primaryIssueCount ?? issueCount
+    );
+    const diagnosticCount = Number(lintFindings.details?.diagnosticCount || 0);
+    const automaticFixCount = Number(lintFindings.details?.automaticFixCount || 0);
+    actions.push({
+      level: "warn",
+      reason: "lint_findings",
+      title:
+        diagnosticCount > 0
+          ? `Review ${primaryIssueCount} lint finding(s) and ${diagnosticCount} grouped graph diagnostic(s) in Cockpit Maintenance.`
+          : `Review ${issueCount} current lint finding(s) in Cockpit Maintenance.`,
+      detail:
+        automaticFixCount > 0
+          ? `${automaticFixCount} safe mechanical fix(es) can be selected there; remaining findings require judgement.`
+          : "No safe automatic fixes are available; the findings require operator judgement.",
     });
   }
 
@@ -1391,7 +1506,7 @@ function buildOperatorActions(status) {
       level: "warn",
       reason: "pending_inbox",
       title: "Review pending Brain inbox files.",
-      detail: "Run brain_scan_inbox and process or intentionally defer the pending source files.",
+      detail: "Open Cockpit Maintenance > Inbox, then process or intentionally defer the pending source files.",
     });
   }
 
@@ -1458,6 +1573,7 @@ function buildOperatorActions(status) {
     "sync_health",
     "launchd",
     "lint_nudge",
+    "lint_findings",
     "inbox",
     "hosted_mcp_auth_failures",
     "sync_heartbeat",
@@ -1585,6 +1701,7 @@ try {
     timedCheck("user_operation_latency", checkUserOperationLatency),
     timedCheck("hosted_mcp_auth_failures", checkAuthFailures),
     timedCheck("lint_nudge", checkLintNudge),
+    timedCheck("lint_findings", checkLintFindings),
     timedCheck("inbox", checkInbox),
     timedCheck("launchd", checkLaunchd),
     timedCheck("fly_status", checkFlyStatus),

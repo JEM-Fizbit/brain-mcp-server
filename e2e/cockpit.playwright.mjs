@@ -447,6 +447,26 @@ async function expectOperationLogTablePolish(page) {
   expect(tableLayout.noPageOverflow).toBe(true);
 }
 
+async function expectMaintenanceLayout(page, { desktop }) {
+  await page.getByRole("tab", { name: "Maintenance", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Brain Lint", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Safe Mechanical Fixes", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run lint now", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Scan inbox", exact: true })).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const grid = document.querySelector(".maintenance-grid");
+    return {
+      columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").length : 0,
+      noPageOverflow:
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+    };
+  });
+  expect(layout.columns).toBe(desktop ? 2 : 1);
+  expect(layout.noPageOverflow).toBe(true);
+}
+
 test("cockpit renders deterministic status on desktop and narrow viewports", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo);
   try {
@@ -457,6 +477,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitLandingRedesign(page, { desktop: true });
     await expectCockpitNavigationHierarchy(page, { desktop: true });
     await expectOperationLogTablePolish(page);
+    await expectMaintenanceLayout(page, { desktop: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
@@ -464,6 +485,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: false });
     await expectCockpitNavigationHierarchy(page, { desktop: false });
+    await expectMaintenanceLayout(page, { desktop: false });
   } finally {
     await stopCockpit(child);
   }
