@@ -1,12 +1,22 @@
 # 010 - Cockpit "Fixes" Tab (per-item approve + localhost write endpoint)
 
-**Status:** implemented 2026-07-01; fix-kind set narrowed 2026-07-17 by spec 013 to ordinary task fixes only
+**Status:** implemented 2026-07-01; fix-kind set narrowed 2026-07-17 by spec 013 to ordinary task fixes only; extended 2026-08-19 into the Cockpit Maintenance surface
 **Source:** conversation request, 2026-07-01. The menubar dropdown + Objective-C modal from spec 009 is poor UX; a cockpit tab that lists each pending fix and lets the operator approve per item is better, and enables per-item (not all-or-nothing) approval.
 **Roadmap link:** Brain quality hardening; operator ergonomics.
 **Decisions impact:** Extends the 2026-07-01 decision — the cockpit gains **one localhost-only write endpoint**, a further scoped relaxation of the read-only invariant. Requires a `docs/DECISIONS.md` update.
 **Related:** `scripts/hosted-cockpit.mjs`; `src/services/lint-fix.ts`; `src/services/lint-apply.ts`; `docs/specs/009-brain-lint-apply-mode.md`; `docs/hosted-cockpit.md`.
 
-> Current contract: `orphan_index` and `reviewed_date` were removed by spec 013. The live Fixes tab can present only `task_relocate`, `done_stamp`, and `done_archive`; no plan or apply route may modify `00_loader.md` or `NOW.md`. Historical design details below describe the original 2026-07-01 shape.
+> Current contract: `orphan_index` and `reviewed_date` were removed by spec 013. The live Maintenance tab can present only `task_relocate`, `done_stamp`, and `done_archive` as safe automatic fixes; no plan or apply route may modify `00_loader.md` or `NOW.md`. Historical design details below describe the original 2026-07-01 shape.
+
+> 2026-08-19 extension: the tab is now named **Maintenance** and also exposes
+> explicit canonical lint execution plus a visibility-only inbox scan.
+> `POST /api/lint/run` records one narrow `LINT` receipt and atomically updates a
+> per-profile structured report cache; `GET /api/lint/report` and
+> `GET /api/inbox/scan` are loopback-only reads. The doctor separates lint
+> freshness (`lint_nudge`) from current findings (`lint_findings`). Semantic and
+> structural findings remain review-only, while the original safe task-fix
+> contract below is unchanged. Both POST routes share the Host allowlist,
+> per-process nonce, JSON-only, and no-CORS controls.
 
 ## Problem
 

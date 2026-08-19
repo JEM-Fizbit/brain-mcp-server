@@ -151,6 +151,7 @@ const profileEnvKeys = new Set([
   "BRAIN_SYNC_HEARTBEAT_INTERVAL_MS",
   "BRAIN_DOCTOR_OPERATION_REFRESH_MS",
   "BRAIN_DOCTOR_DB_TIMEOUT_MS",
+  "BRAIN_LINT_MODE_OVERRIDES",
   "FLY_CONFIG_DIR",
 ]);
 
@@ -270,6 +271,10 @@ function normalizeProfile(rawProfile, index) {
     BRAIN_DOCTOR_OPERATION_CACHE_FILE: path.join(
       profileLogDir,
       "hosted-doctor-operation-cache.json"
+    ),
+    BRAIN_LINT_REPORT_FILE: path.join(
+      profileLogDir,
+      "hosted-lint-report.json"
     ),
     PATH: runtimePath,
   };

@@ -439,6 +439,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
     config.env.BRAIN_DOCTOR_OPERATION_CACHE_FILE,
     path.join(logDir, "hosted-doctor-operation-cache.json")
   );
+  assert.equal(
+    config.env.BRAIN_LINT_REPORT_FILE,
+    path.join(logDir, "hosted-lint-report.json")
+  );
   assert.deepEqual(JSON.parse(config.env.BRAIN_COCKPIT_PROFILES_JSON), [
     {
       brainId: "ers-brain",
@@ -589,6 +593,9 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       healthFile: path.join(tmpRoot, "state", "jem", "state.health.json"),
       logDir: path.join(tmpRoot, "logs", "jem"),
       cockpitUrl: "http://127.0.0.1:8787/",
+      env: {
+        BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ai-brain-jem": "graph" }),
+      },
     },
     {
       id: "ers-brain",
@@ -598,6 +605,7 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
         BRAIN_REVISION_DATABASE_URL: "postgresql://ers-runtime.example.invalid/postgres",
         BRAIN_HOSTED_BASE_URL: "https://brain.example.com",
         BRAIN_FLY_APP: "example-brain-mcp",
+        BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ers-brain": "graph" }),
         FLY_CONFIG_DIR: path.join(tmpRoot, "fly-secondary"),
       },
       stateFile: path.join(tmpRoot, "state", "ers", "state.json"),
@@ -644,12 +652,20 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
   assert.equal(config.brains[0].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "jem", "brain-monitor-stack.json"));
   assert.equal(config.brains[0].env.BRAIN_PROFILE_NAME, "JEM");
   assert.equal(config.brains[0].env.BRAIN_COCKPIT_URL, "http://127.0.0.1:8787/");
+  assert.equal(
+    config.brains[0].cockpitProcess.env.BRAIN_LINT_MODE_OVERRIDES,
+    JSON.stringify({ "ai-brain-jem": "graph" })
+  );
   assert.equal(config.brains[1].brainId, "ers-brain");
   assert.equal(config.brains[1].displayName, "ERS");
   assert.equal(config.brains[1].brainDir, path.join(ersRoot, "brain"));
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8788");
   assert.equal(config.brains[1].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "ers", "brain-monitor-stack.json"));
   assert.equal(config.brains[1].env.BRAIN_REVISION_DATABASE_URL, "postgresql://ers-runtime.example.invalid/postgres");
+  assert.equal(
+    config.brains[1].cockpitProcess.env.BRAIN_LINT_MODE_OVERRIDES,
+    JSON.stringify({ "ers-brain": "graph" })
+  );
   assert.equal(config.brains[1].syncProcess.env.BRAIN_HOSTED_BASE_URL, "https://brain.example.com");
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_FLY_APP, "example-brain-mcp");
   assert.equal(

@@ -3,7 +3,7 @@
 **Status:** active operator guide
 **Last updated:** 2026-08-19
 
-Brain Cockpit is the local read-only operator surface for the hosted JEM Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it?
+Brain Cockpit is the local, read-mostly operator surface for the hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can hosted Brain be trusted right now, or does John need to intervene before using it? Its narrow Maintenance actions are documented below; it is not a general Brain editor or admin surface.
 
 ## Current Recommendation
 
@@ -34,7 +34,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
-- the cockpit browser surface exposes no Brain writes or conflict resolutions; the menu-bar app's one exception is the confirm-gated **Controls → "Apply Lint Fixes..."** action, which delegates to the governed fixer (see "Applying Brain Lint Fixes" below) and never mutates Postgres/Storage/files directly, resolves conflicts, or performs admin mutations.
+- the cockpit browser surface exposes no general Brain editing, conflict resolution, source ingestion, or admin mutations; its narrow Maintenance exceptions are an explicit lint run that records one `LINT` receipt and the confirm-gated application of selected mechanical task fixes. The menu-bar app retains **Controls → "Apply Lint Fixes..."** as the secondary all-or-nothing path.
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
 
@@ -212,8 +212,10 @@ local JEM/ERS stack:
 - runs `scripts/hosted-doctor.mjs` and writes bounded stdout/stderr under the
   configured log directory.
 
-It is a local read-only operator wrapper. It does not expose Brain writes,
-conflict resolution, hosted admin mutations, or public network binding.
+It is a local, read-mostly operator wrapper. It does not expose general Brain
+editing, conflict resolution, source ingestion, hosted admin mutations, or
+public network binding. Its only Brain-content mutations are the governed lint
+receipt and mechanical-fix actions described below.
 
 ```bash
 BRAIN_ID="<brain-id>" \
@@ -242,11 +244,14 @@ For one operator app that supervises both JEM and ERS, pass
 `brainId`, `name` or `displayName`, `brainRoot` or `brainDir`, `stateFile`,
 `healthFile`, `logDir`, `cockpitUrl`, and an optional `env` object. The profile
 environment allow-list is `BRAIN_REVISION_STORE`,
-`BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, and `BRAIN_FLY_APP`;
-`FLY_CONFIG_DIR` may also be supplied when different profiles use isolated Fly
-CLI identities. These values are passed only to that profile's sync, cockpit,
-and doctor processes. This lets two profiles target different hosted stacks
-and Fly organizations from one app without switching the global Fly login.
+`BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, `BRAIN_FLY_APP`,
+`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_DOCTOR_OPERATION_REFRESH_MS`,
+`BRAIN_DOCTOR_DB_TIMEOUT_MS`, and `BRAIN_LINT_MODE_OVERRIDES`; `FLY_CONFIG_DIR`
+may also be supplied when different profiles use isolated Fly CLI identities.
+These values are passed only to that profile's sync, cockpit, and doctor
+processes. This lets two profiles target different hosted stacks, lint
+promotion modes, and Fly organizations from one app without switching the
+global Fly login.
 The generated config is owner-readable only (`0600`) because a database URL is
 a credential; never commit or print the profiles JSON:
 
@@ -261,7 +266,10 @@ BRAIN_MENUBAR_PROFILES_JSON='[
     "stateFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json",
     "healthFile": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync/state.json.health.json",
     "logDir": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync",
-    "cockpitUrl": "http://127.0.0.1:8787/"
+    "cockpitUrl": "http://127.0.0.1:8787/",
+    "env": {
+      "BRAIN_LINT_MODE_OVERRIDES": "{\"ai-brain-jem\":\"graph\"}"
+    }
   },
   {
     "id": "ers-brain",
@@ -270,7 +278,10 @@ BRAIN_MENUBAR_PROFILES_JSON='[
     "stateFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json",
     "healthFile": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync/state.json.health.json",
     "logDir": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync",
-    "cockpitUrl": "http://127.0.0.1:8788/"
+    "cockpitUrl": "http://127.0.0.1:8788/",
+    "env": {
+      "BRAIN_LINT_MODE_OVERRIDES": "{\"ers-brain\":\"graph\"}"
+    }
   }
 ]' \
 npm run sync:menubar:install
@@ -351,7 +362,7 @@ This is reported separately from a Brain MCP stack fault: check Wi-Fi, VPN,
 DNS, or local network access first, then let Brain Monitor's next automatic
 doctor refresh clear the status.
 
-Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
+Warn means use judgement. Typical examples are stale sync health, stale or missing Brain lint, current review-required lint findings, stale or oversized `TASKS.md` Capture / Triage Queue, pending inbox files, missing optional Fly status, no recent measured hosted MCP latency, or a latency SLO warning.
 
 Fail means pause hosted writes until the issue is understood. Typical examples are hosted health failure, Postgres summary failure, or sync health error.
 
@@ -369,15 +380,32 @@ stack from Brain Monitor, then rerun `npm run hosted:doctor`.
 
 Open conflicts must be resolved through `docs/conflict-resolution.md`. Do not manually delete database rows to make the cockpit green.
 
-## Applying Brain Lint Fixes (the one operator write action)
+## Cockpit Maintenance: lint, inbox, and mechanical fixes
 
-The cockpit and Monitor are otherwise read-only. The single exception is a
-confirm-gated **"Apply lint fixes"** action that **delegates** to the governed
-`brain_lint({ fix: true })` logic (via `scripts/brain-lint-fix.mjs` or the hosted
-tool). It never writes Postgres, Storage, or files directly, never resolves
-conflicts, and never performs admin mutations; it stays local-bound. This is a
-deliberate, narrow relaxation of the read-only contract — see
-`docs/DECISIONS.md` (2026-07-01) and `docs/specs/009-brain-lint-apply-mode.md`.
+The **Maintenance** tab keeps detection and governed repair in the operator
+surface instead of forcing a switch to an MCP client or CLI:
+
+- **Run lint now** invokes the canonical `runLint` implementation for the active
+  Brain. A successful explicit run writes one narrow `LINT` receipt through the
+  configured Brain store and atomically refreshes the per-profile
+  `hosted-lint-report.json` cache. The doctor reads that cache first so
+  `lint_nudge` represents freshness while the separate `lint_findings` check
+  represents the current result. The UI shows every primary finding, groups
+  high-volume graph edge diagnostics into one bounded review signal, and keeps
+  the safe mechanical plan separate; an empty mechanical plan never claims the
+  whole Brain is clean.
+- **Scan inbox** lists pending source filenames, sizes, and modification times.
+  It does not ingest, classify, summarize, move, or delete content; those steps
+  remain review-required.
+- **Safe Mechanical Fixes** lists each task relocation, Done-date stamp, and
+  non-destructive archive candidate with per-item approval. Apply re-reads the
+  current Brain, applies only still-valid selected ids, then reruns lint to
+  refresh the report without writing a duplicate receipt.
+
+These are deliberate, narrow relaxations of the read-only default. They never
+resolve conflicts or perform source/admin mutations. See `docs/DECISIONS.md`
+(2026-08-19 and 2026-07-01), `docs/specs/009-brain-lint-apply-mode.md`, and
+`docs/specs/010-cockpit-fixes-tab.md`.
 
 The remaining fixes are mechanical and non-fabricating: relocate completed
 `[x]` tasks into Done (stamped `(done YYYY-MM-DD)`) and archive Done items older
@@ -395,25 +423,28 @@ npm run brain:lint:fix                 # preview the planned fixes
 npm run brain:lint:fix -- --apply      # apply them to the local-first Brain
 ```
 
-The action always runs a dry run first and requires explicit confirmation before
-the apply. There are three surfaces:
+Mechanical application always starts from a live plan and requires explicit
+per-item selection or confirmation before apply. There are three surfaces:
 
-- **Cockpit Fixes tab (primary).** The cockpit's **Fixes** tab lists each atomic
+- **Cockpit Maintenance tab (primary).** The **Safe Mechanical Fixes** section lists each atomic
   fix — each relocated, archived, or stamped task — with its own
   checkbox plus an "Approve all" control, and applies only what you approve. It
   is backed by `GET /api/fixes/plan` (read-only, live per-item plan) and
-  `POST /api/fixes/apply` (the one write endpoint). Apply re-reads current Brain
+  `POST /api/fixes/apply`. Apply re-reads current Brain
   state and only applies still-valid approved ids, then refreshes the doctor.
 - **Menu-bar app (secondary).** Brain Monitor → **Controls → "Apply Lint Fixes..."**
   shells out to `scripts/brain-lint-fix.mjs`, shows the plan in a confirmation
   dialog, and applies all-or-nothing on confirm.
 - **CLI.** `npm run brain:lint:fix` (dry run) / `-- --apply`.
 
-The `POST /api/fixes/apply` write endpoint is loopback-only and guarded by a
-Host-header allowlist (defeats DNS rebinding), a per-process nonce embedded in
-the page and required via `X-Cockpit-Nonce` (a cross-origin page cannot read it —
-no CORS is ever sent), and a JSON-only content-type. See `docs/DECISIONS.md`
-(2026-07-01) and `docs/specs/010-cockpit-fixes-tab.md`.
+Both narrow write endpoints, `POST /api/lint/run` and
+`POST /api/fixes/apply`, are loopback-only and guarded by a Host-header allowlist
+(defeats DNS rebinding), a per-process nonce embedded in the page and required
+via `X-Cockpit-Nonce` (a cross-origin page cannot read it — no CORS is ever
+sent), and a JSON-only content-type. `GET /api/lint/report`,
+`GET /api/inbox/scan`, and `GET /api/fixes/plan` are loopback-only reads. See
+`docs/DECISIONS.md` (2026-08-19 and 2026-07-01) and
+`docs/specs/010-cockpit-fixes-tab.md`.
 
 ## Latency Trend Semantics
 
@@ -461,9 +492,9 @@ Slowest Operations is a separate view for the slowest individual operations in t
 
 For each bucket, the cockpit shows latest, average, p50, p95, range, sample count, failed count, DB contribution when present, and a short trendline. Failed samples are counted separately and shown in the recent sample list, but they are not included in the latency averages.
 
-Refresh remains read-only. The additional usage and operation-log views use bounded server-side Postgres reads over the existing telemetry table. They do not add hidden writes, a metrics daemon, another datastore, or a separate analytics service.
+Routine refresh remains read-only. Lint runs and fix application happen only on explicit button presses. The additional usage and operation-log views use bounded server-side Postgres reads over the existing telemetry table. They do not add hidden writes, a metrics daemon, another datastore, or a separate analytics service.
 
 ## Next Hardening
 
-- Expand source-ingestion nudges beyond pending inbox count.
+- Add an explicitly reviewed inbox-ingestion workflow only when its classification and source-record contract is specified; the current Maintenance scan remains visibility-only.
 - Rehearse recovery/reseed from local Markdown and a restored Supabase project using `docs/hosted-brain-recovery-and-git-export.md`.

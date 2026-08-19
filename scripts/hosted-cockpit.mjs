@@ -7,6 +7,9 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { planLintFixes, applyLintFixSelection } from "../dist/services/lint-apply.js";
 import { brainDate } from "../dist/services/date.js";
+import { runLint, countLintIssues } from "../dist/services/lint.js";
+import { activeBrainStore } from "../dist/services/active-brain-store.js";
+import { scanInbox } from "../dist/services/inbox.js";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +18,16 @@ const doctorScriptPath =
   process.env.BRAIN_COCKPIT_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
 const doctorOutputPath = process.env.BRAIN_COCKPIT_DOCTOR_OUTPUT || "";
+const maintenanceLogDir =
+  process.env.BRAIN_SYNC_LOG_DIR ||
+  (doctorOutputPath
+    ? path.dirname(doctorOutputPath)
+    : process.env.BRAIN_DIR
+      ? path.resolve(process.env.BRAIN_DIR, "..", ".brain-sync")
+      : path.join(repoRoot, ".brain-sync"));
+const lintReportPath =
+  process.env.BRAIN_LINT_REPORT_FILE ||
+  path.join(maintenanceLogDir, "hosted-lint-report.json");
 const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
@@ -30,6 +43,131 @@ const maxPortAttempts = Math.max(
   1,
   Number(process.env.BRAIN_COCKPIT_PORT_ATTEMPTS || 10)
 );
+let lintRunPromise = null;
+
+async function writeJsonAtomic(filePath, payload) {
+  const tempPath = `${filePath}.${process.pid}.next`;
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  try {
+    await fs.writeFile(tempPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+    await fs.rename(tempPath, filePath);
+  } catch (error) {
+    await fs.rm(tempPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
+
+async function readLintReportCache() {
+  try {
+    const payload = JSON.parse(await fs.readFile(lintReportPath, "utf-8"));
+    if (payload.version !== 1 || payload.brainId !== cockpitBrainId) {
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function lintReviewFindings(report) {
+  const findings = [];
+  const add = (kind, summary, detail = "") => findings.push({ kind, summary, detail });
+  for (const item of report.bloat || []) {
+    add("bloat", `${item.file} is ${item.lines} lines`, "Review whether the file should be split; lint will not rewrite semantic content.");
+  }
+  for (const item of report.stale || []) {
+    add("stale", `${item.file} is ${item.days} days stale`, "Review the claims and update or intentionally retain them.");
+  }
+  for (const filename of report.orphans || []) {
+    add("orphan", `${filename} is not reachable`, `Reachability mode: ${report.orphanMode || "legacy"}. Structural files are never auto-edited.`);
+  }
+  for (const item of report.drift || []) add("drift", item, "Confirm the active-project and NOW.md relationship.");
+  for (const item of report.largeDomainPacks || []) {
+    add("large_domain_pack", `${item.dir}/ contains ${item.count} files`, "Review the pack's navigation and progressive disclosure.");
+  }
+  for (const filename of report.unindexedWorkingBinaries || []) {
+    add("unindexed_binary", `${filename} is missing from working/INDEX.md`, "Add a reviewed INDEX entry; Cockpit will not fabricate the description.");
+  }
+  if (report.journalRotation) {
+    add("journal_rotation", "Journal rotation is due", `Triggered by ${report.journalRotation.triggeredBy}; rotation remains a reviewed content move.`);
+  }
+  if (report.captureQueue) {
+    add(
+      "capture_queue",
+      `Capture queue has ${report.captureQueue.openCount} open item(s)`,
+      `${report.captureQueue.staleCount} stale item(s); triage requires operator judgement.`
+    );
+  }
+  if (report.bootstrapBudget?.exceeded) {
+    add(
+      "bootstrap_budget",
+      `Bootstrap estimate ${report.bootstrapBudget.estimatedTokens} exceeds ${report.bootstrapBudget.limitTokens} tokens`,
+      "Review progressive-disclosure moves; 00_loader.md and NOW.md are protected from automatic fixes."
+    );
+  }
+  const graphDiagnostics = report.graphReachability?.diagnostics || [];
+  if (graphDiagnostics.length > 0) {
+    const byCode = new Map();
+    for (const diagnostic of graphDiagnostics) {
+      byCode.set(diagnostic.code, (byCode.get(diagnostic.code) || 0) + 1);
+    }
+    const breakdown = Array.from(byCode.entries())
+      .sort((left, right) => right[1] - left[1])
+      .map(([code, count]) => `${code}: ${count}`)
+      .join(", ");
+    const examples = graphDiagnostics
+      .slice(0, 3)
+      .map((diagnostic) => `${diagnostic.source} → ${diagnostic.target}`)
+      .join("; ");
+    add(
+      "graph_diagnostics",
+      `${graphDiagnostics.length} graph edge diagnostic(s) require review`,
+      `${breakdown}.${examples ? ` Examples: ${examples}.` : ""} These are grouped and never auto-fixed.`
+    );
+  }
+  return findings;
+}
+
+async function executeMaintenanceLint({ recordReceipt = true } = {}) {
+  const report = await runLint(cockpitBrainId);
+  const plan = await planLintFixes(cockpitBrainId, brainDate());
+  const checkedAt = new Date().toISOString();
+  const issueCount = countLintIssues(report);
+  const diagnosticCount = report.graphReachability?.diagnostics.length || 0;
+  const payload = {
+    version: 1,
+    brainId: cockpitBrainId,
+    checkedAt,
+    status: issueCount > 0 ? "warn" : "pass",
+    issueCount,
+    primaryIssueCount: Math.max(0, issueCount - diagnosticCount),
+    diagnosticCount,
+    automaticFixCount: plan.items.length,
+    reviewFindings: lintReviewFindings(report),
+    warnings: report.warnings || [],
+    report,
+  };
+
+  if (recordReceipt) {
+    await activeBrainStore().appendLog(
+      cockpitBrainId,
+      "LINT",
+      [],
+      `Completed lint — ${issueCount} issue(s), ${plan.items.length} mechanical fix(es) available`
+    );
+  }
+  await writeJsonAtomic(lintReportPath, payload);
+  return payload;
+}
+
+function runMaintenanceLint(options) {
+  if (lintRunPromise) return lintRunPromise;
+  lintRunPromise = executeMaintenanceLint(options).finally(() => {
+    lintRunPromise = null;
+  });
+  return lintRunPromise;
+}
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -1288,6 +1426,51 @@ const page = String.raw`<!doctype html>
         margin-top: 0.2rem;
         flex: 0 0 auto;
       }
+      .fixes-item span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .maintenance-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .maintenance-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 1rem;
+        background: var(--panel);
+        min-width: 0;
+      }
+      .maintenance-card h2,
+      .maintenance-card h3 {
+        margin-top: 0;
+      }
+      .maintenance-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        margin: 0.65rem 0;
+      }
+      .maintenance-item {
+        border-top: 1px solid var(--line);
+        padding: 0.55rem 0;
+      }
+      .maintenance-item:first-child {
+        border-top: 0;
+      }
+      .maintenance-item strong {
+        display: block;
+      }
+      .maintenance-item .muted {
+        font-size: 12px;
+      }
+      @media (max-width: 860px) {
+        .maintenance-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1315,7 +1498,7 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-activity" type="button" role="tab" aria-controls="panel-activity" aria-selected="false">Activity</button>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
-          <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Fixes</button>
+          <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Maintenance</button>
           <button class="tab-button" id="tab-raw" type="button" role="tab" aria-controls="panel-raw" aria-selected="false">Raw Output</button>
         </div>
 
@@ -1600,11 +1783,34 @@ const page = String.raw`<!doctype html>
         </div>
 
         <div class="tab-panel" id="panel-fixes" role="tabpanel" aria-labelledby="tab-fixes" hidden>
+          <div class="maintenance-grid">
+            <section class="maintenance-card" aria-labelledby="maintenance-lint-heading">
+              <h2 id="maintenance-lint-heading">Brain Lint</h2>
+              <p class="muted">Run the canonical lint check here. A completed run records a narrow receipt, updates this report, and clears the stale-lint nudge on the next Monitor refresh.</p>
+              <div class="fixes-toolbar">
+                <button id="lint-run" type="button">Run lint now</button>
+                <span id="lint-status" class="muted">Loading latest report…</span>
+              </div>
+              <div id="lint-summary"></div>
+              <div id="lint-findings"></div>
+            </section>
+
+            <section class="maintenance-card" aria-labelledby="maintenance-inbox-heading">
+              <h2 id="maintenance-inbox-heading">Inbox</h2>
+              <p class="muted">Scan pending source files without leaving Cockpit. Content ingestion remains review-required: this surface will not invent classifications or summaries.</p>
+              <div class="fixes-toolbar">
+                <button id="inbox-scan" type="button">Scan inbox</button>
+                <span id="inbox-status" class="muted"></span>
+              </div>
+              <div id="inbox-files"></div>
+            </section>
+          </div>
+
           <section>
-            <h2>Mechanical Brain Fixes</h2>
-            <p class="muted">Review each proposed fix and apply only what you approve. Archiving moves items (nothing is deleted); dates are stamped forward. Writes go to this Brain's local-first store and sync to hosted.</p>
+            <h2>Safe Mechanical Fixes</h2>
+            <p class="muted">Only task relocation, Done-date stamping, and non-destructive archiving are automatic. Review each proposed change; semantic and structural lint findings remain visible above for judgement.</p>
             <div class="fixes-toolbar">
-              <button id="fixes-reload" type="button">Reload plan</button>
+              <button id="fixes-reload" type="button">Reload maintenance</button>
               <button id="fixes-approve-all" type="button">Approve all</button>
               <button id="fixes-apply" type="button" class="fixes-apply">Apply selected</button>
               <span id="fixes-status" class="muted"></span>
@@ -1657,6 +1863,10 @@ const page = String.raw`<!doctype html>
         "lastLintAt",
         "ageDays",
         "maxAgeDays",
+        "issueCount",
+        "primaryIssueCount",
+        "diagnosticCount",
+        "automaticFixCount",
         "pendingFiles",
         "checkedAt",
         "state",
@@ -2937,13 +3147,14 @@ const page = String.raw`<!doctype html>
           document.getElementById(button.getAttribute("aria-controls")).hidden = !selected;
         }
         document.getElementById("tab-context-strip").hidden = tabId === "tab-overview";
-        if (tabId === "tab-fixes" && !fixesLoadedOnce) {
-          loadFixes();
+        if (tabId === "tab-fixes" && !maintenanceLoadedOnce) {
+          loadMaintenance();
         }
       }
 
-      // ---- Fixes tab: per-item mechanical fixes -----------------------------
-      let fixesLoadedOnce = false;
+      // ---- Maintenance: lint, inbox visibility, and mechanical fixes --------
+      let maintenanceLoadedOnce = false;
+      let latestLint = null;
       const FIX_KIND_LABELS = {
         task_relocate: "Move completed tasks into Done",
         done_stamp: "Stamp undated Done items with today's date",
@@ -2954,11 +3165,165 @@ const page = String.raw`<!doctype html>
         document.getElementById("fixes-status").textContent = text || "";
       }
 
+      function renderLint(lint) {
+        latestLint = lint || null;
+        const summary = document.getElementById("lint-summary");
+        const findings = document.getElementById("lint-findings");
+        summary.innerHTML = "";
+        findings.innerHTML = "";
+        if (!lint) {
+          document.getElementById("lint-status").textContent = "No Cockpit lint report yet.";
+          summary.innerHTML = "<p class='muted'>Run lint to create a current assessment and durable receipt.</p>";
+          return;
+        }
+
+        const issueCount = Number(lint.issueCount || 0);
+        const diagnosticCount = Number(
+          lint.diagnosticCount ?? lint.report?.graphReachability?.diagnostics?.length ?? 0
+        );
+        const primaryIssueCount = Number(
+          lint.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
+        );
+        const automaticFixCount = Number(lint.automaticFixCount || 0);
+        const checkedAt = lint.checkedAt ? new Date(lint.checkedAt).toLocaleString() : "unknown time";
+        document.getElementById("lint-status").textContent = "Last run " + checkedAt + ".";
+        summary.innerHTML =
+          "<div class='maintenance-summary'><strong>" + escapeHtml(String(primaryIssueCount)) +
+          " primary lint finding(s)</strong>" +
+          (diagnosticCount > 0
+            ? "<span class='muted'>" + escapeHtml(String(diagnosticCount)) + " graph edge diagnostic(s)</span>"
+            : "") +
+          "<span class='muted'>" + escapeHtml(String(automaticFixCount)) +
+          " safe mechanical fix(es)</span></div>";
+
+        const reviewFindings = Array.isArray(lint.reviewFindings) ? lint.reviewFindings : [];
+        const warnings = Array.isArray(lint.warnings) ? lint.warnings : [];
+        if (reviewFindings.length === 0 && warnings.length === 0) {
+          findings.innerHTML = "<p class='muted'>No review-required lint findings in this report.</p>";
+          return;
+        }
+        for (const finding of reviewFindings) {
+          const item = document.createElement("div");
+          item.className = "maintenance-item";
+          const title = document.createElement("strong");
+          title.textContent = finding.summary || finding.kind || "Lint finding";
+          const detail = document.createElement("p");
+          detail.className = "muted";
+          detail.textContent = finding.detail || "Review required.";
+          item.appendChild(title);
+          item.appendChild(detail);
+          findings.appendChild(item);
+        }
+        for (const warning of warnings) {
+          const item = document.createElement("div");
+          item.className = "maintenance-item";
+          const title = document.createElement("strong");
+          title.textContent = "Lint warning";
+          const detail = document.createElement("p");
+          detail.className = "muted";
+          detail.textContent = String(warning);
+          item.appendChild(title);
+          item.appendChild(detail);
+          findings.appendChild(item);
+        }
+      }
+
+      async function loadLintReport() {
+        document.getElementById("lint-status").textContent = "Loading latest report…";
+        try {
+          const response = await fetch("/api/lint/report", { cache: "no-store" });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "report failed");
+          renderLint(data.lint || null);
+        } catch (error) {
+          document.getElementById("lint-summary").textContent = "Failed to load lint report: " + error.message;
+          document.getElementById("lint-findings").innerHTML = "";
+          document.getElementById("lint-status").textContent = "";
+        }
+      }
+
+      async function runLintNow() {
+        const button = document.getElementById("lint-run");
+        button.disabled = true;
+        document.getElementById("lint-status").textContent = "Running canonical lint…";
+        try {
+          const response = await fetch("/api/lint/run", {
+            method: "POST",
+            cache: "no-store",
+            headers: { "content-type": "application/json", "x-cockpit-nonce": COCKPIT_NONCE },
+            body: JSON.stringify({}),
+          });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "lint failed");
+          renderLint(data.lint);
+          await loadFixes();
+          refresh();
+        } catch (error) {
+          document.getElementById("lint-status").textContent = "Lint failed: " + error.message;
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function formatFileSize(bytes) {
+        const value = Number(bytes || 0);
+        if (value < 1024) return value + " B";
+        if (value < 1024 * 1024) return (value / 1024).toFixed(1) + " KB";
+        return (value / (1024 * 1024)).toFixed(1) + " MB";
+      }
+
+      function renderInbox(files) {
+        const container = document.getElementById("inbox-files");
+        container.innerHTML = "";
+        if (!files.length) {
+          container.innerHTML = "<p class='muted'>Inbox is clear. No pending source files were found.</p>";
+          return;
+        }
+        for (const file of files) {
+          const item = document.createElement("div");
+          item.className = "maintenance-item";
+          const title = document.createElement("strong");
+          title.textContent = file.name;
+          const detail = document.createElement("p");
+          detail.className = "muted";
+          const modified = file.modifiedAt ? new Date(file.modifiedAt).toLocaleString() : "unknown time";
+          detail.textContent = formatFileSize(file.size) + " · modified " + modified + " · ingestion requires review";
+          item.appendChild(title);
+          item.appendChild(detail);
+          container.appendChild(item);
+        }
+      }
+
+      async function scanMaintenanceInbox() {
+        const button = document.getElementById("inbox-scan");
+        button.disabled = true;
+        document.getElementById("inbox-status").textContent = "Scanning…";
+        try {
+          const response = await fetch("/api/inbox/scan", { cache: "no-store" });
+          const data = await response.json();
+          if (!data.ok) throw new Error(data.error || "scan failed");
+          const files = data.files || [];
+          renderInbox(files);
+          document.getElementById("inbox-status").textContent = files.length + " pending file(s).";
+        } catch (error) {
+          document.getElementById("inbox-files").textContent = "Inbox scan failed: " + error.message;
+          document.getElementById("inbox-status").textContent = "";
+        } finally {
+          button.disabled = false;
+        }
+      }
+
       function renderFixes(items) {
         const container = document.getElementById("fixes-list");
         container.innerHTML = "";
         if (!items.length) {
-          container.innerHTML = "<p class='muted'>Nothing to fix — the Brain is clean.</p>";
+          if (!latestLint) {
+            container.innerHTML = "<p class='muted'>No safe mechanical fixes detected. Run lint for the complete assessment.</p>";
+          } else if (Number(latestLint.issueCount || 0) > 0) {
+            container.innerHTML = "<p class='muted'>No safe automatic fixes. The current lint findings above require review.</p>";
+          } else {
+            container.innerHTML = "<p class='muted'>No safe mechanical fixes are needed; the latest lint report found no issues.</p>";
+          }
           return;
         }
         const byKind = new Map();
@@ -2992,12 +3357,12 @@ const page = String.raw`<!doctype html>
       }
 
       async function loadFixes() {
-        fixesLoadedOnce = true;
         fixesStatus("Loading plan…");
         try {
           const response = await fetch("/api/fixes/plan", { cache: "no-store" });
           const data = await response.json();
           if (!data.ok) throw new Error(data.error || "plan failed");
+          if (data.lint) renderLint(data.lint);
           renderFixes(data.items || []);
           fixesStatus((data.items || []).length + " proposed fix(es).");
         } catch (error) {
@@ -3038,6 +3403,10 @@ const page = String.raw`<!doctype html>
           } else {
             fixesStatus("Applied " + applied + " fix(es) → " + wrote + (stale ? " (" + stale + " stale skipped)" : "") + ".");
           }
+          if (data.lint) renderLint(data.lint);
+          if (data.lintRefreshError) {
+            fixesStatus(document.getElementById("fixes-status").textContent + " Lint refresh failed: " + data.lintRefreshError);
+          }
           await loadFixes();
           refresh();
         } catch (error) {
@@ -3047,8 +3416,15 @@ const page = String.raw`<!doctype html>
         }
       }
 
+      async function loadMaintenance() {
+        maintenanceLoadedOnce = true;
+        await Promise.all([loadLintReport(), loadFixes(), scanMaintenanceInbox()]);
+      }
+
       function setupFixes() {
-        document.getElementById("fixes-reload").addEventListener("click", loadFixes);
+        document.getElementById("lint-run").addEventListener("click", runLintNow);
+        document.getElementById("inbox-scan").addEventListener("click", scanMaintenanceInbox);
+        document.getElementById("fixes-reload").addEventListener("click", loadMaintenance);
         document.getElementById("fixes-approve-all").addEventListener("click", () => setFixesApproveAll(true));
         document.getElementById("fixes-apply").addEventListener("click", applyFixes);
       }
@@ -3127,6 +3503,73 @@ function createCockpitServer() {
       sendJson(response, 200, await runDoctor());
       return;
     }
+    if (request.method === "GET" && url.pathname === "/api/lint/report") {
+      if (!isLoopbackHost(request)) {
+        sendJson(response, 403, { ok: false, error: "forbidden_host" });
+        return;
+      }
+      try {
+        const lint = await readLintReportCache();
+        sendJson(response, 200, {
+          ok: true,
+          brainId: cockpitBrainId,
+          state: lint ? "recorded" : "never_run",
+          lint,
+        });
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error?.message || error) });
+      }
+      return;
+    }
+    // Explicit lint is a confirmable local maintenance action because a
+    // successful run records a narrow LINT receipt in Brain LOG.md. It uses the
+    // same loopback/nonce/JSON guards as mechanical fix application.
+    if (request.method === "POST" && url.pathname === "/api/lint/run") {
+      if (!isLoopbackHost(request)) {
+        sendJson(response, 403, { ok: false, error: "forbidden_host" });
+        return;
+      }
+      if (request.headers["x-cockpit-nonce"] !== cockpitNonce) {
+        sendJson(response, 403, { ok: false, error: "bad_nonce" });
+        return;
+      }
+      if (!/^application\/json/.test(String(request.headers["content-type"] || ""))) {
+        sendJson(response, 415, { ok: false, error: "json_required" });
+        return;
+      }
+      try {
+        await readJsonBody(request);
+        sendJson(response, 200, {
+          ok: true,
+          brainId: cockpitBrainId,
+          lint: await runMaintenanceLint({ recordReceipt: true }),
+        });
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error?.message || error) });
+      }
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/api/inbox/scan") {
+      if (!isLoopbackHost(request)) {
+        sendJson(response, 403, { ok: false, error: "forbidden_host" });
+        return;
+      }
+      try {
+        const files = await scanInbox(cockpitBrainId);
+        sendJson(response, 200, {
+          ok: true,
+          brainId: cockpitBrainId,
+          files: files.map((file) => ({
+            name: file.name,
+            size: file.size,
+            modifiedAt: file.modified.toISOString(),
+          })),
+        });
+      } catch (error) {
+        sendJson(response, 500, { ok: false, error: String(error?.message || error) });
+      }
+      return;
+    }
     // Read-only per-item fix plan. Loopback-only, like the write endpoint.
     if (request.method === "GET" && url.pathname === "/api/fixes/plan") {
       if (!isLoopbackHost(request)) {
@@ -3135,15 +3578,21 @@ function createCockpitServer() {
       }
       try {
         const plan = await planLintFixes(cockpitBrainId, brainDate());
-        sendJson(response, 200, { ok: true, brainId: cockpitBrainId, items: plan.items });
+        sendJson(response, 200, {
+          ok: true,
+          brainId: cockpitBrainId,
+          items: plan.items,
+          lint: await readLintReportCache(),
+        });
       } catch (error) {
         sendJson(response, 500, { ok: false, error: String(error?.message || error) });
       }
       return;
     }
-    // The one write endpoint: apply only the approved item ids. Guarded by
-    // loopback Host + per-process nonce + JSON content-type (no CORS is ever
-    // sent, so a cross-origin page can neither read the nonce nor preflight).
+    // The mechanical-fix write endpoint applies only approved item ids. Like
+    // explicit lint, it is guarded by loopback Host + per-process nonce + JSON
+    // content-type (no CORS is ever sent, so a cross-origin page can neither
+    // read the nonce nor preflight).
     if (request.method === "POST" && url.pathname === "/api/fixes/apply") {
       if (!isLoopbackHost(request)) {
         sendJson(response, 403, { ok: false, error: "forbidden_host" });
@@ -3161,7 +3610,24 @@ function createCockpitServer() {
         const body = await readJsonBody(request);
         const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === "string") : [];
         const result = await applyLintFixSelection(cockpitBrainId, brainDate(), ids);
-        sendJson(response, 200, { ok: true, brainId: cockpitBrainId, ...result });
+        let lint = null;
+        let lintRefreshError = null;
+        if (result.applied) {
+          try {
+            // The apply path already wrote a LINT log entry. Refresh only the
+            // structured cache so the tab immediately reflects what remains.
+            lint = await runMaintenanceLint({ recordReceipt: false });
+          } catch (error) {
+            lintRefreshError = String(error?.message || error);
+          }
+        }
+        sendJson(response, 200, {
+          ok: true,
+          brainId: cockpitBrainId,
+          ...result,
+          lint,
+          lintRefreshError,
+        });
       } catch (error) {
         sendJson(response, 400, { ok: false, error: String(error?.message || error) });
       }

@@ -247,3 +247,22 @@ test("lint override fails startup on malformed JSON, unknown modes, and unknown 
   }
   delete process.env.BRAIN_LINT_MODE_OVERRIDES;
 });
+
+test("synthesized registry carries graph defaults for an explicit local promotion", async () => {
+  await fs.rm(registryFile, { force: true });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph",
+  });
+  try {
+    const loaded = await registry.loadRegistry();
+    assert.equal(loaded.brains[0].lint.reachability_mode, "graph");
+    assert.deepEqual(loaded.brains[0].lint.graph_roots, ["00_loader.md", "NOW.md"]);
+    assert.equal(loaded.brains[0].lint.relative_parent_scope, "disabled");
+    assert.deepEqual(loaded.brains[0].lint.exempt_globs, [
+      "archive/JOURNAL-*.md",
+      "archive/LOG-*.md",
+    ]);
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});

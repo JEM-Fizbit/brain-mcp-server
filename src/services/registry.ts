@@ -2,7 +2,14 @@ import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { BRAIN_DIR, GITHUB_REPO, INBOX_DIR, SOURCES_ROOT } from "../constants.js";
+import {
+  BRAIN_DIR,
+  GITHUB_REPO,
+  INBOX_DIR,
+  LOADER_FILE,
+  NOW_FILE,
+  SOURCES_ROOT,
+} from "../constants.js";
 import { runtimeBrainId } from "./runtime-env.js";
 
 export type BrainRole = "owner" | "admin" | "member" | "reader";
@@ -141,6 +148,15 @@ function synthesizedRegistry(): BrainRegistry {
         },
         vector_backend: null,
         vector_scope: ["sources"],
+        // A synthesized local profile stays legacy by default, but carries the
+        // same graph grammar defaults as deployment registries so the explicit
+        // BRAIN_LINT_MODE_OVERRIDES promotion gate produces meaningful graph
+        // results instead of flagging rotated history as unreachable.
+        lint: {
+          graph_roots: [LOADER_FILE, NOW_FILE],
+          relative_parent_scope: "disabled",
+          exempt_globs: ["archive/JOURNAL-*.md", "archive/LOG-*.md"],
+        },
         metadata: {},
       },
     ],

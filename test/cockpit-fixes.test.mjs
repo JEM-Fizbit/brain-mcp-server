@@ -10,8 +10,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
 
-const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cockpit-fixes-"));
-const doctorOutputPath = path.join(tmpDir, "hosted-doctor.out.json");
+const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cockpit-fixes-"));
+const brainDir = path.join(tmpRoot, "brain");
+const inboxDir = path.join(tmpRoot, "inbox");
+const doctorOutputPath = path.join(tmpRoot, "hosted-doctor.out.json");
+const lintReportPath = path.join(tmpRoot, "hosted-lint-report.json");
 
 const LOADER = [
   "# Loader",
@@ -40,10 +43,13 @@ const TASKS = [
 ].join("\n");
 
 async function seed() {
-  await fs.writeFile(path.join(tmpDir, "00_loader.md"), LOADER, "utf-8");
-  await fs.writeFile(path.join(tmpDir, "NOW.md"), "# NOW\n", "utf-8");
-  await fs.writeFile(path.join(tmpDir, "TASKS.md"), TASKS, "utf-8");
-  await fs.writeFile(path.join(tmpDir, "07_orphan.md"), "# Orphan\n", "utf-8");
+  await fs.mkdir(brainDir, { recursive: true });
+  await fs.mkdir(inboxDir, { recursive: true });
+  await fs.writeFile(path.join(brainDir, "00_loader.md"), LOADER, "utf-8");
+  await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n\n`missing.md`\n", "utf-8");
+  await fs.writeFile(path.join(brainDir, "TASKS.md"), TASKS, "utf-8");
+  await fs.writeFile(path.join(brainDir, "07_orphan.md"), "# Orphan\n", "utf-8");
+  await fs.writeFile(path.join(inboxDir, "pending-source.pdf"), "fixture", "utf-8");
   await fs.writeFile(
     doctorOutputPath,
     `${JSON.stringify({
@@ -91,11 +97,14 @@ before(async () => {
     cwd: repoRoot,
     env: {
       ...process.env,
-      BRAIN_DIR: tmpDir,
+      BRAIN_DIR: brainDir,
       BRAIN_ID: "ai-brain-jem",
+      BRAIN_REVISION_STORE: "filesystem",
+      BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ai-brain-jem": "graph" }),
       BRAIN_COCKPIT_PORT: "8811",
       BRAIN_COCKPIT_PORT_FALLBACK: "1",
       BRAIN_COCKPIT_DOCTOR_OUTPUT: doctorOutputPath,
+      BRAIN_LINT_REPORT_FILE: lintReportPath,
     },
   });
   basePort = await new Promise((resolve, reject) => {
@@ -134,7 +143,7 @@ test("GET /api/doctor reads the Brain Monitor last-good report", async () => {
 });
 
 test("GET /api/fixes/plan returns per-item plan and writes nothing", async () => {
-  const before = await fs.readFile(path.join(tmpDir, "TASKS.md"), "utf-8");
+  const before = await fs.readFile(path.join(brainDir, "TASKS.md"), "utf-8");
   const res = await request("GET", "/api/fixes/plan");
   assert.equal(res.status, 200);
   assert.equal(res.json.ok, true);
@@ -144,7 +153,74 @@ test("GET /api/fixes/plan returns per-item plan and writes nothing", async () =>
   assert.ok(!kinds.has("orphan_index"));
   assert.ok(!kinds.has("reviewed_date"));
   // read-only
-  assert.equal(await fs.readFile(path.join(tmpDir, "TASKS.md"), "utf-8"), before);
+  assert.equal(await fs.readFile(path.join(brainDir, "TASKS.md"), "utf-8"), before);
+});
+
+test("Maintenance page exposes lint and inbox actions without claiming the Brain is clean", async () => {
+  const page = await request("GET", "/");
+  assert.equal(page.status, 200);
+  assert.match(page.text, />Maintenance</);
+  assert.match(page.text, /Run lint now/);
+  assert.match(page.text, /Scan inbox/);
+  assert.doesNotMatch(page.text, /Nothing to fix — the Brain is clean/);
+});
+
+test("GET /api/lint/report starts without a cached report", async () => {
+  const res = await request("GET", "/api/lint/report");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.ok, true);
+  assert.equal(res.json.state, "never_run");
+  assert.equal(res.json.lint, null);
+});
+
+test("POST /api/lint/run requires a valid nonce", async () => {
+  const res = await request("POST", "/api/lint/run", {
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(res.status, 403);
+  assert.equal(res.json.error, "bad_nonce");
+});
+
+test("POST /api/lint/run records a receipt and structured report", async () => {
+  const page = await request("GET", "/");
+  const nonce = page.text.match(/COCKPIT_NONCE = "([a-f0-9]+)"/)[1];
+  const res = await request("POST", "/api/lint/run", {
+    headers: { "content-type": "application/json", "x-cockpit-nonce": nonce },
+    body: JSON.stringify({}),
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.json.ok, true);
+  assert.ok(res.json.lint.issueCount >= 1);
+  assert.equal(res.json.lint.report.orphanMode, "graph");
+  assert.equal(res.json.lint.diagnosticCount, 1);
+  assert.equal(
+    res.json.lint.primaryIssueCount,
+    res.json.lint.issueCount - res.json.lint.diagnosticCount
+  );
+  assert.equal(res.json.lint.brainId, "ai-brain-jem");
+  assert.ok(res.json.lint.reviewFindings.some((finding) => finding.kind === "orphan"));
+  assert.equal(
+    res.json.lint.reviewFindings.filter((finding) => finding.kind === "graph_diagnostics").length,
+    1
+  );
+
+  const cache = JSON.parse(await fs.readFile(lintReportPath, "utf-8"));
+  assert.equal(cache.version, 1);
+  assert.equal(cache.brainId, "ai-brain-jem");
+  assert.match(await fs.readFile(path.join(brainDir, "LOG.md"), "utf-8"), /\] LINT/);
+
+  const report = await request("GET", "/api/lint/report");
+  assert.equal(report.json.state, "recorded");
+  assert.equal(report.json.lint.checkedAt, cache.checkedAt);
+});
+
+test("GET /api/inbox/scan returns pending source metadata", async () => {
+  const res = await request("GET", "/api/inbox/scan");
+  assert.equal(res.status, 200);
+  assert.equal(res.json.ok, true);
+  assert.deepEqual(res.json.files.map((file) => file.name), ["pending-source.pdf"]);
+  assert.equal(res.json.files[0].size, 7);
 });
 
 test("POST /api/fixes/apply is rejected without a valid nonce", async () => {
@@ -192,7 +268,7 @@ test("POST /api/fixes/apply applies only the approved id with a valid nonce", as
   assert.equal(res.json.ok, true);
   assert.ok(res.json.appliedIds.includes(archiveId));
 
-  const tasks = await fs.readFile(path.join(tmpDir, "TASKS.md"), "utf-8");
+  const tasks = await fs.readFile(path.join(brainDir, "TASKS.md"), "utf-8");
   assert.doesNotMatch(tasks, /old thing/); // approved archive applied
   assert.doesNotMatch(tasks, /undated thing \(done/); // stamp NOT approved -> untouched
 });
