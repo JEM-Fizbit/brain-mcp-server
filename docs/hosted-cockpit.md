@@ -375,9 +375,9 @@ recent-activity telemetry, and unavailable latency telemetry follow the same
 visibility-without-alarm rule.
 
 Warn means use judgement and always includes a concrete next action. Typical
-examples are stale sync health, stale or missing Brain lint, current
-review-required lint findings, stale or oversized `TASKS.md` Capture / Triage
-Queue, pending inbox files, an authenticated Fly result with no passing
+examples are stale sync health, stale or missing Brain lint, available safe
+mechanical lint fixes, stale or oversized `TASKS.md` Capture / Triage Queue,
+pending inbox files, an authenticated Fly result with no passing
 Machine, or a latency SLO warning. Warnings are condition-derived rather than
 dismissible: perform the stated action and reload, and the next doctor result
 clears the queue item when the condition has recovered.
@@ -417,9 +417,19 @@ surface instead of forcing a switch to an MCP client or CLI:
   refresh or mechanical apply, Cockpit requests one fresh doctor run so the
   action state updates immediately; routine reloads still use the Monitor-owned
   last-good report and do not duplicate polling.
-- **Scan inbox** lists pending source filenames, sizes, and modification times.
-  It does not ingest, classify, summarize, move, or delete content; those steps
-  remain review-required.
+- **Refresh inbox scan** lists pending source filenames, sizes, and modification times.
+  The button is labelled **Refresh inbox scan** because it does not ingest,
+  classify, summarize, move, or delete content. Each pending item says that it
+  is not stuck and exposes a filename-specific **Claude ingestion handoff**.
+  Copy that prompt into an interactive Claude session with access to the
+  selected Brain and ingestion-capable tools. The handoff requires the session
+  to follow the Brain's ingestion protocol, preserve source and provenance,
+  update only reviewed durable content, call `brain_ingest_complete` with the
+  exact `inbox_file`, and verify the file no longer appears in
+  `brain_scan_inbox`. That successful cleanup is what clears the warning; a
+  scan alone never does. If the session has only hosted read tools, use the
+  documented local ingestion-capable workflow rather than deleting the inbox
+  file manually.
 - **Safe Mechanical Fixes** lists each task relocation, Done-date stamp, and
   non-destructive archive candidate with an unchecked per-item checkbox. A
   standard header checkbox selects or clears all current items; the separate

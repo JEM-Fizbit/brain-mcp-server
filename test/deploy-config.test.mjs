@@ -321,6 +321,8 @@ test("hosted doctor emits normalized user-action indicators", async () => {
   assert.match(doctor, /reason: "open_conflicts"/);
   assert.match(doctor, /reason: "sync_health_failed"/);
   assert.match(doctor, /reason: "pending_inbox"/);
+  assert.match(doctor, /pending Brain inbox file\(s\) in an interactive Claude session/);
+  assert.match(doctor, /refreshing the scan is detection-only/);
   assert.match(doctor, /reason: "hosted_auth_failures"/);
   assert.match(doctor, /enforceOperatorAlarmContract\(checks\)/);
   assert.match(doctor, /reason: "fly_control_plane"/);
@@ -618,6 +620,9 @@ test("hosted cockpit is local-only with narrowly guarded maintenance writes", as
   assert.match(script, /\/api\/inbox\/scan/);
   assert.match(script, /Refresh lint assessment/);
   assert.match(script, /Informational review notes remain visible above/);
+  assert.match(script, /Refresh inbox scan/);
+  assert.match(script, /interactive Claude session/);
+  assert.match(script, /Copy Claude ingestion prompt/);
   assert.match(script, /Safe Mechanical Fixes/);
   assert.match(script, /runMaintenanceLint/);
   assert.match(script, /countLintIssues/);

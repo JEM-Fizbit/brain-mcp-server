@@ -1474,6 +1474,24 @@ const page = String.raw`<!doctype html>
       .maintenance-item .muted {
         font-size: 12px;
       }
+      .inbox-handoff {
+        margin-top: 0.55rem;
+      }
+      .inbox-handoff summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .inbox-handoff pre {
+        margin: 0.55rem 0;
+        padding: 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: inherit;
+        font-size: 12px;
+      }
       @media (max-width: 860px) {
         .maintenance-grid {
           grid-template-columns: 1fr;
@@ -1804,9 +1822,9 @@ const page = String.raw`<!doctype html>
 
             <section class="maintenance-card" aria-labelledby="maintenance-inbox-heading">
               <h2 id="maintenance-inbox-heading">Inbox</h2>
-              <p class="muted">Scan pending source files without leaving Cockpit. Content ingestion remains review-required: this surface will not invent classifications or summaries.</p>
+              <p class="muted">Refresh the pending-file list without leaving Cockpit. This scan is detection-only: it cannot ingest or clear a file. Use the prepared handoff below in an interactive Claude session with access to this Brain.</p>
               <div class="fixes-toolbar">
-                <button id="inbox-scan" type="button">Scan inbox</button>
+                <button id="inbox-scan" type="button">Refresh inbox scan</button>
                 <span id="inbox-status" class="muted"></span>
               </div>
               <div id="inbox-files"></div>
@@ -1836,6 +1854,7 @@ const page = String.raw`<!doctype html>
 
     <script>
       const COCKPIT_NONCE = ${JSON.stringify(cockpitNonce)};
+      const COCKPIT_BRAIN_ID = ${JSON.stringify(cockpitBrainId)};
       const operationLog = [];
       let previousSnapshot = null;
 
@@ -3271,6 +3290,32 @@ const page = String.raw`<!doctype html>
         return (value / (1024 * 1024)).toFixed(1) + " MB";
       }
 
+      function inboxClaudeHandoff(filename) {
+        return [
+          "In an interactive Claude session with access to the " + COCKPIT_BRAIN_ID + " workspace and ingestion-capable Brain tools, process the pending inbox file \"" + filename + "\".",
+          "Load the Brain context and follow its documented ingestion protocol. Review the file before changing anything; preserve the original source and provenance; update only justified durable Brain content.",
+          "Complete the ingestion with inbox_file set to \"" + filename + "\" so the inbox copy is removed, then verify the file no longer appears in brain_scan_inbox.",
+          "If this session has only hosted read tools, stop and use the documented local ingestion-capable workflow instead of deleting the file manually.",
+        ].join("\n\n");
+      }
+
+      async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        if (!copied) throw new Error("clipboard unavailable");
+      }
+
       function renderInbox(files) {
         const container = document.getElementById("inbox-files");
         container.innerHTML = "";
@@ -3286,9 +3331,41 @@ const page = String.raw`<!doctype html>
           const detail = document.createElement("p");
           detail.className = "muted";
           const modified = file.modifiedAt ? new Date(file.modifiedAt).toLocaleString() : "unknown time";
-          detail.textContent = formatFileSize(file.size) + " · modified " + modified + " · ingestion requires review";
+          detail.textContent = formatFileSize(file.size) + " · modified " + modified + " · pending reviewed ingestion";
+          const next = document.createElement("p");
+          next.className = "muted";
+          next.textContent = "Not stuck: refreshing this scan only rechecks the inbox. Complete the reviewed ingestion in an interactive Claude session to clear this item.";
+          const handoff = document.createElement("details");
+          handoff.className = "inbox-handoff";
+          const handoffSummary = document.createElement("summary");
+          handoffSummary.textContent = "Claude ingestion handoff";
+          const prompt = document.createElement("pre");
+          prompt.textContent = inboxClaudeHandoff(file.name);
+          const copyButton = document.createElement("button");
+          copyButton.type = "button";
+          copyButton.textContent = "Copy Claude ingestion prompt";
+          copyButton.addEventListener("click", async () => {
+            copyButton.disabled = true;
+            try {
+              await copyText(prompt.textContent);
+              copyButton.textContent = "Copied";
+              document.getElementById("inbox-status").textContent =
+                "Claude ingestion prompt copied. Paste it into an interactive Claude session with access to this Brain.";
+            } catch (error) {
+              copyButton.textContent = "Copy failed";
+              document.getElementById("inbox-status").textContent =
+                "Clipboard unavailable. Open Claude ingestion handoff and copy the prompt manually.";
+            } finally {
+              copyButton.disabled = false;
+            }
+          });
+          handoff.appendChild(handoffSummary);
+          handoff.appendChild(prompt);
+          handoff.appendChild(copyButton);
           item.appendChild(title);
           item.appendChild(detail);
+          item.appendChild(next);
+          item.appendChild(handoff);
           container.appendChild(item);
         }
       }

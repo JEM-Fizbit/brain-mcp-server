@@ -179,7 +179,9 @@ async function startCockpit(testInfo) {
   const port = await openPort();
   const doctorScript = await writeDoctorStub(testInfo);
   const brainDir = testInfo.outputPath("brain");
+  const inboxDir = testInfo.outputPath("inbox");
   await fs.mkdir(brainDir, { recursive: true });
+  await fs.mkdir(inboxDir, { recursive: true });
   await fs.writeFile(
     path.join(brainDir, "00_loader.md"),
     "# Loader\n\n- `NOW.md` — current context.\n- `TASKS.md` — task state.\n",
@@ -191,11 +193,13 @@ async function startCockpit(testInfo) {
     "# TASKS\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n",
     "utf8"
   );
+  await fs.writeFile(path.join(inboxDir, "pending-source.md"), "# Pending source\n", "utf8");
   const child = spawn(process.execPath, [path.join(repoRoot, "scripts", "hosted-cockpit.mjs")], {
     cwd: repoRoot,
     env: {
       ...process.env,
       BRAIN_DIR: brainDir,
+      BRAIN_INBOX_DIR: inboxDir,
       BRAIN_ID: "ai-brain-jem",
       BRAIN_REVISION_STORE: "filesystem",
       BRAIN_COCKPIT_DOCTOR_SCRIPT: doctorScript,
@@ -493,7 +497,13 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Safe Mechanical Fixes", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh lint assessment", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Scan inbox", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh inbox scan", exact: true })).toBeVisible();
+  await expect(page.getByText(/Not stuck: refreshing this scan only rechecks the inbox/)).toBeVisible();
+  const inboxHandoff = page.getByText("Claude ingestion handoff", { exact: true });
+  await expect(inboxHandoff).toBeVisible();
+  await inboxHandoff.click();
+  await expect(page.getByText(/inbox_file set to "pending-source.md"/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy Claude ingestion prompt", exact: true })).toBeVisible();
   const selectAll = page.getByRole("checkbox", { name: "Select all fixes", exact: true });
   const applySelected = page.getByRole("button", { name: "Apply selected", exact: true });
   const itemCheckboxes = page.locator(".fixes-checkbox");

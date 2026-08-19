@@ -8,6 +8,18 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-19 — Make pending inbox warnings an explicit ingestion handoff
+
+**Decision:** **Refresh inbox scan** is detection-only and never claims to ingest or clear a file. A pending inbox warning routes the operator to Cockpit Maintenance, where every file states that it is not stuck, explains that clearing requires reviewed ingestion, and provides a filename-specific **Claude ingestion handoff** with a copy action. The handoff directs an interactive Claude session with access to the selected Brain and ingestion-capable tools to load Brain context, follow the Brain's ingestion protocol, preserve source and provenance, update only justified durable content, complete ingestion with the exact `inbox_file`, and verify that `brain_scan_inbox` is clear. If only hosted read tools are available, the handoff directs the session to the documented local ingestion-capable workflow instead of manual deletion.
+
+**Why:** Re-running the scan only proved that the same ERS file was still present, but the prior UI said merely “ingestion requires review.” That made a deliberate review boundary look like a stalled job and gave the operator no executable next step. The scan and the ingestion workflow are different jobs; the Cockpit must make that boundary explicit and hand off enough context to finish safely.
+
+**Alternatives rejected:** Clear the warning when a scan succeeds (the source is still unprocessed); ingest automatically from Cockpit (classification, source authority, provenance, and durable Brain edits require judgement); add a dismiss button (hides an unprocessed source); delete the inbox file after scanning (data loss); require the operator to invent a Claude prompt from documentation (unnecessary surface switching and ambiguity).
+
+**Related:** `scripts/hosted-doctor.mjs`; `scripts/hosted-cockpit.mjs`; `e2e/cockpit.playwright.mjs`; `docs/hosted-cockpit.md`; `docs/specs/010-cockpit-fixes-tab.md`; the 2026-08-19 operator-alarm and Maintenance decisions below.
+
+---
+
 ## 2026-08-19 — Separate lint refresh, actionable fixes, and review-only notes
 
 **Decision:** The Cockpit action is named **Refresh lint assessment** and is explicitly detection-only: it refreshes the structured report and clears a stale-lint nudge, but it does not claim to fix current findings. `lint_findings` is an operator warning only while the report contains safe mechanical fixes that can be applied in Maintenance. When findings remain but no automatic fixes are available, the check is `info` with state `review_only`; the findings and grouped graph diagnostics stay visible in Maintenance without changing overall readiness or entering Operator Queue. An explicit lint refresh or mechanical apply requests one fresh doctor run so the Cockpit reflects the new classification immediately instead of waiting for the Monitor-owned cache cycle.

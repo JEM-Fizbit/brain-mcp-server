@@ -25,6 +25,13 @@
 > so the Cockpit does not wait for the Monitor cache cycle to update its action
 > state.
 
+> 2026-08-19 inbox handoff correction: **Refresh inbox scan** is explicitly
+> detection-only. Each pending file explains that it is not stuck and provides
+> a copyable, filename-specific prompt for an interactive Claude session with
+> ingestion-capable access to the selected Brain. The prompt completes reviewed
+> ingestion with the exact `inbox_file` and verifies the scan is clear; Cockpit
+> itself still does not classify, ingest, move, or delete the source.
+
 ## Problem
 
 Spec 009 shipped the fix engine plus two apply surfaces: the CLI and a menubar "Apply Lint Fixes..." button whose confirmation is a cramped native modal, all-or-nothing. Operators want to *see* each pending fix and approve/skip them individually, in the cockpit they already have open.
