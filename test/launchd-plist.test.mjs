@@ -594,6 +594,10 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       logDir: path.join(tmpRoot, "logs", "jem"),
       cockpitUrl: "http://127.0.0.1:8787/",
       env: {
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://jem-runtime.jemprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "jemprojectref12",
         BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ai-brain-jem": "graph" }),
       },
     },
@@ -602,7 +606,10 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       name: "ERS",
       brainRoot: ersRoot,
       env: {
-        BRAIN_REVISION_DATABASE_URL: "postgresql://ers-runtime.example.invalid/postgres",
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://ers-runtime.ersprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "ersprojectref12",
         BRAIN_HOSTED_BASE_URL: "https://brain.example.com",
         BRAIN_FLY_APP: "example-brain-mcp",
         BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ers-brain": "graph" }),
@@ -661,7 +668,13 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
   assert.equal(config.brains[1].brainDir, path.join(ersRoot, "brain"));
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_COCKPIT_PORT, "8788");
   assert.equal(config.brains[1].syncProcess.env.BRAIN_MONITOR_STACK_FILE, path.join(tmpRoot, "logs", "ers", "brain-monitor-stack.json"));
-  assert.equal(config.brains[1].env.BRAIN_REVISION_DATABASE_URL, "postgresql://ers-runtime.example.invalid/postgres");
+  assert.equal(
+    config.brains[1].env.BRAIN_REVISION_DATABASE_URL,
+    "postgresql://ers-runtime.ersprojectref12@example.invalid/postgres"
+  );
+  assert.equal(config.brains[0].syncProcess.env.BRAIN_SYNC_LOAD_LOCAL_ENV, "0");
+  assert.equal(config.brains[1].syncProcess.env.BRAIN_SYNC_LOAD_LOCAL_ENV, "0");
+  assert.equal(config.brains[0].env.BRAIN_LOAD_LOCAL_ENV, "0");
   assert.equal(
     config.brains[1].cockpitProcess.env.BRAIN_LINT_MODE_OVERRIDES,
     JSON.stringify({ "ers-brain": "graph" })
@@ -717,6 +730,12 @@ test("menu-bar app can run a cockpit-only profile when sync is disabled", async 
       id: "ers-brain",
       name: "ERS",
       brainRoot: ersRoot,
+      env: {
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://ers-runtime.ersprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "ersprojectref12",
+      },
       stateFile: path.join(tmpRoot, "state", "ers-cockpit-only", "state.json"),
       healthFile: path.join(tmpRoot, "state", "ers-cockpit-only", "state.health.json"),
       logDir: path.join(tmpRoot, "logs", "ers-cockpit-only"),
@@ -751,6 +770,102 @@ test("menu-bar app can run a cockpit-only profile when sync is disabled", async 
   assert.equal(config.brains[1].syncEnabled, true);
   assert.equal(config.brains[1].syncProcess.env.BRAIN_ID, "ers-brain");
   assert.equal(config.syncProcess, undefined);
+});
+
+test("multi-profile menu-bar install fails closed without explicit database binding", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Unsafe Brain Monitor.app");
+  const profiles = [
+    {
+      id: "ai-brain-jem",
+      brainRoot: path.join(tmpRoot, "unsafe-jem"),
+    },
+    {
+      id: "ers-brain",
+      brainRoot: path.join(tmpRoot, "unsafe-ers"),
+      env: {
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://ers-runtime.ersprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "ersprojectref12",
+      },
+    },
+  ];
+
+  await assert.rejects(
+    exec(process.execPath, [menuBarScriptPath], {
+      env: {
+        ...process.env,
+        BRAIN_MENUBAR_APP: appPath,
+        BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
+      },
+    }),
+    /ai-brain-jem must explicitly set BRAIN_REVISION_STORE/
+  );
+});
+
+test("multi-profile menu-bar install rejects a mismatched Supabase project ref", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Mismatched Brain Monitor.app");
+  const profiles = [
+    {
+      id: "ai-brain-jem",
+      brainRoot: path.join(tmpRoot, "mismatch-jem"),
+      env: {
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://jem-runtime.wrongprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "rightprojectref12",
+      },
+    },
+    {
+      id: "ers-brain",
+      brainRoot: path.join(tmpRoot, "mismatch-ers"),
+      syncEnabled: false,
+    },
+  ];
+
+  await assert.rejects(
+    exec(process.execPath, [menuBarScriptPath], {
+      env: {
+        ...process.env,
+        BRAIN_MENUBAR_APP: appPath,
+        BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
+      },
+    }),
+    /database URL does not match its expected Supabase project ref/
+  );
+});
+
+test("multi-profile menu-bar install can read owner-custodied profiles from a file", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "File Profiles Brain Monitor.app");
+  const profilesPath = path.join(tmpRoot, "private-profiles.json");
+  const profiles = [
+    {
+      id: "ai-brain-jem",
+      brainRoot: path.join(tmpRoot, "file-profile-jem"),
+      env: {
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://jem-runtime.jemprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "jemprojectref12",
+      },
+    },
+    {
+      id: "ers-brain",
+      brainRoot: path.join(tmpRoot, "file-profile-ers"),
+      syncEnabled: false,
+    },
+  ];
+  await fs.writeFile(profilesPath, JSON.stringify(profiles), { mode: 0o600 });
+
+  const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
+    env: {
+      ...process.env,
+      BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_PROFILES_FILE: profilesPath,
+    },
+  });
+  const result = JSON.parse(stdout);
+  assert.deepEqual(result.brainIds, ["ai-brain-jem", "ers-brain"]);
 });
 
 test("menu-bar LaunchAgent opens the operator app at login", async () => {

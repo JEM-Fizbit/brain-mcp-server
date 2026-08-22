@@ -87,6 +87,8 @@ function envWithoutSyncConfig() {
     "BRAIN_SYNC_STORE_FILE",
     "BRAIN_REVISION_STORE",
     "BRAIN_REVISION_DATABASE_URL",
+    "BRAIN_EXPECTED_SUPABASE_PROJECT_REF",
+    "BRAIN_SYNC_LOAD_LOCAL_ENV",
   ]) {
     delete env[key];
   }
@@ -249,6 +251,39 @@ test("sync CLI loads local env files before reading config", async () => {
   assert.equal(output.config.revisionStore, "file");
 });
 
+test("sync CLI can disable ambient local env loading for an explicit supervisor profile", async () => {
+  const config = dirs("local-env-disabled");
+  const cwd = path.dirname(config.brainDir);
+  await fs.mkdir(cwd, { recursive: true });
+  await fs.writeFile(
+    path.join(cwd, ".env.local"),
+    [
+      "BRAIN_REVISION_STORE=postgres",
+      "BRAIN_REVISION_DATABASE_URL=postgresql://wrong.wrongprojectref12@example.invalid/postgres",
+      "",
+    ].join("\n"),
+    "utf-8"
+  );
+
+  const { stdout } = await exec(process.execPath, [cliPath, "status"], {
+    cwd,
+    env: {
+      ...envWithoutSyncConfig(),
+      BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+      BRAIN_ID: "ai-brain-jem",
+      BRAIN_DIR: config.brainDir,
+      BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_LOCK_FILE: config.lockFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile,
+      BRAIN_SYNC_STORE_FILE: config.storeFile,
+    },
+  });
+  const output = JSON.parse(stdout);
+
+  assert.equal(output.config.revisionStore, "file");
+  assert.equal(output.config.databaseUrl, "missing");
+});
+
 test("sync CLI reports missing Postgres database URL when provider is postgres", async () => {
   const config = dirs("postgres-missing-url");
 
@@ -267,6 +302,29 @@ test("sync CLI reports missing Postgres database URL when provider is postgres",
       },
     }),
     /BRAIN_REVISION_DATABASE_URL is required/
+  );
+});
+
+test("sync CLI rejects a Postgres URL for the wrong Supabase project before connecting", async () => {
+  const config = dirs("postgres-wrong-project");
+
+  await assert.rejects(
+    exec(process.execPath, [cliPath, "status"], {
+      env: {
+        ...process.env,
+        BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+        BRAIN_ID: "ai-brain-jem",
+        BRAIN_DIR: config.brainDir,
+        BRAIN_SYNC_STATE_FILE: config.stateFile,
+        BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_HEALTH_FILE: config.healthFile,
+        BRAIN_REVISION_STORE: "postgres",
+        BRAIN_REVISION_DATABASE_URL:
+          "postgresql://runtime.wrongprojectref12@example.invalid/postgres",
+        BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "rightprojectref12",
+      },
+    }),
+    /does not match BRAIN_EXPECTED_SUPABASE_PROJECT_REF/
   );
 });
 

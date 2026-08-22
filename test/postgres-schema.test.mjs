@@ -47,6 +47,13 @@ const boundedObservabilityPath = path.join(
   "migrations",
   "2026-08-19_001_bounded_sync_observability.sql"
 );
+const sourceReferenceIdentityPath = path.join(
+  __dirname,
+  "..",
+  "db",
+  "migrations",
+  "2026-08-22_001_source_reference_identity.sql"
+);
 const pilotSeedPath = path.join(
   __dirname,
   "..",
@@ -178,6 +185,28 @@ test("bounded sync observability keeps liveness private and current-state only",
   assert.match(executableSql, /revoke all on table brain\.sync_heartbeats from authenticated/i);
   assert.doesNotMatch(executableSql, /grant .*brain\.sync_heartbeats.* to (public|anon|authenticated)/i);
   assert.doesNotMatch(sql, /delete from brain\.sync_events/i);
+});
+
+test("source-reference identity migration is additive, private, and path-safe", async () => {
+  const sql = await fs.readFile(sourceReferenceIdentityPath, "utf-8");
+  const executableSql = sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+
+  assert.match(sql, /add column if not exists companion_path text/i);
+  assert.match(sql, /add column if not exists provider_revision text/i);
+  assert.match(sql, /add column if not exists root_alias text/i);
+  assert.match(sql, /add column if not exists relative_path text/i);
+  assert.match(sql, /add constraint source_artifacts_locator_check check/i);
+  assert.match(sql, /create table if not exists brain\.source_brain_links/i);
+  assert.match(sql, /relation in \('supports', 'context', 'contradicts', 'derived_from', 'mentions'\)/i);
+  assert.match(sql, /alter table brain\.source_brain_links enable row level security/i);
+  assert.match(sql, /grant select, insert, update, delete on brain\.source_brain_links to brain_runtime/i);
+  assert.match(executableSql, /revoke all on table brain\.source_brain_links from public/i);
+  assert.match(executableSql, /revoke all on table brain\.source_brain_links from anon/i);
+  assert.match(executableSql, /revoke all on table brain\.source_brain_links from authenticated/i);
+  assert.doesNotMatch(executableSql, /grant .*brain\.source_brain_links.* to (public|anon|authenticated)/i);
 });
 
 test("pilot seed bootstraps Brain registry without public grants", async () => {

@@ -27,6 +27,7 @@ interface SyncCliConfig {
   storeFile: string;
   revisionStore: RevisionStoreProvider;
   databaseUrl?: string;
+  expectedSupabaseProjectRef?: string;
   includeFiles?: string[];
   watchIntervalMs: number;
   watchCycles?: number;
@@ -62,6 +63,7 @@ function parseEnvLine(line: string): [string, string] | null {
 }
 
 function loadLocalEnv(rootDir = process.cwd()): void {
+  if (process.env.BRAIN_SYNC_LOAD_LOCAL_ENV === "0") return;
   for (const filename of [".env.local", ".env"]) {
     const envPath = path.join(rootDir, filename);
     if (!fsSync.existsSync(envPath)) continue;
@@ -72,6 +74,23 @@ function loadLocalEnv(rootDir = process.cwd()): void {
       const [key, value] = parsed;
       if (process.env[key] === undefined) process.env[key] = value;
     }
+  }
+}
+
+function projectRefFromDatabaseUrl(databaseUrl: string): string | null {
+  try {
+    const url = new URL(databaseUrl);
+    const usernameSuffix = decodeURIComponent(url.username).split(".").at(-1);
+    if (
+      usernameSuffix &&
+      usernameSuffix !== "postgres" &&
+      /^[a-z0-9]{12,32}$/.test(usernameSuffix)
+    ) {
+      return usernameSuffix;
+    }
+    return url.hostname.match(/^db\.([a-z0-9]{12,32})\.supabase\.co$/)?.[1] || null;
+  } catch {
+    return null;
   }
 }
 
@@ -97,6 +116,9 @@ function usage(): string {
     "  BRAIN_REVISION_STORE      Revision store provider: file|postgres",
     "  BRAIN_REVISION_DATABASE_URL",
     "                            Required when BRAIN_REVISION_STORE=postgres",
+    "  BRAIN_EXPECTED_SUPABASE_PROJECT_REF",
+    "                            Optional fail-closed binding for the Postgres URL",
+    "  BRAIN_SYNC_LOAD_LOCAL_ENV Set to 0 for explicitly configured supervisors",
   ].join("\n");
 }
 
@@ -143,6 +165,8 @@ function readConfig(): SyncCliConfig {
       defaultStoreFile(process.env.BRAIN_DIR || BRAIN_DIR),
     revisionStore,
     databaseUrl: process.env.BRAIN_REVISION_DATABASE_URL,
+    expectedSupabaseProjectRef:
+      process.env.BRAIN_EXPECTED_SUPABASE_PROJECT_REF,
     includeFiles: includeFiles && includeFiles.length > 0 ? includeFiles : undefined,
     watchIntervalMs: Math.max(
       250,
@@ -202,6 +226,14 @@ function createStore(config: SyncCliConfig): StoreHandle {
       throw new Error(
         "BRAIN_REVISION_DATABASE_URL is required when BRAIN_REVISION_STORE=postgres"
       );
+    }
+    if (config.expectedSupabaseProjectRef) {
+      const actualProjectRef = projectRefFromDatabaseUrl(config.databaseUrl);
+      if (actualProjectRef !== config.expectedSupabaseProjectRef) {
+        throw new Error(
+          "BRAIN_REVISION_DATABASE_URL does not match BRAIN_EXPECTED_SUPABASE_PROJECT_REF"
+        );
+      }
     }
     const store = new PostgresRevisionStore(config.databaseUrl);
     return {

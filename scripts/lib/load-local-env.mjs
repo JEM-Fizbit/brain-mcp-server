@@ -20,6 +20,7 @@ function parseEnvLine(line) {
 }
 
 export function loadLocalEnv(rootDir = process.cwd()) {
+  if (process.env.BRAIN_LOAD_LOCAL_ENV === "0") return;
   const candidates = [".env.local", ".env"];
   for (const filename of candidates) {
     const envPath = path.join(rootDir, filename);
