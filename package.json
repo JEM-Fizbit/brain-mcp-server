@@ -50,6 +50,7 @@
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
     "sources:compile-reference": "npm run build && node scripts/compile-source-reference.mjs",
     "sources:audit-links": "npm run build && node scripts/audit-source-links.mjs",
+    "sources:backfill-brain-links:postgres": "node scripts/backfill-source-brain-links-postgres.mjs",
     "sources:persist-reference:postgres": "npm run build && node scripts/persist-source-reference-postgres.mjs",
     "smoke:brain-runtime-role": "node scripts/smoke-brain-runtime-role.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",

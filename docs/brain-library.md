@@ -81,6 +81,11 @@ npm run sources:compile-reference -- --manifest /path/to/manifest.json --brain-r
 # Read-only cross-link audit
 npm run sources:audit-links -- --brain-root /path/to/brain
 
+# Dry-run reviewed companion backlinks against existing Postgres source ids
+npm run sources:backfill-brain-links:postgres -- \
+  --brain-root /path/to/brain \
+  --brain-id ai-brain-jem
+
 # Transactional Postgres persistence; JEM-only and project-ref guarded
 npm run sources:persist-reference:postgres -- \
   --manifest /path/to/manifest.json \

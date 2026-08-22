@@ -104,6 +104,26 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   linked companions, 39 unlinked companions, 35 without a backlink, zero
   broken links, and 63 non-clickable references. The remaining findings are a
   measured maintenance queue; no semantic relationship was invented.
+- The approved content/semantic pass reviewed that queue against the companions
+  and existing Brain claims. The final repository-wide audit reports all 45
+  companions directly linked, zero index-only or unlinked companions, zero
+  companions without backlinks, zero broken links, and zero non-clickable
+  source references. Each companion now has an explicit `## Brain links`
+  declaration, and every relationship remains human-reviewed rather than
+  inferred by the compiler.
+- The same declarations were transactionally backfilled into the personal JEM
+  Postgres source registry: 74 sources, 74 artifacts, 45 companion paths, and 46
+  reviewed source-to-Brain relationships (45 backfill-owned plus the original
+  compiler-owned canary). A repeat dry run found all 45 source ids and an
+  idempotent repeat apply created none. Immutable Storage identity was verified
+  after the backfill for every stored companion artifact: 41 of 41 hashes match
+  their content-addressed Storage paths, with zero mismatches. No source bytes
+  were uploaded by the backfill.
+- Live JEM search spot checks now resolve document-led queries to source
+  companions and concept-led queries to the relevant Brain synthesis; exact
+  source-title queries expose both sides of the relationship. This is useful
+  pilot evidence but is not a representative session-frequency baseline for
+  spec 014.
 - The real JEM companion was exercised in the local Library with reciprocal
   Brain navigation, HTTPS Dropbox navigation, exact provider/revision/hash and
   local-locator trace data, and local opening disabled.
@@ -115,3 +135,8 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   it was not added to Cockpit, installed as another login item, hosted, or
   exposed to ERS. The supporting source-manifest/runtime implementation shipped
   to personal JEM in `v1.5.0` (`379b965`).
+- Hosted lint remains deliberately confined to the `brain/` namespace, so it
+  reports repository-parent source hyperlinks as `parent_link_disabled` edge
+  diagnostics. Those diagnostics are not broken-link findings; the strict
+  repository-wide source-link audit validates the `brain/` to `sources/`
+  boundary. ERS content, schema, credentials, and deployment remain unchanged.
