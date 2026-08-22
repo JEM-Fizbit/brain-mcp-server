@@ -61,9 +61,10 @@ The hosted Brain rebuild has passed the first critical sync gates:
   fail-closed structural-file roles, reserved external-namespace guards,
   idempotent conflict recording, and a parity-gated local state-rebase
   procedure. Both Brains use graph reachability as the primary beta path while
-  legacy deltas remain the inverse comparator through 2026-07-24; JEM has 39
-  hosted files and ERS has 50/50 graph-reachable files with three deliberate
-  history exemptions. Both consolidated local Monitor profiles are healthy and
+  legacy deltas remain the inverse comparator through 2026-07-24. JEM currently
+  has 39 hosted files; ERS currently has 51 hosted files, and its migration
+  baseline recorded 50/50 graph-reachable files with three deliberate history
+  exemptions. Both consolidated local Monitor profiles are healthy and
   conflict-free. The task-context compiler remains unbuilt and spec 014 stays
   trigger-gated;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
