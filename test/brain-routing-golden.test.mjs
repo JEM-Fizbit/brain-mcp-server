@@ -29,6 +29,7 @@ test("brain routing golden set covers diverse Brain behavior surfaces", async ()
       "personal_contact",
       "private_personal",
       "project_routing",
+      "semantic_destination",
       "source_escalation",
       "task_routing",
       "work_contact",
@@ -45,6 +46,7 @@ test("brain routing golden set covers diverse Brain behavior surfaces", async ()
       testCase.expected.route_files?.length ||
         testCase.expected.loader_must_contain?.length ||
         testCase.expected.search ||
+        testCase.expected.destinations?.length ||
         testCase.expected.canonical_for,
       `at least one assertion is required for ${testCase.id}`
     );
@@ -66,6 +68,7 @@ test("brain routing eval command is wired as a read-only script", async () => {
   );
   assert.match(runner, /evaluateBrainRoutingGolden/);
   assert.match(runner, /--fixtures/);
+  assert.match(runner, /--brain-id/);
   assert.doesNotMatch(runner, /writeFile|appendFile|brain_update_file|brain_log|brain_commit/);
 });
 

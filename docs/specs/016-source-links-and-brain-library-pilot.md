@@ -4,7 +4,7 @@
 **Source:** John-approved implementation plan, 2026-08-22
 **Roadmap link:** `BACKLOG.md` polished human reading UX, JEM-first pilot slice
 **Decisions impact:** keeps Brain Library separate from Brain Cockpit
-**Related:** [`015-compiled-source-ingestion.md`](015-compiled-source-ingestion.md); [`006-brain-sync-architecture-simplification.md`](006-brain-sync-architecture-simplification.md); [`007-brain-cockpit-ux-redesign.md`](007-brain-cockpit-ux-redesign.md)
+**Related:** [`015-compiled-source-ingestion.md`](015-compiled-source-ingestion.md); [`006-brain-sync-architecture-simplification.md`](006-brain-sync-architecture-simplification.md); [`007-brain-cockpit-ux-redesign.md`](007-brain-cockpit-ux-redesign.md); [`../brain-content-linking-runbook.md`](../brain-content-linking-runbook.md)
 
 ## Problem
 
@@ -17,6 +17,12 @@ artifact resolution.
 The operator Cockpit is deliberately a health and maintenance surface. Human
 content reading needs a separate read-only Brain Library that consumes the same
 Markdown and source-reference contract without turning Cockpit into a wiki.
+
+The first semantic review exposed a second, independent gap: internal graph and
+source-link integrity did not require important entity hubs to expose an
+official, historical or explicitly unavailable external destination. The
+source-link audit's earlier zero non-clickable result therefore described only
+Brain-to-source file references, not complete human navigation.
 
 ## Acceptance criteria
 
@@ -40,6 +46,14 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
 - The Library works at desktop and 390px, in light and dark modes, without
   horizontal overflow. It does not expose Brain editing or hosted admin actions.
 - JEM is the only live pilot. ERS remains untouched.
+- Audit semantic destinations separately from source-link integrity. Every
+  declared entity hub must contain a controlled `## Canonical destinations`
+  section identifying a current official website, authoritative historical
+  evidence, or an explicit no-verified-public-website state.
+- Report bare URLs in active Brain content as strict portability failures and
+  source-companion bare URLs/source-only domains as review candidates.
+- Routing regressions can assert an exact Markdown destination and lifecycle
+  marker in the routed hub.
 
 ## Out of scope
 
@@ -47,6 +61,8 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   in the Library.
 - Adding content-reading tabs to Brain Cockpit.
 - Automatic semantic cross-link creation.
+- Mechanically promoting every source-only domain or rewriting quoted source
+  bodies solely to satisfy link formatting.
 - A hosted multi-user Library, authentication or ERS colleague rollout.
 - Spec 014 activation.
 
@@ -61,6 +77,8 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   limited to deterministic syntax/path fixes.
 - Source companions and original artifacts may sit outside `brain/`; the audit
   therefore operates on the repository root, not only hosted Brain files.
+- External link availability is advisory. Identity and lifecycle status require
+  reviewed primary evidence; a redirect or HTTP failure alone is not authority.
 
 ## Test plan
 
@@ -84,6 +102,7 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
 ## Verification commands
 
 - `npm run build`
+- `npm run brain:audit:destinations -- --brain-root <brain-repo-root> --strict`
 - focused `node --test` link-audit, resolver and Library HTTP tests
 - `npm run test:brain-library:e2e`
 - `npm test`
@@ -140,3 +159,20 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   diagnostics. Those diagnostics are not broken-link findings; the strict
   repository-wide source-link audit validates the `brain/` to `sources/`
   boundary. ERS content, schema, credentials, and deployment remain unchanged.
+- The follow-on semantic-destination audit found five entity hubs without a
+  canonical-destination section and 19 bare URLs in active Brain content. The
+  reviewed JEM correction gave all five hubs an explicit current, historical or
+  unavailable destination state; promoted Quanta, ERS and Celox destinations;
+  corrected stale NVT and Prince's Trust links; localized current-role links;
+  and converted the 19 active-content URLs to ordinary Markdown links. The
+  Nextkidney/Neokidney company-product ambiguity is recorded for human
+  adjudication rather than silently rewritten. The reusable sequence and ERS
+  replay gate live in `docs/brain-content-linking-runbook.md`.
+- Rapid sequential hosted patches to one JEM file were briefly observed by the
+  live watcher between revisions and produced duplicate conflicts against the
+  same stale local base. The reviewed hosted content was preserved, the JEM
+  watcher alone was paused, the local file was made byte-identical (including
+  terminal-newline state), all duplicates were resolved, and the resumed sync
+  cycle returned healthy with zero conflicts. The runbook now requires a paused
+  target watcher and one consolidated replacement per file for future bulk
+  content passes.

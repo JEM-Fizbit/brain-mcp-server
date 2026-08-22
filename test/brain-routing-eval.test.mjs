@@ -17,6 +17,7 @@ const fixtureBrains = {
         "Reading source archives: escalate to `sources` or `all` when a query clearly implicates original ingested material.",
       ].join("\n"),
       "01_identity.md": "Email address\nPhone number / mobile\n",
+      "quanta.md": "## Canonical destinations\n- **Official website:** [Quanta](https://quantadt.com/)\n",
       "09_tools_stack.md": "UChicago account: CNetID and email alias are stable non-secret account identifiers. No passwords, tokens, MFA secrets, recovery codes, or private keys.\n",
       "ers_genomics.md": "John's personal summary/bridge. Authoritative ERS-owned facts live in the accessible canonical ERS Brain when available.\n",
     },
@@ -78,6 +79,22 @@ test("brain routing eval passes route, registry, policy, and fuzzy-search cases"
       },
     },
     {
+      id: "quanta-destination",
+      prompt: "Take me to Quanta.",
+      category: "semantic_destination",
+      expected: {
+        brain_id: "ai-brain-jem",
+        route_files: ["quanta.md"],
+        destinations: [
+          {
+            file: "quanta.md",
+            url: "https://quantadt.com/",
+            status_marker: "Official website",
+          },
+        ],
+      },
+    },
+    {
       id: "ers-company-fact",
       prompt: "What is the ERS company address?",
       category: "cross_brain_authority",
@@ -107,9 +124,9 @@ test("brain routing eval passes route, registry, policy, and fuzzy-search cases"
   });
 
   assert.equal(results.status, "pass");
-  assert.equal(results.summary.total, 4);
+  assert.equal(results.summary.total, 5);
   assert.equal(results.summary.failed, 0);
-  assert.match(summarizeBrainRoutingResults(results), /PASS 4\/4/);
+  assert.match(summarizeBrainRoutingResults(results), /PASS 5\/5/);
 });
 
 test("brain routing eval reports missing required routes", () => {

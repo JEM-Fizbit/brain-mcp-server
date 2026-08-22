@@ -54,7 +54,13 @@ The hosted Brain rebuild has passed the first critical sync gates:
   content-addressed hash identity. The live hosted MCP returned the JEM canary's exact
   provider id/revision, HTTPS locator, registered local-root alias, relative
   path, content hash, provenance, and reviewed Brain link without returning
-  source bytes. Spec 014 remains deferred because no representative post-content
+  source bytes. A separate semantic-destination pass now requires every JEM
+  entity hub to declare a current official, historical-evidence, or explicit
+  unavailable destination state; all five hubs satisfy the contract, active
+  Brain content has no bare URLs, and exact Quanta/Nitec destination regressions
+  are in the routing golden set. The combined source-link and destination
+  sequence is preserved in `docs/brain-content-linking-runbook.md`; ERS replay
+  remains separately approval-gated. Spec 014 remains deferred because no representative post-content
   follow-up-read gap or weaker-harness gap has been measured. ERS schema,
   content, credentials, and deployment remain unchanged and separately gated;
 - multi-profile Monitor sync now requires an explicit revision store and binds

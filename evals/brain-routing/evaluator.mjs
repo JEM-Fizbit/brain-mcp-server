@@ -52,6 +52,7 @@ function emptyAssertionSummary() {
     policyMarkers: { total: 0, passed: 0, failed: 0 },
     signposts: { total: 0, passed: 0, failed: 0 },
     search: { total: 0, passed: 0, failed: 0 },
+    destinations: { total: 0, passed: 0, failed: 0 },
   };
 }
 
@@ -138,6 +139,30 @@ function evaluateCase(testCase, context) {
       if (!passed) {
         failures.push(
           `Search query "${expected.search.query}" did not hit required file ${filename} in ${brainId}.`
+        );
+      }
+    }
+  }
+
+  for (const destination of expected.destinations || []) {
+    const content = brain?.files?.[destination.file];
+    const hasUrl =
+      typeof content === "string" &&
+      content.includes(`](${destination.url})`);
+    recordAssertion(assertions, "destinations", hasUrl);
+    if (!hasUrl) {
+      failures.push(
+        `Expected ${destination.file} in ${brainId} to contain Markdown destination ${destination.url}.`
+      );
+    }
+    if (destination.status_marker) {
+      const hasMarker =
+        typeof content === "string" &&
+        textMatchesQuery(content, destination.status_marker);
+      recordAssertion(assertions, "destinations", hasMarker);
+      if (!hasMarker) {
+        failures.push(
+          `Expected ${destination.file} in ${brainId} to contain destination status marker "${destination.status_marker}".`
         );
       }
     }
@@ -258,9 +283,10 @@ export function summarizeBrainRoutingResults(results) {
   const policy = results.summary.assertions.policyMarkers;
   const signposts = results.summary.assertions.signposts;
   const search = results.summary.assertions.search;
+  const destinations = results.summary.assertions.destinations;
   const lines = [
     `${status} ${results.summary.passed}/${results.summary.total} brain-routing cases`,
-    `Policy markers: ${policy.passed}/${policy.total}; signposts: ${signposts.passed}/${signposts.total}; search: ${search.passed}/${search.total}`,
+    `Policy markers: ${policy.passed}/${policy.total}; signposts: ${signposts.passed}/${signposts.total}; search: ${search.passed}/${search.total}; destinations: ${destinations.passed}/${destinations.total}`,
     `Follow-up reads: ${results.summary.followUpReads.total} total (${results.summary.followUpReads.average} average)`,
     `Route files: ${results.summary.routeFiles.passed}/${results.summary.routeFiles.total}; evaluator latency p95: ${results.summary.latencyMs.p95} ms`,
   ];

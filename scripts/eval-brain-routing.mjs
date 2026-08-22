@@ -33,6 +33,7 @@ function usage() {
     "  --golden <path>     Golden-case JSON file",
     "  --fixtures <path>   Frozen evaluator bundle (cases + Brains + registry)",
     "  --registry <path>   Brain registry JSON file",
+    "  --brain-id <id>     Evaluate only cases for one Brain",
     "  --jem-dir <path>    Local ai-brain-jem markdown root",
     "  --ers-dir <path>    Local ers-brain markdown root",
     "  --json              Emit machine-readable results after the summary",
@@ -45,6 +46,7 @@ function parseArgs(argv) {
     golden: path.join(repoRoot, "evals", "brain-routing", "golden.json"),
     registry: path.join(repoRoot, "config", "brain-platform.john-ers-pilot.json"),
     fixtures: undefined,
+    brainId: undefined,
     brainDirs: {
       "ai-brain-jem": process.env.BRAIN_EVAL_JEM_DIR || defaultBrainDirs["ai-brain-jem"],
       "ers-brain": process.env.BRAIN_EVAL_ERS_DIR || defaultBrainDirs["ers-brain"],
@@ -66,6 +68,8 @@ function parseArgs(argv) {
       options.golden = path.resolve(nextValue());
     } else if (flag === "--registry") {
       options.registry = path.resolve(nextValue());
+    } else if (flag === "--brain-id") {
+      options.brainId = nextValue();
     } else if (flag === "--fixtures") {
       options.fixtures = path.resolve(nextValue());
     } else if (flag === "--jem-dir") {
@@ -111,6 +115,14 @@ async function main() {
     return;
   }
 
+  const selectedBrainDirs = options.brainId
+    ? options.brainDirs[options.brainId]
+      ? { [options.brainId]: options.brainDirs[options.brainId] }
+      : (() => {
+          throw new Error(`No local Brain directory option is defined for ${options.brainId}.`);
+        })()
+    : options.brainDirs;
+
   const [cases, registry, loaded] = options.fixtures
     ? await (async () => {
         const fixture = await readJsonFile(options.fixtures);
@@ -123,13 +135,22 @@ async function main() {
     : await Promise.all([
         readJsonFile(options.golden),
         readJsonFile(options.registry),
-        loadBrains(options.brainDirs),
+        loadBrains(selectedBrainDirs),
       ]);
 
+  const selectedCases = options.brainId
+    ? cases.filter((testCase) => testCase.expected?.brain_id === options.brainId)
+    : cases;
+  if (options.brainId && selectedCases.length === 0) {
+    throw new Error(`No routing cases found for Brain ${options.brainId}.`);
+  }
+
   const results = evaluateBrainRoutingGolden({
-    cases,
+    cases: selectedCases,
     registry,
-    brains: loaded.brains,
+    brains: options.brainId
+      ? { [options.brainId]: loaded.brains[options.brainId] }
+      : loaded.brains,
   });
 
   console.log(summarizeBrainRoutingResults(results));
