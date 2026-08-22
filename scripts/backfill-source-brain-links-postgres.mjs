@@ -31,20 +31,17 @@ const createMissing = argv.includes("--create-missing");
 const databaseUrl =
   process.env.BRAIN_SOURCE_REFERENCE_DATABASE_URL || process.env.BRAIN_REVISION_DATABASE_URL;
 
-if (!brainId || !databaseUrl) {
+if (!brainId || !databaseUrl || !expectedProjectRef) {
   console.error(
-    "Usage: npm run sources:backfill-brain-links:postgres -- --brain-root <path> --brain-id <id> [--expected-project-ref <ref>] [--apply]"
+    "Usage: npm run sources:backfill-brain-links:postgres -- --brain-root <path> --brain-id <id> --expected-project-ref <ref> [--apply] [--create-missing]"
   );
   process.exit(2);
 }
 
 let pool;
 try {
-  if (apply && !expectedProjectRef) {
-    throw new Error("--expected-project-ref is required in apply mode");
-  }
   const actualProjectRef = projectRefFromDatabaseUrl(databaseUrl);
-  if (expectedProjectRef && actualProjectRef !== expectedProjectRef) {
+  if (actualProjectRef !== expectedProjectRef) {
     throw new Error("Database URL does not match --expected-project-ref");
   }
 

@@ -84,7 +84,8 @@ npm run sources:audit-links -- --brain-root /path/to/brain
 # Dry-run reviewed companion backlinks against existing Postgres source ids
 npm run sources:backfill-brain-links:postgres -- \
   --brain-root /path/to/brain \
-  --brain-id ai-brain-jem
+  --brain-id ai-brain-jem \
+  --expected-project-ref gfipcidoyrtgngauzijy
 
 # Transactional Postgres persistence; JEM-only and project-ref guarded
 npm run sources:persist-reference:postgres -- \
