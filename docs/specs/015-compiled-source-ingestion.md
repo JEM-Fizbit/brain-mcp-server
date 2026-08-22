@@ -114,3 +114,14 @@ opening the same Markdown in Obsidian or another viewer.
   revision. ERS data, schema, credential, and deployment were unchanged.
 - Fresh Supabase Security Advisor verdict after the migration, credential, and
   canary: 0 errors, 0 warnings, 0 suggestions.
+- Released the implementation as annotated tag `v1.5.0` at commit `379b965`
+  and deployed it only to the personal `jem-brain-mcp` Fly app (release v64).
+  The live health endpoint reports server version `1.5.0`, Postgres revisions,
+  Supabase artifacts, Postgres OAuth state, metadata-only artifact access, and
+  the Git hot path disabled. A real hosted `brain_read_file` source read
+  returned the canary's exact portable identity and reviewed relationship while
+  withholding source bytes.
+- The final release suite passed 381 tests (376 passed, five intentionally
+  skipped, zero failed), the dependency audit reported zero vulnerabilities,
+  and both JEM and ERS local Monitor profiles remained healthy and
+  conflict-free. ERS deployment and data were not changed.

@@ -111,3 +111,7 @@ Markdown and source-reference contract without turning Cockpit into a wiki.
   horizontal overflow. Unit/HTTP tests cover untrusted Markdown, loopback Host
   checks, artifact containment, unknown ids, traversal/symlink escape, nonce
   enforcement, and default-disabled local opening.
+- The Brain Library remains a manually started, local-only development pilot;
+  it was not added to Cockpit, installed as another login item, hosted, or
+  exposed to ERS. The supporting source-manifest/runtime implementation shipped
+  to personal JEM in `v1.5.0` (`379b965`).
