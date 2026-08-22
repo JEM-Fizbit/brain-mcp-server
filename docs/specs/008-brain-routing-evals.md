@@ -13,8 +13,11 @@ Conventional unit tests prove server mechanics, but they do not catch regression
 ## Acceptance criteria
 
 - A deterministic golden set covers diverse Brain behavior surfaces, not only one academic-credential edge case.
-- The golden set checks routing, signposts, registry authority metadata, search tolerance, fallback disclosure, and secret-storage refusal markers.
+- The golden set checks routing, signposts, registry authority metadata, search tolerance, fallback disclosure, secret-storage refusal markers, and exact semantic destinations when a case requires live or historical evidence.
 - The runner is read-only and supports frozen fixture bundles or explicit local Markdown roots plus registry metadata.
+- The runner can isolate one Brain with `--brain-id`, allowing the personal and
+  dedicated ERS deployments to use their own registries without rebuilding a
+  cross-deployment configuration.
 - Search assertions execute the production deterministic ranking code rather than a separate fuzzy matcher.
 - Policy-marker assertions are reported separately from retargetable signpost assertions.
 - The result records per-Brain bootstrap bytes/estimated tokens, route-file success, follow-up reads, search mechanisms, and evaluator latency.
@@ -23,7 +26,7 @@ Conventional unit tests prove server mechanics, but they do not catch regression
 
 ## Current baseline
 
-`evals/brain-routing/golden.json` starts with 27 cases across these behavior surfaces:
+`evals/brain-routing/golden.json` now contains 31 cases across these behavior surfaces:
 
 - personal contact lookup;
 - private personal details;
@@ -34,6 +37,7 @@ Conventional unit tests prove server mechanics, but they do not catch regression
 - task routing;
 - project and working-artifact routing;
 - writing voice, career, investor, and opportunity context routing.
+- current official and historical successor destinations.
 
 The evaluator intentionally checks durable routing evidence rather than exact natural-language answers. Production search ranking is imported from `dist/search-ranking.js`. `evals/brain-routing/fixtures/server-foundation.json` freezes a non-sensitive two-Brain regression bundle; explicit local roots remain the read-only fat-bootstrap baseline lane.
 
@@ -51,6 +55,9 @@ The evaluator intentionally checks durable routing evidence rather than exact na
 - The runner accepts explicit Brain roots so future tenants or snapshot directories can reuse the same evaluator shape.
 - Search matching is the same deterministic exact/normalised/compact/token ranking implementation used by the server.
 - Golden assertions should test the intended signpost or route, not accidental phrase choices inside individual Brain files.
+- Destination assertions require an exact URL inside an ordinary Markdown link
+  plus an optional lifecycle marker; a bare URL elsewhere in the Brain does not
+  satisfy the case.
 
 ## Test plan
 
@@ -76,6 +83,7 @@ The evaluator intentionally checks durable routing evidence rather than exact na
 
 - `node --test test/brain-routing-eval.test.mjs test/brain-routing-golden.test.mjs`
 - `npm run eval:brain:routing -- --fixtures evals/brain-routing/fixtures/server-foundation.json`
+- `npm run eval:brain:routing -- --brain-id ai-brain-jem --jem-dir "/Users/johnemilad/Projects/ai-brain-jem/brain"`
 - `npm run eval:brain:routing -- --jem-dir "/Users/johnemilad/Projects/ai-brain-jem/brain" --ers-dir "/Users/johnemilad/Library/CloudStorage/OneDrive-SharedLibraries-ERSGenomics/Systems & IT - Documents/01_ers-brain/brain"`
 - `npm test`
 

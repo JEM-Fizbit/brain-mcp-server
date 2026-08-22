@@ -8,6 +8,39 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-22 — Make semantic destinations a separate reviewed content contract
+
+**Decision:** Treat external semantic-destination completeness as independent
+from graph reachability and Brain-to-source link integrity. Every declared
+entity hub must contain a human-readable `## Canonical destinations` section
+that records one of three reviewed states: current official website,
+authoritative historical/successor evidence, or no verified public website.
+Active Brain content uses ordinary Markdown hyperlinks; source-only domains are
+promotion candidates, not automatic relationships. Routing evals may require an
+exact Markdown destination and lifecycle marker. JEM is the development pilot;
+the complete source-link plus semantic-destination sequence is recorded in a
+tenant-neutral runbook for a separately approved ERS replay.
+
+**Why:** The JEM graph and source-link audit were green while the Quanta hub had
+no link to Quanta's website, even though the correct URL already existed in a
+reviewed source companion. Internal reachability, direct evidence, human
+clickability and authoritative external destination are different guarantees
+and need different checks. Historical, private and pre-launch entities also
+make a universal "official website required" rule both inaccurate and prone to
+fabrication.
+
+**Alternatives rejected:** Count any external URL anywhere in a file (allows a
+counterparty link to satisfy the entity itself); promote every source-only
+domain automatically (invents relevance); require a live homepage for defunct
+or private entities (fabricates identity); treat HTTP status as authority
+(redirects, bot blocking and outages are ambiguous); activate Spec 014 to solve
+the gap (a compiler would only package incomplete content).
+
+**Related:** `docs/brain-content-linking-runbook.md`;
+`docs/specs/016-source-links-and-brain-library-pilot.md`;
+`src/semantic-destinations/audit.ts`;
+`evals/brain-routing/golden.json`.
+
 ## 2026-08-22 — Compile source identity and keep content reading separate from Cockpit
 
 **Decision:** Use a versioned `brain.source-reference/v1` manifest as the

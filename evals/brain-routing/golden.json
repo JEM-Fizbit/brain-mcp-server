@@ -272,6 +272,76 @@
     }
   },
   {
+    "id": "quanta-canonical-destination",
+    "prompt": "Take me to Quanta Dialysis Technologies and its official website.",
+    "category": "semantic_destination",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["quanta.md"],
+      "loader_must_contain": ["Entity or prior-role context", "quanta"],
+      "search": { "query": "Quanta Dialysis Technologies", "must_hit_files": ["quanta.md"] },
+      "destinations": [
+        {
+          "file": "quanta.md",
+          "url": "https://quantadt.com/",
+          "status_marker": "Official website"
+        }
+      ]
+    }
+  },
+  {
+    "id": "nitec-historical-destination",
+    "prompt": "Find Nitec Pharma and the authoritative evidence for what happened to it.",
+    "category": "semantic_destination",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["nitec.md"],
+      "loader_must_contain": ["Entity or prior-role context", "nitec"],
+      "search": { "query": "Nitec Pharma", "must_hit_files": ["nitec.md"] },
+      "destinations": [
+        {
+          "file": "nitec.md",
+          "url": "https://www.sec.gov/Archives/edgar/data/1492426/000119312510250304/ds1a.htm",
+          "status_marker": "Historical"
+        }
+      ]
+    }
+  },
+  {
+    "id": "edge-unavailable-destination",
+    "prompt": "Take me to Edge Biotech and tell me whether it has a public website.",
+    "category": "semantic_destination",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["edge_biotech.md"],
+      "search": { "query": "Edge Biotech public website", "must_hit_files": ["edge_biotech.md"] },
+      "destinations": [
+        {
+          "file": "edge_biotech.md",
+          "url": "https://md.catapult.org.uk/",
+          "status_marker": "No verified standalone public website"
+        }
+      ]
+    }
+  },
+  {
+    "id": "neokidney-identity-ambiguity",
+    "prompt": "Take me to the company behind Neokidney and flag any naming ambiguity.",
+    "category": "semantic_destination",
+    "expected": {
+      "brain_id": "ai-brain-jem",
+      "route_files": ["04_active_roles.md"],
+      "search": { "query": "Nextkidney Neokidney identity", "must_hit_files": ["04_active_roles.md"] },
+      "destinations": [
+        {
+          "file": "04_active_roles.md",
+          "url": "https://nextkidney.com/about-kidney-dialysis/",
+          "status_marker": "Needs John verification before renaming"
+        }
+      ]
+    }
+  },
+  {
     "id": "edge-biotech-routing",
     "prompt": "Evaluate the Edge Biotech opportunity.",
     "category": "project_routing",
