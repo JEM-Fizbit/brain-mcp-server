@@ -125,11 +125,13 @@ opening the same Markdown in Obsidian or another viewer.
   skipped, zero failed), the dependency audit reported zero vulnerabilities,
   and both JEM and ERS local Monitor profiles remained healthy and
   conflict-free. ERS deployment and data were not changed.
-- The subsequent JEM content pass added a dry-run-first, project-ref-guarded
+- The subsequent JEM content pass added a dry-run-first, fail-closed
+  project-ref-guarded
   transactional backfill for legacy source companions. It parses only explicit
   `## Brain links` declarations, validates every Brain target, preserves
   compiler-owned relationships, and updates artifact hashes only for
   pointer-only artifacts without immutable Storage objects. The personal JEM
   registry now has 45 companion paths and 46 reviewed relationships across the
-  current 45-companion corpus; a repeat apply is idempotent. ERS remains
-  untouched.
+  current 45-companion corpus; a repeat apply is idempotent. Both dry-run and
+  apply modes require the expected project ref, so ambient repo credentials
+  cannot silently select another deployment. ERS remains untouched.
