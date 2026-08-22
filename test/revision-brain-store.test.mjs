@@ -61,6 +61,9 @@ function sourceStore(pathsByCategory) {
     async recordArtifact() {
       throw new Error("not implemented");
     },
+    async recordBrainLink() {
+      throw new Error("not implemented");
+    },
     async recordStoredArtifact() {
       throw new Error("not implemented");
     },
@@ -68,6 +71,9 @@ function sourceStore(pathsByCategory) {
       throw new Error("not implemented");
     },
     async listArtifacts() {
+      return [];
+    },
+    async listBrainLinks() {
       return [];
     },
     async listSourcePaths(_brainId, category) {
@@ -85,6 +91,7 @@ function sourceStore(pathsByCategory) {
             status: "processed",
             sourceDate: null,
             provenanceNote: null,
+            companionPath: `sources/${sourcePath}.md`,
             metadata: {},
             createdAt: "2026-06-14T00:00:00.000Z",
             updatedAt: "2026-06-14T00:00:00.000Z",
@@ -99,6 +106,10 @@ function sourceStore(pathsByCategory) {
               externalUrl: null,
               externalProvider: null,
               externalId: null,
+              providerRevision: null,
+              rootAlias: null,
+              relativePath: null,
+              observedAt: null,
               originalFilename: path.basename(sourcePath),
               mimeType: "application/octet-stream",
               byteSize: 123,
@@ -106,6 +117,19 @@ function sourceStore(pathsByCategory) {
               retentionStatus: "active",
               metadata: { local_path: `sources/${sourcePath}` },
               createdAt: "2026-06-14T00:00:00.000Z",
+            },
+          ],
+          brainLinks: [
+            {
+              id: `${category}-${index}-link`,
+              sourceId: `${category}-${index}`,
+              brainFilename: "08_personal.md",
+              relation: "supports",
+              label: "Personal context",
+              anchor: "",
+              metadata: {},
+              createdAt: "2026-06-14T00:00:00.000Z",
+              updatedAt: "2026-06-14T00:00:00.000Z",
             },
           ],
           paths: [sourcePath],
@@ -214,6 +238,8 @@ test("RevisionBrainStore reads hosted source manifests from metadata", async () 
   assert.match(manifest, /# Source Manifest: photos\/headshot\.jpg/);
   assert.match(manifest, /storage_bucket: brain-artifacts/);
   assert.match(manifest, /original_filename: headshot\.jpg/);
+  assert.match(manifest, /companion_path: sources\/photos\/headshot\.jpg\.md/);
+  assert.match(manifest, /supports: 08_personal\.md \(Personal context\)/);
   assert.match(manifest, /metadata only/);
 });
 

@@ -40,6 +40,17 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 
 Do not build a hosted persistent admin website yet. A hosted website would be useful later, but today it would hide the most important local-first signals: whether the Mac sync loop is alive, whether the local Markdown mirror is current, whether local credentials are configured, and whether the operator's local state is stale.
 
+## Separate content-reading surface
+
+Brain Cockpit remains an operator surface. Rendered Brain content, source
+companions, provenance, and local artifact inspection belong in the separate
+local-only **Brain Library** pilot documented in
+[`brain-library.md`](brain-library.md). The Library consumes the same Markdown
+and source-reference contract but does not share Cockpit navigation or expand
+Cockpit's mutation boundary. This separation is deliberate and is the first
+JEM-only slice of the broader human Brain viewer direction; ERS and hosted
+multi-user use remain separately gated.
+
 ## Optional Cockpit E2E Check
 
 Run the Playwright cockpit check after cockpit layout or hydration changes:
@@ -242,11 +253,14 @@ write to temporary files before atomically promoting valid JSON, preserving the
 last usable report when a launch fails.
 
 For one operator app that supervises both JEM and ERS, pass
-`BRAIN_MENUBAR_PROFILES_JSON` as a JSON array. Each profile supports `id` or
+`BRAIN_MENUBAR_PROFILES_JSON` as a JSON array, or point
+`BRAIN_MENUBAR_PROFILES_FILE` at an owner-readable JSON file so credentials do
+not appear in a shell command. Each profile supports `id` or
 `brainId`, `name` or `displayName`, `brainRoot` or `brainDir`, `stateFile`,
 `healthFile`, `logDir`, `cockpitUrl`, and an optional `env` object. The profile
 environment allow-list is `BRAIN_REVISION_STORE`,
 `BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, `BRAIN_FLY_APP`,
+`BRAIN_EXPECTED_SUPABASE_PROJECT_REF`,
 `BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_DOCTOR_OPERATION_REFRESH_MS`,
 `BRAIN_DOCTOR_DB_TIMEOUT_MS`, and `BRAIN_LINT_MODE_OVERRIDES`; `FLY_CONFIG_DIR`
 may also be supplied when different profiles use isolated Fly CLI identities.
@@ -254,6 +268,12 @@ These values are passed only to that profile's sync, cockpit, and doctor
 processes. This lets two profiles target different hosted stacks, lint
 promotion modes, and Fly organizations from one app without switching the
 global Fly login.
+Every sync-enabled profile in a multi-profile Monitor must declare its revision
+store explicitly. A Postgres profile must also declare its database URL and
+expected Supabase project ref. Installation fails if the URL does not match the
+declared ref, and managed sync children ignore ambient repo `.env.local` files.
+The sync CLI repeats the project-ref check before opening a connection. This is
+a fail-closed cross-deployment guard, not a naming convention.
 The generated config is owner-readable only (`0600`) because a database URL is
 a credential; never commit or print the profiles JSON:
 
@@ -270,6 +290,9 @@ BRAIN_MENUBAR_PROFILES_JSON='[
     "logDir": "/Users/johnemilad/Projects/ai-brain-jem/.brain-sync",
     "cockpitUrl": "http://127.0.0.1:8787/",
     "env": {
+      "BRAIN_REVISION_STORE": "postgres",
+      "BRAIN_REVISION_DATABASE_URL": "<JEM_RUNTIME_DATABASE_URL>",
+      "BRAIN_EXPECTED_SUPABASE_PROJECT_REF": "gfipcidoyrtgngauzijy",
       "BRAIN_LINT_MODE_OVERRIDES": "{\"ai-brain-jem\":\"graph\"}"
     }
   },
@@ -282,6 +305,9 @@ BRAIN_MENUBAR_PROFILES_JSON='[
     "logDir": "/Users/johnemilad/Library/Application Support/Brain MCP/ers-brain-onedrive-sync",
     "cockpitUrl": "http://127.0.0.1:8788/",
     "env": {
+      "BRAIN_REVISION_STORE": "postgres",
+      "BRAIN_REVISION_DATABASE_URL": "<ERS_RUNTIME_DATABASE_URL>",
+      "BRAIN_EXPECTED_SUPABASE_PROJECT_REF": "omnwbcdtmtvxasgdmvwr",
       "BRAIN_LINT_MODE_OVERRIDES": "{\"ers-brain\":\"graph\"}"
     }
   }

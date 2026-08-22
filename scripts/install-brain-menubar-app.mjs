@@ -146,6 +146,7 @@ const configPath = path.join(resourcesDir, "brain-menubar-config.json");
 const profileEnvKeys = new Set([
   "BRAIN_REVISION_STORE",
   "BRAIN_REVISION_DATABASE_URL",
+  "BRAIN_EXPECTED_SUPABASE_PROJECT_REF",
   "BRAIN_HOSTED_BASE_URL",
   "BRAIN_FLY_APP",
   "BRAIN_SYNC_HEARTBEAT_INTERVAL_MS",
@@ -161,6 +162,20 @@ function parseUrl(value) {
   } catch {
     return null;
   }
+}
+
+function projectRefFromDatabaseUrl(databaseUrl) {
+  const url = parseUrl(databaseUrl);
+  if (!url) return null;
+  const usernameSuffix = decodeURIComponent(url.username).split(".").at(-1);
+  if (
+    usernameSuffix &&
+    usernameSuffix !== "postgres" &&
+    /^[a-z0-9]{12,32}$/.test(usernameSuffix)
+  ) {
+    return usernameSuffix;
+  }
+  return url.hostname.match(/^db\.([a-z0-9]{12,32})\.supabase\.co$/)?.[1] || null;
 }
 
 function isExplicitlyFalse(value) {
@@ -266,6 +281,10 @@ function normalizeProfile(rawProfile, index) {
     BRAIN_SYNC_HEALTH_FILE: profileHealthFile,
     BRAIN_SYNC_LOG_DIR: profileLogDir,
     BRAIN_SYNC_SUPERVISOR: "menubar",
+    ...(process.env.BRAIN_MENUBAR_PROFILES_JSON ||
+    process.env.BRAIN_MENUBAR_PROFILES_FILE
+      ? { BRAIN_SYNC_LOAD_LOCAL_ENV: "0", BRAIN_LOAD_LOCAL_ENV: "0" }
+      : {}),
     BRAIN_MONITOR_STACK_FILE: profileStackStatusFile,
     BRAIN_COCKPIT_URL: resolvedCockpitUrl,
     BRAIN_DOCTOR_OPERATION_CACHE_FILE: path.join(
@@ -331,23 +350,55 @@ function normalizeProfile(rawProfile, index) {
   };
 }
 
-function readProfiles() {
-  if (!process.env.BRAIN_MENUBAR_PROFILES_JSON) {
+async function readProfiles() {
+  const profilesFile = process.env.BRAIN_MENUBAR_PROFILES_FILE;
+  const profilesJson = profilesFile
+    ? await fs.readFile(path.resolve(profilesFile), "utf-8")
+    : process.env.BRAIN_MENUBAR_PROFILES_JSON;
+  if (!profilesJson) {
     return [normalizeProfile({}, 0)];
   }
   let rawProfiles;
   try {
-    rawProfiles = JSON.parse(process.env.BRAIN_MENUBAR_PROFILES_JSON);
+    rawProfiles = JSON.parse(profilesJson);
   } catch (error) {
-    throw new Error(`BRAIN_MENUBAR_PROFILES_JSON must be valid JSON: ${error.message}`);
+    throw new Error(`Brain Monitor profiles must be valid JSON: ${error.message}`);
   }
   if (!Array.isArray(rawProfiles) || rawProfiles.length === 0) {
     throw new Error("BRAIN_MENUBAR_PROFILES_JSON must be a non-empty array");
   }
-  return rawProfiles.map((profile, index) => normalizeProfile(profile, index));
+  const profiles = rawProfiles.map((profile, index) => normalizeProfile(profile, index));
+  for (const profile of profiles) {
+    if (!profile.syncEnabled) continue;
+    const store = profile.env.BRAIN_REVISION_STORE;
+    if (!store) {
+      throw new Error(
+        `Brain profile ${profile.brainId} must explicitly set BRAIN_REVISION_STORE`
+      );
+    }
+    if (store !== "postgres" && store !== "file") {
+      throw new Error(
+        `Brain profile ${profile.brainId} has unsupported BRAIN_REVISION_STORE: ${store}`
+      );
+    }
+    if (store !== "postgres") continue;
+    const databaseUrl = profile.env.BRAIN_REVISION_DATABASE_URL;
+    const expectedProjectRef = profile.env.BRAIN_EXPECTED_SUPABASE_PROJECT_REF;
+    if (!databaseUrl || !expectedProjectRef) {
+      throw new Error(
+        `Postgres Brain profile ${profile.brainId} must set BRAIN_REVISION_DATABASE_URL and BRAIN_EXPECTED_SUPABASE_PROJECT_REF`
+      );
+    }
+    if (projectRefFromDatabaseUrl(databaseUrl) !== expectedProjectRef) {
+      throw new Error(
+        `Postgres Brain profile ${profile.brainId} database URL does not match its expected Supabase project ref`
+      );
+    }
+  }
+  return profiles;
 }
 
-const brainProfiles = readProfiles();
+const brainProfiles = await readProfiles();
 const primaryProfile = brainProfiles[0];
 
 const cockpitProfilesJson = JSON.stringify(

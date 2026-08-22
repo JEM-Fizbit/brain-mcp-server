@@ -109,7 +109,19 @@ function formatArtifact(artifact: SourceArtifactRecord): string {
     `  content_sha256: ${artifact.contentSha256 || "-"}`,
     `  external_provider: ${artifact.externalProvider || "-"}`,
     `  external_id: ${artifact.externalId || "-"}`,
+    `  provider_revision: ${artifact.providerRevision || "-"}`,
+    `  root_alias: ${artifact.rootAlias || "-"}`,
+    `  relative_path: ${artifact.relativePath || "-"}`,
+    `  observed_at: ${artifact.observedAt || "-"}`,
+    `  external_url: ${artifact.externalUrl || "-"}`,
   ].join("\n");
+}
+
+function formatBrainLink(link: SourceManifestRecord["brainLinks"][number]): string {
+  const anchor = link.anchor ? `#${link.anchor}` : "";
+  return `- ${link.relation}: ${link.brainFilename}${anchor}${
+    link.label ? ` (${link.label})` : ""
+  }`;
 }
 
 function formatSourceManifest(manifest: SourceManifestRecord): string {
@@ -121,11 +133,17 @@ function formatSourceManifest(manifest: SourceManifestRecord): string {
     `status: ${manifest.source.status}`,
     `source_date: ${manifest.source.sourceDate || "-"}`,
     `provenance_note: ${manifest.source.provenanceNote || "-"}`,
+    `companion_path: ${manifest.source.companionPath || "-"}`,
     `paths: ${manifest.paths.length ? manifest.paths.join(", ") : "-"}`,
     "",
     "Artifacts:",
     manifest.artifacts.length
       ? manifest.artifacts.map(formatArtifact).join("\n")
+      : "- none",
+    "",
+    "Brain links:",
+    manifest.brainLinks.length
+      ? manifest.brainLinks.map(formatBrainLink).join("\n")
       : "- none",
     "",
     "Note: hosted source reads currently return metadata only. Original bytes remain in private artifact storage until an explicit download/signed-URL policy is implemented.",

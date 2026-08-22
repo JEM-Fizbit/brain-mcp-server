@@ -15,6 +15,26 @@ This gate does not approve broad client-side access, public API access, addition
 
 ## Verified Controls
 
+- The 2026-08-22 JEM-first source-reference migration was applied to the
+  personal `jem-brain-personal` project (`gfipcidoyrtgngauzijy`) with ERS
+  untouched. The post-migration gate reported 16/16 Brain tables with RLS,
+  zero `anon`/`authenticated`/`public` Brain grants, one `brain_runtime`-only
+  policy and no other policy on `brain.source_brain_links`, a private artifact
+  bucket, all five new path/identity constraints present, and all 70 existing
+  source plus 70 artifact rows preserved. A fresh Supabase Security Advisor run
+  returned 0 errors, 0 warnings, and 0 suggestions. The reviewed JEM canary then
+  added one pointer-only artifact and one declared source-to-Brain link, for
+  totals of 71 sources, 71 artifacts, and one reviewed link; its complete
+  persisted identity digest matched the compiled manifest, and no source bytes
+  or extracted content were uploaded.
+- The personal local-sync login `brain_jem_sync_user` exists solely for the JEM
+  Monitor profile, inherits `brain_runtime`, and has no superuser, role-creation,
+  database-creation, replication, or RLS-bypass privilege. Its transaction
+  pooler URL is stored only in the owner-readable (`0600`) installed Monitor
+  config, bound to expected project ref `gfipcidoyrtgngauzijy`, and excluded
+  from ambient repo env loading. A known personal hosted revision pulled to the
+  local JEM mirror after cutover. A fresh post-credential Security Advisor run
+  again returned 0 errors, 0 warnings, and 0 suggestions.
 - The `brain` schema has no grants to `anon`, `authenticated`, or `public`.
 - All `brain.*` tables have Row Level Security enabled.
 - The `brain.*` tables have server-side RLS policies only for the no-login `brain_runtime` database role; web/client roles still have no row access.

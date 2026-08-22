@@ -8,6 +8,60 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-22 — Compile source identity and keep content reading separate from Cockpit
+
+**Decision:** Use a versioned `brain.source-reference/v1` manifest as the
+canonical compilation input for source companions. Artifact identity records a
+provider id and revision, HTTPS locator, content hash, observation time, and a
+registered local-root alias plus safe relative path; machine-specific absolute
+paths are runtime configuration, not canonical data. The compiler emits
+ordinary reciprocal Markdown links for humans and one bounded embedded JSON
+manifest for LLM traceability. Brain relationships are reviewed declarations:
+the compiler and persistence layer may format and replace a manifest's declared
+link set, while the audit may identify thin, distant, broken, or non-clickable
+connections, but neither may invent semantic backlinks.
+
+Rendered content belongs in a separate local-only **Brain Library**, not Brain
+Cockpit. Cockpit remains the maintenance and health surface. Library is
+loopback-only and read-only, renders untrusted Markdown without HTML execution,
+keeps local artifact opening disabled by default, and resolves any enabled
+local open through registered artifact ids, allowlisted root aliases,
+containment checks, and a nonce-protected POST. JEM is the only development
+canary; ERS schema, content, deployment, and credentials remain untouched until
+a separate rollout decision.
+
+Multi-profile local sync is fail-closed by deployment identity. Each managed
+Postgres profile must explicitly bind its database URL to an expected Supabase
+project ref; managed sync children do not inherit repo `.env.local`, and the
+sync CLI refuses a URL whose project ref differs. This prevents a correctly
+named Brain profile from silently operating against another deployment.
+
+This work improves the evidence and navigation plane but does **not** activate
+spec 014. The task-context compiler remains deferred until its existing
+post-slim measured trigger passes; richer provenance alone is not an activation
+signal.
+
+**Why:** Provider web links are portable but do not identify an exact observed
+revision; absolute laptop paths are clickable but non-portable and leak machine
+layout; code-span references are readable to models but poor human navigation.
+The combined contract gives humans click-through navigation and models exact
+trace identity without duplicating source bytes or coupling content reading to
+the operator dashboard. Declared-only semantics prevent plausible-looking but
+unsupported graph edges.
+
+**Alternatives rejected:** Canonical `file://` URLs (machine-specific and
+viewer-dependent); Dropbox paths without provider id/revision (weak exact-file
+identity); automatic semantic backlink generation (fabricated provenance
+risk); a Cockpit content tab (blurs operator and reader responsibilities); a
+hosted multi-user viewer during development (premature auth and isolation
+surface); activating spec 014 as part of ingestion work (no measured compiler
+trigger).
+
+**Related:** `docs/specs/015-compiled-source-ingestion.md`;
+`docs/specs/016-source-links-and-brain-library-pilot.md`;
+`docs/specs/014-task-context-compiler.md`; `docs/brain-library.md`;
+`db/migrations/2026-08-22_001_source_reference_identity.sql`.
+
 ## 2026-08-19 — Make pending inbox warnings an explicit ingestion handoff
 
 **Decision:** **Refresh inbox scan** is detection-only and never claims to ingest or clear a file. A pending inbox warning routes the operator to Cockpit Maintenance, where every file states that it is not stuck, explains that clearing requires reviewed ingestion, and provides a filename-specific **Claude ingestion handoff** with a copy action. The handoff directs an interactive Claude session with access to the selected Brain and ingestion-capable tools to load Brain context, follow the Brain's ingestion protocol, preserve source and provenance, update only justified durable content, complete ingestion with the exact `inbox_file`, and verify that `brain_scan_inbox` is clear. If only hosted read tools are available, the handoff directs the session to the documented local ingestion-capable workflow instead of manual deletion.

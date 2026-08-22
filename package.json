@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.4.11",
+  "version": "1.5.0",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
@@ -39,6 +39,7 @@
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "eval:brain:routing": "npm run build && node scripts/eval-brain-routing.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",
+    "brain:library": "npm run build && node scripts/brain-library.mjs",
     "hosted:cockpit:launchd:plist": "node scripts/write-cockpit-launchd-plist.mjs",
     "hosted:cockpit:launcher:install": "node scripts/install-cockpit-launcher.mjs",
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
@@ -47,10 +48,14 @@
     "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
     "sources:extract-text:postgres": "npm run build && node scripts/extract-source-text-postgres.mjs",
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
+    "sources:compile-reference": "npm run build && node scripts/compile-source-reference.mjs",
+    "sources:audit-links": "npm run build && node scripts/audit-source-links.mjs",
+    "sources:persist-reference:postgres": "npm run build && node scripts/persist-source-reference-postgres.mjs",
     "smoke:brain-runtime-role": "node scripts/smoke-brain-runtime-role.mjs",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "test": "npm run build && node --test",
-    "test:cockpit:e2e": "env -u NO_COLOR playwright test --config=playwright.config.mjs"
+    "test:cockpit:e2e": "env -u NO_COLOR playwright test --config=playwright.config.mjs",
+    "test:brain-library:e2e": "npm run build && env -u NO_COLOR playwright test --config=playwright.brain-library.config.mjs"
   },
   "keywords": [
     "mcp",
@@ -64,11 +69,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@supabase/supabase-js": "^2.108.1",
+    "markdown-it": "^14.3.0",
     "pg": "^8.21.0",
     "zod": "^3.24.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^22.15.3",
     "@types/pg": "^8.20.0",
     "typescript": "^5.8.3"

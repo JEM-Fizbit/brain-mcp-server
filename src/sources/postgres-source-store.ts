@@ -10,7 +10,9 @@ import type {
   CreateSourceInput,
   RecordArtifactTextInput,
   RecordSourceArtifactInput,
+  RecordSourceBrainLinkInput,
   SourceArtifactRecord,
+  SourceBrainLinkRecord,
   SourceManifestRecord,
   SourceMetadataStore,
   SourceRecord,
@@ -32,6 +34,7 @@ interface SourceRow {
   status: SourceRecord["status"];
   source_date: string | null;
   provenance_note: string | null;
+  companion_path: string | null;
   metadata: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
@@ -46,6 +49,10 @@ interface SourceArtifactRow {
   external_url: string | null;
   external_provider: string | null;
   external_id: string | null;
+  provider_revision: string | null;
+  root_alias: string | null;
+  relative_path: string | null;
+  observed_at: Date | null;
   original_filename: string | null;
   mime_type: string | null;
   byte_size: string | number | null;
@@ -66,6 +73,10 @@ interface SourceManifestRow extends SourceRow {
   external_url: string | null;
   external_provider: string | null;
   external_id: string | null;
+  provider_revision: string | null;
+  root_alias: string | null;
+  relative_path: string | null;
+  observed_at: Date | null;
   original_filename: string | null;
   mime_type: string | null;
   byte_size: string | number | null;
@@ -73,6 +84,18 @@ interface SourceManifestRow extends SourceRow {
   retention_status: SourceArtifactRecord["retentionStatus"] | null;
   artifact_metadata: Record<string, unknown> | null;
   artifact_created_at: Date | null;
+}
+
+interface SourceBrainLinkRow {
+  id: string;
+  source_id: string;
+  brain_filename: string;
+  relation: SourceBrainLinkRecord["relation"];
+  label: string | null;
+  anchor: string;
+  metadata: Record<string, unknown>;
+  created_at: Date;
+  updated_at: Date;
 }
 
 interface SourceTextSearchRow {
@@ -93,6 +116,7 @@ function sourceFromRow(row: SourceRow): SourceRecord {
     status: row.status,
     sourceDate: row.source_date,
     provenanceNote: row.provenance_note,
+    companionPath: row.companion_path,
     metadata: row.metadata,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -109,6 +133,10 @@ function artifactFromRow(row: SourceArtifactRow): SourceArtifactRecord {
     externalUrl: row.external_url,
     externalProvider: row.external_provider,
     externalId: row.external_id,
+    providerRevision: row.provider_revision,
+    rootAlias: row.root_alias,
+    relativePath: row.relative_path,
+    observedAt: row.observed_at?.toISOString() || null,
     originalFilename: row.original_filename,
     mimeType: row.mime_type,
     byteSize: row.byte_size === null ? null : Number(row.byte_size),
@@ -116,6 +144,20 @@ function artifactFromRow(row: SourceArtifactRow): SourceArtifactRecord {
     retentionStatus: row.retention_status,
     metadata: row.metadata,
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+function brainLinkFromRow(row: SourceBrainLinkRow): SourceBrainLinkRecord {
+  return {
+    id: row.id,
+    sourceId: row.source_id,
+    brainFilename: row.brain_filename,
+    relation: row.relation,
+    label: row.label,
+    anchor: row.anchor,
+    metadata: row.metadata,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
   };
 }
 
@@ -171,9 +213,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           status,
           source_date,
           provenance_note,
+          companion_path,
           metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7)
+        values ($1, $2, $3, $4, $5, $6, $7, $8)
         returning *
       `,
       [
@@ -183,6 +226,7 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
         input.status ?? "pending",
         input.sourceDate ?? null,
         input.provenanceNote ?? null,
+        input.companionPath ?? null,
         input.metadata || {},
       ]
     );
@@ -200,6 +244,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           external_url,
           external_provider,
           external_id,
+          provider_revision,
+          root_alias,
+          relative_path,
+          observed_at,
           original_filename,
           mime_type,
           byte_size,
@@ -207,7 +255,7 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           retention_status,
           metadata
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         returning *
       `,
       [
@@ -218,6 +266,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
         input.externalUrl ?? null,
         input.externalProvider ?? null,
         input.externalId ?? null,
+        input.providerRevision ?? null,
+        input.rootAlias ?? null,
+        input.relativePath ?? null,
+        input.observedAt ?? null,
         input.originalFilename ?? null,
         input.mimeType ?? null,
         input.byteSize ?? null,
@@ -227,6 +279,36 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
       ]
     );
     return artifactFromRow(result.rows[0]);
+  }
+
+  async recordBrainLink(input: RecordSourceBrainLinkInput): Promise<SourceBrainLinkRecord> {
+    const result = await this.pool.query<SourceBrainLinkRow>(
+      `
+        insert into brain.source_brain_links (
+          source_id,
+          brain_filename,
+          relation,
+          label,
+          anchor,
+          metadata
+        )
+        values ($1, $2, $3, $4, $5, $6)
+        on conflict (source_id, brain_filename, relation, anchor) do update
+        set label = excluded.label,
+            metadata = excluded.metadata,
+            updated_at = now()
+        returning *
+      `,
+      [
+        input.sourceId,
+        input.brainFilename,
+        input.relation,
+        input.label ?? null,
+        input.anchor || "",
+        input.metadata || {},
+      ]
+    );
+    return brainLinkFromRow(result.rows[0]);
   }
 
   recordStoredArtifact(
@@ -289,6 +371,19 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
     return result.rows.map(artifactFromRow);
   }
 
+  async listBrainLinks(sourceId: string): Promise<SourceBrainLinkRecord[]> {
+    const result = await this.pool.query<SourceBrainLinkRow>(
+      `
+        select *
+        from brain.source_brain_links
+        where source_id = $1
+        order by brain_filename, relation, anchor
+      `,
+      [sourceId]
+    );
+    return result.rows.map(brainLinkFromRow);
+  }
+
   async listSourcePaths(brainId: string, category?: string): Promise<string[]> {
     const manifests = await this.listSourceManifests(brainId, category);
     return Array.from(
@@ -310,6 +405,7 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           s.status,
           s.source_date,
           s.provenance_note,
+          s.companion_path,
           s.metadata,
           s.created_at as source_created_at,
           s.updated_at as source_updated_at,
@@ -321,6 +417,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           a.external_url,
           a.external_provider,
           a.external_id,
+          a.provider_revision,
+          a.root_alias,
+          a.relative_path,
+          a.observed_at,
           a.original_filename,
           a.mime_type,
           a.byte_size,
@@ -350,11 +450,13 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
             status: row.status,
             source_date: row.source_date,
             provenance_note: row.provenance_note,
+            companion_path: row.companion_path,
             metadata: row.metadata,
             created_at: row.source_created_at,
             updated_at: row.source_updated_at,
           }),
           artifacts: [],
+          brainLinks: [],
           paths: [],
         };
         manifests.set(row.id, manifest);
@@ -370,6 +472,10 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
         external_url: row.external_url,
         external_provider: row.external_provider,
         external_id: row.external_id,
+        provider_revision: row.provider_revision,
+        root_alias: row.root_alias,
+        relative_path: row.relative_path,
+        observed_at: row.observed_at,
         original_filename: row.original_filename,
         mime_type: row.mime_type,
         byte_size: row.byte_size,
@@ -392,6 +498,22 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
 
     for (const manifest of manifests.values()) {
       manifest.paths = Array.from(new Set(manifest.paths)).sort();
+    }
+
+    const sourceIds = Array.from(manifests.keys());
+    if (sourceIds.length > 0) {
+      const links = await this.pool.query<SourceBrainLinkRow>(
+        `
+          select *
+          from brain.source_brain_links
+          where source_id = any($1::uuid[])
+          order by source_id, brain_filename, relation, anchor
+        `,
+        [sourceIds]
+      );
+      for (const row of links.rows) {
+        manifests.get(row.source_id)?.brainLinks.push(brainLinkFromRow(row));
+      }
     }
     return Array.from(manifests.values());
   }
