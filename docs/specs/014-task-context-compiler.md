@@ -101,6 +101,26 @@ The promoted spec must set values before implementation for:
 
 Until all five occur, the default decision is **do not build**.
 
+## Current JEM gate evidence — 2026-08-22
+
+- The cheaper content correction has now been completed first: all 45 current
+  JEM source companions have reviewed direct Brain links and reciprocal
+  backlinks, with zero index-only, unlinked, broken, or non-clickable findings
+  in the repository-wide audit.
+- Live search spot checks show the intended split: document-title queries find
+  the source companion and its linked synthesis, while concept queries find the
+  synthesis directly. The source registry also exposes 46 structured reviewed
+  relationships to clients.
+- This does **not** satisfy either activation trigger. There is not yet a frozen,
+  representative post-content session set showing a material two-or-more-read
+  frequency, and there is no controlled weaker-harness failure corrected by a
+  server packet.
+- Therefore spec 014 remains deferred. The next eligible activation checkpoint
+  is after real JEM usage or a frozen production-search evaluation establishes
+  a post-content baseline against a materiality threshold approved before the
+  results are scored. If the simpler content/search path meets that target, the
+  kill criterion applies and the compiler should not be built.
+
 ## Verification
 
 For this stub:

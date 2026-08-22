@@ -45,11 +45,18 @@ The hosted Brain rebuild has passed the first critical sync gates:
   the local read-only Brain Library pilot renders canonical Markdown and exact
   source trace data separately from Cockpit; and the source-link audit has made
   direct evidence coverage, missing backlinks, broken links, and non-clickable
-  references measurable. The live hosted MCP returned the JEM canary's exact
+  references measurable. The approved JEM content pass has since reviewed the
+  full current corpus: all 45 source companions are directly linked with
+  reciprocal backlinks, and the strict audit reports zero index-only,
+  unlinked, broken, or non-clickable findings. The personal source registry now
+  records 45 companion paths and 46 reviewed source-to-Brain relationships;
+  repeat persistence is idempotent and all 41 stored companion artifacts retain
+  content-addressed hash identity. The live hosted MCP returned the JEM canary's exact
   provider id/revision, HTTPS locator, registered local-root alias, relative
   path, content hash, provenance, and reviewed Brain link without returning
-  source bytes. ERS schema, content, credentials, and deployment remain
-  unchanged and separately gated;
+  source bytes. Spec 014 remains deferred because no representative post-content
+  follow-up-read gap or weaker-harness gap has been measured. ERS schema,
+  content, credentials, and deployment remain unchanged and separately gated;
 - multi-profile Monitor sync now requires an explicit revision store and binds
   each Postgres URL to an expected Supabase project ref, with ambient repo env
   loading disabled for managed profiles. This closes a discovered path by which
