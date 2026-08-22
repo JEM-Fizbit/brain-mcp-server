@@ -16,6 +16,15 @@ and reviewed source links.
   resolution, a loopback Host header, and the page's per-process nonce.
 - ERS rollout requires a separate review and approval after the JEM pilot.
 
+## JEM validation status
+
+The source-reference/runtime support is deployed to personal JEM in `v1.5.0`
+(`379b965`). The live hosted MCP returned the pilot source's portable locator,
+exact provider revision and reviewed Brain relationship without returning the
+private source bytes. The Library itself remains a manually started local
+development surface; it is not a Cockpit feature, login item, hosted service or
+ERS deployment.
+
 ## Start the JEM pilot
 
 ```bash

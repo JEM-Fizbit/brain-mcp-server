@@ -38,17 +38,34 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
-- specs 015–016 are in JEM-first implementation: the personal schema now has
+- specs 015–016 are implemented and validated on JEM: release `v1.5.0`
+  (`379b965`) is deployed only to the personal `jem-brain-mcp` app; the
+  personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
   the local read-only Brain Library pilot renders canonical Markdown and exact
   source trace data separately from Cockpit; and the source-link audit has made
   direct evidence coverage, missing backlinks, broken links, and non-clickable
-  references measurable. ERS rollout remains separately gated;
+  references measurable. The live hosted MCP returned the JEM canary's exact
+  provider id/revision, HTTPS locator, registered local-root alias, relative
+  path, content hash, provenance, and reviewed Brain link without returning
+  source bytes. ERS schema, content, credentials, and deployment remain
+  unchanged and separately gated;
 - multi-profile Monitor sync now requires an explicit revision store and binds
   each Postgres URL to an expected Supabase project ref, with ambient repo env
   loading disabled for managed profiles. This closes a discovered path by which
   a JEM-named local watcher could silently target the ERS database;
-- spec 013 server Phases 1–3 and both Brain-content migrations are deployed, with the corrective runtime current at `v1.4.5`: ranked structured search/evals, the private Postgres FTS index, graph lint, bootstrap-budget/read-only lint, fail-closed structural-file roles, reserved external-namespace guards, idempotent conflict recording, and a parity-gated local state-rebase procedure. Both Brains use graph reachability as the primary beta path while legacy deltas remain the inverse comparator through 2026-07-24; JEM has 39 hosted files and a 1,863-token bootstrap, ERS has 50/50 graph-reachable files, a 1,600-token bootstrap and three deliberate history exemptions, and both hosted/local sync paths are conflict-free with zero deletion skips. The task-context compiler remains unbuilt;
+- spec 013 server Phases 1–3 and both Brain-content migrations are deployed; the
+  corrective graph/sync baseline landed in `v1.4.5`, and the personal JEM
+  runtime is now current at `v1.5.0`: ranked structured search/evals, the
+  private Postgres FTS index, graph lint, bootstrap-budget/read-only lint,
+  fail-closed structural-file roles, reserved external-namespace guards,
+  idempotent conflict recording, and a parity-gated local state-rebase
+  procedure. Both Brains use graph reachability as the primary beta path while
+  legacy deltas remain the inverse comparator through 2026-07-24; JEM has 39
+  hosted files and ERS has 50/50 graph-reachable files with three deliberate
+  history exemptions. Both consolidated local Monitor profiles are healthy and
+  conflict-free. The task-context compiler remains unbuilt and spec 014 stays
+  trigger-gated;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;
 - the recovery/export runbook records the current backup baseline: Supabase physical backups visible, PITR not enabled, Storage objects outside database backups, and restore/export rehearsal still required before deleting Git as emergency history;
 - local Brain MCP remains the trusted fallback while hosted becomes operationally boring.
