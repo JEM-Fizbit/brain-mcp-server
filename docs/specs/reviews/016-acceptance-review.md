@@ -1,6 +1,6 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** complete — remediated and live-verified on JEM through `v1.6.1`
+**Status:** complete — remediated and live-verified on JEM through `v1.6.2`
 **Started:** 2026-08-23
 **Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
@@ -21,6 +21,7 @@ implemented outcome. ERS remains separately approval-gated.
 | 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; the deployed hosted read returns the complete companion and preserves binary privacy. |
 | 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
 | 8 | Operator lint queue now excludes graph/source locator telemetry; genuine stale internal links were repaired and technical detail is collapsed/maintainer-owned. | Local and hosted graph lint: zero broken internal links, 261 classified references, four maintenance findings; strict source audit still passes 45/45. JEM `v1.6.1` is live. |
+| 9 | Capture-queue guidance distinguishes 13 total open items from the 12-item stale subset and offers an approval-first copyable LLM workflow plus an exact Obsidian alternative. | Unit/HTTP tests plus desktop and 390px browser checks pass; JEM `v1.6.2` is live and ERS remains untouched. |
 
 ## Acceptance results
 
@@ -360,3 +361,33 @@ companions with zero strict failures.
   review.
 - Hosted sync reports 39 files and zero open conflicts. ERS was not deployed or
   modified.
+
+## Finding 9 — The bounded capture-queue decision lacks a completion path
+
+**Surface:** JEM Brain Monitor → Maintenance → Brain Lint
+**Evidence:** `Screenshot 2026-08-24 at 00.09.29.png`, supplied by John
+**Status:** remediated and live-verified in JEM `v1.6.2`
+
+### Observation from John
+
+The surface showed 13 open items and 12 stale items but did not make clear that
+the latter is a subset of the former or explain the work required to clear the
+warning. Manually reconstructing the correct route for every item would defeat
+the purpose of the bounded operator decision.
+
+### Implemented outcome
+
+- Cockpit states that all 13 open items need a disposition, 12 are stale because
+  they are at least seven days old, and one is newer but still open.
+- The recommended path exposes a model-neutral **Copy LLM triage prompt**. It
+  directs a Brain-aware LLM to inspect every item, return one compact proposed
+  disposition table, and stop for John's approval before any writes.
+- The prompt preserves the canonical ownership boundary: personal non-project
+  work in `TASKS.md`, project work in its owning backlog/tracker, ERS work in
+  Asana, and audit findings in their audit backlog. Inaccessible destinations
+  remain open with an exact handoff.
+- The manual Obsidian alternative explains that a Capture item is checked only
+  after its destination is updated or a supported closure is approved. Editing
+  its date does not clear it.
+- Completion requires re-reading `TASKS.md` and rerunning lint. Cockpit still
+  performs no automatic semantic transfer, closure, or deletion.

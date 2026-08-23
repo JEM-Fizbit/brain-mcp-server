@@ -38,6 +38,15 @@ const LOADER = [
 const TASKS = [
   "# TASKS",
   "",
+  "## Capture / Triage Queue",
+  "",
+  "Temporary holding area for conversationally captured items that need later routing.",
+  "",
+  "- [ ] 2026-08-01 — FOLLOW-UP — stale captured item",
+  "  - Triage: Route to canonical destination, then mark transferred/closed.",
+  "- [ ] 2026-08-24 — NOTE — recent captured item",
+  "  - Triage: Route to canonical destination, then mark transferred/closed.",
+  "",
   "## Done",
   "- [x] old thing *(done 2026-05-01)*",
   "- [x] undated thing",
@@ -196,6 +205,10 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.match(page.text, /Refresh lint assessment/);
   assert.match(page.text, /Refresh inbox scan/);
   assert.match(page.text, /Copy Claude ingestion prompt/);
+  assert.match(page.text, /Copy LLM triage prompt/);
+  assert.match(page.text, /LLM-assisted triage \(recommended\)/);
+  assert.match(page.text, /Manual triage in Obsidian/);
+  assert.match(page.text, /Phase 1 — proposal only/);
   assert.match(page.text, /inbox_file set to/);
   assert.match(page.text, /id="fixes-select-all"[^>]*aria-label="Select all fixes"[^>]*disabled/);
   assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
@@ -239,6 +252,13 @@ test("POST /api/lint/run records a receipt and structured report", async () => {
   assert.equal(res.json.lint.diagnosticCount, 1);
   assert.equal(res.json.lint.primaryIssueCount, res.json.lint.issueCount);
   assert.equal(res.json.lint.brainId, "ai-brain-jem");
+  assert.equal(res.json.lint.operatorDecisionCount, 1);
+  const captureFinding = res.json.lint.reviewFindings.find(
+    (finding) => finding.kind === "capture_queue"
+  );
+  assert.equal(captureFinding.openCount, 2);
+  assert.equal(captureFinding.staleCount, 1);
+  assert.equal(captureFinding.thresholdDays, 7);
   assert.ok(res.json.lint.reviewFindings.some((finding) => finding.kind === "orphan"));
   assert.equal(
     res.json.lint.technicalDiagnostics.filter(

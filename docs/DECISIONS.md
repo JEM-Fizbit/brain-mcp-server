@@ -8,6 +8,34 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-24 — Give capture-queue findings a completion workflow
+
+**Decision:** A `TASKS.md` Capture / Triage warning must state that the open
+count is the total queue and the stale count is its age-based subset. Cockpit
+shows an approval-first, model-neutral LLM handoff as the recommended path and
+a manual Obsidian procedure as the alternative. The copied prompt requires a
+complete item-by-item disposition table, names the canonical task owners, and
+stops before any write. After John approves, inaccessible destinations remain
+open with an exact handoff; the workflow ends by re-reading `TASKS.md` and
+rerunning lint. Cockpit never transfers, closes, or deletes semantic items
+automatically.
+
+**Why:** “13 open, 12 stale” was technically accurate but looked like two
+different workloads and did not tell John what action would clear the warning.
+This queue can span personal tasks, project backlogs, ERS Asana, and audit
+backlogs, so judgement and destination access are required. A ready-to-use
+handoff makes the bounded decision executable without asking John to inspect
+technical diagnostics or manually reconstruct the routing rules.
+
+**Alternatives rejected:** Show counts without a procedure; ask John to review
+all items manually; auto-route by keyword; let an LLM write before presenting
+the complete proposal; clear an item by changing its date; mark an inaccessible
+transfer complete.
+
+**Related:** `scripts/hosted-cockpit.mjs`; `src/services/task-intake.ts`;
+`docs/hosted-cockpit.md`; `docs/specs/reviews/016-acceptance-review.md`;
+`docs/brain-content-linking-runbook.md`.
+
 ## 2026-08-23 — Keep graph telemetry out of the operator lint queue
 
 **Decision:** Brain lint counts only semantic/structural maintenance findings.

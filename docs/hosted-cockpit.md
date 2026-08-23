@@ -451,6 +451,16 @@ surface instead of forcing a switch to an MCP client or CLI:
   refresh or mechanical apply, Cockpit requests one fresh doctor run so the
   action state updates immediately; routine reloads still use the Monitor-owned
   last-good report and do not duplicate polling.
+  A Capture / Triage finding states the total number of open items, identifies
+  the stale count as the subset at least seven days old, and shows the newer
+  remainder. Its recommended **LLM-assisted triage** handoff is model-neutral
+  and copyable: the LLM must inspect all items, propose canonical destinations
+  in one table, and stop for John's approval before any write. The adjacent
+  **Manual triage in Obsidian** alternative explains how to move personal work
+  into `TASKS.md` Active, transfer project/ERS/audit work to its real owner,
+  mark the Capture item checked only after that destination is updated, and
+  rerun lint. Changing a date or leaving an item unchecked does not clear the
+  queue; inaccessible destinations remain open with an explicit handoff.
 - **Refresh inbox scan** lists pending source filenames, sizes, and modification times.
   The button is labelled **Refresh inbox scan** because it does not ingest,
   classify, summarize, move, or delete content. Each pending item says that it
