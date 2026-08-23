@@ -495,8 +495,9 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await page.getByRole("tab", { name: "Maintenance", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Brain Lint", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Inbox", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Safe Mechanical Fixes", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Actions You Can Approve", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh lint assessment", exact: true })).toBeVisible();
+  await expect(page.getByText(/never need to review technical diagnostics individually/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh inbox scan", exact: true })).toBeVisible();
   await expect(page.getByText(/Not stuck: refreshing this scan only rechecks the inbox/)).toBeVisible();
   const inboxHandoff = page.getByText("Claude ingestion handoff", { exact: true });
@@ -537,7 +538,7 @@ async function expectMaintenanceLayout(page, { desktop }) {
         document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     };
   });
-  expect(layout.columns).toBe(desktop ? 2 : 1);
+  expect(layout.columns).toBe(1);
   expect(layout.noPageOverflow).toBe(true);
 }
 

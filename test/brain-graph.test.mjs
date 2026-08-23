@@ -60,7 +60,7 @@ test("graph reachability resolves the spec 013 edge grammar", () => {
   assert.equal(result.diagnostics.length, 0);
 });
 
-test("graph reachability reports malformed, escaping, parent-disabled, and unresolved edges", () => {
+test("graph reachability separates broken internal links from external locator telemetry", () => {
   const result = analyzeBrainGraph(
     new Map([
       [
@@ -82,10 +82,12 @@ test("graph reachability reports malformed, escaping, parent-disabled, and unres
     new Set([
       "malformed_encoding",
       "path_escape",
-      "parent_link_disabled",
-      "missing_directory_index",
       "unresolved_target",
     ])
+  );
+  assert.deepEqual(
+    new Set(result.externalReferences.map((reference) => reference.reason)),
+    new Set(["outside_brain", "directory_locator"])
   );
 });
 
@@ -133,4 +135,20 @@ test("fenced examples are ignored without hiding later inline backtick edges", (
   assert.ok(!result.reachable.includes("example-only.md"));
   assert.deepEqual(result.unreachable, ["example-only.md"]);
   assert.equal(result.diagnostics.length, 0);
+});
+
+test("wikilink examples inside inline code do not become broken-link diagnostics", () => {
+  const result = analyzeBrainGraph(
+    new Map([
+      [
+        "00_loader.md",
+        "Use `[[filename_without_extension]]` as an example. Real route: [[NOW]].",
+      ],
+      ["NOW.md", "# Now"],
+    ])
+  );
+
+  assert.deepEqual(result.diagnostics, []);
+  assert.deepEqual(result.externalReferences, []);
+  assert.ok(result.reachable.includes("NOW.md"));
 });

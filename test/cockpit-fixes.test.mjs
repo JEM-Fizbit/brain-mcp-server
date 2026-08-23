@@ -23,7 +23,8 @@ const LOADER = [
   "## All Files",
   "",
   "### Core Context",
-  "- `NOW.md` — now.",
+  "- [NOW](NOW.md) — now.",
+  "- [Reviewed source](../sources/example.md) — source companion.",
   "",
   "### Operations",
   "- `TASKS.md` — tasks.",
@@ -46,11 +47,28 @@ const TASKS = [
 async function seed() {
   await fs.mkdir(brainDir, { recursive: true });
   await fs.mkdir(inboxDir, { recursive: true });
+  await fs.mkdir(path.join(tmpRoot, "sources"), { recursive: true });
   await fs.writeFile(path.join(brainDir, "00_loader.md"), LOADER, "utf-8");
-  await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n\n`missing.md`\n", "utf-8");
+  await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n\n[[missing]]\n", "utf-8");
   await fs.writeFile(path.join(brainDir, "TASKS.md"), TASKS, "utf-8");
   await fs.writeFile(path.join(brainDir, "07_orphan.md"), "# Orphan\n", "utf-8");
+  await fs.writeFile(
+    path.join(tmpRoot, "sources", "example.md"),
+    "# Example source\n\n[Back to loader](../brain/00_loader.md)\n",
+    "utf-8"
+  );
   await fs.writeFile(path.join(inboxDir, "pending-source.pdf"), "fixture", "utf-8");
+  await fs.writeFile(
+    lintReportPath,
+    `${JSON.stringify({
+      version: 1,
+      brainId: "ai-brain-jem",
+      checkedAt: "2026-08-19T10:00:00.000Z",
+      issueCount: 279,
+      diagnosticCount: 279,
+    })}\n`,
+    "utf-8"
+  );
   await fs.writeFile(
     doctorOutputPath,
     `${JSON.stringify({
@@ -183,12 +201,14 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
   assert.match(page.text, /Actions You Can Approve/);
   assert.match(page.text, /Show full proposed change/);
+  assert.match(page.text, /you never need to review technical diagnostics individually/i);
+  assert.match(page.text, /Maintainer-only diagnostics and context/);
   assert.match(page.text, /grid-template-columns: minmax\(0, 1fr\);/);
   assert.doesNotMatch(page.text, /Approve all/);
   assert.doesNotMatch(page.text, /Nothing to fix — the Brain is clean/);
 });
 
-test("GET /api/lint/report starts without a cached report", async () => {
+test("GET /api/lint/report ignores the legacy cache format", async () => {
   const res = await request("GET", "/api/lint/report");
   assert.equal(res.status, 200);
   assert.equal(res.json.ok, true);
@@ -217,26 +237,32 @@ test("POST /api/lint/run records a receipt and structured report", async () => {
   assert.ok(res.json.lint.issueCount >= 1);
   assert.equal(res.json.lint.report.orphanMode, "graph");
   assert.equal(res.json.lint.diagnosticCount, 1);
-  assert.equal(
-    res.json.lint.primaryIssueCount,
-    res.json.lint.issueCount - res.json.lint.diagnosticCount
-  );
+  assert.equal(res.json.lint.primaryIssueCount, res.json.lint.issueCount);
   assert.equal(res.json.lint.brainId, "ai-brain-jem");
   assert.ok(res.json.lint.reviewFindings.some((finding) => finding.kind === "orphan"));
   assert.equal(
-    res.json.lint.reviewFindings.filter((finding) => finding.kind === "graph_diagnostics").length,
+    res.json.lint.technicalDiagnostics.filter(
+      (finding) => finding.kind === "broken_internal_links"
+    ).length,
     1
   );
-  const graphFinding = res.json.lint.reviewFindings.find(
-    (finding) => finding.kind === "graph_diagnostics"
+  const graphFinding = res.json.lint.technicalDiagnostics.find(
+    (finding) => finding.kind === "broken_internal_links"
   );
   assert.equal(graphFinding.diagnosticCode, "unresolved_target");
   assert.equal(graphFinding.owner, "Brain content maintainer");
-  assert.match(graphFinding.statusLabel, /no operator action/i);
+  assert.match(graphFinding.statusLabel, /maintainer repair required/i);
   assert.ok(graphFinding.examples[0].includes("NOW.md"));
+  assert.equal(res.json.lint.sourceLinkAudit.state, "pass");
+  assert.ok(res.json.lint.externalReferenceCount >= 1);
+  const sourceBoundary = res.json.lint.technicalDiagnostics.find(
+    (finding) => finding.diagnosticCode === "source_boundary"
+  );
+  assert.equal(sourceBoundary.statusLabel, "Verified automatically");
+  assert.match(sourceBoundary.completion, /no operator review required/i);
 
   const cache = JSON.parse(await fs.readFile(lintReportPath, "utf-8"));
-  assert.equal(cache.version, 1);
+  assert.equal(cache.version, 2);
   assert.equal(cache.brainId, "ai-brain-jem");
   assert.match(await fs.readFile(path.join(brainDir, "LOG.md"), "utf-8"), /\] LINT/);
 

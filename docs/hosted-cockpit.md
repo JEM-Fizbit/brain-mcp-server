@@ -435,13 +435,18 @@ surface instead of forcing a switch to an MCP client or CLI:
   `hosted-lint-report.json` cache. The action is detection-only and does not
   change Brain content. The doctor reads that cache first so `lint_nudge`
   represents freshness while the separate `lint_findings` check represents the
-  current result. Safe mechanical fixes make `lint_findings` an actionable
-  warning until applied; findings with no automatic fix are `info` review notes
-  that remain visible without changing readiness. High-volume graph edge
-  diagnostics are grouped by diagnostic class with a plain-language meaning,
-  status, owner, completion criterion, and expandable representative paths.
-  Expected repository-to-source boundary findings are explicitly owned by the
-  strict source-link audit rather than presented as operator work. An empty
+  current result. Safe mechanical fixes and explicitly labelled operator
+  content decisions make `lint_findings` an actionable warning; maintainer-only
+  findings and genuine broken internal links remain `info` without changing
+  readiness. Graph telemetry does not inflate the maintenance finding count.
+  Real unresolved Markdown links and wikilinks are grouped as maintainer-owned
+  repair items; source-boundary links and backtick project/file/directory
+  locators are classified automatically. Cockpit runs the strict local
+  source-link audit with each lint refresh and marks source-boundary references
+  complete when it passes. All technical groups retain a plain-language
+  meaning, status, owner, completion criterion, and expandable representative
+  paths inside a collapsed **Maintainer-only diagnostics and context** panel.
+  The operator never needs to review those paths individually. An empty
   mechanical plan never claims the whole Brain is clean. After an explicit lint
   refresh or mechanical apply, Cockpit requests one fresh doctor run so the
   action state updates immediately; routine reloads still use the Monitor-owned

@@ -23,6 +23,17 @@ export interface GraphDiagnostic {
   target: string;
 }
 
+export interface GraphExternalReference {
+  reason:
+    | "source_boundary"
+    | "outside_brain"
+    | "unresolved_locator"
+    | "directory_locator";
+  source: string;
+  syntax: GraphEdgeSyntax;
+  target: string;
+}
+
 export interface GraphEdge {
   source: string;
   target: string;
@@ -36,6 +47,7 @@ export interface BrainGraphAnalysis {
   exempted: string[];
   edges: GraphEdge[];
   diagnostics: GraphDiagnostic[];
+  externalReferences: GraphExternalReference[];
 }
 
 interface RawEdge {
@@ -82,6 +94,10 @@ function withoutFencedCodeBlocks(content: string): string {
     .join("\n");
 }
 
+function withoutInlineCodeSpans(content: string): string {
+  return content.replace(/(?<!`)`[^`\n]+`(?!`)/g, (match) => " ".repeat(match.length));
+}
+
 function decodeTarget(raw: string): string | null {
   try {
     return decodeURIComponent(raw);
@@ -109,6 +125,7 @@ function extractRawEdges(
   config: BrainLintConfig
 ): RawEdge[] {
   const graphContent = withoutFencedCodeBlocks(content);
+  const linkContent = withoutInlineCodeSpans(graphContent);
   const found: RawEdge[] = [];
   const seen = new Set<string>();
   const add = (edge: RawEdge) => {
@@ -118,7 +135,7 @@ function extractRawEdges(
     found.push(edge);
   };
 
-  for (const match of graphContent.matchAll(/\[\[([^\]]+?)\]\]/g)) {
+  for (const match of linkContent.matchAll(/\[\[([^\]]+?)\]\]/g)) {
     const inner = match[1].replace(/\\\|/g, "|");
     const target = inner.split("|", 1)[0].split("#", 1)[0].trim();
     if (target) {
@@ -126,7 +143,7 @@ function extractRawEdges(
     }
   }
 
-  for (const match of graphContent.matchAll(/!?\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+['"][^'"]*['"])?\)/g)) {
+  for (const match of linkContent.matchAll(/!?\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+['"][^'"]*['"])?\)/g)) {
     const target = (match[1] || match[2] || "").trim();
     if (!target) continue;
     if (/^https:\/\//i.test(target)) {
@@ -160,7 +177,7 @@ function extractRawEdges(
     }
   }
 
-  for (const match of graphContent.matchAll(/https:\/\/[^\s)>\]`"']+/g)) {
+  for (const match of linkContent.matchAll(/https:\/\/[^\s)>\]`"']+/g)) {
     const url = match[0];
     for (const mapping of config.sharepoint_url_mappings || []) {
       if (!url.startsWith(mapping.url_prefix)) continue;
@@ -182,7 +199,8 @@ function resolveRawEdge(
   rawEdge: RawEdge,
   files: Set<string>,
   config: BrainLintConfig,
-  diagnostics: GraphDiagnostic[]
+  diagnostics: GraphDiagnostic[],
+  externalReferences: GraphExternalReference[]
 ): string | null {
   const decoded = decodeTarget(stripFragmentAndQuery(rawEdge.raw));
   if (decoded === null) {
@@ -195,15 +213,26 @@ function resolveRawEdge(
     return null;
   }
   if (path.posix.isAbsolute(decoded) || /^[A-Za-z]:[\\/]/.test(decoded)) {
-    diagnostics.push({ code: "path_escape", source, syntax: rawEdge.syntax, target: rawEdge.raw });
+    if (rawEdge.syntax === "backtick_file" || rawEdge.syntax === "backtick_directory") {
+      externalReferences.push({
+        reason: "outside_brain",
+        source,
+        syntax: rawEdge.syntax,
+        target: rawEdge.raw,
+      });
+    } else {
+      diagnostics.push({ code: "path_escape", source, syntax: rawEdge.syntax, target: rawEdge.raw });
+    }
     return null;
   }
   if (
     decoded.split("/").includes("..") &&
     config.relative_parent_scope !== "within_brain"
   ) {
-    diagnostics.push({
-      code: "parent_link_disabled",
+    externalReferences.push({
+      reason: decoded.replace(/^(?:\.\.\/)+/, "").startsWith("sources/")
+        ? "source_boundary"
+        : "outside_brain",
       source,
       syntax: rawEdge.syntax,
       target: rawEdge.raw,
@@ -226,7 +255,16 @@ function resolveRawEdge(
     (candidate) => candidate !== ".." && !candidate.startsWith("../")
   );
   if (candidates.length === 0) {
-    diagnostics.push({ code: "path_escape", source, syntax: rawEdge.syntax, target: rawEdge.raw });
+    if (rawEdge.syntax === "backtick_file" || rawEdge.syntax === "backtick_directory") {
+      externalReferences.push({
+        reason: "outside_brain",
+        source,
+        syntax: rawEdge.syntax,
+        target: rawEdge.raw,
+      });
+    } else {
+      diagnostics.push({ code: "path_escape", source, syntax: rawEdge.syntax, target: rawEdge.raw });
+    }
     return null;
   }
 
@@ -261,12 +299,21 @@ function resolveRawEdge(
     }
   }
 
-  diagnostics.push({
-    code: rawEdge.directory ? "missing_directory_index" : "unresolved_target",
-    source,
-    syntax: rawEdge.syntax,
-    target: rawEdge.raw,
-  });
+  if (rawEdge.syntax === "backtick_file" || rawEdge.syntax === "backtick_directory") {
+    externalReferences.push({
+      reason: rawEdge.directory ? "directory_locator" : "unresolved_locator",
+      source,
+      syntax: rawEdge.syntax,
+      target: rawEdge.raw,
+    });
+  } else {
+    diagnostics.push({
+      code: rawEdge.directory ? "missing_directory_index" : "unresolved_target",
+      source,
+      syntax: rawEdge.syntax,
+      target: rawEdge.raw,
+    });
+  }
   return null;
 }
 
@@ -276,6 +323,7 @@ export function analyzeBrainGraph(
 ): BrainGraphAnalysis {
   const files = new Set(contents.keys());
   const diagnostics: GraphDiagnostic[] = [];
+  const externalReferences: GraphExternalReference[] = [];
   const edges: GraphEdge[] = [];
   const roots = Array.from(
     new Set([LOADER_FILE, NOW_FILE, ...(config.graph_roots || [])])
@@ -296,7 +344,14 @@ export function analyzeBrainGraph(
     // not create current graph diagnostics or routing edges.
     if (isExempt(source)) continue;
     for (const rawEdge of extractRawEdges(content, config)) {
-      const target = resolveRawEdge(source, rawEdge, files, config, diagnostics);
+      const target = resolveRawEdge(
+        source,
+        rawEdge,
+        files,
+        config,
+        diagnostics,
+        externalReferences
+      );
       if (target) edges.push({ source, target, syntax: rawEdge.syntax });
     }
   }
@@ -341,6 +396,12 @@ export function analyzeBrainGraph(
       (a, b) =>
         a.source.localeCompare(b.source) ||
         a.code.localeCompare(b.code) ||
+        a.target.localeCompare(b.target)
+    ),
+    externalReferences: externalReferences.sort(
+      (a, b) =>
+        a.source.localeCompare(b.source) ||
+        a.reason.localeCompare(b.reason) ||
         a.target.localeCompare(b.target)
     ),
   };

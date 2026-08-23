@@ -339,7 +339,7 @@ function readMaintenanceLintReport() {
       .then((payload) => {
         const checkedAtMs = Date.parse(payload?.checkedAt || "");
         if (
-          payload?.version !== 1 ||
+          payload?.version !== 2 ||
           payload?.brainId !== brainId ||
           !Number.isFinite(checkedAtMs)
         ) {
@@ -1117,7 +1117,10 @@ async function checkLintNudge() {
       primaryIssueCount:
         cachedReport.primaryIssueCount ?? cachedReport.issueCount ?? 0,
       diagnosticCount: cachedReport.diagnosticCount || 0,
+      externalReferenceCount: cachedReport.externalReferenceCount || 0,
       automaticFixCount: cachedReport.automaticFixCount || 0,
+      operatorDecisionCount: cachedReport.operatorDecisionCount || 0,
+      maintainerFindingCount: cachedReport.maintainerFindingCount || 0,
     });
     return;
   }
@@ -1187,10 +1190,20 @@ async function checkLintFindings() {
       0
   );
   const primaryIssueCount = Number(
-    cachedReport.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
+    cachedReport.primaryIssueCount ?? issueCount
   );
   const automaticFixCount = Number(cachedReport.automaticFixCount || 0);
-  const classification = classifyLintFindings({ issueCount, automaticFixCount });
+  const operatorDecisionCount = Number(cachedReport.operatorDecisionCount || 0);
+  const maintainerFindingCount = Number(
+    cachedReport.maintainerFindingCount ?? Math.max(0, issueCount - operatorDecisionCount)
+  );
+  const externalReferenceCount = Number(cachedReport.externalReferenceCount || 0);
+  const classification = classifyLintFindings({
+    issueCount,
+    automaticFixCount,
+    operatorDecisionCount,
+    diagnosticCount,
+  });
   addCheck("lint_findings", classification.status, {
     lintReportFile,
     state: classification.state,
@@ -1198,8 +1211,13 @@ async function checkLintFindings() {
     issueCount,
     primaryIssueCount,
     diagnosticCount,
+    externalReferenceCount,
     automaticFixCount,
+    operatorDecisionCount,
+    maintainerFindingCount,
     reviewFindings: (cachedReport.reviewFindings || []).slice(0, 20),
+    technicalDiagnostics: (cachedReport.technicalDiagnostics || []).slice(0, 20),
+    sourceLinkAudit: cachedReport.sourceLinkAudit || null,
     warnings: (cachedReport.warnings || []).slice(0, 20),
   });
 }
@@ -1555,12 +1573,19 @@ function buildOperatorActions(status) {
 
   if (lintFindings?.status === "warn") {
     const automaticFixCount = Number(lintFindings.details?.automaticFixCount || 0);
+    const operatorDecisionCount = Number(lintFindings.details?.operatorDecisionCount || 0);
+    const title =
+      automaticFixCount > 0 && operatorDecisionCount > 0
+        ? `Review ${automaticFixCount} mechanical lint fix(es) and ${operatorDecisionCount} bounded content-triage decision(s) in Cockpit Maintenance.`
+        : automaticFixCount > 0
+          ? `Review and apply ${automaticFixCount} safe mechanical lint fix(es) in Cockpit Maintenance.`
+          : `Review ${operatorDecisionCount} bounded Brain content-triage decision(s) in Cockpit Maintenance.`;
     actions.push({
       level: "warn",
       reason: "lint_findings",
-      title: `Review and apply ${automaticFixCount} safe mechanical lint fix(es) in Cockpit Maintenance.`,
+      title,
       detail:
-        "Select the fixes you approve and use Apply selected. Refreshing the lint assessment only rechecks the Brain; remaining review-only notes are informational.",
+        "Approve mechanical fixes selectively and triage only the explicitly labelled user decision. Technical graph and source-link diagnostics are maintainer-only and never require item-by-item operator review.",
     });
   }
 

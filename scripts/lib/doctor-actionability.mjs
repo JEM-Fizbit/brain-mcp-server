@@ -18,16 +18,26 @@ export const OPERATOR_ALARM_CHECKS = new Set([
   "pooler_config",
 ]);
 
-export function classifyLintFindings({ issueCount = 0, automaticFixCount = 0 } = {}) {
+export function classifyLintFindings({
+  issueCount = 0,
+  automaticFixCount = 0,
+  operatorDecisionCount = 0,
+  diagnosticCount = 0,
+} = {}) {
   const findings = Math.max(0, Number(issueCount) || 0);
   const automaticFixes = Math.max(0, Number(automaticFixCount) || 0);
-  if (findings === 0) {
-    return { status: "pass", state: "clear" };
-  }
   if (automaticFixes > 0) {
     return { status: "warn", state: "actionable_fixes" };
   }
-  return { status: "info", state: "review_only" };
+  const operatorDecisions = Math.max(0, Number(operatorDecisionCount) || 0);
+  if (operatorDecisions > 0) {
+    return { status: "warn", state: "operator_decisions" };
+  }
+  const diagnostics = Math.max(0, Number(diagnosticCount) || 0);
+  if (findings > 0 || diagnostics > 0) {
+    return { status: "info", state: "maintainer_only" };
+  }
+  return { status: "pass", state: "clear" };
 }
 
 export function enforceOperatorAlarmContract(checks) {

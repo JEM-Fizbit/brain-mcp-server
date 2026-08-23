@@ -25,6 +25,14 @@
 > so the Cockpit does not wait for the Monitor cache cycle to update its action
 > state.
 
+> 2026-08-23 operator-boundary correction: technical graph telemetry no longer
+> inflates the lint maintenance count. Only real unresolved Markdown/wikilinks
+> remain broken-internal-link diagnostics; source-boundary links and backtick
+> workspace locators are classified automatically. Cockpit verifies the source
+> boundary with the strict local source-link audit and keeps all technical
+> groups collapsed in a maintainer-only panel. Operator warnings are reserved
+> for mechanical fixes and explicitly labelled bounded content decisions.
+
 > 2026-08-19 inbox handoff correction: **Refresh inbox scan** is explicitly
 > detection-only. Each pending file explains that it is not stuck and provides
 > a copyable, filename-specific prompt for an interactive Claude session with

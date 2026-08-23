@@ -91,9 +91,9 @@ export interface LintReport {
 }
 
 /**
- * Count actionable lint findings from the canonical report shape. Presentation
- * layers use this helper so Cockpit, MCP output, and receipts cannot drift on
- * what "issues found" means.
+ * Count maintenance findings from the canonical report shape. Graph parser
+ * diagnostics and classified external locators are technical telemetry, not
+ * operator work, and therefore never inflate this number.
  */
 export function countLintIssues(report: LintReport): number {
   return (
@@ -105,8 +105,7 @@ export function countLintIssues(report: LintReport): number {
     report.unindexedWorkingBinaries.length +
     (report.journalRotation ? 1 : 0) +
     (report.captureQueue ? 1 : 0) +
-    (report.bootstrapBudget.exceeded ? 1 : 0) +
-    (report.graphReachability?.diagnostics.length || 0)
+    (report.bootstrapBudget.exceeded ? 1 : 0)
   );
 }
 
@@ -557,8 +556,8 @@ export function formatLintReport(report: LintReport): string {
 
   sections.push(
     issueCount === 0
-      ? "**All clear** — no structural issues detected.\n"
-      : `**${issueCount} issue(s) found:**\n`
+      ? "**No maintenance findings** — no user or maintainer review is currently due.\n"
+      : `**${issueCount} maintenance finding(s):**\n`
   );
 
   // Warnings (e.g. drift fallback when no Active section is parseable)
@@ -645,12 +644,32 @@ export function formatLintReport(report: LintReport): string {
     for (const filename of graph.removedFindings) sections.push(`  - ${filename}`);
     sections.push(`- Exemptions used: ${graph.exempted.length}`);
     for (const filename of graph.exempted) sections.push(`  - ${filename}`);
-    sections.push(`- Edge diagnostics: ${graph.diagnostics.length}`);
-    for (const diagnostic of graph.diagnostics) {
+    sections.push(`- Broken internal-link diagnostics: ${graph.diagnostics.length}`);
+    for (const diagnostic of graph.diagnostics.slice(0, 20)) {
       sections.push(
         `  - ${diagnostic.code}: ${diagnostic.source} -> ${diagnostic.target} (${diagnostic.syntax})`
       );
     }
+    if (graph.diagnostics.length > 20) {
+      sections.push(`  - ...and ${graph.diagnostics.length - 20} more.`);
+    }
+    const externalReferences = graph.externalReferences || [];
+    sections.push(`- Classified external/reference locators: ${externalReferences.length}`);
+    const byReason = new Map<string, typeof externalReferences>();
+    for (const reference of externalReferences) {
+      const group = byReason.get(reference.reason) || [];
+      group.push(reference);
+      byReason.set(reference.reason, group);
+    }
+    for (const [reason, references] of Array.from(byReason.entries()).sort(
+      (left, right) => right[1].length - left[1].length
+    )) {
+      sections.push(`  - ${reason}: ${references.length}`);
+      for (const reference of references.slice(0, 3)) {
+        sections.push(`    - ${reference.source} -> ${reference.target} (${reference.syntax})`);
+      }
+    }
+    sections.push("- Classified locators are excluded from the maintenance total and require no operator review.");
     if (graph.mode === "graph_shadow") {
       sections.push("- Shadow mode is advisory: legacy orphans remain the enforced report set and graph findings cannot alter fix plans.");
     }

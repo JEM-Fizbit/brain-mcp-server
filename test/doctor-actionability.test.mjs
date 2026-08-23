@@ -9,18 +9,36 @@ import {
   OPERATOR_ALARM_CHECKS,
 } from "../scripts/lib/doctor-actionability.mjs";
 
-test("lint alarms distinguish actionable fixes from review-only findings", () => {
+test("lint alarms distinguish operator actions from maintainer-only findings", () => {
   assert.deepEqual(
     classifyLintFindings({ issueCount: 0, automaticFixCount: 0 }),
     { status: "pass", state: "clear" }
   );
   assert.deepEqual(
     classifyLintFindings({ issueCount: 685, automaticFixCount: 0 }),
-    { status: "info", state: "review_only" }
+    { status: "info", state: "maintainer_only" }
   );
   assert.deepEqual(
     classifyLintFindings({ issueCount: 685, automaticFixCount: 34 }),
     { status: "warn", state: "actionable_fixes" }
+  );
+  assert.deepEqual(
+    classifyLintFindings({
+      issueCount: 4,
+      automaticFixCount: 0,
+      operatorDecisionCount: 1,
+      diagnosticCount: 0,
+    }),
+    { status: "warn", state: "operator_decisions" }
+  );
+  assert.deepEqual(
+    classifyLintFindings({
+      issueCount: 0,
+      automaticFixCount: 0,
+      operatorDecisionCount: 0,
+      diagnosticCount: 9,
+    }),
+    { status: "info", state: "maintainer_only" }
   );
 });
 
