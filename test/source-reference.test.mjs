@@ -148,3 +148,37 @@ test("source-link audit distinguishes direct, index-only, unlinked and non-click
     },
   ]);
 });
+
+test("source-link audit requires clickable primary declarations and original artifacts", () => {
+  const result = auditSourceLinks({
+    brainFiles: new Map([
+      ["reference.md", "> **Sources:** CV (FINAL), Resume (FINAL)\n\n[CV](../sources/cv/profile.md)"],
+    ]),
+    sourceFiles: new Map([
+      ["cv/profile.md", "# Profile\n\n[Back](../../brain/reference.md)\n"],
+      ["assessments/report.md", "# Report\n\n[Original](./report.pdf)\n[Back](../../brain/reference.md)\n"],
+    ]),
+    sourceArtifactFiles: new Set([
+      "cv/profile.md",
+      "cv/profile.pdf",
+      "assessments/report.md",
+      "assessments/report.pdf",
+    ]),
+  });
+
+  assert.deepEqual(result.nonClickablePrimarySourceDeclarations, [
+    {
+      source: "brain/reference.md",
+      target: "CV (FINAL), Resume (FINAL)",
+      suggestion:
+        "Replace each named source with a direct Markdown link to its reviewed companion.",
+    },
+  ]);
+  assert.deepEqual(result.companionsWithoutOriginalLinks, [
+    {
+      source: "sources/cv/profile.md",
+      target: "sources/cv/profile.pdf",
+      suggestion: "[Open original PDF](./profile.pdf)",
+    },
+  ]);
+});

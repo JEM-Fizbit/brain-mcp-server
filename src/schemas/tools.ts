@@ -45,7 +45,7 @@ export const ReadFileSchema = BrainIdSchema.extend({
     .enum(["brain", "sources"])
     .default("brain")
     .describe(
-      'Where to read from. "brain" (default) reads from the Brain vault. "sources" reads from the sources/ archive (bios, assessments, meeting notes, writing samples, etc.). Use "sources" when you need the original ingested material rather than a Brain summary — e.g., full KRUK bio text, a past meeting transcript, or an ingested assessment.'
+      'Where to read from. "brain" (default) reads from the Brain vault. "sources" returns the full stored text for an exact reviewed Markdown source companion when available — e.g., the KRUK bio, a meeting transcript, or an assessment conversion. A binary or pointer-only path returns source/artifact metadata; it never returns original binary bytes or creates a signed URL.'
     ),
 });
 

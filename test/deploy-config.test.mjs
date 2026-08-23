@@ -623,7 +623,9 @@ test("hosted cockpit is local-only with narrowly guarded maintenance writes", as
   assert.match(script, /Refresh inbox scan/);
   assert.match(script, /interactive Claude session/);
   assert.match(script, /Copy Claude ingestion prompt/);
-  assert.match(script, /Safe Mechanical Fixes/);
+  assert.match(script, /Actions You Can Approve/);
+  assert.match(script, /Show full proposed change/);
+  assert.match(script, /no operator action/i);
   assert.match(script, /runMaintenanceLint/);
   assert.match(script, /countLintIssues/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);

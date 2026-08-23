@@ -1,8 +1,8 @@
-# Brain Content Linking And Semantic-Destination Runbook
+# Brain Content Linking, Source Trace And Freshness Runbook
 
-**Status:** active — JEM pilot completed; ERS replay pending separate approval  
-**Last reviewed:** 2026-08-22  
-**Related:** [Spec 013](specs/013-brain-context-architecture.md); [Spec 015](specs/015-compiled-source-ingestion.md); [Spec 016](specs/016-source-links-and-brain-library-pilot.md); [Brain Library](brain-library.md)
+**Status:** active — JEM pilot completed; ERS replay pending separate approval
+**Last reviewed:** 2026-08-23
+**Related:** [Spec 013](specs/013-brain-context-architecture.md); [Spec 015](specs/015-compiled-source-ingestion.md); [Spec 016](specs/016-source-links-and-brain-library-pilot.md); [Brain Library](brain-library.md); [JEM freshness register](jem-brain-freshness-register.md)
 
 This runbook preserves the complete linking remediation so it can be replayed
 for another Brain without rediscovering the distinction between graph
@@ -12,7 +12,7 @@ content authority, credentials, snapshots and hosted write path.
 
 ## Outcomes
 
-A completed rollout provides four independent guarantees:
+A completed rollout provides five independent guarantees:
 
 1. **Internal reachability:** important Brain content is reachable from the
    loader or a named hub.
@@ -24,6 +24,9 @@ A completed rollout provides four independent guarantees:
 4. **Semantic destination completeness:** an entity hub identifies its current
    official website, authoritative historical evidence, or an explicit
    no-verified-public-website state.
+5. **Freshness accountability:** volatile content names its review date, owner,
+   cadence, event trigger and live authority; lint uses that review date and
+   cadence instead of treating a mechanical file modification as semantic review.
 
 Passing one guarantee does not imply the others. In particular, zero broken
 internal links does not prove that an entity has an official website link.
@@ -43,6 +46,9 @@ internal links does not prove that an entity has an official website link.
   identifies a source artifact's web locator; it does not satisfy an entity
   hub's official-destination obligation.
 - This work does not activate the Spec 014 task-context compiler.
+- A reviewed Markdown companion and its original binary are separate access
+  surfaces. Hosted reads may return the complete stored Markdown text while the
+  original binary remains private and metadata-only.
 
 ## Destination contract
 
@@ -120,13 +126,23 @@ not already been completed for the target Brain.
    existing Brain claims. Reject plausible but unsupported associations.
 5. Add direct portable Markdown links from substantive synthesis files and an
    explicit `## Brain links` declaration in each companion.
-6. Compile/persist the Spec 015 source-reference manifest where that Brain uses
+6. Convert prominent primary-source declarations into direct links to the
+   reviewed companions. When an adjacent ingested original exists, add a plainly
+   labelled `## Original artifact` relative link in the companion. Prefer an
+   already-reviewed provider HTTPS locator for an external authority; never
+   create sharing or embed a machine-specific `file://` URL.
+7. Compile/persist the Spec 015 source-reference manifest where that Brain uses
    the compiled source registry. Backfill only reviewed relationships, then
    prove repeat application is idempotent and stored artifact hashes still
    match their content-addressed paths.
-7. Run the source-link audit in strict mode and require zero index-only,
+8. When companion Markdown changes without changing its original binary, use
+   the project-ref-guarded companion refresh. `pointer_text` versions the exact
+   reviewed Markdown in `brain.source_artifact_text` through the owner-only
+   Monitor database profile; `storage` additionally requires the explicit
+   admin-only Storage credential. Retain prior artifacts as snapshots.
+9. Run the source-link audit in strict mode and require zero index-only,
    unlinked, missing-backlink, broken and non-clickable source-reference
-   findings.
+   findings, including primary-source declarations and original-artifact links.
 
 ## Phase 2 — Semantic-destination remediation
 
@@ -148,6 +164,23 @@ not already been completed for the target Brain.
    ingestion, but do not rewrite quoted source bodies mechanically.
 7. Record unresolved aliases, private-site absences and lifecycle transitions
    explicitly instead of guessing.
+
+## Phase 2B — Freshness review
+
+1. Classify the complete corpus as cadence-controlled, event-reviewed durable,
+   operational/structural, queue/state, or append/rotation content.
+2. Prioritize current projects, roles, priorities, opportunities, tools and
+   canonical routing. Compare them with the owning repository, tracker or cloud
+   workspace; do not infer live state from an old Brain page.
+3. Keep durable orientation and settled facts in Brain. Route actions, volatile
+   plans and current delivery state to the first-class project home.
+4. Add `Last reviewed`, `Review owner`, and `Review cadence` to content that can
+   become misleading. Include event triggers in the cadence sentence.
+5. Treat an explicit review date as semantic authority. A sync, formatting or
+   hyperlink edit must not reset it. Lint enforces a supported declared cadence
+   before the filename-tier fallback.
+6. Close a review only after strict link/destination audits, routing regressions,
+   hosted lint and zero-conflict convergence pass.
 
 ## Phase 3 — Regression gates
 
@@ -178,6 +211,17 @@ Brain, and verify sync returns to zero conflicts. Inspect representative links
 in Obsidian, a normal Markdown viewer and Brain Library. Confirm external links
 open as web destinations and internal/source links stay inside the intended
 Brain.
+
+For hosted source retrieval, read an exact reviewed `.md` companion through
+`brain_read_file(scope="sources")` and require its complete stored text. Read a
+binary/pointer path separately and require metadata-only behavior. For a source
+with an authority exception, require the routing case to retrieve both the
+source path and the governing Brain context.
+
+In Cockpit Maintenance, refresh lint and verify that graph diagnostics are
+grouped by class with plain-language status, owner and completion criteria.
+Only safe mechanical changes belong under **Actions You Can Approve**, and each
+candidate must expose its full proposed change before selection.
 
 ## JEM pilot evidence — 2026-08-22
 
@@ -212,6 +256,33 @@ verified a healthy cycle with zero open conflicts. No content was lost and ERS
 was untouched. Future bulk passes should pause the target watcher first,
 consolidate per-file edits and verify exact hashes before resolving conflicts.
 
+## JEM acceptance remediation — 2026-08-23
+
+- The strict source audit now covers all 45 companions and reports 45 directly
+  linked, zero index-only/unlinked/missing-backlink/broken/non-clickable items,
+  and zero companions missing an original-artifact link. Five prominent
+  primary-source declarations are direct links; 26 same-stem binary companions
+  now link to their adjacent ingested originals.
+- The 26 changed companions were refreshed only in personal project
+  `gfipcidoyrtgngauzijy` through the owner-only Monitor profile. The first plan
+  reported 26 `refresh_required`; apply created exact hashed `pointer_text`
+  artifacts with prior active versions retained as snapshots; the repeat plan
+  reported 26 `unchanged`. No ERS credential, schema, content or deployment was
+  touched.
+- The complete 39-file corpus received a freshness classification. Nine
+  cadence-controlled areas record a review date, owner, cadence and trigger;
+  priority projects/roles/next-chapter/Edge/NOW content was refreshed against
+  its current authority. Lint gives the declared cadence precedence over file
+  modification time and no longer reports the priority pages stale or bloated.
+- Cockpit Maintenance uses the full content width, groups high-volume graph
+  diagnostics into plain-language ownership/completion classes, labels the
+  bounded mechanical queue **Actions You Can Approve**, and gives every item an
+  expandable full proposed change. Desktop and 390px checks passed.
+- The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
+  and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
+  additionally requires the full 1,968-byte reviewed companion and its
+  artifact-specific founder-wording exception after deployment.
+
 ## ERS replay gate
 
 Do not copy JEM URLs or classifications into `ers-brain`. When John separately
@@ -220,6 +291,7 @@ approves the ERS pass:
 1. Use only the dedicated ERS hosted connector, local mirror, snapshot and
    credentials.
 2. Run Phases 0–3 against the ERS content and source taxonomy as it exists then.
+   Include Phase 2B and the hosted reviewed-Markdown read gate.
 3. Produce an ERS-specific review matrix before writes: current destinations,
    historical/successor destinations, explicit unavailable states, ambiguous
    identities and source-promotion candidates.

@@ -146,8 +146,43 @@ function formatSourceManifest(manifest: SourceManifestRecord): string {
       ? manifest.brainLinks.map(formatBrainLink).join("\n")
       : "- none",
     "",
-    "Note: hosted source reads currently return metadata only. Original bytes remain in private artifact storage until an explicit download/signed-URL policy is implemented.",
+    manifest.source.companionPath
+      ? `Reviewed Markdown companion: ${manifest.source.companionPath}`
+      : "Reviewed Markdown companion: not recorded",
+    "Note: this source path has no readable hosted text. Original binary bytes remain private; read the reviewed Markdown companion when one is recorded.",
   ].join("\n");
+}
+
+function normalizeSourcePath(sourcePath: string): string {
+  return sourcePath
+    .replace(/^sources\//, "")
+    .replace(/^brain\/working\//, "working/");
+}
+
+function artifactSourcePath(
+  artifact: SourceArtifactRecord,
+  manifest: SourceManifestRecord
+): string | null {
+  const displayPath =
+    artifact.metadata.local_path ||
+    artifact.externalId ||
+    artifact.storagePath ||
+    manifest.source.metadata.local_path ||
+    manifest.source.label;
+  return typeof displayPath === "string" && displayPath
+    ? normalizeSourcePath(displayPath)
+    : null;
+}
+
+function validateSourceFilename(filename: string): string {
+  if (path.isAbsolute(filename)) {
+    throw new Error("Absolute paths are not allowed");
+  }
+  const requested = normalizeSourcePath(filename);
+  if (!requested || requested.split("/").includes("..")) {
+    throw new Error("Path traversal (..) is not allowed");
+  }
+  return requested;
 }
 
 export class RevisionBrainStore implements BrainStore {
@@ -170,13 +205,20 @@ export class RevisionBrainStore implements BrainStore {
       if (!this.sourceStore) {
         throw new Error("Revision store has no source metadata provider.");
       }
-      const requested = filename.replace(/^sources\//, "");
+      const requested = validateSourceFilename(filename);
       const manifests = await this.sourceStore.listSourceManifests(brainId);
       const manifest = manifests.find((candidate) =>
         candidate.paths.includes(requested)
       );
       if (!manifest) {
         throw new Error(`Source manifest not found in hosted metadata: ${filename}`);
+      }
+      const artifact = manifest.artifacts.find(
+        (candidate) => artifactSourcePath(candidate, manifest) === requested
+      );
+      if (artifact && requested.toLowerCase().endsWith(".md")) {
+        const text = await this.sourceStore.readArtifactText(brainId, artifact.id);
+        if (text) return text.content;
       }
       return formatSourceManifest(manifest);
     }

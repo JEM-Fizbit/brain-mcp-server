@@ -172,13 +172,13 @@
   },
   {
     "id": "kruk-bio-source",
-    "prompt": "What did the KRUK trustee bio say?",
+    "prompt": "Find my Kidney Research UK trustee biography. Show me the source and the relevant Brain context.",
     "category": "source_escalation",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["SOURCES.md"],
+      "route_files": ["SOURCES.md", "quanta.md"],
       "loader_must_contain": ["scope: \"sources\"", "original ingested material", "KRUK bio"],
-      "search": { "query": "KRUK Trustee Bio", "must_hit_files": ["SOURCES.md"] }
+      "search": { "query": "KRUK Trustee Bio", "must_hit_files": ["SOURCES.md", "quanta.md"] }
     }
   },
   {
@@ -314,12 +314,12 @@
     "expected": {
       "brain_id": "ai-brain-jem",
       "route_files": ["edge_biotech.md"],
-      "search": { "query": "Edge Biotech public website", "must_hit_files": ["edge_biotech.md"] },
+      "search": { "query": "Edge Biotech", "must_hit_files": ["edge_biotech.md"] },
       "destinations": [
         {
           "file": "edge_biotech.md",
           "url": "https://md.catapult.org.uk/",
-          "status_marker": "No verified standalone public website"
+          "status_marker": "No verified standalone Edge Biotech website"
         }
       ]
     }
@@ -336,7 +336,7 @@
         {
           "file": "04_active_roles.md",
           "url": "https://nextkidney.com/about-kidney-dialysis/",
-          "status_marker": "Needs John verification before renaming"
+          "status_marker": "Confirm with John before renaming"
         }
       ]
     }

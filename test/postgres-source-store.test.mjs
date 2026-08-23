@@ -186,3 +186,39 @@ test("PostgresSourceMetadataStore searches extracted source text with normalized
     20,
   ]);
 });
+
+test("PostgresSourceMetadataStore reads complete artifact text within the selected Brain", async () => {
+  const queries = [];
+  const store = new PostgresSourceMetadataStore({
+    async query(sql, values) {
+      queries.push({ sql, values });
+      return {
+        rows: [
+          {
+            artifact_id: "artifact-kruk",
+            text_format: "markdown",
+            content: "# KRUK Trustee Bio\n\nComplete reviewed text.\n",
+            content_sha256: "c".repeat(64),
+            language: "en",
+            created_at: new Date("2026-06-14T00:00:00.000Z"),
+          },
+        ],
+      };
+    },
+  });
+
+  assert.deepEqual(
+    await store.readArtifactText("ai-brain-jem", "artifact-kruk"),
+    {
+      artifactId: "artifact-kruk",
+      textFormat: "markdown",
+      content: "# KRUK Trustee Bio\n\nComplete reviewed text.\n",
+      contentSha256: "c".repeat(64),
+      language: "en",
+      createdAt: "2026-06-14T00:00:00.000Z",
+    }
+  );
+  assert.match(queries[0].sql, /join brain\.sources s/);
+  assert.match(queries[0].sql, /where s\.brain_id = \$1/);
+  assert.deepEqual(queries[0].values, ["ai-brain-jem", "artifact-kruk"]);
+});

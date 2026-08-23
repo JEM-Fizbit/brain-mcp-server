@@ -50,7 +50,15 @@ interface LintFileSnapshot {
 
 export interface LintReport {
   bloat: { file: string; lines: number }[];
-  stale: { file: string; days: number }[];
+  stale: {
+    file: string;
+    days: number;
+    thresholdDays: number;
+    thresholdBasis: "declared_cadence" | "filename_tier";
+    basis: "review_date" | "modified_date";
+    reviewedAt?: string;
+    cadence?: string;
+  }[];
   orphans: string[];
   drift: string[];
   largeDomainPacks: { dir: string; count: number }[];
@@ -108,6 +116,38 @@ function countLines(content: string): number {
 
 function byteLength(content: string): number {
   return Buffer.byteLength(content, "utf-8");
+}
+
+function explicitReviewDate(content: string): string | null {
+  const match = content.match(
+    /(?:\*\*)?Last (?:reviewed|updated)(?:\*\*)?\s*:\s*\**_?\s*(\d{4}-\d{2}-\d{2})/i
+  );
+  if (!match) return null;
+  const timestamp = Date.parse(`${match[1]}T00:00:00.000Z`);
+  return Number.isNaN(timestamp) ? null : match[1];
+}
+
+function explicitReviewCadence(content: string): {
+  label: string;
+  days: number;
+} | null {
+  const match = content.match(
+    /(?:\*\*)?Review cadence(?:\*\*)?\s*:\s*\**_?\s*([^\n]+)/i
+  );
+  if (!match) return null;
+  const label = match[1].replace(/\s{2,}$/, "").trim();
+  const everyDays = label.match(/^every\s+(\d{1,3})\s+days?\b/i);
+  if (everyDays) {
+    const days = Number.parseInt(everyDays[1], 10);
+    return days > 0 ? { label, days } : null;
+  }
+  if (/^weekly\b/i.test(label)) return { label, days: 7 };
+  if (/^monthly\b/i.test(label)) return { label, days: 30 };
+  if (/^quarterly\b/i.test(label)) return { label, days: 90 };
+  if (/^(?:annual|annually|yearly)\b/i.test(label)) {
+    return { label, days: 365 };
+  }
+  return null;
 }
 
 function isBloatExempt(filename: string): boolean {
@@ -286,12 +326,27 @@ export async function runLint(brainId?: string): Promise<LintReport> {
       bloat.push({ file: name, lines });
     }
 
-    const daysSinceModified = file.lastModified
-      ? Math.floor((now - file.lastModified.getTime()) / (1000 * 60 * 60 * 24))
-      : file.staleDays;
-    const threshold = getStalenessThreshold(name);
+    const reviewedAt = explicitReviewDate(file.content);
+    const reviewTime = reviewedAt
+      ? Date.parse(`${reviewedAt}T00:00:00.000Z`)
+      : null;
+    const daysSinceModified = reviewTime !== null
+      ? Math.floor((now - reviewTime) / (1000 * 60 * 60 * 24))
+      : file.lastModified
+        ? Math.floor((now - file.lastModified.getTime()) / (1000 * 60 * 60 * 24))
+        : file.staleDays;
+    const declaredCadence = explicitReviewCadence(file.content);
+    const threshold = declaredCadence?.days ?? getStalenessThreshold(name);
     if (daysSinceModified !== null && daysSinceModified > threshold) {
-      stale.push({ file: name, days: daysSinceModified });
+      stale.push({
+        file: name,
+        days: daysSinceModified,
+        thresholdDays: threshold,
+        thresholdBasis: declaredCadence ? "declared_cadence" : "filename_tier",
+        basis: reviewedAt ? "review_date" : "modified_date",
+        ...(reviewedAt ? { reviewedAt } : {}),
+        ...(declaredCadence ? { cadence: declaredCadence.label } : {}),
+      });
     }
   }
 
@@ -527,8 +582,24 @@ export function formatLintReport(report: LintReport): string {
   // Stale
   if (report.stale.length > 0) {
     sections.push("## Stale files");
-    for (const { file, days } of report.stale) {
-      sections.push(`- ${file}: ${days} days since last modification`);
+    for (const {
+      file,
+      days,
+      thresholdDays,
+      thresholdBasis,
+      basis,
+      reviewedAt,
+      cadence,
+    } of report.stale) {
+      const cadenceText =
+        thresholdBasis === "declared_cadence" && cadence
+          ? `declared cadence ${cadence} (${thresholdDays} days)`
+          : `filename-tier cadence threshold ${thresholdDays} days`;
+      sections.push(
+        basis === "review_date"
+          ? `- ${file}: reviewed ${reviewedAt} (${days} days ago; ${cadenceText})`
+          : `- ${file}: ${days} days since last modification (${cadenceText}; no explicit review date found)`
+      );
     }
     sections.push("");
   }

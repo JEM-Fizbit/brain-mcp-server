@@ -13,8 +13,10 @@ export interface SourceLinkAudit {
   indexOnlyCompanions: string[];
   unlinkedCompanions: string[];
   companionsWithoutBacklinks: string[];
+  companionsWithoutOriginalLinks: SourceLinkIssue[];
   brokenLinks: SourceLinkIssue[];
   nonClickableSourceReferences: SourceLinkIssue[];
+  nonClickablePrimarySourceDeclarations: SourceLinkIssue[];
 }
 
 interface MarkdownLink {
@@ -131,6 +133,7 @@ function suggestedMarkdownLink(source: string, target: string): string | undefin
 export function auditSourceLinks(input: {
   brainFiles: ReadonlyMap<string, string>;
   sourceFiles: ReadonlyMap<string, string>;
+  sourceArtifactFiles?: ReadonlySet<string>;
 }): SourceLinkAudit {
   const files = new Map<string, string>();
   for (const [name, content] of input.brainFiles) files.set(`brain/${name}`, content);
@@ -145,6 +148,7 @@ export function auditSourceLinks(input: {
   const backlinks = new Map<string, Set<string>>();
   const brokenLinks: SourceLinkIssue[] = [];
   const nonClickableSourceReferences: SourceLinkIssue[] = [];
+  const nonClickablePrimarySourceDeclarations: SourceLinkIssue[] = [];
 
   for (const [source, content] of files) {
     if (isArchivedBrainFile(source)) continue;
@@ -209,6 +213,15 @@ export function auditSourceLinks(input: {
           suggestion: suggestedMarkdownLink(source, target),
         });
       }
+      for (const line of withoutFencedCodeBlocks(content).split("\n")) {
+        if (!/^>\s*\*\*Sources?:\*\*/i.test(line)) continue;
+        if (markdownLinks(line).length > 0) continue;
+        nonClickablePrimarySourceDeclarations.push({
+          source,
+          target: line.replace(/^>\s*\*\*Sources?:\*\*\s*/i, "").trim(),
+          suggestion: "Replace each named source with a direct Markdown link to its reviewed companion.",
+        });
+      }
     }
   }
 
@@ -220,6 +233,30 @@ export function auditSourceLinks(input: {
     (name) => !substantiveLinkers.has(name) && !indexLinkers.has(name)
   );
   const companionsWithoutBacklinks = companions.filter((name) => !backlinks.has(name));
+  const sourceArtifactFiles = input.sourceArtifactFiles || new Set<string>();
+  const companionsWithoutOriginalLinks: SourceLinkIssue[] = [];
+  for (const companion of companions) {
+    const stem = companion.slice(0, -3);
+    const originals = Array.from(sourceArtifactFiles)
+      .map((name) => (name.startsWith("sources/") ? name : `sources/${name}`))
+      .filter((name) => name.startsWith(`${stem}.`) && name !== companion)
+      .sort();
+    if (originals.length === 0) continue;
+    const linked = new Set(
+      markdownLinks(files.get(companion) || "")
+        .map((link) => internalTarget(link.target))
+        .filter((target): target is string => target !== null)
+        .map((target) => resolveTarget(companion, target))
+    );
+    for (const original of originals) {
+      if (linked.has(original)) continue;
+      companionsWithoutOriginalLinks.push({
+        source: companion,
+        target: original,
+        suggestion: `[Open original ${path.posix.extname(original).slice(1).toUpperCase()}](./${path.posix.basename(original)})`,
+      });
+    }
+  }
 
   return {
     brainMarkdownFiles: input.brainFiles.size,
@@ -228,10 +265,14 @@ export function auditSourceLinks(input: {
     indexOnlyCompanions,
     unlinkedCompanions,
     companionsWithoutBacklinks,
+    companionsWithoutOriginalLinks,
     brokenLinks: brokenLinks.sort(
       (a, b) => a.source.localeCompare(b.source) || a.target.localeCompare(b.target)
     ),
     nonClickableSourceReferences: nonClickableSourceReferences.sort(
+      (a, b) => a.source.localeCompare(b.source) || a.target.localeCompare(b.target)
+    ),
+    nonClickablePrimarySourceDeclarations: nonClickablePrimarySourceDeclarations.sort(
       (a, b) => a.source.localeCompare(b.source) || a.target.localeCompare(b.target)
     ),
   };

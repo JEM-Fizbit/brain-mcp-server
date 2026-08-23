@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
@@ -45,11 +45,13 @@
     "bench:http:postgres": "npm run build && node scripts/benchmark-http-postgres-runtime.mjs",
     "sources:inventory:postgres": "npm run build && node scripts/inventory-source-artifacts-postgres.mjs",
     "sources:upload:postgres": "npm run build && node scripts/upload-source-artifacts-postgres.mjs",
+    "sources:refresh-companions:postgres": "npm run build && node scripts/refresh-source-companions-postgres.mjs",
     "sources:upload:postgres:interactive": "bash scripts/run-source-upload-interactive.sh",
     "sources:extract-text:postgres": "npm run build && node scripts/extract-source-text-postgres.mjs",
     "sources:verify-list:postgres": "npm run build && node scripts/verify-postgres-source-list.mjs",
     "sources:compile-reference": "npm run build && node scripts/compile-source-reference.mjs",
     "sources:audit-links": "npm run build && node scripts/audit-source-links.mjs",
+    "sources:fix-original-links": "npm run build && node scripts/fix-source-original-links.mjs",
     "brain:audit:destinations": "npm run build && node scripts/audit-semantic-destinations.mjs",
     "sources:backfill-brain-links:postgres": "node scripts/backfill-source-brain-links-postgres.mjs",
     "sources:persist-reference:postgres": "npm run build && node scripts/persist-source-reference-postgres.mjs",

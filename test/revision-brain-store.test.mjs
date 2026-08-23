@@ -152,6 +152,24 @@ function sourceStore(pathsByCategory) {
         .filter((row) => row.line.toLowerCase().includes(query.toLowerCase()))
         .slice(0, maxResults);
     },
+    async readArtifactText(_brainId, artifactId) {
+      if (artifactId !== "bios-0-artifact") return null;
+      const content = [
+        "# KRUK Trustee Bio — John E. Milad",
+        "",
+        "John E. Milad is an operator-investor with 25+ years across life sciences.",
+        "",
+        "The reviewed biography continues beyond its opening paragraph.",
+      ].join("\n");
+      return {
+        artifactId,
+        textFormat: "markdown",
+        content,
+        contentSha256: "b".repeat(64),
+        language: "en",
+        createdAt: "2026-06-14T00:00:00.000Z",
+      };
+    },
   };
 }
 
@@ -240,7 +258,46 @@ test("RevisionBrainStore reads hosted source manifests from metadata", async () 
   assert.match(manifest, /original_filename: headshot\.jpg/);
   assert.match(manifest, /companion_path: sources\/photos\/headshot\.jpg\.md/);
   assert.match(manifest, /supports: 08_personal\.md \(Personal context\)/);
-  assert.match(manifest, /metadata only/);
+  assert.match(manifest, /no readable hosted text/);
+  assert.match(manifest, /Original binary bytes remain private/);
+});
+
+test("RevisionBrainStore returns the complete stored Markdown source companion", async () => {
+  const store = new RevisionBrainStore(
+    new MemoryRevisionStore(),
+    sourceStore({
+      bios: ["bios/2026-04-15_kruk_trustee_bio.md"],
+    })
+  );
+
+  const content = await store.readFile(
+    "ai-brain-jem",
+    "bios/2026-04-15_kruk_trustee_bio.md",
+    "sources"
+  );
+  assert.equal(
+    content,
+    [
+      "# KRUK Trustee Bio — John E. Milad",
+      "",
+      "John E. Milad is an operator-investor with 25+ years across life sciences.",
+      "",
+      "The reviewed biography continues beyond its opening paragraph.",
+    ].join("\n")
+  );
+  assert.doesNotMatch(content, /Source Manifest|metadata only/);
+});
+
+test("RevisionBrainStore rejects traversal in hosted source reads", async () => {
+  const store = new RevisionBrainStore(
+    new MemoryRevisionStore(),
+    sourceStore({ bios: ["bios/profile.md"] })
+  );
+
+  await assert.rejects(
+    () => store.readFile("ai-brain-jem", "../bios/profile.md", "sources"),
+    /Path traversal/
+  );
 });
 
 test("RevisionBrainStore rejects external namespaces at the Brain-vault boundary", async () => {

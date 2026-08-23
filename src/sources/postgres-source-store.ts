@@ -12,6 +12,7 @@ import type {
   RecordSourceArtifactInput,
   RecordSourceBrainLinkInput,
   SourceArtifactRecord,
+  SourceArtifactTextRecord,
   SourceBrainLinkRecord,
   SourceManifestRecord,
   SourceMetadataStore,
@@ -105,6 +106,15 @@ interface SourceTextSearchRow {
   display_path: string | null;
   text_format: SourceTextSearchResult["textFormat"];
   content: string;
+}
+
+interface SourceArtifactTextRow {
+  artifact_id: string;
+  text_format: SourceArtifactTextRecord["textFormat"];
+  content: string;
+  content_sha256: string;
+  language: string | null;
+  created_at: Date;
 }
 
 function sourceFromRow(row: SourceRow): SourceRecord {
@@ -580,5 +590,39 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
       if (matches.length >= maxResults) break;
     }
     return matches;
+  }
+
+  async readArtifactText(
+    brainId: string,
+    artifactId: string
+  ): Promise<SourceArtifactTextRecord | null> {
+    const result = await this.pool.query<SourceArtifactTextRow>(
+      `
+        select
+          t.artifact_id,
+          t.text_format,
+          t.content,
+          t.content_sha256,
+          t.language,
+          t.created_at
+        from brain.source_artifact_text t
+        join brain.source_artifacts a on a.id = t.artifact_id
+        join brain.sources s on s.id = a.source_id
+        where s.brain_id = $1
+          and t.artifact_id = $2
+        limit 1
+      `,
+      [brainId, artifactId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      artifactId: row.artifact_id,
+      textFormat: row.text_format,
+      content: row.content,
+      contentSha256: row.content_sha256,
+      language: row.language,
+      createdAt: row.created_at.toISOString(),
+    };
   }
 }

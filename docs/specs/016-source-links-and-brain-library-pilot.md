@@ -176,3 +176,17 @@ Brain-to-source file references, not complete human navigation.
   cycle returned healthy with zero conflicts. The runbook now requires a paused
   target watcher and one consolidated replacement per file for future bulk
   content passes.
+- The 2026-08-23 human acceptance pass identified seven follow-on gaps. The
+  approved remediation made five prominent primary-source declarations direct
+  links, added adjacent original-artifact links to 26 binary-paired companions,
+  versioned those exact Markdown companions in the personal hosted registry,
+  refreshed stale projects/roles/next-chapter/Edge/NOW content, and established
+  a complete-corpus freshness register. A repeat companion plan reported all 26
+  unchanged; strict source and destination audits pass.
+- Hosted source reads now distinguish complete reviewed Markdown text from
+  private original binary access. The observed KRUK prompt requires both the
+  source and `quanta.md` exception context in the golden routing set. Cockpit
+  Maintenance groups technical diagnostics by owner/completion and gives every
+  safe mechanical candidate an expandable untruncated proposal; desktop and
+  390px acceptance checks pass. Live hosted KRUK retrieval is the final release
+  verification gate.

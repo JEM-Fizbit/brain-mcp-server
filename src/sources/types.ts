@@ -96,6 +96,15 @@ export interface SourceTextSearchResult {
   line: string;
 }
 
+export interface SourceArtifactTextRecord {
+  artifactId: string;
+  textFormat: "plain_text" | "markdown" | "ocr_text";
+  content: string;
+  contentSha256: string;
+  language: string | null;
+  createdAt: string;
+}
+
 export interface RecordSourceArtifactInput {
   sourceId: string;
   artifactKind: SourceArtifactKind;
@@ -145,4 +154,8 @@ export interface SourceMetadataStore {
     query: string,
     maxResults: number
   ): Promise<SourceTextSearchResult[]>;
+  readArtifactText(
+    brainId: string,
+    artifactId: string
+  ): Promise<SourceArtifactTextRecord | null>;
 }
