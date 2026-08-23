@@ -1,6 +1,6 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** approved remediation implemented on JEM; live release verification pending
+**Status:** complete — remediated and live-verified on JEM `v1.6.0`
 **Started:** 2026-08-23
 **Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
@@ -18,7 +18,7 @@ implemented outcome. ERS remains separately approval-gated.
 | 3 | Five primary-source declarations link directly to companions; 26 binary-paired companions link to the adjacent original. | Strict source audit: zero non-clickable declarations and zero missing original-artifact links. |
 | 4 | Edge refreshed as durable orientation and linked to its live Dropbox workspace; public-site absence is explicit. | Strict semantic-destination audit passes. |
 | 5 | NanoRenal/iHemo demoted from active prominence to dormant/cold with historical context preserved. | Hosted/local `04_active_roles.md` convergence verified. |
-| 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; live hosted read is the release gate. |
+| 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; the deployed hosted read returns the complete companion and preserves binary privacy. |
 | 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
 
 ## Acceptance results
@@ -29,17 +29,19 @@ John reports that Test 3 passed in full on 2026-08-23. The local Obsidian edit,
 hosted visibility check, local removal, and hosted removal check all behaved as
 specified in the acceptance plan. No remediation is indicated by this test.
 
-### Test suite 4 — LLM retrieval: PASS with one exception
+### Test suite 4 — LLM retrieval: PASS after remediation
 
-John reports that the suite passed except for the KRUK trustee-biography source
-retrieval described in Finding 6. The exception prevents an unqualified full
-pass until its retrieval and authority behavior are triaged.
+John reported that the original suite passed except for the KRUK
+trustee-biography source retrieval described in Finding 6. Release `v1.6.0`
+closed that exception: hosted retrieval now returns the complete reviewed
+companion, search returns both the source and `quanta.md`, and the original
+binary remains private.
 
 ## Finding 1 — Lint warning and unreadable mechanical-fix candidates
 
 **Surface:** JEM Brain Monitor → maintenance/lint → safe mechanical fixes
 **Evidence:** `Screenshot 2026-08-23 at 21.28.56.png`, supplied by John
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation
 
@@ -71,7 +73,7 @@ specific interaction and layout remain to be decided.
 
 **Surface:** JEM Brain Monitor → maintenance/lint → graph diagnostics
 **Evidence:** `Screenshot 2026-08-23 at 21.31.54.png`, supplied by John
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation
 
@@ -106,7 +108,7 @@ both alarming and non-actionable.
 
 **Surface:** JEM Brain content in Obsidian; extracted-fact reference files
 **Example:** `> **Sources:** CV (FINAL), Resume (FINAL)`
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation
 
@@ -151,7 +153,7 @@ where the source is correctly ingested and machine traceability exists.
 ## Finding 4 — Edge Brain context is stale against its live Dropbox project
 
 **Surface:** JEM Brain → `edge_biotech.md`
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation from John
 
@@ -175,7 +177,7 @@ where the source is correctly ingested and machine traceability exists.
 **Surface:** JEM Brain → `04_active_roles.md`
 **User wording:** “neorenal/ihemo has gone cold”
 **Likely existing entity label:** NanoRenal, formerly iHemo
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation from John
 
@@ -195,7 +197,7 @@ prominent placement among active roles.
 
 **Surface:** JEM Brain integration; source retrieval and synthesis
 **Prompt:** `Find my Kidney Research UK trustee biography. Show me the source and the relevant Brain context.`
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observed response
 
@@ -246,10 +248,28 @@ authority hierarchy.
   not merely a model choosing the wrong tool. The search excerpt and metadata
   read are two incomplete surfaces over content that is already stored.
 
+### Post-release verification — JEM `v1.6.0`
+
+- The public health endpoint reports `brain-mcp-server` `1.6.0`, Postgres
+  revisions, Supabase artifacts in metadata-only byte mode, and Postgres OAuth
+  state.
+- The exact hosted KRUK source read returns the complete 1,963-character tool
+  text corresponding to the 1,968-byte reviewed Markdown companion, rather
+  than a generated manifest.
+- An exact binary-source read still returns the metadata manifest and states
+  that original bytes remain private.
+- Search for `KRUK Trustee Bio` returns both
+  `sources/bios/2026-04-15_kruk_trustee_bio.md` and `quanta.md`; the latter
+  preserves the artifact-specific founder-wording exception.
+- Hosted sync reports 39 files and zero open conflicts. Hosted lint reports no
+  priority-page stale or bloat findings; its remaining 282 items are three
+  graph-unreachable notes, 278 grouped edge diagnostics, and one bounded
+  capture-queue finding.
+
 ## Finding 7 — Brain content needs a systematic freshness review and maintenance model
 
 **Surface:** JEM Brain corpus; example `05_projects.md`
-**Status:** remediated and locally verified; live release gate pending
+**Status:** remediated and live-verified in JEM `v1.6.0`
 
 ### Observation from John
 
