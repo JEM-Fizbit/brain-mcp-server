@@ -10,6 +10,7 @@ import { brainDate } from "../dist/services/date.js";
 import { runLint, countLintIssues } from "../dist/services/lint.js";
 import { activeBrainStore } from "../dist/services/active-brain-store.js";
 import { scanInbox } from "../dist/services/inbox.js";
+import { auditSourceLinks } from "../dist/source-references/index.js";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,8 @@ const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
 const cockpitBrainId = process.env.BRAIN_ID || "ai-brain-jem";
+const localBrainDir = process.env.BRAIN_DIR ? path.resolve(process.env.BRAIN_DIR) : null;
+const localBrainRoot = localBrainDir ? path.resolve(localBrainDir, "..") : null;
 // Per-process CSRF nonce: embedded in the served page and required on the write
 // endpoint. A cross-origin page cannot read it (no CORS headers are ever sent),
 // so it cannot forge the POST. Rotates every cockpit restart.
@@ -60,7 +63,7 @@ async function writeJsonAtomic(filePath, payload) {
 async function readLintReportCache() {
   try {
     const payload = JSON.parse(await fs.readFile(lintReportPath, "utf-8"));
-    if (payload.version !== 1 || payload.brainId !== cockpitBrainId) {
+    if (payload.version !== 2 || payload.brainId !== cockpitBrainId) {
       return null;
     }
     return payload;
@@ -70,10 +73,87 @@ async function readLintReportCache() {
   }
 }
 
+async function readMarkdownFiles(root) {
+  const files = new Map();
+  async function walk(directory) {
+    const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(fullPath);
+      if (entry.isFile() && entry.name.endsWith(".md")) {
+        const relativePath = path.relative(root, fullPath).split(path.sep).join("/");
+        files.set(relativePath, await fs.readFile(fullPath, "utf-8"));
+      }
+    }
+  }
+  await walk(root);
+  return files;
+}
+
+async function readAllFiles(root) {
+  const files = new Set();
+  async function walk(directory) {
+    const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(fullPath);
+      if (entry.isFile()) files.add(path.relative(root, fullPath).split(path.sep).join("/"));
+    }
+  }
+  await walk(root);
+  return files;
+}
+
+async function runLocalSourceLinkAudit() {
+  if (!localBrainDir || !localBrainRoot) {
+    return { state: "unavailable", reason: "local Brain root is not configured" };
+  }
+  const sourceRoot = path.join(localBrainRoot, "sources");
+  const [brainFiles, sourceFiles, sourceArtifactFiles] = await Promise.all([
+    readMarkdownFiles(localBrainDir),
+    readMarkdownFiles(sourceRoot),
+    readAllFiles(sourceRoot),
+  ]);
+  if (sourceFiles.size === 0) {
+    return { state: "unavailable", reason: "no local source companions were found" };
+  }
+  const report = auditSourceLinks({ brainFiles, sourceFiles, sourceArtifactFiles });
+  const strictFailureCount =
+    report.brokenLinks.length +
+    report.nonClickableSourceReferences.length +
+    report.companionsWithoutOriginalLinks.length +
+    report.nonClickablePrimarySourceDeclarations.length;
+  return {
+    state: strictFailureCount === 0 ? "pass" : "fail",
+    checkedAt: new Date().toISOString(),
+    strictFailureCount,
+    brainMarkdownFiles: report.brainMarkdownFiles,
+    sourceCompanions: report.sourceCompanions,
+    directlyLinkedCompanions: report.directlyLinkedCompanions.length,
+    unlinkedCompanions: report.unlinkedCompanions.length,
+    missingBacklinks: report.companionsWithoutBacklinks.length,
+  };
+}
+
 function lintReviewFindings(report) {
   const findings = [];
   const add = (kind, summary, detail = "", metadata = {}) =>
-    findings.push({ kind, summary, detail, ...metadata });
+    findings.push({
+      kind,
+      summary,
+      detail,
+      audience: "maintainer",
+      owner: "Brain content maintainer",
+      ...metadata,
+    });
   for (const item of report.bloat || []) {
     add("bloat", `${item.file} is ${item.lines} lines`, "Review whether the file should be split; lint will not rewrite semantic content.");
   }
@@ -97,7 +177,13 @@ function lintReviewFindings(report) {
     add(
       "capture_queue",
       `Capture queue has ${report.captureQueue.openCount} open item(s)`,
-      `${report.captureQueue.staleCount} stale item(s); triage requires operator judgement.`
+      `${report.captureQueue.staleCount} stale item(s); this is one bounded content-triage decision, not ${report.captureQueue.openCount} lint diagnostics.`,
+      {
+        audience: "operator",
+        owner: "John",
+        statusLabel: "User decision",
+        completion: "Complete when the capture queue is triaged into its canonical trackers or closed.",
+      }
     );
   }
   if (report.bootstrapBudget?.exceeded) {
@@ -107,6 +193,21 @@ function lintReviewFindings(report) {
       "Review progressive-disclosure moves; 00_loader.md and NOW.md are protected from automatic fixes."
     );
   }
+  return findings;
+}
+
+function lintTechnicalDiagnostics(report, sourceLinkAudit) {
+  const findings = [];
+  const add = (kind, summary, detail, metadata = {}) =>
+    findings.push({
+      kind,
+      summary,
+      detail,
+      audience: "maintainer",
+      operatorAction: false,
+      owner: "Brain content maintainer",
+      ...metadata,
+    });
   const graphDiagnostics = report.graphReachability?.diagnostics || [];
   if (graphDiagnostics.length > 0) {
     const byCode = new Map();
@@ -116,35 +217,27 @@ function lintReviewFindings(report) {
       byCode.set(diagnostic.code, group);
     }
     const definitions = {
-      parent_link_disabled: {
-        label: "Source-archive boundary",
-        status: "Expected under current design",
-        detail:
-          "The hosted Brain graph deliberately does not follow links from brain/ into the repository-level sources/ archive. The strict source-link audit, not Brain lint, owns this boundary.",
-        owner: "Automated source-link audit",
-        completion: "Complete when the repository-wide source-link audit passes in strict mode.",
-      },
       unresolved_target: {
-        label: "Unresolved internal-target candidates",
-        status: "Maintainer review; no operator action",
+        label: "Broken internal-link candidates",
+        status: "Maintainer repair required",
         detail:
-          "The target does not resolve inside the hosted Brain namespace. This class mixes genuine typos with external workspace references and legacy placeholders, so it cannot be repaired mechanically.",
+          "A real Markdown link or wikilink does not resolve inside the Brain. Backtick project locators and source-boundary links have already been excluded from this class.",
         owner: "Brain content maintainer",
-        completion: "Complete when genuine broken Brain links are repaired and intentional external or legacy references are classified.",
+        completion: "Complete when the internal destination is repaired or the link is deliberately removed.",
       },
       missing_directory_index: {
         label: "Directory references without a Brain index",
-        status: "Usually informational",
+        status: "Maintainer repair required",
         detail:
-          "A reference names a directory that has no index page inside the hosted Brain. Many are routes to an external project workspace rather than missing Brain content.",
+          "A real Brain link names a directory that has no README.md or INDEX.md inside the Brain.",
         owner: "Brain content maintainer",
         completion: "Complete when each route is either linked to its canonical external workspace or given a reviewed Brain index where one is genuinely useful.",
       },
       path_escape: {
         label: "Paths outside the Brain namespace",
-        status: "Portability review; no operator action",
+        status: "Maintainer repair required",
         detail:
-          "An absolute or parent-relative path points outside brain/. These routes are excluded from the hosted graph and should use reviewed HTTPS destinations where human click-through is required.",
+          "A real Markdown link escapes the Brain namespace. Machine locators are classified separately and do not enter this failure class.",
         owner: "Brain content maintainer",
         completion: "Complete when human-facing routes are portable hyperlinks or explicitly retained as machine-only locators.",
       },
@@ -154,13 +247,13 @@ function lintReviewFindings(report) {
     )) {
       const definition = definitions[code] || {
         label: code,
-        status: "Maintainer review; no operator action",
-        detail: "This diagnostic class is retained for expert graph maintenance and is never auto-fixed.",
+        status: "Maintainer repair required",
+        detail: "This internal graph failure is retained for maintainer repair and is never delegated to the operator.",
         owner: "Brain content maintainer",
         completion: "Complete when the maintainer has classified or repaired the affected references.",
       };
       add(
-        "graph_diagnostics",
+        "broken_internal_links",
         `${diagnostics.length} ${definition.label.toLowerCase()} diagnostic(s)`,
         definition.detail,
         {
@@ -175,25 +268,114 @@ function lintReviewFindings(report) {
       );
     }
   }
+
+  const externalReferences = report.graphReachability?.externalReferences || [];
+  const byReason = new Map();
+  for (const reference of externalReferences) {
+    const group = byReason.get(reference.reason) || [];
+    group.push(reference);
+    byReason.set(reference.reason, group);
+  }
+  const definitions = {
+    source_boundary: {
+      label: "reviewed source links",
+      status:
+        sourceLinkAudit?.state === "pass"
+          ? "Verified automatically"
+          : sourceLinkAudit?.state === "fail"
+            ? "Strict source audit failed"
+            : "Verification unavailable",
+      detail:
+        sourceLinkAudit?.state === "pass"
+          ? `The strict local source audit passes across ${sourceLinkAudit.sourceCompanions} companions, so these links are satisfied and closed automatically.`
+          : "These links leave brain/ for sources/. They remain outside graph reachability and are owned by the strict repository-wide source audit.",
+      owner: "Automated source-link audit",
+      completion:
+        sourceLinkAudit?.state === "pass"
+          ? "Complete; no operator review required."
+          : "Complete when the strict source-link audit passes.",
+    },
+    outside_brain: {
+      label: "external workspace locators",
+      status: "Classified informational",
+      detail:
+        "Absolute and parent-relative machine locators are retained for LLM traceability but are not Brain navigation links.",
+      completion: "Complete by classification; no operator review required.",
+    },
+    unresolved_locator: {
+      label: "project/file locators",
+      status: "Classified informational",
+      detail:
+        "Backtick file references describe project-owned or templated locators. They are not clickable Brain links and do not imply a missing Brain node.",
+      completion: "Complete by classification; no operator review required.",
+    },
+    directory_locator: {
+      label: "project/directory locators",
+      status: "Classified informational",
+      detail:
+        "Backtick directory references route agents to external workspaces. They do not require a Brain index page.",
+      completion: "Complete by classification; no operator review required.",
+    },
+  };
+  for (const [reason, references] of Array.from(byReason.entries()).sort(
+    (left, right) => right[1].length - left[1].length
+  )) {
+    const definition = definitions[reason] || definitions.outside_brain;
+    add(
+      "classified_reference",
+      `${references.length} ${definition.label}`,
+      definition.detail,
+      {
+        diagnosticCode: reason,
+        statusLabel: definition.status,
+        owner: definition.owner || "Brain content maintainer",
+        completion: definition.completion,
+        examples: references.slice(0, 5).map((reference) =>
+          `${reference.source} → ${reference.target}`
+        ),
+      }
+    );
+  }
   return findings;
 }
 
 async function executeMaintenanceLint({ recordReceipt = true } = {}) {
   const report = await runLint(cockpitBrainId);
   const plan = await planLintFixes(cockpitBrainId, brainDate());
+  const sourceLinkAudit = await runLocalSourceLinkAudit().catch((error) => ({
+    state: "unavailable",
+    reason: String(error?.message || error).slice(0, 180),
+  }));
   const checkedAt = new Date().toISOString();
   const issueCount = countLintIssues(report);
   const diagnosticCount = report.graphReachability?.diagnostics.length || 0;
+  const externalReferenceCount = report.graphReachability?.externalReferences?.length || 0;
+  const reviewFindings = lintReviewFindings(report);
+  const technicalDiagnostics = lintTechnicalDiagnostics(report, sourceLinkAudit);
+  const operatorDecisionCount = reviewFindings.filter(
+    (finding) => finding.audience === "operator"
+  ).length;
+  const maintainerFindingCount = reviewFindings.length - operatorDecisionCount;
   const payload = {
-    version: 1,
+    version: 2,
     brainId: cockpitBrainId,
     checkedAt,
-    status: issueCount > 0 ? "warn" : "pass",
+    status:
+      plan.items.length > 0 || operatorDecisionCount > 0
+        ? "warn"
+        : issueCount > 0 || diagnosticCount > 0 || sourceLinkAudit.state === "fail"
+          ? "info"
+          : "pass",
     issueCount,
-    primaryIssueCount: Math.max(0, issueCount - diagnosticCount),
+    primaryIssueCount: issueCount,
+    operatorDecisionCount,
+    maintainerFindingCount,
     diagnosticCount,
+    externalReferenceCount,
     automaticFixCount: plan.items.length,
-    reviewFindings: lintReviewFindings(report),
+    reviewFindings,
+    technicalDiagnostics,
+    sourceLinkAudit,
     warnings: report.warnings || [],
     report,
   };
@@ -203,7 +385,7 @@ async function executeMaintenanceLint({ recordReceipt = true } = {}) {
       cockpitBrainId,
       "LINT",
       [],
-      `Completed lint — ${issueCount} issue(s), ${plan.items.length} mechanical fix(es) available`
+      `Completed lint — ${issueCount} maintenance finding(s), ${diagnosticCount} broken internal-link diagnostic(s), ${externalReferenceCount} classified locator(s), ${plan.items.length} mechanical fix(es) available`
     );
   }
   await writeJsonAtomic(lintReportPath, payload);
@@ -1562,6 +1744,17 @@ const page = String.raw`<!doctype html>
       .maintenance-diagnostic {
         margin-top: 0.35rem;
       }
+      .maintenance-diagnostic-panel {
+        margin-top: 0.8rem;
+        border-top: 1px solid var(--line);
+        padding-top: 0.75rem;
+      }
+      .maintenance-diagnostic-panel > summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
       .inbox-handoff {
         margin-top: 0.55rem;
       }
@@ -1899,13 +2092,19 @@ const page = String.raw`<!doctype html>
           <div class="maintenance-grid">
             <section class="maintenance-card" aria-labelledby="maintenance-lint-heading">
               <h2 id="maintenance-lint-heading">Brain Lint</h2>
-              <p class="muted">Refresh the canonical assessment here. This does not change Brain content. User-approvable mechanical fixes appear below; content-review notes and technical link diagnostics identify their owner and next step separately.</p>
+              <p class="muted">Refresh the canonical assessment here. This does not change Brain content. You only review explicitly labelled user decisions and mechanical fixes; you never need to review technical diagnostics individually.</p>
               <div class="fixes-toolbar">
                 <button id="lint-run" type="button">Refresh lint assessment</button>
                 <span id="lint-status" class="muted">Loading latest report…</span>
               </div>
               <div id="lint-summary"></div>
               <div id="lint-findings"></div>
+              <details id="lint-maintainer-panel" class="maintenance-diagnostic-panel">
+                <summary id="lint-maintainer-summary">Maintainer-only diagnostics and context</summary>
+                <p class="muted">These entries are automatically classified for engineering/content maintenance. They are not an operator approval queue.</p>
+                <div id="lint-maintainer-findings"></div>
+                <div id="lint-technical-diagnostics"></div>
+              </details>
             </section>
 
             <section class="maintenance-card" aria-labelledby="maintenance-inbox-heading">
@@ -1980,7 +2179,10 @@ const page = String.raw`<!doctype html>
         "issueCount",
         "primaryIssueCount",
         "diagnosticCount",
+        "externalReferenceCount",
         "automaticFixCount",
+        "operatorDecisionCount",
+        "maintainerFindingCount",
         "pendingFiles",
         "checkedAt",
         "state",
@@ -3272,11 +3474,19 @@ const page = String.raw`<!doctype html>
         latestLint = lint || null;
         const summary = document.getElementById("lint-summary");
         const findings = document.getElementById("lint-findings");
+        const maintainerPanel = document.getElementById("lint-maintainer-panel");
+        const maintainerSummary = document.getElementById("lint-maintainer-summary");
+        const maintainerFindings = document.getElementById("lint-maintainer-findings");
+        const technicalDiagnostics = document.getElementById("lint-technical-diagnostics");
         summary.innerHTML = "";
         findings.innerHTML = "";
+        maintainerFindings.innerHTML = "";
+        technicalDiagnostics.innerHTML = "";
+        maintainerPanel.open = false;
         if (!lint) {
           document.getElementById("lint-status").textContent = "No Cockpit lint report yet.";
           summary.innerHTML = "<p class='muted'>Run lint to create a current assessment and durable receipt.</p>";
+          maintainerPanel.hidden = true;
           return;
         }
 
@@ -3284,31 +3494,42 @@ const page = String.raw`<!doctype html>
         const diagnosticCount = Number(
           lint.diagnosticCount ?? lint.report?.graphReachability?.diagnostics?.length ?? 0
         );
-        const primaryIssueCount = Number(
-          lint.primaryIssueCount ?? Math.max(0, issueCount - diagnosticCount)
-        );
         const automaticFixCount = Number(lint.automaticFixCount || 0);
-        const reviewOnly = issueCount > 0 && automaticFixCount === 0;
+        const operatorDecisionCount = Number(lint.operatorDecisionCount || 0);
+        const maintainerFindingCount = Number(
+          lint.maintainerFindingCount ?? Math.max(0, issueCount - operatorDecisionCount)
+        );
+        const externalReferenceCount = Number(lint.externalReferenceCount || 0);
+        const sourceAudit = lint.sourceLinkAudit || null;
         const checkedAt = lint.checkedAt ? new Date(lint.checkedAt).toLocaleString() : "unknown time";
         document.getElementById("lint-status").textContent = "Last refreshed " + checkedAt + ".";
         summary.innerHTML =
           "<div class='maintenance-summary'>" +
-          (reviewOnly ? "<span class='pill info'>info</span>" : "") +
-          "<strong>" + escapeHtml(String(primaryIssueCount)) +
-          (reviewOnly ? " review note(s)</strong>" : " primary lint finding(s)</strong>") +
+          "<strong>" + escapeHtml(String(automaticFixCount)) + " action(s) you can approve</strong>" +
+          "<strong>" + escapeHtml(String(operatorDecisionCount)) + " bounded content decision(s)</strong>" +
+          "<span class='muted'>" + escapeHtml(String(maintainerFindingCount)) + " maintainer note(s)</span>" +
           (diagnosticCount > 0
-            ? "<span class='muted'>" + escapeHtml(String(diagnosticCount)) + " grouped graph diagnostic(s)</span>"
+            ? "<span class='muted'>" + escapeHtml(String(diagnosticCount)) + " broken internal link(s), maintainer-owned</span>"
             : "") +
-          "<span class='muted'>" + escapeHtml(String(automaticFixCount)) +
-          " safe mechanical fix(es)</span></div>";
+          (externalReferenceCount > 0
+            ? "<span class='muted'>" + escapeHtml(String(externalReferenceCount)) + " locator/source reference(s) classified automatically</span>"
+            : "") +
+          (sourceAudit?.state === "pass"
+            ? "<span class='pill pass'>source links verified</span>"
+            : sourceAudit?.state === "fail"
+              ? "<span class='pill info'>source audit: maintainer</span>"
+              : "") +
+          "</div>";
 
         const reviewFindings = Array.isArray(lint.reviewFindings) ? lint.reviewFindings : [];
+        const operatorFindings = reviewFindings.filter((finding) => finding.audience === "operator");
+        const maintainerOnlyFindings = reviewFindings.filter((finding) => finding.audience !== "operator");
+        const technicalFindings = Array.isArray(lint.technicalDiagnostics)
+          ? lint.technicalDiagnostics
+          : [];
         const warnings = Array.isArray(lint.warnings) ? lint.warnings : [];
-        if (reviewFindings.length === 0 && warnings.length === 0) {
-          findings.innerHTML = "<p class='muted'>No review-required lint findings in this report.</p>";
-          return;
-        }
-        for (const finding of reviewFindings) {
+
+        function appendLintFinding(container, finding) {
           const item = document.createElement("div");
           item.className = "maintenance-item";
           const title = document.createElement("strong");
@@ -3344,7 +3565,20 @@ const page = String.raw`<!doctype html>
             examples.appendChild(examplesText);
             item.appendChild(examples);
           }
-          findings.appendChild(item);
+          container.appendChild(item);
+        }
+
+        if (operatorFindings.length === 0) {
+          findings.innerHTML = "<p class='muted'>No Brain content decisions need your review.</p>";
+        } else {
+          for (const finding of operatorFindings) appendLintFinding(findings, finding);
+        }
+
+        for (const finding of maintainerOnlyFindings) {
+          appendLintFinding(maintainerFindings, finding);
+        }
+        for (const finding of technicalFindings) {
+          appendLintFinding(technicalDiagnostics, finding);
         }
         for (const warning of warnings) {
           const item = document.createElement("div");
@@ -3356,8 +3590,12 @@ const page = String.raw`<!doctype html>
           detail.textContent = String(warning);
           item.appendChild(title);
           item.appendChild(detail);
-          findings.appendChild(item);
+          maintainerFindings.appendChild(item);
         }
+        const maintainerTotal = maintainerOnlyFindings.length + technicalFindings.length + warnings.length;
+        maintainerPanel.hidden = maintainerTotal === 0;
+        maintainerSummary.textContent =
+          "Maintainer-only diagnostics and context (" + String(maintainerTotal) + ")";
       }
 
       async function loadLintReport() {

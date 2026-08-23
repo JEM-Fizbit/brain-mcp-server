@@ -1,6 +1,6 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** complete — remediated and live-verified on JEM `v1.6.0`
+**Status:** complete — acceptance remediation live on JEM `v1.6.0`; operator-diagnostic follow-up prepared for `v1.6.1`
 **Started:** 2026-08-23
 **Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
@@ -20,6 +20,7 @@ implemented outcome. ERS remains separately approval-gated.
 | 5 | NanoRenal/iHemo demoted from active prominence to dormant/cold with historical context preserved. | Hosted/local `04_active_roles.md` convergence verified. |
 | 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; the deployed hosted read returns the complete companion and preserves binary privacy. |
 | 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
+| 8 | Operator lint queue now excludes graph/source locator telemetry; genuine stale internal links were repaired and technical detail is collapsed/maintainer-owned. | Local graph lint: zero broken internal links, 261 classified references, four maintenance findings; strict source audit still passes 45/45. JEM `v1.6.1` live verification pending. |
 
 ## Acceptance results
 
@@ -308,3 +309,39 @@ will be detected before it affects an answer.
 John stated that this was the final observation in the JEM acceptance pass and
 subsequently approved the complete remediation. The closure matrix above is the
 current status; ERS replay remains out of scope until separately approved.
+
+## Finding 8 — The remaining lint diagnostic count is not a usable operator task
+
+**Surface:** JEM Brain Monitor → Maintenance → Brain Lint
+**Status:** implemented for JEM `v1.6.1`; live verification pending
+
+### Observation from John
+
+The grouped surface still left 279 technical edge records attached to lint and
+did not make the operator boundary sufficiently clear. Manual review at that
+volume is neither practical nor an appropriate use of the owner/operator.
+
+### Implemented outcome
+
+- Lint's maintenance total excludes graph parser telemetry.
+- Real unresolved Markdown links and wikilinks remain maintainer-owned broken
+  internal links.
+- Source-boundary links, absolute/parent-relative machine locators, and
+  backtick project/file/directory references are classified automatically.
+- The strict local source-link audit runs during Cockpit lint refresh and closes
+  source-boundary references automatically when it passes.
+- Inline-code link examples no longer create false graph failures.
+- Cockpit shows only safe mechanical approvals and explicitly labelled bounded
+  content decisions in the operator surface; technical groups are collapsed in
+  **Maintainer-only diagnostics and context**.
+- Sixteen genuine stale links into the retired JEM ERS fallback mirror were
+  replaced with the surviving fallback README route. ERS content and runtime
+  were not touched.
+
+### Pre-release verification
+
+Local graph-primary lint reports four maintenance findings: three
+maintainer-owned unreachable notes plus one capture-queue decision containing
+13 items. It reports zero broken internal links and classifies 261 external or
+reference locators. The strict source audit still reports 45 directly linked
+companions with zero strict failures.

@@ -12,7 +12,7 @@ content authority, credentials, snapshots and hosted write path.
 
 ## Outcomes
 
-A completed rollout provides five independent guarantees:
+A completed rollout provides six independent guarantees:
 
 1. **Internal reachability:** important Brain content is reachable from the
    loader or a named hub.
@@ -27,6 +27,10 @@ A completed rollout provides five independent guarantees:
 5. **Freshness accountability:** volatile content names its review date, owner,
    cadence, event trigger and live authority; lint uses that review date and
    cadence instead of treating a mechanical file modification as semantic review.
+6. **Actionable maintenance ownership:** the operator sees only mechanical
+   approvals and bounded content decisions; technical graph/source telemetry is
+   classified automatically and retained for maintainers without becoming a
+   manual review queue.
 
 Passing one guarantee does not imply the others. In particular, zero broken
 internal links does not prove that an entity has an official website link.
@@ -182,6 +186,30 @@ not already been completed for the target Brain.
 6. Close a review only after strict link/destination audits, routing regressions,
    hosted lint and zero-conflict convergence pass.
 
+## Phase 2C — Graph diagnostic classification and repair
+
+Run graph-primary lint and retain the complete edge telemetry, then classify by
+syntax and ownership before changing content:
+
+1. Treat unresolved ordinary Markdown links and wikilinks as genuine internal
+   repair candidates. Verify each destination and repair or remove the stale
+   relationship; do not invent a node merely to clear lint.
+2. Treat `brain/` links into `sources/` as a repository boundary, not a broken
+   Brain node. Close that class automatically only when the strict source-link
+   audit passes.
+3. Treat absolute/parent-relative machine locators and backtick project, file
+   and directory references as external/reference telemetry. Preserve them for
+   LLM routing unless a reviewed portable hyperlink is available; do not ask
+   the operator to adjudicate them item by item.
+4. Ignore link syntax shown only inside inline or fenced code examples.
+5. Re-run lint after content repair. Require zero genuine broken internal links;
+   classified locators may remain and must be reported outside the maintenance
+   finding total.
+
+In Cockpit, keep technical groups collapsed with their status, owner,
+completion criterion and representative paths. Only safe mechanical fixes and
+explicitly labelled content-triage decisions may create an operator warning.
+
 ## Phase 3 — Regression gates
 
 Add deterministic routing cases for important real incidents. A destination
@@ -278,6 +306,12 @@ consolidate per-file edits and verify exact hashes before resolving conflicts.
   diagnostics into plain-language ownership/completion classes, labels the
   bounded mechanical queue **Actions You Can Approve**, and gives every item an
   expandable full proposed change. Desktop and 390px checks passed.
+- The follow-up edge audit classified 261 source/workspace/project references
+  outside the operator total, repaired 16 genuine stale links into the
+  retired JEM ERS fallback mirror, and removed two inline-code false positives.
+  Fresh graph lint reports zero broken internal links, four maintenance
+  findings (three maintainer-owned unreachable notes and one bounded capture
+  queue decision), and the strict 45-companion source audit still passes.
 - The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
   and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
   passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed

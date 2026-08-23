@@ -8,6 +8,37 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-23 — Keep graph telemetry out of the operator lint queue
+
+**Decision:** Brain lint counts only semantic/structural maintenance findings.
+Real unresolved Markdown links and wikilinks remain broken-internal-link
+diagnostics owned by the Brain content maintainer. Links from `brain/` to the
+reviewed `sources/` archive, absolute or parent-relative machine locators, and
+backtick project/file/directory references are classified separately as
+external/reference telemetry and never inflate the maintenance total. Cockpit
+automatically runs the strict local source-link audit when lint is refreshed,
+closes source-boundary references when that audit passes, and keeps all
+technical detail collapsed in a maintainer-only panel. Operator warnings are
+reserved for safe mechanical fixes and explicitly labelled bounded content
+decisions.
+
+**Why:** JEM's 279 edge records mixed valid source navigation, intentional
+project locators, stale links and parser false positives into one apparent
+manual review task. John could not reasonably adjudicate that queue and should
+not have been asked to. Classification establishes the correct ownership while
+preserving diagnostic evidence; ignoring inline-code link examples removes a
+known false-positive class. The 16 genuine stale links into the retired JEM ERS
+mirror were repaired separately rather than hidden by classification.
+
+**Alternatives rejected:** Ask the operator to inspect every edge; suppress all
+graph telemetry; treat every backtick locator as a missing Brain node; count
+valid `sources/` links as graph failures; auto-rewrite ambiguous external
+locators into hyperlinks.
+
+**Related:** `src/services/brain-graph.ts`; `src/services/lint.ts`;
+`scripts/hosted-cockpit.mjs`; `scripts/hosted-doctor.mjs`;
+`docs/brain-content-linking-runbook.md`.
+
 ## 2026-08-23 — Version reviewed Markdown separately from private source bytes
 
 **Decision:** An exact reviewed `.md` source companion is readable hosted

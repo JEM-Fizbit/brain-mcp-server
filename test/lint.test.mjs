@@ -464,6 +464,25 @@ test("graph mode enforces graph reachability while retaining the legacy comparis
   }
 });
 
+test("technical graph telemetry does not inflate the maintenance finding count", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\n[[NOW]]\n[[missing-page]]\n`~/Projects/example/BACKLOG.md`\n",
+    "NOW.md": "# NOW\n",
+  });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph",
+  });
+  try {
+    const report = await runLint();
+    assert.equal(report.graphReachability.diagnostics.length, 1);
+    assert.equal(report.graphReachability.externalReferences.length, 1);
+    assert.equal(countLintIssues(report), 0);
+    assert.match(formatLintReport(report), /No maintenance findings/);
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});
+
 test("legacy lint remains the default and bootstrap budget excess is review-only", async () => {
   await writeFixture({
     "00_loader.md": `# Loader\n\n${"x".repeat(10_100)}\n`,
@@ -477,6 +496,6 @@ test("legacy lint remains the default and bootstrap budget excess is review-only
   const issueCount = countLintIssues(report);
   const formatted = formatLintReport(report);
   assert.ok(issueCount >= 1);
-  assert.match(formatted, new RegExp(`\\*\\*${issueCount} issue\\(s\\) found`));
+  assert.match(formatted, new RegExp(`\\*\\*${issueCount} maintenance finding\\(s\\)`));
   assert.match(formatted, /Review required:.*budget exceeded/i);
 });
