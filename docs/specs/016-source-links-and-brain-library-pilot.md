@@ -188,5 +188,7 @@ Brain-to-source file references, not complete human navigation.
   source and `quanta.md` exception context in the golden routing set. Cockpit
   Maintenance groups technical diagnostics by owner/completion and gives every
   safe mechanical candidate an expandable untruncated proposal; desktop and
-  390px acceptance checks pass. Live hosted KRUK retrieval is the final release
-  verification gate.
+  390px acceptance checks pass. JEM release `v1.6.0` passed the final hosted
+  gate: the exact KRUK source read returns the complete reviewed companion,
+  binary-source reads remain metadata-only, search returns both required
+  routes, and sync is conflict-free.

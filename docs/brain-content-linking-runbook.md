@@ -280,8 +280,8 @@ consolidate per-file edits and verify exact hashes before resolving conflicts.
   expandable full proposed change. Desktop and 390px checks passed.
 - The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
   and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
-  additionally requires the full 1,968-byte reviewed companion and its
-  artifact-specific founder-wording exception after deployment.
+  passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed
+  companion, exact search exposes both routes, and binary bytes remain private.
 
 ## ERS replay gate
 
