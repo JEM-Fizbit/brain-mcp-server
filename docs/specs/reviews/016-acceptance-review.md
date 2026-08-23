@@ -391,3 +391,15 @@ the purpose of the bounded operator decision.
   its date does not clear it.
 - Completion requires re-reading `TASKS.md` and rerunning lint. Cockpit still
   performs no automatic semantic transfer, closure, or deletion.
+
+### Post-release verification — JEM `v1.6.2`
+
+- Fly release 67 completed on 24 August 2026; the public health endpoint reports
+  `brain-mcp-server` `1.6.2` with the existing Postgres revision,
+  Supabase metadata-only artifact, and Postgres OAuth-state modes unchanged.
+- The live local JEM Monitor shows 13 total open items, 12 stale items, and one
+  newer open item; both the LLM and Obsidian paths render at desktop and 390px.
+  The copy action reports success with the complete approval-first prompt.
+- Hosted lint remains at four maintenance findings, zero broken internal links,
+  and 261 automatically classified locators. Hosted sync remains at 39 files
+  and zero open conflicts. ERS was not deployed or modified.
