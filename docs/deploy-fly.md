@@ -85,7 +85,7 @@ fly secrets set \
   --app jem-brain-mcp
 ```
 
-Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source metadata/search. Add it only for an ingestion/admin process with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`, such as source artifact byte upload. Hosted MCP source reads currently return manifests and extracted text, not original bytes.
+Do not set `BRAIN_SUPABASE_SERVICE_ROLE_KEY` for normal hosted runtime source metadata/search. Add it only for an ingestion/admin process with `BRAIN_ARTIFACT_BYTE_ACCESS=admin`, such as source artifact byte upload. Hosted MCP returns the complete stored text for an exact reviewed Markdown companion when available; binary and pointer-only reads return manifests. It never returns original binary bytes or creates signed URLs.
 
 Do not set `BRAIN_AUTO_SYNC=true`, `BRAIN_AUTO_PUSH=true`, or a deploy key for the Supabase-backed hosted runtime. Those belong to the retired git hot path.
 

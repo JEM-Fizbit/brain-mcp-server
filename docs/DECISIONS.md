@@ -8,6 +8,64 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-23 — Version reviewed Markdown separately from private source bytes
+
+**Decision:** An exact reviewed `.md` source companion is readable hosted
+content, not a private-binary download. `brain_read_file(scope="sources")`
+returns its complete stored `brain.source_artifact_text` when the requested path
+matches that artifact; binary and pointer-only paths continue to return bounded
+metadata and never create a signed URL. Companion-only maintenance may create a
+hashed `pointer_text` artifact through the target Brain's owner-only Monitor
+database profile, retaining the prior active artifact as a snapshot. Private
+Storage byte replacement remains a distinct `storage` mode requiring the
+explicit admin-only service credential. Ordinary relative Markdown links expose
+an adjacent ingested original to local Obsidian/viewer users without making it
+public or embedding a laptop absolute path.
+
+**Why:** The KRUK acceptance prompt found the correct source but received only a
+manifest/opening search excerpt even though the complete reviewed Markdown was
+already stored. Requiring a broad Storage key to update or read that text would
+collapse the deliberate runtime/admin credential boundary. Treating Postgres
+text as its own versioned authority fixes the tool contract honestly while
+leaving original binary custody unchanged.
+
+**Alternatives rejected:** Return original binary bytes from hosted MCP; require
+the Storage service-role key in normal runtime or Brain Monitor; overwrite an
+old artifact-text row in place; call a plain-text excerpt a complete source
+read; use machine-specific `file://` links.
+
+**Related:** `src/services/revision-brain-store.ts`;
+`src/sources/postgres-source-store.ts`;
+`scripts/refresh-source-companions-postgres.mjs`;
+`docs/brain-content-linking-runbook.md`.
+
+## 2026-08-23 — Make freshness semantic and lint diagnostics owned
+
+**Decision:** For cadence-controlled Brain content, an explicit `Last reviewed`
+date outranks filesystem modification time and a supported declared `Review
+cadence` outranks filename-tier defaults. Volatile pages name their review
+owner, cadence, event trigger and canonical live authority; the Brain keeps
+durable orientation rather than copying live plans. Cockpit separates primary
+semantic findings, grouped technical diagnostics and safe mechanical actions.
+Each diagnostic class explains status, owner and completion; each mechanical
+candidate has an expandable full proposal before selection.
+
+**Why:** Mechanical sync/hyperlink edits were masking semantically stale pages,
+including `05_projects.md`, while the old lint surface asked John to “review”
+hundreds of mixed graph findings without defining his action. The same surface
+truncated the content he was expected to approve. Dates, cadence and ownership
+make staleness enforceable; progressive disclosure makes the review gate usable
+without turning Cockpit into a general content editor.
+
+**Alternatives rejected:** Use mtime as proof of review; auto-refresh semantic
+claims; treat every graph diagnostic as user work; hide review-only diagnostics;
+show only truncated mechanical candidates; activate Spec 014 to compensate for
+stale content.
+
+**Related:** `docs/jem-brain-freshness-register.md`;
+`docs/hosted-cockpit.md`; `src/services/lint.ts`;
+`scripts/hosted-cockpit.mjs`.
+
 ## 2026-08-22 — Make semantic destinations a separate reviewed content contract
 
 **Decision:** Treat external semantic-destination completeness as independent

@@ -181,6 +181,9 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.match(page.text, /inbox_file set to/);
   assert.match(page.text, /id="fixes-select-all"[^>]*aria-label="Select all fixes"[^>]*disabled/);
   assert.match(page.text, /id="fixes-apply"[^>]*disabled>Apply selected</);
+  assert.match(page.text, /Actions You Can Approve/);
+  assert.match(page.text, /Show full proposed change/);
+  assert.match(page.text, /grid-template-columns: minmax\(0, 1fr\);/);
   assert.doesNotMatch(page.text, /Approve all/);
   assert.doesNotMatch(page.text, /Nothing to fix — the Brain is clean/);
 });
@@ -224,6 +227,13 @@ test("POST /api/lint/run records a receipt and structured report", async () => {
     res.json.lint.reviewFindings.filter((finding) => finding.kind === "graph_diagnostics").length,
     1
   );
+  const graphFinding = res.json.lint.reviewFindings.find(
+    (finding) => finding.kind === "graph_diagnostics"
+  );
+  assert.equal(graphFinding.diagnosticCode, "unresolved_target");
+  assert.equal(graphFinding.owner, "Brain content maintainer");
+  assert.match(graphFinding.statusLabel, /no operator action/i);
+  assert.ok(graphFinding.examples[0].includes("NOW.md"));
 
   const cache = JSON.parse(await fs.readFile(lintReportPath, "utf-8"));
   assert.equal(cache.version, 1);

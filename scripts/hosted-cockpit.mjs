@@ -72,7 +72,8 @@ async function readLintReportCache() {
 
 function lintReviewFindings(report) {
   const findings = [];
-  const add = (kind, summary, detail = "") => findings.push({ kind, summary, detail });
+  const add = (kind, summary, detail = "", metadata = {}) =>
+    findings.push({ kind, summary, detail, ...metadata });
   for (const item of report.bloat || []) {
     add("bloat", `${item.file} is ${item.lines} lines`, "Review whether the file should be split; lint will not rewrite semantic content.");
   }
@@ -110,21 +111,69 @@ function lintReviewFindings(report) {
   if (graphDiagnostics.length > 0) {
     const byCode = new Map();
     for (const diagnostic of graphDiagnostics) {
-      byCode.set(diagnostic.code, (byCode.get(diagnostic.code) || 0) + 1);
+      const group = byCode.get(diagnostic.code) || [];
+      group.push(diagnostic);
+      byCode.set(diagnostic.code, group);
     }
-    const breakdown = Array.from(byCode.entries())
-      .sort((left, right) => right[1] - left[1])
-      .map(([code, count]) => `${code}: ${count}`)
-      .join(", ");
-    const examples = graphDiagnostics
-      .slice(0, 3)
-      .map((diagnostic) => `${diagnostic.source} → ${diagnostic.target}`)
-      .join("; ");
-    add(
-      "graph_diagnostics",
-      `${graphDiagnostics.length} graph edge diagnostic(s) require review`,
-      `${breakdown}.${examples ? ` Examples: ${examples}.` : ""} These are grouped and never auto-fixed.`
-    );
+    const definitions = {
+      parent_link_disabled: {
+        label: "Source-archive boundary",
+        status: "Expected under current design",
+        detail:
+          "The hosted Brain graph deliberately does not follow links from brain/ into the repository-level sources/ archive. The strict source-link audit, not Brain lint, owns this boundary.",
+        owner: "Automated source-link audit",
+        completion: "Complete when the repository-wide source-link audit passes in strict mode.",
+      },
+      unresolved_target: {
+        label: "Unresolved internal-target candidates",
+        status: "Maintainer review; no operator action",
+        detail:
+          "The target does not resolve inside the hosted Brain namespace. This class mixes genuine typos with external workspace references and legacy placeholders, so it cannot be repaired mechanically.",
+        owner: "Brain content maintainer",
+        completion: "Complete when genuine broken Brain links are repaired and intentional external or legacy references are classified.",
+      },
+      missing_directory_index: {
+        label: "Directory references without a Brain index",
+        status: "Usually informational",
+        detail:
+          "A reference names a directory that has no index page inside the hosted Brain. Many are routes to an external project workspace rather than missing Brain content.",
+        owner: "Brain content maintainer",
+        completion: "Complete when each route is either linked to its canonical external workspace or given a reviewed Brain index where one is genuinely useful.",
+      },
+      path_escape: {
+        label: "Paths outside the Brain namespace",
+        status: "Portability review; no operator action",
+        detail:
+          "An absolute or parent-relative path points outside brain/. These routes are excluded from the hosted graph and should use reviewed HTTPS destinations where human click-through is required.",
+        owner: "Brain content maintainer",
+        completion: "Complete when human-facing routes are portable hyperlinks or explicitly retained as machine-only locators.",
+      },
+    };
+    for (const [code, diagnostics] of Array.from(byCode.entries()).sort(
+      (left, right) => right[1].length - left[1].length
+    )) {
+      const definition = definitions[code] || {
+        label: code,
+        status: "Maintainer review; no operator action",
+        detail: "This diagnostic class is retained for expert graph maintenance and is never auto-fixed.",
+        owner: "Brain content maintainer",
+        completion: "Complete when the maintainer has classified or repaired the affected references.",
+      };
+      add(
+        "graph_diagnostics",
+        `${diagnostics.length} ${definition.label.toLowerCase()} diagnostic(s)`,
+        definition.detail,
+        {
+          diagnosticCode: code,
+          statusLabel: definition.status,
+          owner: definition.owner,
+          completion: definition.completion,
+          examples: diagnostics.slice(0, 5).map((diagnostic) =>
+            `${diagnostic.source} → ${diagnostic.target}`
+          ),
+        }
+      );
+    }
   }
   return findings;
 }
@@ -1421,26 +1470,54 @@ const page = String.raw`<!doctype html>
         font-size: 0.9rem;
       }
       .fixes-item {
-        display: flex;
-        gap: 0.5rem;
-        align-items: flex-start;
-        padding: 0.3rem 0.5rem;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.35rem 0.65rem;
+        align-items: start;
+        padding: 0.55rem 0.5rem;
         border-radius: 6px;
       }
       .fixes-item:hover {
         background: rgba(127, 127, 127, 0.1);
       }
       .fixes-item .fixes-checkbox {
-        margin-top: 0.2rem;
+        margin-top: 0.15rem;
         flex: 0 0 auto;
       }
-      .fixes-item span {
+      .fixes-item-main,
+      .fixes-item-main span {
         min-width: 0;
         overflow-wrap: anywhere;
       }
+      .fixes-item-label {
+        display: block;
+        cursor: pointer;
+      }
+      .fixes-item-detail {
+        margin-top: 0.35rem;
+      }
+      .fixes-item-detail summary,
+      .maintenance-diagnostic summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .fixes-item-detail pre,
+      .maintenance-diagnostic pre {
+        margin: 0.45rem 0 0;
+        padding: 0.65rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: inherit;
+        font-size: 12px;
+      }
       .maintenance-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: 1rem;
         margin-bottom: 1rem;
       }
@@ -1473,6 +1550,17 @@ const page = String.raw`<!doctype html>
       }
       .maintenance-item .muted {
         font-size: 12px;
+      }
+      .maintenance-item-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 0.8rem;
+        margin-top: 0.35rem;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .maintenance-diagnostic {
+        margin-top: 0.35rem;
       }
       .inbox-handoff {
         margin-top: 0.55rem;
@@ -1811,7 +1899,7 @@ const page = String.raw`<!doctype html>
           <div class="maintenance-grid">
             <section class="maintenance-card" aria-labelledby="maintenance-lint-heading">
               <h2 id="maintenance-lint-heading">Brain Lint</h2>
-              <p class="muted">Refresh the canonical lint assessment here. This updates the report and clears a stale-lint nudge; it does not change Brain content. Any safe mechanical fixes appear below.</p>
+              <p class="muted">Refresh the canonical assessment here. This does not change Brain content. User-approvable mechanical fixes appear below; content-review notes and technical link diagnostics identify their owner and next step separately.</p>
               <div class="fixes-toolbar">
                 <button id="lint-run" type="button">Refresh lint assessment</button>
                 <span id="lint-status" class="muted">Loading latest report…</span>
@@ -1832,8 +1920,8 @@ const page = String.raw`<!doctype html>
           </div>
 
           <section>
-            <h2>Safe Mechanical Fixes</h2>
-            <p class="muted">Only task relocation, Done-date stamping, and non-destructive archiving are automatic. Review each proposed change; semantic and structural lint findings remain visible above for judgement.</p>
+            <h2>Actions You Can Approve</h2>
+            <p class="muted">Only task relocation, Done-date stamping, and non-destructive archiving are available here. Open “Show full proposed change” to inspect the complete item before selecting it.</p>
             <div class="fixes-toolbar">
               <button id="fixes-reload" type="button">Reload maintenance</button>
               <button id="fixes-apply" type="button" class="fixes-apply" disabled>Apply selected</button>
@@ -3230,6 +3318,32 @@ const page = String.raw`<!doctype html>
           detail.textContent = finding.detail || "Review required.";
           item.appendChild(title);
           item.appendChild(detail);
+          const metaValues = [
+            finding.statusLabel ? "Status: " + finding.statusLabel : null,
+            finding.owner ? "Owner: " + finding.owner : null,
+            finding.completion ? "Completion: " + finding.completion : null,
+          ].filter(Boolean);
+          if (metaValues.length) {
+            const meta = document.createElement("div");
+            meta.className = "maintenance-item-meta";
+            for (const value of metaValues) {
+              const span = document.createElement("span");
+              span.textContent = value;
+              meta.appendChild(span);
+            }
+            item.appendChild(meta);
+          }
+          if (Array.isArray(finding.examples) && finding.examples.length) {
+            const examples = document.createElement("details");
+            examples.className = "maintenance-diagnostic";
+            const examplesSummary = document.createElement("summary");
+            examplesSummary.textContent = "Show representative paths";
+            const examplesText = document.createElement("pre");
+            examplesText.textContent = finding.examples.join("\n");
+            examples.appendChild(examplesSummary);
+            examples.appendChild(examplesText);
+            item.appendChild(examples);
+          }
           findings.appendChild(item);
         }
         for (const warning of warnings) {
@@ -3415,7 +3529,7 @@ const page = String.raw`<!doctype html>
           heading.textContent = (FIX_KIND_LABELS[kind] || kind) + " (" + group.length + ")";
           section.appendChild(heading);
           for (const item of group) {
-            const row = document.createElement("label");
+            const row = document.createElement("div");
             row.className = "fixes-item";
             const box = document.createElement("input");
             box.type = "checkbox";
@@ -3423,11 +3537,25 @@ const page = String.raw`<!doctype html>
             box.checked = false;
             box.value = item.id;
             box.addEventListener("change", updateFixSelectionState);
-            const text = document.createElement("span");
+            const main = document.createElement("div");
+            main.className = "fixes-item-main";
+            const text = document.createElement("label");
+            text.className = "fixes-item-label";
+            text.htmlFor = "fix-" + item.id.replace(/[^a-zA-Z0-9_-]/g, "-");
+            box.id = text.htmlFor;
             text.textContent = item.summary;
-            text.title = item.detail || "";
+            const detail = document.createElement("details");
+            detail.className = "fixes-item-detail";
+            const detailSummary = document.createElement("summary");
+            detailSummary.textContent = "Show full proposed change";
+            const detailText = document.createElement("pre");
+            detailText.textContent = item.detail || item.summary;
+            detail.appendChild(detailSummary);
+            detail.appendChild(detailText);
+            main.appendChild(text);
+            main.appendChild(detail);
             row.appendChild(box);
-            row.appendChild(text);
+            row.appendChild(main);
             section.appendChild(row);
           }
           container.appendChild(section);

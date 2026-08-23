@@ -376,6 +376,46 @@ test("revision-store lint does not scan BRAIN_DIR", async () => {
   }
 });
 
+test("lint uses an explicit review date instead of a recent mechanical modification time", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `NOW.md`, `05_projects.md`\n",
+    "NOW.md": "# NOW\n\n> **Last updated:** 2026-07-17\n",
+    "05_projects.md": "# Projects\n\n## Active\n\n**Last reviewed:** 2026-07-17\n",
+  });
+
+  const report = await runLint();
+  const nowFinding = report.stale.find((item) => item.file === "NOW.md");
+  const projectsFinding = report.stale.find((item) => item.file === "05_projects.md");
+  assert.equal(nowFinding?.basis, "review_date");
+  assert.equal(nowFinding?.reviewedAt, "2026-07-17");
+  assert.equal(nowFinding?.thresholdDays, 7);
+  assert.equal(projectsFinding?.basis, "review_date");
+  assert.equal(projectsFinding?.reviewedAt, "2026-07-17");
+  assert.equal(projectsFinding?.thresholdDays, 30);
+  assert.match(formatLintReport(report), /reviewed 2026-07-17/);
+});
+
+test("lint enforces an explicit review cadence before filename-tier defaults", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `NOW.md`, `09_tools_stack.md`\n",
+    "NOW.md": "# NOW\n\n> **Last reviewed:** 2026-08-23\n",
+    "09_tools_stack.md": [
+      "# Tools",
+      "",
+      "> **Last reviewed:** 2026-07-17  ",
+      "> **Review cadence:** Monthly and whenever the canonical owner changes.",
+      "",
+    ].join("\n"),
+  });
+
+  const report = await runLint();
+  const finding = report.stale.find((item) => item.file === "09_tools_stack.md");
+  assert.equal(finding?.thresholdDays, 30);
+  assert.equal(finding?.thresholdBasis, "declared_cadence");
+  assert.match(finding?.cadence || "", /^Monthly/);
+  assert.match(formatLintReport(report), /declared cadence Monthly/);
+});
+
 test("graph shadow reports graph deltas without changing legacy orphan enforcement", async () => {
   await writeFixture({
     "00_loader.md": "# Loader\n\nReferences: `NOW.md`, `01_hub.md`\n",

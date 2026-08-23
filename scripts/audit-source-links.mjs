@@ -31,6 +31,24 @@ async function markdownFiles(root) {
   return files;
 }
 
+async function allFiles(root) {
+  const files = new Set();
+  async function walk(directory) {
+    const entries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    });
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(fullPath);
+      if (entry.isFile()) files.add(path.relative(root, fullPath).split(path.sep).join("/"));
+    }
+  }
+  await walk(root);
+  return files;
+}
+
 function printList(label, items, render = (item) => item) {
   console.log(`${label}: ${items.length}`);
   for (const item of items.slice(0, 20)) console.log(`  - ${render(item)}`);
@@ -44,11 +62,12 @@ const json = argv.includes("--json");
 const strict = argv.includes("--strict");
 
 try {
-  const [brainFiles, sourceFiles] = await Promise.all([
+  const [brainFiles, sourceFiles, sourceArtifactFiles] = await Promise.all([
     markdownFiles(path.join(brainRoot, "brain")),
     markdownFiles(path.join(brainRoot, "sources")),
+    allFiles(path.join(brainRoot, "sources")),
   ]);
-  const report = auditSourceLinks({ brainFiles, sourceFiles });
+  const report = auditSourceLinks({ brainFiles, sourceFiles, sourceArtifactFiles });
   if (json) {
     console.log(JSON.stringify({ brainRoot, ...report }, null, 2));
   } else {
@@ -60,6 +79,11 @@ try {
     printList("Unlinked companions", report.unlinkedCompanions);
     printList("Companions without backlinks", report.companionsWithoutBacklinks);
     printList(
+      "Companions without original-artifact links",
+      report.companionsWithoutOriginalLinks,
+      (item) => `${item.source} → ${item.target}${item.suggestion ? ` (suggest: ${item.suggestion})` : ""}`
+    );
+    printList(
       "Broken links",
       report.brokenLinks,
       (item) => `${item.source} → ${item.target}${item.suggestion ? ` (suggest: ${item.suggestion})` : ""}`
@@ -69,10 +93,18 @@ try {
       report.nonClickableSourceReferences,
       (item) => `${item.source} → ${item.target}${item.suggestion ? ` (suggest: ${item.suggestion})` : ""}`
     );
+    printList(
+      "Non-clickable primary-source declarations",
+      report.nonClickablePrimarySourceDeclarations,
+      (item) => `${item.source} → ${item.target}`
+    );
   }
   if (
     strict &&
-    (report.brokenLinks.length > 0 || report.nonClickableSourceReferences.length > 0)
+    (report.brokenLinks.length > 0 ||
+      report.nonClickableSourceReferences.length > 0 ||
+      report.companionsWithoutOriginalLinks.length > 0 ||
+      report.nonClickablePrimarySourceDeclarations.length > 0)
   ) {
     process.exitCode = 1;
   }

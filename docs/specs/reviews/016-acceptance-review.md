@@ -1,13 +1,25 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** comment collection complete — awaiting triage; no implementation authority  
-**Started:** 2026-08-23  
-**Scope:** JEM Brain development pilot; ERS remains untouched  
+**Status:** approved remediation implemented on JEM; live release verification pending
+**Started:** 2026-08-23
+**Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
 
-Comments are recorded sequentially as observed. Do not implement, promote to
-the backlog, or treat a suggested interface direction as approved until John
-asks for triage or action.
+Comments were recorded sequentially before John approved remediation. The
+original observations remain below as evidence; the closure matrix records the
+implemented outcome. ERS remains separately approval-gated.
+
+## Remediation closure matrix
+
+| Finding | Implemented JEM outcome | Verification |
+|---|---|---|
+| 1 | Full-width Maintenance layout; every compact fix row has an expandable complete proposal. | Unit/HTTP tests plus desktop and 390px browser checks pass. |
+| 2 | Graph diagnostics grouped by meaning with status, owner, completion and representative paths; expected source-boundary findings are owned by the strict source audit. | Fresh JEM lint renders four primary findings separately from 278 grouped diagnostics. |
+| 3 | Five primary-source declarations link directly to companions; 26 binary-paired companions link to the adjacent original. | Strict source audit: zero non-clickable declarations and zero missing original-artifact links. |
+| 4 | Edge refreshed as durable orientation and linked to its live Dropbox workspace; public-site absence is explicit. | Strict semantic-destination audit passes. |
+| 5 | NanoRenal/iHemo demoted from active prominence to dormant/cold with historical context preserved. | Hosted/local `04_active_roles.md` convergence verified. |
+| 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; live hosted read is the release gate. |
+| 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
 
 ## Acceptance results
 
@@ -25,9 +37,9 @@ pass until its retrieval and authority behavior are triaged.
 
 ## Finding 1 — Lint warning and unreadable mechanical-fix candidates
 
-**Surface:** JEM Brain Monitor → maintenance/lint → safe mechanical fixes  
-**Evidence:** `Screenshot 2026-08-23 at 21.28.56.png`, supplied by John  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain Monitor → maintenance/lint → safe mechanical fixes
+**Evidence:** `Screenshot 2026-08-23 at 21.28.56.png`, supplied by John
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation
 
@@ -57,9 +69,9 @@ specific interaction and layout remain to be decided.
 
 ## Finding 2 — Review-only graph diagnostics do not explain the user's action
 
-**Surface:** JEM Brain Monitor → maintenance/lint → graph diagnostics  
-**Evidence:** `Screenshot 2026-08-23 at 21.31.54.png`, supplied by John  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain Monitor → maintenance/lint → graph diagnostics
+**Evidence:** `Screenshot 2026-08-23 at 21.31.54.png`, supplied by John
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation
 
@@ -92,9 +104,9 @@ both alarming and non-actionable.
 
 ## Finding 3 — Primary-source labels are not direct links to evidence
 
-**Surface:** JEM Brain content in Obsidian; extracted-fact reference files  
-**Example:** `> **Sources:** CV (FINAL), Resume (FINAL)`  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain content in Obsidian; extracted-fact reference files
+**Example:** `> **Sources:** CV (FINAL), Resume (FINAL)`
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation
 
@@ -138,8 +150,8 @@ where the source is correctly ingested and machine traceability exists.
 
 ## Finding 4 — Edge Brain context is stale against its live Dropbox project
 
-**Surface:** JEM Brain → `edge_biotech.md`  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain → `edge_biotech.md`
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation from John
 
@@ -160,10 +172,10 @@ where the source is correctly ingested and machine traceability exists.
 
 ## Finding 5 — NanoRenal/iHemo is stale and over-prominent as an active role
 
-**Surface:** JEM Brain → `04_active_roles.md`  
-**User wording:** “neorenal/ihemo has gone cold”  
-**Likely existing entity label:** NanoRenal, formerly iHemo  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain → `04_active_roles.md`
+**User wording:** “neorenal/ihemo has gone cold”
+**Likely existing entity label:** NanoRenal, formerly iHemo
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation from John
 
@@ -181,9 +193,9 @@ prominent placement among active roles.
 
 ## Finding 6 — Hosted source retrieval stopped at metadata/opening text and missed an authority conflict
 
-**Surface:** JEM Brain integration; source retrieval and synthesis  
-**Prompt:** `Find my Kidney Research UK trustee biography. Show me the source and the relevant Brain context.`  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain integration; source retrieval and synthesis
+**Prompt:** `Find my Kidney Research UK trustee biography. Show me the source and the relevant Brain context.`
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observed response
 
@@ -236,8 +248,8 @@ authority hierarchy.
 
 ## Finding 7 — Brain content needs a systematic freshness review and maintenance model
 
-**Surface:** JEM Brain corpus; example `05_projects.md`  
-**Status:** recorded; untriaged; no action taken
+**Surface:** JEM Brain corpus; example `05_projects.md`
+**Status:** remediated and locally verified; live release gate pending
 
 ### Observation from John
 
@@ -273,5 +285,6 @@ will be detected before it affects an answer.
 
 ### Review collection close
 
-John stated that this is the final observation in the current JEM acceptance
-pass. Findings 1–7 remain record-only until separately triaged and approved.
+John stated that this was the final observation in the JEM acceptance pass and
+subsequently approved the complete remediation. The closure matrix above is the
+current status; ERS replay remains out of scope until separately approved.

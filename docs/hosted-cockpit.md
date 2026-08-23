@@ -438,7 +438,10 @@ surface instead of forcing a switch to an MCP client or CLI:
   current result. Safe mechanical fixes make `lint_findings` an actionable
   warning until applied; findings with no automatic fix are `info` review notes
   that remain visible without changing readiness. High-volume graph edge
-  diagnostics stay grouped into one bounded review signal, and an empty
+  diagnostics are grouped by diagnostic class with a plain-language meaning,
+  status, owner, completion criterion, and expandable representative paths.
+  Expected repository-to-source boundary findings are explicitly owned by the
+  strict source-link audit rather than presented as operator work. An empty
   mechanical plan never claims the whole Brain is clean. After an explicit lint
   refresh or mechanical apply, Cockpit requests one fresh doctor run so the
   action state updates immediately; routine reloads still use the Monitor-owned
@@ -456,13 +459,16 @@ surface instead of forcing a switch to an MCP client or CLI:
   scan alone never does. If the session has only hosted read tools, use the
   documented local ingestion-capable workflow rather than deleting the inbox
   file manually.
-- **Safe Mechanical Fixes** lists each task relocation, Done-date stamp, and
+- **Actions You Can Approve** lists each task relocation, Done-date stamp, and
   non-destructive archive candidate with an unchecked per-item checkbox. A
   standard header checkbox selects or clears all current items; the separate
   **Apply selected** button remains disabled until at least one item is
-  selected. Apply re-reads the current Brain, applies only still-valid selected
-  ids, then reruns lint to refresh the report without writing a duplicate
-  receipt.
+  selected. The compact row may truncate a long item for scanning, but every row
+  has **Show full proposed change** and renders the complete untruncated change
+  before approval. Maintenance uses the available content width and retains the
+  same stacked behavior at 390px. Apply re-reads the current Brain, applies only
+  still-valid selected ids, then reruns lint to refresh the report without
+  writing a duplicate receipt.
 
 These are deliberate, narrow relaxations of the read-only default. They never
 resolve conflicts or perform source/admin mutations. See `docs/DECISIONS.md`

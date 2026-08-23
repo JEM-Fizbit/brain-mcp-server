@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-23
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -39,7 +39,8 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
 - specs 015–016 are implemented and validated on JEM: release `v1.5.0`
-  (`379b965`) is deployed only to the personal `jem-brain-mcp` app; the
+  (`379b965`) established the source/Library pilot, and the `v1.6.0` acceptance
+  remediation is scoped only to the personal `jem-brain-mcp` app; the
   personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
   the local read-only Brain Library pilot renders canonical Markdown and exact
@@ -48,19 +49,27 @@ The hosted Brain rebuild has passed the first critical sync gates:
   references measurable. The approved JEM content pass has since reviewed the
   full current corpus: all 45 source companions are directly linked with
   reciprocal backlinks, and the strict audit reports zero index-only,
-  unlinked, broken, or non-clickable findings. The personal source registry now
+  unlinked, broken, or non-clickable findings. Five prominent primary-source
+  declarations now link directly to their companions and all 26 companions
+  with a same-stem ingested binary link directly to that original. The personal source registry now
   records 45 companion paths and 46 reviewed source-to-Brain relationships;
   repeat persistence is idempotent and all 41 stored companion artifacts retain
   content-addressed hash identity. The live hosted MCP returned the JEM canary's exact
   provider id/revision, HTTPS locator, registered local-root alias, relative
   path, content hash, provenance, and reviewed Brain link without returning
-  source bytes. A separate semantic-destination pass now requires every JEM
+  source bytes. Exact reviewed Markdown reads now return complete stored text
+  independently of private original-binary access. A separate semantic-destination pass now requires every JEM
   entity hub to declare a current official, historical-evidence, or explicit
   unavailable destination state; all five hubs satisfy the contract, active
   Brain content has no bare URLs, and exact Quanta/Nitec destination regressions
   are in the routing golden set. The combined source-link and destination
   sequence is preserved in `docs/brain-content-linking-runbook.md`; ERS replay
-  remains separately approval-gated. Spec 014 remains deferred because no representative post-content
+  remains separately approval-gated. The complete 39-file JEM corpus also has a
+  freshness classification; nine cadence-controlled areas record review date,
+  owner, cadence and trigger, and lint enforces declared cadence over mtime.
+  Cockpit Maintenance now gives grouped technical diagnostics explicit owners
+  and completion criteria and exposes each safe mechanical proposal in full.
+  Spec 014 remains deferred because no representative post-content
   follow-up-read gap or weaker-harness gap has been measured. ERS schema,
   content, credentials, and deployment remain unchanged and separately gated;
 - multi-profile Monitor sync now requires an explicit revision store and binds
