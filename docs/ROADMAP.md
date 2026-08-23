@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-08-23
+**Last updated:** 2026-08-24
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -39,9 +39,10 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
 - specs 015–016 are implemented and validated on JEM: release `v1.5.0`
-  (`379b965`) established the source/Library pilot, and the `v1.6.0` acceptance
-  remediation (`e1e29b8`) was deployed only to the personal `jem-brain-mcp`
-  app on 2026-08-23; the
+  (`379b965`) established the source/Library pilot, the `v1.6.0` acceptance
+  remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`
+  operator-diagnostic remediation (`2ed0393`) was deployed only to the personal
+  `jem-brain-mcp` app on 2026-08-24; the
   personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
   the local read-only Brain Library pilot renders canonical Markdown and exact
@@ -68,8 +69,12 @@ The hosted Brain rebuild has passed the first critical sync gates:
   remains separately approval-gated. The complete 39-file JEM corpus also has a
   freshness classification; nine cadence-controlled areas record review date,
   owner, cadence and trigger, and lint enforces declared cadence over mtime.
-  Cockpit Maintenance now gives grouped technical diagnostics explicit owners
-  and completion criteria and exposes each safe mechanical proposal in full.
+  Cockpit Maintenance now excludes graph/source locator telemetry from the
+  maintenance count, automatically verifies the source boundary, leaves zero
+  genuine broken internal links, and shows only one bounded capture-queue
+  decision to John; 261 classified references remain available in a collapsed
+  maintainer-only panel. Each safe mechanical proposal remains inspectable in
+  full.
   Spec 014 remains deferred because no representative post-content
   follow-up-read gap or weaker-harness gap has been measured. ERS schema,
   content, credentials, and deployment remain unchanged and separately gated;
@@ -79,7 +84,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
   a JEM-named local watcher could silently target the ERS database;
 - spec 013 server Phases 1–3 and both Brain-content migrations are deployed; the
   corrective graph/sync baseline landed in `v1.4.5`, and the personal JEM
-  runtime is now current at `v1.6.0`: ranked structured search/evals, the
+  runtime is now current at `v1.6.1`: ranked structured search/evals, the
   private Postgres FTS index, graph lint, bootstrap-budget/read-only lint,
   fail-closed structural-file roles, reserved external-namespace guards,
   idempotent conflict recording, and a parity-gated local state-rebase
