@@ -311,7 +311,10 @@ consolidate per-file edits and verify exact hashes before resolving conflicts.
   retired JEM ERS fallback mirror, and removed two inline-code false positives.
   Fresh graph lint reports zero broken internal links, four maintenance
   findings (three maintainer-owned unreachable notes and one bounded capture
-  queue decision), and the strict 45-companion source audit still passes.
+  queue decision), and the strict 45-companion source audit still passes. JEM
+  `v1.6.1` deployed this ownership model on 24 August 2026; hosted health, lint,
+  sync and the desktop/390px Cockpit surface passed while ERS remained
+  untouched.
 - The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
   and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
   passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed

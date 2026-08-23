@@ -1,6 +1,6 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** complete — acceptance remediation live on JEM `v1.6.0`; operator-diagnostic follow-up prepared for `v1.6.1`
+**Status:** complete — remediated and live-verified on JEM through `v1.6.1`
 **Started:** 2026-08-23
 **Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
@@ -14,13 +14,13 @@ implemented outcome. ERS remains separately approval-gated.
 | Finding | Implemented JEM outcome | Verification |
 |---|---|---|
 | 1 | Full-width Maintenance layout; every compact fix row has an expandable complete proposal. | Unit/HTTP tests plus desktop and 390px browser checks pass. |
-| 2 | Graph diagnostics grouped by meaning with status, owner, completion and representative paths; expected source-boundary findings are owned by the strict source audit. | Fresh JEM lint renders four primary findings separately from 278 grouped diagnostics. |
+| 2 | Graph/source telemetry is classified automatically with status, owner and completion; technical detail is collapsed and source-boundary references are closed by the strict audit. | Fresh JEM lint renders four maintenance findings, zero broken internal links and 261 classified references outside the operator total. |
 | 3 | Five primary-source declarations link directly to companions; 26 binary-paired companions link to the adjacent original. | Strict source audit: zero non-clickable declarations and zero missing original-artifact links. |
 | 4 | Edge refreshed as durable orientation and linked to its live Dropbox workspace; public-site absence is explicit. | Strict semantic-destination audit passes. |
 | 5 | NanoRenal/iHemo demoted from active prominence to dormant/cold with historical context preserved. | Hosted/local `04_active_roles.md` convergence verified. |
 | 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; the deployed hosted read returns the complete companion and preserves binary privacy. |
 | 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
-| 8 | Operator lint queue now excludes graph/source locator telemetry; genuine stale internal links were repaired and technical detail is collapsed/maintainer-owned. | Local graph lint: zero broken internal links, 261 classified references, four maintenance findings; strict source audit still passes 45/45. JEM `v1.6.1` live verification pending. |
+| 8 | Operator lint queue now excludes graph/source locator telemetry; genuine stale internal links were repaired and technical detail is collapsed/maintainer-owned. | Local and hosted graph lint: zero broken internal links, 261 classified references, four maintenance findings; strict source audit still passes 45/45. JEM `v1.6.1` is live. |
 
 ## Acceptance results
 
@@ -313,7 +313,7 @@ current status; ERS replay remains out of scope until separately approved.
 ## Finding 8 — The remaining lint diagnostic count is not a usable operator task
 
 **Surface:** JEM Brain Monitor → Maintenance → Brain Lint
-**Status:** implemented for JEM `v1.6.1`; live verification pending
+**Status:** remediated and live-verified in JEM `v1.6.1`
 
 ### Observation from John
 
@@ -345,3 +345,18 @@ maintainer-owned unreachable notes plus one capture-queue decision containing
 13 items. It reports zero broken internal links and classifies 261 external or
 reference locators. The strict source audit still reports 45 directly linked
 companions with zero strict failures.
+
+### Post-release verification — JEM `v1.6.1`
+
+- Fly release v66 completed on 24 August 2026; the public health endpoint
+  reports `brain-mcp-server` `1.6.1` with the existing Postgres revision,
+  Supabase metadata-only artifact and Postgres OAuth-state modes unchanged.
+- Hosted graph-primary lint reports four maintenance findings, zero broken
+  internal links and 261 classified external/reference locators excluded from
+  the maintenance total.
+- Cockpit shows zero mechanical approvals, one bounded capture-queue decision,
+  three maintainer notes and a passing automated 45-companion source-link
+  audit. The technical groups are collapsed and explicitly require no operator
+  review.
+- Hosted sync reports 39 files and zero open conflicts. ERS was not deployed or
+  modified.
