@@ -251,6 +251,17 @@ grouped by class with plain-language status, owner and completion criteria.
 Only safe mechanical changes belong under **Actions You Can Approve**, and each
 candidate must expose its full proposed change before selection.
 
+If lint reports a `TASKS.md` Capture / Triage decision, verify that Cockpit
+states the open count as the total queue and stale as its age-based subset. The
+recommended copyable LLM handoff must be proposal-first: classify every item to
+the canonical personal task list, owning project tracker, ERS Asana, audit
+backlog, or an evidenced closure, then stop for approval before writing. The
+manual Obsidian alternative is valid, but a Capture item is marked transferred
+only after its destination is actually updated. Leave inaccessible destinations
+open with an exact handoff, then re-read `TASKS.md` and rerun lint. Never copy
+JEM item classifications into ERS; repeat the review against the live ERS queue
+and owners during the separately approved replay.
+
 ## JEM pilot evidence — 2026-08-22
 
 The source-link baseline began with 39 Brain Markdown files and 45 source
@@ -315,6 +326,9 @@ consolidate per-file edits and verify exact hashes before resolving conflicts.
   `v1.6.1` deployed this ownership model on 24 August 2026; hosted health, lint,
   sync and the desktop/390px Cockpit surface passed while ERS remained
   untouched.
+- Capture-queue warnings now include a proposal-first LLM handoff and an exact
+  Obsidian alternative. The surface explains that open is the total queue and
+  stale is its seven-day subset; it never auto-routes or auto-closes items.
 - The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
   and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
   passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed

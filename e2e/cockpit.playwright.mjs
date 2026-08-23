@@ -190,7 +190,7 @@ async function startCockpit(testInfo) {
   await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n", "utf8");
   await fs.writeFile(
     path.join(brainDir, "TASKS.md"),
-    "# TASKS\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n",
+    "# TASKS\n\n## Capture / Triage Queue\n\nTemporary holding area for captured items.\n\n- [ ] 2026-08-01 — FOLLOW-UP — stale captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n- [ ] 2026-08-24 — NOTE — recent captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n",
     "utf8"
   );
   await fs.writeFile(path.join(inboxDir, "pending-source.md"), "# Pending source\n", "utf8");
@@ -498,6 +498,23 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await expect(page.getByRole("heading", { name: "Actions You Can Approve", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh lint assessment", exact: true })).toBeVisible();
   await expect(page.getByText(/never need to review technical diagnostics individually/i)).toBeVisible();
+  const captureFinding = page.getByText("Capture queue has 2 open item(s)", { exact: true });
+  if (!(await captureFinding.isVisible())) {
+    await page.getByRole("button", { name: "Refresh lint assessment", exact: true }).click();
+  }
+  await expect(captureFinding).toBeVisible();
+  const captureDetail = captureFinding.locator("..").locator("p.muted").first();
+  await expect(captureDetail).toContainText("2 total open item(s) need a disposition");
+  await expect(captureDetail).toContainText("1 is stale because it is at least 7 days old");
+  const triageHandoff = page.getByText("LLM-assisted triage (recommended)", { exact: true });
+  await expect(triageHandoff).toBeVisible();
+  await triageHandoff.click();
+  await expect(page.getByText(/Phase 1 — proposal only/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy LLM triage prompt", exact: true })).toBeVisible();
+  const manualTriage = page.getByText("Manual triage in Obsidian", { exact: true });
+  await expect(manualTriage).toBeVisible();
+  await manualTriage.click();
+  await expect(page.getByText(/Only after the destination is updated/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh inbox scan", exact: true })).toBeVisible();
   await expect(page.getByText(/Not stuck: refreshing this scan only rechecks the inbox/)).toBeVisible();
   const inboxHandoff = page.getByText("Claude ingestion handoff", { exact: true });

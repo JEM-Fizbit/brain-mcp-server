@@ -183,6 +183,9 @@ function lintReviewFindings(report) {
         owner: "John",
         statusLabel: "User decision",
         completion: "Complete when the capture queue is triaged into its canonical trackers or closed.",
+        openCount: report.captureQueue.openCount,
+        staleCount: report.captureQueue.staleCount,
+        thresholdDays: report.captureQueue.thresholdDays,
       }
     );
   }
@@ -1772,6 +1775,27 @@ const page = String.raw`<!doctype html>
         overflow-wrap: anywhere;
         font: inherit;
         font-size: 12px;
+      }
+      .capture-triage-guidance {
+        margin-top: 0.7rem;
+        padding: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+      }
+      .capture-triage-guidance > p:first-child {
+        margin-top: 0;
+      }
+      .capture-triage-guidance ol {
+        margin: 0.55rem 0 0;
+        padding-left: 1.25rem;
+      }
+      .capture-handoff-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin-top: 0.55rem;
       }
       @media (max-width: 860px) {
         .maintenance-grid {
@@ -3536,7 +3560,19 @@ const page = String.raw`<!doctype html>
           title.textContent = finding.summary || finding.kind || "Lint finding";
           const detail = document.createElement("p");
           detail.className = "muted";
-          detail.textContent = finding.detail || "Review required.";
+          const isCaptureQueue = finding.kind === "capture_queue";
+          const openCount = Number(finding.openCount ?? lint.report?.captureQueue?.openCount ?? 0);
+          const staleCount = Number(finding.staleCount ?? lint.report?.captureQueue?.staleCount ?? 0);
+          const thresholdDays = Number(finding.thresholdDays ?? lint.report?.captureQueue?.thresholdDays ?? 7);
+          const recentCount = Math.max(0, openCount - staleCount);
+          detail.textContent = isCaptureQueue
+            ? String(openCount) + " total open item(s) need a disposition. " +
+              String(staleCount) + (staleCount === 1 ? " is" : " are") +
+              " stale because " + (staleCount === 1 ? "it is" : "they are") +
+              " at least " + String(thresholdDays) + " days old; " + String(recentCount) +
+              (recentCount === 1 ? " is" : " are") +
+              " newer but still open. Stale is a subset of open, not a second queue."
+            : finding.detail || "Review required.";
           item.appendChild(title);
           item.appendChild(detail);
           const metaValues = [
@@ -3553,6 +3589,75 @@ const page = String.raw`<!doctype html>
               meta.appendChild(span);
             }
             item.appendChild(meta);
+          }
+          if (isCaptureQueue) {
+            const guidance = document.createElement("div");
+            guidance.className = "capture-triage-guidance";
+
+            const recommendation = document.createElement("p");
+            recommendation.innerHTML = "<strong>Recommended:</strong> ask an LLM with access to this Brain and its canonical trackers to prepare a disposition table. It must stop for your approval before moving or closing anything.";
+            guidance.appendChild(recommendation);
+
+            const llmDetails = document.createElement("details");
+            llmDetails.className = "inbox-handoff";
+            const llmSummary = document.createElement("summary");
+            llmSummary.textContent = "LLM-assisted triage (recommended)";
+            const prompt = captureQueueTriageHandoff(openCount, staleCount, thresholdDays);
+            const promptText = document.createElement("pre");
+            promptText.textContent = prompt;
+            const promptActions = document.createElement("div");
+            promptActions.className = "capture-handoff-actions";
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.textContent = "Copy LLM triage prompt";
+            const copyStatus = document.createElement("span");
+            copyStatus.className = "muted";
+            copyButton.addEventListener("click", async () => {
+              try {
+                await copyText(prompt);
+                copyStatus.textContent = "Copied. Paste it into Codex, Claude, or ChatGPT with JEM Brain access.";
+              } catch (error) {
+                copyStatus.textContent = "Copy failed: " + error.message;
+              }
+            });
+            promptActions.appendChild(copyButton);
+            promptActions.appendChild(copyStatus);
+            llmDetails.appendChild(llmSummary);
+            llmDetails.appendChild(promptText);
+            llmDetails.appendChild(promptActions);
+            guidance.appendChild(llmDetails);
+
+            const manualDetails = document.createElement("details");
+            manualDetails.className = "inbox-handoff";
+            const manualSummary = document.createElement("summary");
+            manualSummary.textContent = "Manual triage in Obsidian";
+            const manualIntro = document.createElement("p");
+            manualIntro.className = "muted";
+            manualIntro.textContent = "Open TASKS.md, find Capture / Triage Queue, and process every unchecked item:";
+            const manualSteps = document.createElement("ol");
+            const manualRoutingSteps = COCKPIT_BRAIN_ID === "ai-brain-jem"
+              ? [
+                  "Move personal non-project work to TASKS Active.",
+                  "Copy project work to the owning project BACKLOG or tracker; copy ERS work to Asana; keep audit findings in their audit backlog.",
+                ]
+              : [
+                  "Move work to TASKS Active only when this Brain's work-tracking guidance says TASKS is its canonical owner.",
+                  "Transfer project, organizational, and audit work to the canonical destinations named by this Brain; do not reuse JEM routing assumptions.",
+                ];
+            for (const step of [
+              ...manualRoutingSteps,
+              "Only after the destination is updated, mark the Capture item checked as transferred. Mark it closed only when completion, obsolescence, or duplication is clear.",
+              "Refresh the lint assessment. Editing a date or leaving an item unchecked in Capture does not clear it.",
+            ]) {
+              const li = document.createElement("li");
+              li.textContent = step;
+              manualSteps.appendChild(li);
+            }
+            manualDetails.appendChild(manualSummary);
+            manualDetails.appendChild(manualIntro);
+            manualDetails.appendChild(manualSteps);
+            guidance.appendChild(manualDetails);
+            item.appendChild(guidance);
           }
           if (Array.isArray(finding.examples) && finding.examples.length) {
             const examples = document.createElement("details");
@@ -3648,6 +3753,34 @@ const page = String.raw`<!doctype html>
           "Load the Brain context and follow its documented ingestion protocol. Review the file before changing anything; preserve the original source and provenance; update only justified durable Brain content.",
           "Complete the ingestion with inbox_file set to \"" + filename + "\" so the inbox copy is removed, then verify the file no longer appears in brain_scan_inbox.",
           "If this session has only hosted read tools, stop and use the documented local ingestion-capable workflow instead of deleting the file manually.",
+        ].join("\n\n");
+      }
+
+      function captureQueueTriageHandoff(openCount, staleCount, thresholdDays) {
+        const jemBrain = COCKPIT_BRAIN_ID === "ai-brain-jem";
+        const brainLabel = jemBrain ? "JEM Brain" : "the selected Brain";
+        const routingRules = jemBrain
+          ? [
+              "Allowed dispositions:",
+              "- Keep or move to TASKS Active only if it is personal/professional non-ERS and non-project work.",
+              "- Transfer project work to the owning project's BACKLOG or tracker.",
+              "- Transfer ERS work to Asana.",
+              "- Retain audit findings in their audit backlog.",
+              "- Close as completed, obsolete, or duplicate only with evidence and my approval.",
+              "Do not duplicate tasks. Do not use NOW.md, JOURNAL.md, LOG.md, BUSINESS_IDEAS.md, or working notes as task repositories.",
+            ]
+          : [
+              "Use only the canonical owners and destinations declared by this Brain's work-tracking guidance. Do not reuse JEM routing assumptions.",
+              "Close as completed, obsolete, or duplicate only with evidence and my approval. Do not duplicate tasks or use orientation, journal, log, or working-note files as task repositories.",
+            ];
+        return [
+          "Help me triage the Capture / Triage Queue in " + brainLabel + " (" + COCKPIT_BRAIN_ID + ").",
+          "Load Brain context first, then read its work-tracking guidance and TASKS.md. There are currently " + String(openCount) + " open items; " + String(staleCount) + (staleCount === 1 ? " is" : " are") + " stale because " + (staleCount === 1 ? "it is" : "they are") + " at least " + String(thresholdDays) + " days old. Review all " + String(openCount) + ".",
+          "Phase 1 — proposal only. Do not write, move, delete, or close anything yet.",
+          "For every item, give me a compact table with: item, recommended disposition, canonical owner/destination, rationale, and any access blocker.",
+          routingRules.join("\n"),
+          "Stop and wait for my approval of the complete proposal. After approval, use hosted writes for the selected Brain's TASKS.md and update the canonical project or tracker surfaces available to you. If a destination is inaccessible, leave that item open in Capture / Triage and state the exact handoff needed; do not claim it was transferred.",
+          "Finally, re-read TASKS.md and run brain_lint. Success means the queue is smaller or clear, with only genuinely unresolved items retained.",
         ].join("\n\n");
       }
 

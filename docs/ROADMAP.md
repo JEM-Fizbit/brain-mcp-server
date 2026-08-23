@@ -41,8 +41,9 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - specs 015–016 are implemented and validated on JEM: release `v1.5.0`
   (`379b965`) established the source/Library pilot, the `v1.6.0` acceptance
   remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`
-  operator-diagnostic remediation (`2ed0393`) was deployed only to the personal
-  `jem-brain-mcp` app on 2026-08-24; the
+  operator-diagnostic remediation (`2ed0393`) and the `v1.6.2` capture-queue
+  completion guidance were deployed only to the personal `jem-brain-mcp` app
+  on 2026-08-24; the
   personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
   the local read-only Brain Library pilot renders canonical Markdown and exact
@@ -84,7 +85,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
   a JEM-named local watcher could silently target the ERS database;
 - spec 013 server Phases 1–3 and both Brain-content migrations are deployed; the
   corrective graph/sync baseline landed in `v1.4.5`, and the personal JEM
-  runtime is now current at `v1.6.1`: ranked structured search/evals, the
+  runtime is now current at `v1.6.2`: ranked structured search/evals, the
   private Postgres FTS index, graph lint, bootstrap-budget/read-only lint,
   fail-closed structural-file roles, reserved external-namespace guards,
   idempotent conflict recording, and a parity-gated local state-rebase
