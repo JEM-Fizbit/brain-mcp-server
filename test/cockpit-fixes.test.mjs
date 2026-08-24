@@ -206,6 +206,8 @@ test("Maintenance page exposes lint and inbox actions without claiming the Brain
   assert.match(page.text, /Refresh inbox scan/);
   assert.match(page.text, /Copy Claude ingestion prompt/);
   assert.match(page.text, /Copy LLM triage prompt/);
+  assert.match(page.text, /capture-prompt-copy/);
+  assert.match(page.text, /position: absolute/);
   assert.match(page.text, /LLM-assisted triage \(recommended\)/);
   assert.match(page.text, /Manual triage in Obsidian/);
   assert.match(page.text, /Phase 1 — proposal only/);

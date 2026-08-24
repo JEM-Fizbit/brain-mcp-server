@@ -329,6 +329,12 @@ consolidate per-file edits and verify exact hashes before resolving conflicts.
 - Capture-queue warnings now include a proposal-first LLM handoff and an exact
   Obsidian alternative. The surface explains that open is the total queue and
   stale is its seven-day subset; it never auto-routes or auto-closes items.
+- The JEM workflow was successfully used on 24 August 2026: all 13 Capture /
+  Triage items were routed or closed and hosted lint no longer reports an
+  operator decision. The follow-up also restored session-start maintenance
+  nudges on the active-store context path and placed the prompt's Copy control
+  at its upper-right point of use. Replay must verify both detection and
+  completion against ERS's own live queue rather than copying JEM dispositions.
 - The observed KRUK prompt is a routing regression requiring both `SOURCES.md`
   and `quanta.md`; the 26-case JEM routing suite passes. The hosted release gate
   passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed

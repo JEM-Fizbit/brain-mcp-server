@@ -1790,12 +1790,26 @@ const page = String.raw`<!doctype html>
         margin: 0.55rem 0 0;
         padding-left: 1.25rem;
       }
-      .capture-handoff-actions {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 0.55rem;
+      .capture-prompt-panel {
+        position: relative;
         margin-top: 0.55rem;
+      }
+      .capture-prompt-panel pre {
+        margin: 0;
+        padding-top: 2.9rem;
+      }
+      .capture-prompt-copy {
+        position: absolute;
+        top: 0.55rem;
+        right: 0.55rem;
+        z-index: 1;
+        padding: 0.32rem 0.55rem;
+        font-size: 12px;
+      }
+      .capture-copy-status {
+        display: block;
+        min-height: 1.1rem;
+        margin-top: 0.35rem;
       }
       @media (max-width: 860px) {
         .maintenance-grid {
@@ -3603,15 +3617,19 @@ const page = String.raw`<!doctype html>
             const llmSummary = document.createElement("summary");
             llmSummary.textContent = "LLM-assisted triage (recommended)";
             const prompt = captureQueueTriageHandoff(openCount, staleCount, thresholdDays);
+            const promptPanel = document.createElement("div");
+            promptPanel.className = "capture-prompt-panel";
             const promptText = document.createElement("pre");
             promptText.textContent = prompt;
-            const promptActions = document.createElement("div");
-            promptActions.className = "capture-handoff-actions";
             const copyButton = document.createElement("button");
             copyButton.type = "button";
-            copyButton.textContent = "Copy LLM triage prompt";
+            copyButton.className = "capture-prompt-copy";
+            copyButton.textContent = "Copy";
+            copyButton.setAttribute("aria-label", "Copy LLM triage prompt");
             const copyStatus = document.createElement("span");
-            copyStatus.className = "muted";
+            copyStatus.className = "muted capture-copy-status";
+            copyStatus.setAttribute("role", "status");
+            copyStatus.setAttribute("aria-live", "polite");
             copyButton.addEventListener("click", async () => {
               try {
                 await copyText(prompt);
@@ -3620,11 +3638,11 @@ const page = String.raw`<!doctype html>
                 copyStatus.textContent = "Copy failed: " + error.message;
               }
             });
-            promptActions.appendChild(copyButton);
-            promptActions.appendChild(copyStatus);
+            promptPanel.appendChild(promptText);
+            promptPanel.appendChild(copyButton);
             llmDetails.appendChild(llmSummary);
-            llmDetails.appendChild(promptText);
-            llmDetails.appendChild(promptActions);
+            llmDetails.appendChild(promptPanel);
+            llmDetails.appendChild(copyStatus);
             guidance.appendChild(llmDetails);
 
             const manualDetails = document.createElement("details");
