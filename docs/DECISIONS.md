@@ -8,6 +8,44 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-24 — Session-start nudges are a transport-independent contract
+
+**Decision:** `brain_load_context` must emit its health nudges on every
+transport, and the capture queue is one of them. Nudge assembly lives in a pure
+`buildContextNudges` fed by explicitly-typed inputs, and every input
+distinguishes *measured empty* from *not answerable on this backend*: a
+Postgres-backed Brain has no host inbox, so `inboxCount` is `null` and no inbox
+nudge is emitted, rather than a count of zero implying an all-clear. An
+unreadable `LOG.md` likewise suppresses the lint nudge instead of reporting
+"never linted". `test/load-context-nudges.test.mjs` holds the contract.
+
+**Why:** the nudges silently stopped on the hosted path when `36bdcec` rewired
+the tool onto the store abstraction — the replacement was written without the
+nudge block and the original was left with zero callers. Six docs still asserted
+the nudges existed and `docs/conflict-resolution.md` stated it as a live
+requirement, so nothing but the running code disagreed, and nothing failed.
+The compounding cost was the capture queue: `summarizeCaptureQueue` was correct
+but reachable only from an explicit `brain_lint` run, and the only prompt to run
+`brain_lint` was the dead lint nudge. The JEM queue consequently reached 13 open
+items with 12 stale — both thresholds breached every session, unreported — which
+is the workload the 2026-08-24 cockpit decision below was written to clear. That
+decision covers the operator-initiated path; this one covers the agent-facing
+one, so the queue surfaces without John opening the cockpit first.
+
+**Alternatives rejected:** leave the hosted bootstrap deliberately slim and
+update the docs to match (the queue would keep silently refilling); keep the
+capture-queue warning exclusive to lint and the cockpit (both require someone to
+already suspect a problem); call `scanInbox` and render `0` when it refuses on a
+non-filesystem backend (reports an all-clear the backend cannot support);
+restore the nudges without tests (this exact block regressed to silence once
+already, undetected).
+
+**Related:** `src/services/context-nudges.ts`;
+`src/services/active-brain-store.ts`; `src/services/task-intake.ts`;
+`test/load-context-nudges.test.mjs`; `docs/conflict-resolution.md`.
+
+---
+
 ## 2026-08-24 — Give capture-queue findings a completion workflow
 
 **Decision:** A `TASKS.md` Capture / Triage warning must state that the open
