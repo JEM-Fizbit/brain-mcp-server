@@ -10,7 +10,8 @@ Start a task that needs Brain context by calling brain_load_context with an expl
 than one Brain is visible. It returns the slim loader/task router plus NOW.md. Follow the loader's intent \
 route and read only the relevant hubs or files. Before ingestion, output capture, maintenance, or another \
 write workflow, read the on-demand operations guide named by that Brain's loader; detailed procedures do \
-not belong in the always-loaded bootstrap.
+not belong in the always-loaded bootstrap. Before any ingestion-related write, call brain_prepare_ingest: \
+it is read-only and identifies the selected Brain's backend, categories, and authoritative source/inbox workflow.
 
 Notes: brain_read_file and brain_search take a scope param ("brain" default, "sources", or "all") to \
 reach original ingested material; brain_sync_status reports hosted sync health. A Brain is authoritative \

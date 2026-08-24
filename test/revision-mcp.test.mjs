@@ -142,6 +142,7 @@ async function setupHarness(name, brainConfig = {}) {
           integration_mode: "vertical",
           storage_backend: brainConfig.storage_backend || "filesystem",
           storage_config: brainConfig.storage_config || { brain_dir: brainDir },
+          source_categories: brainConfig.source_categories,
         },
       ],
       principals: [
@@ -308,6 +309,37 @@ async function callTool(harness, name, args = {}) {
     throw new Error(message.error.message);
   }
   return message.result.content.map((part) => part.text).join("\n");
+}
+
+async function listTools(harness) {
+  const body = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/list",
+    params: {},
+  });
+  const req = Readable.from([Buffer.from(body)]);
+  req.method = "POST";
+  req.url = "/mcp";
+  req.headers = {
+    host: "127.0.0.1:1234",
+    authorization: `Bearer ${harness.token}`,
+    "content-type": "application/json",
+    "content-length": String(Buffer.byteLength(body)),
+    accept: "application/json, text/event-stream",
+  };
+  req.rawHeaders = Object.entries(req.headers).flat();
+
+  const res = new FakeResponse();
+  await handleHttpRequest(req, res, {
+    config: harness.config,
+    state: memoryState(),
+  });
+  const dataLine = res.text().split("\n").find((line) => line.startsWith("data: "));
+  assert.ok(dataLine, res.text());
+  const message = JSON.parse(dataLine.slice("data: ".length));
+  assert.ifError(message.error);
+  return message.result.tools;
 }
 
 test("HTTP MCP reads and loads context from revision store harness", async () => {
@@ -530,10 +562,80 @@ test("HTTP MCP hosted inbox scan does not require a server brain_dir", async () 
   });
 
   const result = await callTool(harness, "brain_scan_inbox");
-  assert.match(result, /Server-side inbox/);
-  assert.match(result, /deployment's operator ingestion workflow/);
+  assert.match(result, /Server-side inbox state/);
+  assert.match(result, /backend capability result/);
+  assert.match(result, /local Monitor\/operator workspace/);
   assert.doesNotMatch(result, /local stdio server|local sync mirror/);
   assert.match(result, /Postgres-backed Brain/);
+});
+
+test("HTTP MCP hosted ingestion preflight is read-only and backend-aware", async () => {
+  const harness = await setupHarness("hosted-ingest-preflight", {
+    storage_backend: "postgres",
+    storage_config: {},
+    source_categories: ["personal", "research"],
+  });
+
+  const tools = await listTools(harness);
+  const prepareTool = tools.find((tool) => tool.name === "brain_prepare_ingest");
+  assert.ok(prepareTool);
+  assert.equal(prepareTool.annotations?.readOnlyHint, true);
+  assert.equal(prepareTool.annotations?.destructiveHint, false);
+  assert.equal(prepareTool.annotations?.idempotentHint, true);
+
+  const preflight = await callTool(harness, "brain_prepare_ingest", {
+    source_label: "Research note",
+  });
+  assert.match(preflight, /Backend: `postgres`/);
+  assert.match(preflight, /`personal`, `research`/);
+  assert.match(preflight, /Server source-path read\/write: not supported/);
+  assert.match(preflight, /This preflight made no writes/);
+  assert.match(preflight, /00_loader\.md/);
+  assert.match(preflight, /NOW\.md/);
+  assert.match(preflight, /Do not call `brain_ingest` with `dry_run=false`/);
+  assert.match(preflight, /Fly cannot see either surface/);
+
+  const dryRun = await callTool(harness, "brain_ingest", {
+    source_label: "Research note",
+    category: "research",
+    dry_run: true,
+  });
+  assert.match(dryRun, /Ingest Analysis: Research note/);
+  assert.match(dryRun, /Source categories \(for saving\): personal, research/);
+  assert.match(dryRun, /Do not call `brain_ingest` with `dry_run=false`/);
+
+  const unsupportedSave = await callTool(harness, "brain_ingest", {
+    source_label: "Research note",
+    category: "research",
+    source_content: "Short source text",
+    dry_run: false,
+  });
+  assert.match(unsupportedSave, /No writes occurred/);
+  assert.match(unsupportedSave, /brain_prepare_ingest/);
+
+  const unsupportedComplete = await callTool(harness, "brain_ingest_complete", {
+    source_label: "Research note",
+    category: "research",
+    md_file: "sources/research/2026-08-24_research-note.md",
+    files_touched: ["NOW.md"],
+  });
+  assert.match(unsupportedComplete, /No writes occurred/);
+  assert.match(unsupportedComplete, /operator workflow/);
+});
+
+test("HTTP MCP ingestion rejects a category outside the selected Brain registry", async () => {
+  const harness = await setupHarness("hosted-ingest-category", {
+    storage_backend: "postgres",
+    storage_config: {},
+    source_categories: ["legal", "projects"],
+  });
+  const result = await callTool(harness, "brain_ingest", {
+    source_label: "Biography",
+    category: "bios",
+    dry_run: true,
+  });
+  assert.match(result, /Unsupported source category/);
+  assert.match(result, /legal, projects/);
 });
 
 test("HTTP MCP detection-only lint is read-only through revision store harness", async () => {

@@ -28,9 +28,10 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_log` | Append an entry to the Brain change log |
 | `brain_read_log` | Read recent change log entries |
 | `brain_lint` | Read-only health check by default: bloat, staleness, legacy/graph-shadow reachability, 2,500-token bootstrap budget, drift, and maintenance signals. `fix=true` can only relocate/date-stamp/archive ordinary task content; structural files are never auto-fixed. See [Applying Brain lint fixes](#applying-brain-lint-fixes) |
-| `brain_ingest` | Process a new source — dry-run analysis or save to sources/ |
-| `brain_ingest_complete` | Record provenance after ingest (updates SOURCES.md + LOG.md, optionally deletes inbox file) |
-| `brain_scan_inbox` | List files pending in the inbox/ drop-folder for processing |
+| `brain_prepare_ingest` | Read-only backend/category/capability preflight; call before any ingestion-related write |
+| `brain_ingest` | Filesystem-backed source analysis/save; Postgres Brains use their operator source workflow |
+| `brain_ingest_complete` | Complete filesystem provenance/inbox cleanup after preflight; hosted revision logging remains available through `brain_log` |
+| `brain_scan_inbox` | List a filesystem-backed inbox; hosted Postgres output reports that operator-side inbox state is not observable |
 
 The `scope` parameter on `brain_read_file` and `brain_search` separates the Brain vault (curated summaries, default) from the sources/ archive (original ingested documents: bios, assessments, meeting notes, writing samples, analysis, correspondence, etc.). `brain_search` returns deterministic ranked matches; normalized fallback makes queries like `cnet id` match `CNetID`. Its default knowledge scope excludes `LOG.md`, `JOURNAL.md`, `archive/**`, and `working/**`; set `include_operational=true` only when those paths are intended.
 
@@ -203,7 +204,7 @@ Skip when:
   or user explicitly says not to load.
 
 Load sequence (when loading):
-1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_files,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
+1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_files,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_prepare_ingest,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
 2. Call brain_load_context — returns the loader navigation table, current priorities, and nudges (lint overdue, capture queue stale, maintenance issues open, inbox pending). The loader contains the full ingestion protocol, source categories, and file-editing rules; follow it.
 3. Call brain_read_file for task-relevant files per the navigation table.
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work.
@@ -212,7 +213,7 @@ Reading source archives:
 - brain_read_file and brain_search accept scope = "brain" (default, vault only), "sources", or "all" (search only). brain_search prefers exact keyword matches, then uses normalized fallback for spacing, punctuation, camel-case, and common lookup wording. Escalate scope automatically when a query implicates original ingested material rather than a Brain summary.
 - Use brain_list_sources (optional category filter) to discover source files.
 
-Inbox: files dropped into the inbox/ folder are pending sources. Use brain_scan_inbox when asked, then process each using the ingestion protocol in the loader. The inbox_file parameter on brain_ingest_complete handles cleanup.
+Ingestion: call `brain_prepare_ingest` before any source or Brain-content write. A filesystem-backed Brain can use `brain_scan_inbox`, `brain_ingest`, and `brain_ingest_complete` directly. A hosted Postgres Brain has no Fly-local inbox or source tree: preserve source bytes, provenance and inbox cleanup through its local Monitor/operator workflow, then use hosted revision tools only for reviewed Brain writes and `brain_log` receipts.
 ```
 
 This works for both Claude Code and Cowork (both read `~/.claude/CLAUDE.md`).

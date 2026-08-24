@@ -3768,9 +3768,10 @@ const page = String.raw`<!doctype html>
       function inboxClaudeHandoff(filename) {
         return [
           "In an interactive Claude session with access to the " + COCKPIT_BRAIN_ID + " workspace and ingestion-capable Brain tools, process the pending inbox file \"" + filename + "\".",
-          "Load the Brain context and follow its documented ingestion protocol. Review the file before changing anything; preserve the original source and provenance; update only justified durable Brain content.",
-          "Complete the ingestion with inbox_file set to \"" + filename + "\" so the inbox copy is removed, then verify the file no longer appears in brain_scan_inbox.",
-          "If this session has only hosted read tools, stop and use the documented local ingestion-capable workflow instead of deleting the file manually.",
+          "Load the Brain context, then call brain_prepare_ingest before changing anything. Review the file; preserve the original source and provenance; update only justified durable Brain content.",
+          "If preflight reports a filesystem backend, complete the ingestion with inbox_file set to \"" + filename + "\" and verify it no longer appears in brain_scan_inbox.",
+          "If preflight reports a Postgres backend, do not call the filesystem ingest mutation tools. Use this Brain's local Monitor/operator source workflow to persist provenance and clear exactly \"" + filename + "\" only after the source receipt exists; refresh the Monitor inbox scan for verification. Hosted brain_log may record the reviewed Brain-revision receipt.",
+          "If this session cannot access that operator workspace, stop with an explicit handoff. Never delete the inbox file merely to clear the warning.",
         ].join("\n\n");
       }
 

@@ -25,6 +25,7 @@ test("tool telemetry classifies hosted MCP reads and writes", () => {
   assert.equal(classifyToolOperation("brain_resolve_conflict", {}), "write");
   assert.equal(classifyToolOperation("brain_log", {}), "write");
   assert.equal(classifyToolOperation("brain_lint", {}), "write");
+  assert.equal(classifyToolOperation("brain_prepare_ingest", {}), "read");
   assert.equal(classifyToolOperation("brain_ingest", { dry_run: true }), "operation");
   assert.equal(classifyToolOperation("brain_ingest", { dry_run: false }), "write");
 });

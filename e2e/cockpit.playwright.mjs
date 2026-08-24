@@ -549,7 +549,9 @@ async function expectMaintenanceLayout(page, { desktop }) {
   const inboxHandoff = page.getByText("Claude ingestion handoff", { exact: true });
   await expect(inboxHandoff).toBeVisible();
   await inboxHandoff.click();
+  await expect(page.getByText(/call brain_prepare_ingest before changing anything/)).toBeVisible();
   await expect(page.getByText(/inbox_file set to "pending-source.md"/)).toBeVisible();
+  await expect(page.getByText(/If preflight reports a Postgres backend/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy Claude ingestion prompt", exact: true })).toBeVisible();
   const selectAll = page.getByRole("checkbox", { name: "Select all fixes", exact: true });
   const applySelected = page.getByRole("button", { name: "Apply selected", exact: true });

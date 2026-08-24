@@ -82,7 +82,7 @@ export function registerStatusTools(server: McpServer): void {
 
   server.tool(
     "brain_list_sources",
-    "List files in the sources/ archive. Optionally filter by category (bios, cv, assessments, meeting_notes, writing_samples, analysis, correspondence, personal, research, etc.). Use to discover what ingested material is available before calling brain_read_file with scope=\"sources\".",
+    "List files in the sources archive. Optionally filter by a category returned by brain_prepare_ingest for the selected Brain. Use to discover ingested material before calling brain_read_file with scope=\"sources\".",
     ListSourcesSchema.shape,
     async ({ brain_id, category }, extra) => {
       try {

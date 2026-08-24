@@ -69,6 +69,7 @@ export async function closeToolTelemetryForTests(): Promise<void> {
 }
 
 export function classifyToolOperation(toolName: string, args: unknown): string {
+  if (toolName === "brain_prepare_ingest") return "read";
   if (
     toolName === "brain_update_file" ||
     toolName === "brain_resolve_conflict" ||

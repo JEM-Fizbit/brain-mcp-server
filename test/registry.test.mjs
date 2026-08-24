@@ -164,6 +164,54 @@ test("pathsForBrain resolves on a filesystem backend", () => {
   assert.equal(paths.sourcesRoot, sourcesDir);
 });
 
+test("source categories are deployment-specific with a backward-compatible personal fallback", () => {
+  const configured = registry.sourceCategoriesForBrain({
+    id: "ers-brain",
+    type: "shared",
+    template_used: "ers",
+    integration_mode: "vertical",
+    storage_backend: "postgres",
+    storage_config: {},
+    source_categories: ["brand", "company", "legal"],
+  });
+  assert.deepEqual(configured, ["brand", "company", "legal"]);
+
+  const fallback = registry.sourceCategoriesForBrain({
+    id: "ai-brain-jem",
+    type: "personal",
+    template_used: "personal",
+    integration_mode: "vertical",
+    storage_backend: "filesystem",
+    storage_config: { brain_dir: brainDir },
+  });
+  assert.ok(fallback.includes("bios"));
+  assert.ok(fallback.includes("research"));
+});
+
+test("registry rejects unsafe or duplicate configured source categories", async () => {
+  const base = {
+    version: 1,
+    default_brain_id: "ai-brain-jem",
+    brains: [
+      {
+        id: "ai-brain-jem",
+        type: "personal",
+        template_used: "personal",
+        integration_mode: "vertical",
+        storage_backend: "filesystem",
+        storage_config: { brain_dir: brainDir },
+        source_categories: ["research", "../escape"],
+      },
+    ],
+  };
+  await writeRegistry(base);
+  await assert.rejects(() => registry.loadRegistry(), /source_categories.*safe/i);
+
+  base.brains[0].source_categories = ["research", "research"];
+  await writeRegistry(base);
+  await assert.rejects(() => registry.loadRegistry(), /must not contain duplicates/i);
+});
+
 test("registry rejects unknown roles fail-closed", async () => {
   await writeRegistry({
     version: 1,

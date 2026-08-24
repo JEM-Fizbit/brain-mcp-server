@@ -5,9 +5,14 @@ import {
   IngestCompleteSchema,
   IngestSchema,
   ListSourcesSchema,
+  PrepareIngestSchema,
 } from "../dist/schemas/tools.js";
 
 test("source tools accept deployment-specific categories", () => {
+  assert.equal(
+    PrepareIngestSchema.parse({ source_label: "Template" }).source_label,
+    "Template"
+  );
   assert.equal(ListSourcesSchema.parse({ category: "legal" }).category, "legal");
   assert.equal(
     IngestSchema.parse({ source_label: "Template", category: "templates" }).category,

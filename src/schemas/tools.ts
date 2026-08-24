@@ -27,6 +27,12 @@ export const LintSchema = BrainIdSchema.extend({
     ),
 });
 export const ScanInboxSchema = BrainIdSchema;
+export const PrepareIngestSchema = BrainIdSchema.extend({
+  source_label: z
+    .string()
+    .min(1)
+    .describe("Short human-readable label for the source being assessed."),
+});
 export const ListBrainsSchema = z.object({});
 export const DescribeBrainSchema = BrainIdSchema.extend({
   brain_id: z
@@ -244,20 +250,20 @@ export const IngestSchema = BrainIdSchema.extend({
   source_content: z
     .string()
     .optional()
-    .describe("Short text only (under 500 words). For larger content, save to sources/ via Desktop Commander and omit this."),
+    .describe("Short text only (under 500 words). Call brain_prepare_ingest first; hosted Postgres Brains use their operator source workflow rather than this field."),
   source_path: z
     .string()
     .optional()
-    .describe("Absolute path to a file on disk. Server reads it directly."),
+    .describe("Absolute path readable by a filesystem-backed server. Call brain_prepare_ingest first; Fly-hosted Postgres servers cannot read laptop paths."),
   source_label: z
     .string()
     .describe("A short label (e.g. 'CV update April 2026', 'Board meeting notes')."),
   category: sourceCategory
-    .describe("Source category — determines which subfolder in sources/ the file is saved to."),
+    .describe("Source category returned by brain_prepare_ingest for the selected Brain."),
   dry_run: z
     .boolean()
     .default(true)
-    .describe("If true (default), returns analysis plan — no content needed, you already read the document. If false, saves source .md (requires source_content or source_path)."),
+    .describe("If true (default), returns a read-only analysis plan. If false, saves source Markdown only when brain_prepare_ingest reports a filesystem-backed write path."),
 });
 
 export const IngestCompleteSchema = BrainIdSchema.extend({
@@ -265,7 +271,7 @@ export const IngestCompleteSchema = BrainIdSchema.extend({
     .string()
     .describe("Label of the source that was ingested."),
   category: sourceCategory
-    .describe("Source category."),
+    .describe("Source category returned by brain_prepare_ingest for the selected Brain."),
   original_file: z
     .string()
     .optional()
