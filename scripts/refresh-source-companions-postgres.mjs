@@ -72,7 +72,12 @@ async function registryRows(pool) {
         a.mime_type,
         a.content_sha256,
         a.retention_status,
-        a.metadata
+        a.metadata,
+        exists (
+          select 1
+          from brain.source_artifact_text companion_text
+          where companion_text.artifact_id = a.id
+        ) as text_available
       from brain.sources s
       join brain.source_artifacts a on a.source_id = s.id
       where s.brain_id = $1

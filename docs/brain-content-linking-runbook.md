@@ -1,13 +1,13 @@
 # Brain Content Linking, Source Trace And Freshness Runbook
 
-**Status:** active — JEM pilot completed; approved ERS replay in progress
+**Status:** active — JEM pilot and dedicated ERS development replay completed
 **Last reviewed:** 2026-08-24
 **Related:** [Spec 013](specs/013-brain-context-architecture.md); [Spec 015](specs/015-compiled-source-ingestion.md); [Spec 016](specs/016-source-links-and-brain-library-pilot.md); [Brain Library](brain-library.md); [JEM freshness register](jem-brain-freshness-register.md)
 
 This runbook preserves the complete linking remediation so it can be replayed
 for another Brain without rediscovering the distinction between graph
 reachability, evidence linkage and external semantic destinations. It records
-the JEM sequence; `ers-brain` remains a separately approved rollout with its own
+the JEM sequence and the completed `ers-brain` replay, which retained its own
 content authority, credentials, snapshots and hosted write path.
 
 ## Outcomes
@@ -327,6 +327,38 @@ non-clickable baseline is therefore 47 unique references. The relationship
 backfill now also excludes the same ten navigation indexes and can consume the
 exact ERS Brain Monitor database binding without exposing it in shell history.
 
+## ERS replay completion — 2026-08-24
+
+- A pre-write snapshot captured the ERS Brain, sources and sync state. All 39
+  evidence companions were reviewed; the final corpus records 43 explicit
+  source-to-Brain relationships and 17 same-stem original-artifact links. Two
+  registry records with no local companion remain explicitly inventoried rather
+  than represented by invented Markdown.
+- Every companion has a direct synthesis link and reciprocal `## Brain links`
+  declaration. Strict source audit reports 39 directly linked, zero index-only,
+  unlinked, missing-backlink, broken or non-clickable findings, and zero missing
+  originals where an adjacent same-stem artifact exists. The semantic audit
+  reports three current entity hubs, complete destination contracts and zero
+  bare URLs in active Brain content.
+- Relationship persistence was transactional and idempotent. The guarded
+  refresh stored the exact reviewed Markdown in `brain.source_artifact_text`;
+  repeat planning reported 39 `unchanged`. Hosted reads return the complete
+  companion text while original binaries remain private, separately linked
+  artifacts.
+- The content pass refreshed current ERS role, project and infrastructure state,
+  cleared the stale Capture / Triage queue against its canonical homes, linked
+  the official ERS website and team page from the relevant entity hubs, and
+  added an ERS-owned freshness register with cadence, owner and event triggers.
+  Spec 014 remains inactive and trigger-gated.
+- The replay exposed three shared maintenance defects: same-hash pointers could
+  be considered current despite missing hosted text; code-styled labels inside
+  complete Markdown links could be reported as non-clickable paths; and graph
+  lint treated same-document anchors and non-HTTP URI schemes as Brain files.
+  Release `v1.7.3` repairs all three and adds regression coverage.
+- The local and hosted ERS Brain converged at 52 files with zero conflicts. The
+  dedicated ERS stack remains a John-led development baseline; colleague access
+  and hardened production controls remain separately gated.
+
 ## JEM acceptance remediation — 2026-08-23
 
 - The strict source audit now covers all 45 companions and reports 45 directly
@@ -372,10 +404,10 @@ exact ERS Brain Monitor database binding without exposing it in shell history.
   passed on JEM `v1.6.0`: the hosted tool returns the complete reviewed
   companion, exact search exposes both routes, and binary bytes remain private.
 
-## ERS replay gate
+## ERS replay gate — retained for future reruns
 
-Do not copy JEM URLs or classifications into `ers-brain`. When John separately
-approves the ERS pass:
+The 2026-08-24 replay passed this gate. Retain it for later corpus-wide reruns;
+do not copy JEM URLs or classifications into `ers-brain`:
 
 1. Use only the dedicated ERS hosted connector, local mirror, snapshot and
    credentials.

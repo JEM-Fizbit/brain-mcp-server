@@ -149,6 +149,23 @@ test("source-link audit distinguishes direct, index-only, unlinked and non-click
   ]);
 });
 
+test("source-link audit does not flag code-styled labels inside Markdown links", () => {
+  const result = auditSourceLinks({
+    brainFiles: new Map([
+      [
+        "topic.md",
+        "[`sources/research/direct.md`](../sources/research/direct.md)",
+      ],
+    ]),
+    sourceFiles: new Map([
+      ["research/direct.md", "[Back](../../brain/topic.md)"],
+    ]),
+  });
+
+  assert.deepEqual(result.nonClickableSourceReferences, []);
+  assert.deepEqual(result.directlyLinkedCompanions, ["sources/research/direct.md"]);
+});
+
 test("source-link audit excludes source folder indexes from evidence-companion counts", () => {
   const result = auditSourceLinks({
     brainFiles: new Map([["topic.md", "[Source](../sources/company/source.md)"]]),

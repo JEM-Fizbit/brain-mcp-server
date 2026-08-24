@@ -152,3 +152,38 @@ test("wikilink examples inside inline code do not become broken-link diagnostics
   assert.deepEqual(result.externalReferences, []);
   assert.ok(result.reachable.includes("NOW.md"));
 });
+
+test("same-file anchors and external URI schemes do not become graph diagnostics", () => {
+  const result = analyzeBrainGraph(
+    new Map([
+      [
+        "00_loader.md",
+        [
+          "[Section](#section)",
+          "[Local app](computer:///Users/example/Documents/note.md)",
+          "[Email](mailto:person@example.com)",
+          "[[NOW]]",
+        ].join("\n"),
+      ],
+      ["NOW.md", "# Now"],
+    ])
+  );
+
+  assert.deepEqual(result.diagnostics, []);
+  assert.deepEqual(result.externalReferences, []);
+  assert.ok(result.reachable.includes("NOW.md"));
+});
+
+test("code-styled labels inside Markdown links do not become backtick diagnostics", () => {
+  const result = analyzeBrainGraph(
+    new Map([
+      ["00_loader.md", "[`README.md`](folder/README.md) and [[NOW]]"],
+      ["NOW.md", "# Now"],
+      ["folder/README.md", "# Folder"],
+      ["other/README.md", "# Other"],
+    ])
+  );
+
+  assert.deepEqual(result.diagnostics, []);
+  assert.ok(result.reachable.includes("folder/README.md"));
+});

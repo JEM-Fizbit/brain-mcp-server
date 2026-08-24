@@ -1,6 +1,6 @@
 # 017 — Hosted Ingestion Preflight And Backend Contract
 
-**Status:** in-progress — approved by John 2026-08-24
+**Status:** implemented — JEM and dedicated ERS development baselines (2026-08-24)
 **Source:** `BACKLOG.md` hosted-ingestion failure plus approval-gate preflight item
 **Roadmap link:** source/provenance maintenance foundation before ERS semantic replay
 **Decisions impact:** formalises the split between hosted Brain writes and operator-side source-byte/inbox custody
@@ -119,3 +119,14 @@ the owner-only Monitor credential path. Release `v1.7.2` corrects all four.
 Backfill and refresh now share the same explicit Brain/project binding, source
 indexes are excluded consistently, and every emitted link suggestion resolves
 to an evidence companion rather than a naming pattern.
+
+The approved ERS semantic replay then completed the operational proof. All 39
+evidence companions were refreshed into versioned Postgres text and repeat
+planning reported 39 `unchanged`. During that proof, a same-hash pointer with no
+`brain.source_artifact_text` row was incorrectly classified as current. Release
+`v1.7.3` requires both the hash and stored text before returning `unchanged`, so
+an interrupted or legacy pointer is repaired instead of silently preserving a
+metadata-only hosted read. The same release also stops complete Markdown links
+whose labels use code styling, same-document anchors and non-HTTP URI schemes
+from becoming false graph/source diagnostics. These are shared maintenance
+corrections; the dedicated ERS deployment retains no protected runtime drift.

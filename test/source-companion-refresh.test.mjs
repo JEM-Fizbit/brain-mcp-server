@@ -50,6 +50,16 @@ test("companion inventory hashes exact bytes and refresh plan is idempotent", as
   ]);
   assert.equal(unchanged[0].state, "unchanged");
 
+  const missingHostedText = planCompanionRefresh(inventory, [
+    {
+      companion_path: relativePath,
+      content_sha256: inventory[0].contentSha256,
+      artifact_id: "pointer-only",
+      text_available: false,
+    },
+  ]);
+  assert.equal(missingHostedText[0].state, "refresh_required");
+
   const changed = planCompanionRefresh(inventory, [
     { companion_path: relativePath, content_sha256: "different", artifact_id: "old" },
   ]);
