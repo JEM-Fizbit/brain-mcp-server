@@ -94,7 +94,10 @@ fact unchanged until a human resolves it.
 ## Phase 0 — Authority, safety and baseline
 
 1. Load the target Brain with its explicit `brain_id`, then read its operations
-   guide.
+   guide. Before any ingestion-related write, call `brain_prepare_ingest` and
+   follow the backend/category contract it returns. A hosted Postgres result is
+   not permission to invent a Fly-local source tree or treat `brain_scan_inbox`
+   as evidence about the operator-side inbox.
 2. Confirm hosted sync is healthy and open conflicts are zero. Do not write if
    either condition fails.
 3. Confirm the target Brain's canonical content owner and source archive. Never

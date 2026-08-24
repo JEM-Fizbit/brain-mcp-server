@@ -172,13 +172,13 @@ brain-mcp-server/
 │       ├── log.ts        # brain_log, brain_read_log
 │       ├── tasks.ts      # brain_capture_item, brain_report_item alias
 │       ├── lint.ts       # brain_lint
-│       ├── ingest.ts     # brain_ingest, brain_ingest_complete
+│       ├── ingest.ts     # brain_prepare_ingest, brain_ingest, brain_ingest_complete
 │       ├── inbox.ts      # brain_scan_inbox
 │       └── index.ts      # Tool registration barrel
 └── dist/                 # Compiled output
 ```
 
-### Tools (25 total — 24 distinct + 1 alias)
+### Tools (26 total — 25 distinct + 1 alias)
 
 Registered in `src/tools/index.ts` across the registry, semantic, sync, context, update, status, log, tasks, lint, ingest, and inbox modules.
 
@@ -213,9 +213,10 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 - `brain_capture_item` — Capture a temporary conversational bug/feature/observation/investigation/follow-up/idea/question/reminder/note/routing item in `TASKS.md` `## Capture / Triage Queue` before triage into the canonical destination.
 - `brain_report_item` — Compatibility alias for `brain_capture_item`.
 - `brain_lint` — Health check: bloat, staleness, orphans, drift, capture queue, unindexed working binaries. Auto-logs the pass.
-- `brain_ingest` — Process a new source (dry_run=true returns analysis plan; dry_run=false saves source to sources/{category}/)
-- `brain_ingest_complete` — Record provenance after ingest (updates SOURCES.md index + LOG.md, optionally deletes inbox file via `inbox_file` param)
-- `brain_scan_inbox` — List files pending in the inbox/ drop-folder for processing
+- `brain_prepare_ingest` — Read-only backend/category/capability preflight. Call before any ingestion-related write.
+- `brain_ingest` — Filesystem-backed source analysis/save. Postgres-backed Brains route source custody through their operator workflow.
+- `brain_ingest_complete` — Complete filesystem provenance and inbox cleanup after preflight. Hosted revision logging remains available through `brain_log`.
+- `brain_scan_inbox` — List a filesystem-backed inbox; hosted Postgres output explicitly reports that operator-side inbox state is not observable.
 
 ---
 

@@ -11,6 +11,22 @@
       "storage_config": {},
       "vector_backend": null,
       "vector_scope": ["sources"],
+      "source_categories": [
+        "bios",
+        "cv",
+        "career_history",
+        "assessments",
+        "writing_samples",
+        "analysis",
+        "meeting_notes",
+        "correspondence",
+        "personal",
+        "research",
+        "travel",
+        "favourites",
+        "photos",
+        "other"
+      ],
       "lint": {
         "graph_roots": ["00_loader.md", "NOW.md"],
         "relative_parent_scope": "disabled",

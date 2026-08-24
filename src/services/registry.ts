@@ -8,6 +8,7 @@ import {
   INBOX_DIR,
   LOADER_FILE,
   NOW_FILE,
+  SOURCE_CATEGORIES,
   SOURCES_ROOT,
 } from "../constants.js";
 import { runtimeBrainId } from "./runtime-env.js";
@@ -48,6 +49,7 @@ export interface BrainDefinition {
   storage_config: BrainStorageConfig;
   vector_backend?: string | null;
   vector_scope?: string[];
+  source_categories?: string[];
   created_at?: string;
   metadata?: Record<string, unknown>;
   lint?: BrainLintConfig;
@@ -92,6 +94,7 @@ const LINT_MODES = new Set<BrainLintReachabilityMode>([
   "graph_shadow",
   "graph",
 ]);
+const SOURCE_CATEGORY_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
 export function isBrainRole(value: unknown): value is BrainRole {
   return typeof value === "string" && BRAIN_ROLES.has(value as BrainRole);
@@ -148,6 +151,7 @@ function synthesizedRegistry(): BrainRegistry {
         },
         vector_backend: null,
         vector_scope: ["sources"],
+        source_categories: [...SOURCE_CATEGORIES],
         // A synthesized local profile stays legacy by default, but carries the
         // same graph grammar defaults as deployment registries so the explicit
         // BRAIN_LINT_MODE_OVERRIDES promotion gate produces meaningful graph
@@ -177,6 +181,23 @@ function assertRegistryShape(registry: BrainRegistry): void {
     seen.add(brain.id);
     if (brain.storage_backend !== "filesystem" && brain.storage_backend !== "postgres") {
       throw new Error(`Unsupported storage_backend for ${brain.id}: ${brain.storage_backend}`);
+    }
+    if (brain.source_categories !== undefined) {
+      if (
+        !Array.isArray(brain.source_categories) ||
+        brain.source_categories.length === 0 ||
+        brain.source_categories.some(
+          (category) =>
+            typeof category !== "string" || !SOURCE_CATEGORY_RE.test(category)
+        )
+      ) {
+        throw new Error(
+          `Brain ${brain.id} source_categories must be a non-empty array of safe directory names.`
+        );
+      }
+      if (new Set(brain.source_categories).size !== brain.source_categories.length) {
+        throw new Error(`Brain ${brain.id} source_categories must not contain duplicates.`);
+      }
     }
     const lint = brain.lint;
     if (lint?.reachability_mode !== undefined && !isLintMode(lint.reachability_mode)) {
@@ -240,6 +261,12 @@ function assertRegistryShape(registry: BrainRegistry): void {
       }
     }
   }
+}
+
+export function sourceCategoriesForBrain(brain: BrainDefinition): readonly string[] {
+  return brain.source_categories?.length
+    ? brain.source_categories
+    : SOURCE_CATEGORIES;
 }
 
 function applyLintModeOverrides(registry: BrainRegistry): BrainRegistry {
@@ -461,13 +488,13 @@ export async function getBrainPaths(brainId?: string): Promise<BrainPaths> {
 export function pathsForBrain(brain: BrainDefinition): BrainPaths {
   // S1-guard: host-filesystem path resolution is only valid for filesystem-backed
   // Brains. On a non-filesystem backend (e.g. the hosted Postgres connector) the
-  // FS-write tools (ingest, source save, log append, git) must refuse cleanly
+  // FS-write tools (ingest, source save, inbox cleanup, git) must refuse cleanly
   // rather than resolve to a path that does not exist in the container — which
   // would otherwise silently write to ephemeral disk that no hosted read sees.
   if (brain.storage_backend !== "filesystem") {
     throw new Error(
       `Brain ${brain.id} uses the "${brain.storage_backend}" backend; host filesystem ` +
-        `operations (ingest, source save, log append, git) are unavailable here. Run these ` +
+        `operations (ingest, source save, inbox cleanup, git) are unavailable here. Run these ` +
         `through the deployment's documented operator workflow against its authoritative ` +
         `revision/source stores; do not substitute a separate filesystem Brain for hosted state.`
     );

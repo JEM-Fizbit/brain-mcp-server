@@ -26,9 +26,10 @@ export function registerInboxTools(server: McpServer): void {
               {
                 type: "text",
                 text: [
-                  `Server-side inbox scanning is unavailable for Postgres-backed Brain ${ctx.brainId}.`,
+                  `Server-side inbox state is not observable for Postgres-backed Brain ${ctx.brainId}.`,
                   "The hosted MCP server has no Fly-local inbox directory for this Brain.",
-                  "Use the deployment's operator ingestion workflow so source metadata and artifacts land in its authoritative stores.",
+                  "This is a backend capability result, not evidence that the real inbox is empty or still pending.",
+                  "Use brain_prepare_ingest, then inspect and verify the selected Brain's real inbox through its local Monitor/operator workspace so source metadata and artifacts land in the authoritative stores.",
                 ].join("\n"),
               },
             ],

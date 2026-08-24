@@ -467,14 +467,15 @@ surface instead of forcing a switch to an MCP client or CLI:
   classify, summarize, move, or delete content. Each pending item says that it
   is not stuck and exposes a filename-specific **Claude ingestion handoff**.
   Copy that prompt into an interactive Claude session with access to the
-  selected Brain and ingestion-capable tools. The handoff requires the session
-  to follow the Brain's ingestion protocol, preserve source and provenance,
-  update only reviewed durable content, call `brain_ingest_complete` with the
-  exact `inbox_file`, and verify the file no longer appears in
-  `brain_scan_inbox`. That successful cleanup is what clears the warning; a
-  scan alone never does. If the session has only hosted read tools, use the
-  documented local ingestion-capable workflow rather than deleting the inbox
-  file manually.
+  selected Brain and its operator workspace. The handoff first calls the
+  read-only `brain_prepare_ingest`. A filesystem-backed Brain may then use
+  `brain_ingest_complete` with the exact `inbox_file` and verify through
+  `brain_scan_inbox`. A Postgres-backed Brain must instead preserve source and
+  provenance, clear the exact operator-side inbox file only after its source
+  receipt exists, and verify by refreshing the local Monitor inbox scan; Fly
+  cannot see that state. Hosted `brain_log` remains available for the reviewed
+  Brain-revision receipt. If the session cannot access the operator workspace,
+  it stops with an explicit handoff rather than deleting the file manually.
 - **Actions You Can Approve** lists each task relocation, Done-date stamp, and
   non-destructive archive candidate with an unchecked per-item checkbox. A
   standard header checkbox selects or clears all current items; the separate

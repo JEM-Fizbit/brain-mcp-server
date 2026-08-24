@@ -3,13 +3,16 @@ import path from "node:path";
 import {
   SOURCES_DIR,
   SOURCES_INDEX,
-  SOURCE_CATEGORIES,
   type SourceCategory,
 } from "../constants.js";
-import { listFileNames } from "./brain.js";
+import { activeBrainStore } from "./active-brain-store.js";
 import { brainDate } from "./date.js";
 import * as log from "./log.js";
-import { getBrainPaths } from "./registry.js";
+import {
+  getBrainPaths,
+  sourceCategoriesForBrain,
+  type BrainDefinition,
+} from "./registry.js";
 
 export interface IngestAnalysis {
   sourceLabel: string;
@@ -40,9 +43,29 @@ function assertSourceCategory(category: SourceCategory): void {
  */
 export async function analyzeForIngest(
   sourceLabel: string,
-  brainId?: string
+  brain: BrainDefinition
 ): Promise<IngestAnalysis> {
-  const files = await listFileNames(brainId);
+  const listed = await activeBrainStore().listFiles(brain.id);
+  const files = listed
+    .map((file) => (typeof file === "string" ? file : file.name))
+    .sort();
+  const categories = sourceCategoriesForBrain(brain);
+  const completionSteps =
+    brain.storage_backend === "filesystem"
+      ? [
+          "- **For large documents (over 500 words or non-text files):**",
+          "  1. Save the original at `sources/{category}/{YYYY-MM-DD}_{slug}.{ext}`",
+          "  2. Save a reviewed markdown conversion at `sources/{category}/{YYYY-MM-DD}_{slug}.md`",
+          "  3. Update Brain files via `brain_update_file`",
+          "  4. Call `brain_ingest_complete` with both file paths and Brain files touched",
+          "- **For short text (under 500 words):** Call `brain_ingest` with `dry_run=false` and `source_content`",
+        ]
+      : [
+          "- Preserve source bytes, the reviewed Markdown companion, provenance and inbox state through the selected Brain's local Monitor/operator workflow",
+          "- Complete the Postgres/Storage source inventory before applying reviewed Brain-content changes through hosted revision tools",
+          "- Do not call `brain_ingest` with `dry_run=false` or `brain_ingest_complete`; those mutation tools require a filesystem-backed Brain",
+          "- Verify source custody and inbox cleanup in the local Monitor/operator workspace; Fly cannot see either surface",
+        ];
 
   const instructions = [
     `## Ingest Analysis: ${sourceLabel}`,
@@ -56,18 +79,13 @@ export async function analyzeForIngest(
     "",
     ...files.map((f) => `- ${f}`),
     "",
-    `### Source categories (for saving): ${SOURCE_CATEGORIES.join(", ")}`,
+    `### Source categories (for saving): ${categories.join(", ")}`,
     "",
     "### Next steps:",
     "- Read the per-Brain operations guide named by `brain_load_context` before writing",
     "- Use `brain_read_file` to read any files you expect the source touches",
     "- Get human approval for proposed changes",
-    "- **For large documents (over 500 words or non-text files):**",
-    "  1. Use the deployment's documented operator workflow to save the original at `sources/{category}/{YYYY-MM-DD}_{slug}.{ext}`",
-    "  2. Save a reviewed markdown conversion at `sources/{category}/{YYYY-MM-DD}_{slug}.md`",
-    "  3. Update Brain files via `brain_update_file`",
-    "  4. Call `brain_ingest_complete` with both file paths and Brain files touched",
-    "- **For short text (under 500 words):** Call `brain_ingest` with `dry_run=false` and `source_content`",
+    ...completionSteps,
     "- Run `brain_lint` after ingesting to check for inconsistencies",
   ].join("\n");
 
@@ -75,9 +93,23 @@ export async function analyzeForIngest(
     sourceLabel,
     fileCount: files.length,
     files,
-    categories: SOURCE_CATEGORIES,
+    categories,
     instructions,
   };
+}
+
+export function assertConfiguredSourceCategory(
+  category: SourceCategory,
+  brain: BrainDefinition
+): void {
+  assertSourceCategory(category);
+  const categories = sourceCategoriesForBrain(brain);
+  if (!categories.includes(category)) {
+    throw new Error(
+      `Unsupported source category for ${brain.id}: ${category}. ` +
+        `Allowed categories: ${categories.join(", ")}. Call brain_prepare_ingest first.`
+    );
+  }
 }
 
 /**

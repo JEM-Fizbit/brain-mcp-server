@@ -111,6 +111,12 @@ test("image-baked registry satisfies universal and profile expectations", async 
     principal.roles?.[registry.default_brain_id] === "owner"
   ));
   assert.ok(registry.brains.every((brain) => brain.storage_backend === "postgres"));
+  assert.ok(registry.brains.every((brain) =>
+    Array.isArray(brain.source_categories) &&
+    brain.source_categories.length > 0 &&
+    brain.source_categories.every((category) => /^[a-z0-9][a-z0-9_-]*$/.test(category)) &&
+    new Set(brain.source_categories).size === brain.source_categories.length
+  ));
   assert.doesNotMatch(JSON.stringify(registry), /secret|token|postgresql:\/\//i);
 
   assertUniversalLintProfile(registry);
@@ -730,7 +736,8 @@ test("MCP guidance uses the slim bootstrap and on-demand operations contract", a
   assert.doesNotMatch(server, /loader is the single source of truth/);
   assert.match(contextTool, /operations guide/);
   assert.match(ingestTool, /per-Brain operations guide/);
-  assert.match(ingestTool, /Common categories include bios, cv, career_history/);
+  assert.match(ingestTool, /sourceCategoriesForBrain/);
+  assert.match(ingestTool, /Source categories:/);
   assert.match(ingestService, /operations guide named by `brain_load_context`/);
   assert.doesNotMatch(ingestService, /Desktop Commander write_file/);
   assert.match(inboxTool, /Run `brain_lint` after the coordinated update/);

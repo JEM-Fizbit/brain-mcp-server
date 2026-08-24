@@ -8,6 +8,42 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-24 — Preflight ingestion and preserve operator-side source custody
+
+**Decision:** Every ingestion begins with the read-only, idempotent
+`brain_prepare_ingest` tool. It resolves the selected Brain and returns its
+configured categories, file inventory, backend capabilities, and authoritative
+completion/verification surface before any content write. Filesystem-backed
+Brains retain the existing save/provenance/inbox workflow. Postgres-backed
+Brains use the local Monitor/operator workspace for source bytes, provenance
+inventory and real inbox cleanup; Fly remains the hosted Brain revision and
+source-metadata reader, not a second filesystem authority. Unsupported ingest
+mutation calls fail before server-side writes and state that no writes occurred.
+
+**Why:** JEM and ERS hosted tools previously advertised a filesystem workflow
+that Fly could not execute. The real backend refusal appeared only after a host
+approval prompt, and `brain_ingest_complete` could fail after Brain revisions
+had already landed. The hardcoded JEM category examples were also wrong for
+ERS, hosted inbox output could not establish real inbox state, and the shared
+filesystem guard incorrectly said hosted log append was unavailable even though
+`brain_log` already writes through the revision store. A dedicated annotated
+preflight gives clients a correct no-write decision surface while preserving
+one source authority.
+
+**Alternatives rejected:** create an ephemeral Fly `sources/`/`inbox/` tree
+(silent divergence and data loss on replacement); make Postgres artifact text a
+new unversioned Markdown authority (conflicts with local canonical content);
+upload source bytes through ordinary MCP writes (widens the private artifact
+surface); keep only better error text on the mutation tools (still burns an
+avoidable approval prompt and permits content writes before capability is
+known); copy JEM categories into the ERS runtime (tenant error).
+
+**Related:** `docs/specs/017-hosted-ingestion-preflight.md`;
+`src/tools/ingest.ts`; `src/services/ingest.ts`;
+`src/services/registry.ts`; `scripts/hosted-cockpit.mjs`.
+
+---
+
 ## 2026-08-24 — Session-start nudges are a transport-independent contract
 
 **Decision:** `brain_load_context` must emit its health nudges on every
