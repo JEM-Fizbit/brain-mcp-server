@@ -418,3 +418,16 @@ the purpose of the bounded operator decision.
 - JEM `v1.6.4` places the single **Copy** widget inside the LLM prompt window's
   upper-right corner. The full button name remains **Copy LLM triage prompt**
   for assistive technology, and copy success is announced through a live status.
+
+### Post-release verification — JEM `v1.6.4`
+
+- Fly release 69 completed on 24 August 2026; the public health endpoint reports
+  `brain-mcp-server` `1.6.4` with the existing runtime custody modes unchanged.
+- The running local JEM Monitor serves the upper-right prompt widget and its
+  accessible Copy label. Desktop and 390px tests verify placement inside the
+  prompt panel, the complete clipboard payload, and the success announcement.
+- Hosted `brain_load_context` returns loader plus `NOW.md` through the repaired
+  active-store path without obsolete Capture or lint-staleness nudges. Hosted
+  lint reports three maintainer findings, no Capture queue, zero broken internal
+  links, and 262 classified locators; sync reports 39 files and zero conflicts.
+- ERS content, schema, credentials, and deployment were not changed.
