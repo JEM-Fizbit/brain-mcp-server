@@ -510,7 +510,36 @@ async function expectMaintenanceLayout(page, { desktop }) {
   await expect(triageHandoff).toBeVisible();
   await triageHandoff.click();
   await expect(page.getByText(/Phase 1 — proposal only/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy LLM triage prompt", exact: true })).toBeVisible();
+  const promptPanel = page.locator(".capture-prompt-panel");
+  const copyPrompt = page.getByRole("button", { name: "Copy LLM triage prompt", exact: true });
+  await expect(copyPrompt).toBeVisible();
+  const copyPlacement = await promptPanel.evaluate((panel) => {
+    const panelRect = panel.getBoundingClientRect();
+    const buttonRect = panel.querySelector(".capture-prompt-copy")?.getBoundingClientRect();
+    return {
+      insideTopRight:
+        Boolean(buttonRect) &&
+        buttonRect.top >= panelRect.top &&
+        buttonRect.right <= panelRect.right &&
+        buttonRect.top < panelRect.top + 60 &&
+        buttonRect.right > panelRect.right - 100,
+    };
+  });
+  expect(copyPlacement.insideTopRight).toBe(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.__copiedTriagePrompt = text;
+        },
+      },
+    });
+  });
+  await copyPrompt.click();
+  await expect(page.getByText(/Copied\. Paste it into Codex/)).toBeVisible();
+  const copiedPrompt = await page.evaluate(() => window.__copiedTriagePrompt);
+  expect(copiedPrompt).toContain("Phase 1 — proposal only");
   const manualTriage = page.getByText("Manual triage in Obsidian", { exact: true });
   await expect(manualTriage).toBeVisible();
   await manualTriage.click();

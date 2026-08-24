@@ -454,7 +454,8 @@ surface instead of forcing a switch to an MCP client or CLI:
   A Capture / Triage finding states the total number of open items, identifies
   the stale count as the subset at least seven days old, and shows the newer
   remainder. Its recommended **LLM-assisted triage** handoff is model-neutral
-  and copyable: the LLM must inspect all items, propose canonical destinations
+  and copyable from the **Copy** control fixed inside the prompt window's upper
+  right corner: the LLM must inspect all items, propose canonical destinations
   in one table, and stop for John's approval before any write. The adjacent
   **Manual triage in Obsidian** alternative explains how to move personal work
   into `TASKS.md` Active, transfer project/ERS/audit work to its real owner,

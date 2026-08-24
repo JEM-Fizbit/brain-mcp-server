@@ -1,6 +1,6 @@
 # Spec 016 — JEM Acceptance Review
 
-**Status:** complete — remediated and live-verified on JEM through `v1.6.2`
+**Status:** complete — remediated and live-verified on JEM through `v1.6.4`
 **Started:** 2026-08-23
 **Scope:** JEM Brain development pilot; ERS remains untouched
 **Related:** [`../016-source-links-and-brain-library-pilot.md`](../016-source-links-and-brain-library-pilot.md)
@@ -21,7 +21,7 @@ implemented outcome. ERS remains separately approval-gated.
 | 6 | Exact reviewed Markdown source reads return complete stored text; KRUK routing requires both source and `quanta.md` exception context. | Store regressions and 26/26 JEM routing eval pass; the deployed hosted read returns the complete companion and preserves binary privacy. |
 | 7 | Complete corpus classified by freshness behavior; nine cadence-controlled areas reviewed and given owner/cadence/trigger controls; lint enforces semantic review date and declared cadence. | Priority pages no longer appear stale/bloated in fresh hosted lint. |
 | 8 | Operator lint queue now excludes graph/source locator telemetry; genuine stale internal links were repaired and technical detail is collapsed/maintainer-owned. | Local and hosted graph lint: zero broken internal links, 261 classified references, four maintenance findings; strict source audit still passes 45/45. JEM `v1.6.1` is live. |
-| 9 | Capture-queue guidance distinguishes 13 total open items from the 12-item stale subset and offers an approval-first copyable LLM workflow plus an exact Obsidian alternative. | Unit/HTTP tests plus desktop and 390px browser checks pass; JEM `v1.6.2` is live and ERS remains untouched. |
+| 9 | Capture-queue guidance distinguishes total open items from the stale subset and offers an approval-first LLM workflow plus an exact Obsidian alternative; the prompt has an upper-right Copy control. | Triage cleared all 13 items; hosted lint has no operator decision. Unit/HTTP tests plus desktop and 390px browser checks pass; JEM `v1.6.4` is live and ERS remains untouched. |
 
 ## Acceptance results
 
@@ -366,7 +366,7 @@ companions with zero strict failures.
 
 **Surface:** JEM Brain Monitor → Maintenance → Brain Lint
 **Evidence:** `Screenshot 2026-08-24 at 00.09.29.png`, supplied by John
-**Status:** remediated and live-verified in JEM `v1.6.2`
+**Status:** remediated, successfully used, and live-verified in JEM `v1.6.4`
 
 ### Observation from John
 
@@ -403,3 +403,18 @@ the purpose of the bounded operator decision.
 - Hosted lint remains at four maintenance findings, zero broken internal links,
   and 261 automatically classified locators. Hosted sync remains at 39 files
   and zero open conflicts. ERS was not deployed or modified.
+
+### Acceptance follow-up — successful triage and prompt-copy refinement
+
+- John confirmed that the LLM-assisted workflow completed successfully and
+  cleared all Capture / Triage items. Fresh hosted lint contains no capture
+  finding or operator decision: only three maintainer-owned graph-orphan notes,
+  zero broken internal links, and 262 automatically classified locators remain.
+- The LLM also found and fixed a latent hosted-session bug: the active-store
+  `brain_load_context` path had stopped appending maintenance nudges. The shared
+  nudge builder now restores lint, maintenance-issue, inbox-when-measurable, and
+  Capture / Triage notices without fabricating an all-clear when a backend
+  cannot answer a signal.
+- JEM `v1.6.4` places the single **Copy** widget inside the LLM prompt window's
+  upper-right corner. The full button name remains **Copy LLM triage prompt**
+  for assistive technology, and copy success is announced through a live status.

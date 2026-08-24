@@ -42,8 +42,9 @@ The hosted Brain rebuild has passed the first critical sync gates:
   (`379b965`) established the source/Library pilot, the `v1.6.0` acceptance
   remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`
   operator-diagnostic remediation (`2ed0393`) and the `v1.6.2` capture-queue
-  completion guidance were deployed only to the personal `jem-brain-mcp` app
-  on 2026-08-24; the
+  completion guidance, followed by the `v1.6.4` point-of-use Copy control and
+  restored hosted session-start maintenance nudges, were deployed only to the
+  personal `jem-brain-mcp` app on 2026-08-24; the
   personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
   the local read-only Brain Library pilot renders canonical Markdown and exact
@@ -72,10 +73,10 @@ The hosted Brain rebuild has passed the first critical sync gates:
   owner, cadence and trigger, and lint enforces declared cadence over mtime.
   Cockpit Maintenance now excludes graph/source locator telemetry from the
   maintenance count, automatically verifies the source boundary, leaves zero
-  genuine broken internal links, and shows only one bounded capture-queue
-  decision to John; 261 classified references remain available in a collapsed
-  maintainer-only panel. Each safe mechanical proposal remains inspectable in
-  full.
+  genuine broken internal links, and now shows no bounded capture-queue
+  decision after the successful 13-item triage; 262 classified references
+  remain available in a collapsed maintainer-only panel. Each safe mechanical
+  proposal remains inspectable in full.
   Spec 014 remains deferred because no representative post-content
   follow-up-read gap or weaker-harness gap has been measured. ERS schema,
   content, credentials, and deployment remain unchanged and separately gated;
@@ -85,7 +86,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
   a JEM-named local watcher could silently target the ERS database;
 - spec 013 server Phases 1–3 and both Brain-content migrations are deployed; the
   corrective graph/sync baseline landed in `v1.4.5`, and the personal JEM
-  runtime is now current at `v1.6.2`: ranked structured search/evals, the
+  runtime is now current at `v1.6.4`: ranked structured search/evals, the
   private Postgres FTS index, graph lint, bootstrap-budget/read-only lint,
   fail-closed structural-file roles, reserved external-namespace guards,
   idempotent conflict recording, and a parity-gated local state-rebase
