@@ -100,7 +100,9 @@ export function planCompanionRefresh(inventory, registryRows) {
     if (!current) return { state: "unregistered", local, current: null };
     return {
       state:
-        current.content_sha256 === local.contentSha256 ? "unchanged" : "refresh_required",
+        current.content_sha256 === local.contentSha256 && current.text_available !== false
+          ? "unchanged"
+          : "refresh_required",
       local,
       current,
     };

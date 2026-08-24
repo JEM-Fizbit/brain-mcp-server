@@ -153,7 +153,9 @@ database profile, retaining the prior active artifact as a snapshot. Private
 Storage byte replacement remains a distinct `storage` mode requiring the
 explicit admin-only service credential. Ordinary relative Markdown links expose
 an adjacent ingested original to local Obsidian/viewer users without making it
-public or embedding a laptop absolute path.
+public or embedding a laptop absolute path. A matching companion hash is current
+only when the versioned text row also exists; pointer-only legacy or interrupted
+states must be refreshed.
 
 **Why:** The KRUK acceptance prompt found the correct source but received only a
 manifest/opening search excerpt even though the complete reviewed Markdown was

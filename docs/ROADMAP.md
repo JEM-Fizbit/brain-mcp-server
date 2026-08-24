@@ -43,7 +43,7 @@ The hosted Brain rebuild has passed the first critical sync gates:
   remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`
   operator-diagnostic remediation (`2ed0393`) and the `v1.6.2` capture-queue
   completion guidance, followed by the `v1.6.4` point-of-use Copy control and
-  restored hosted session-start maintenance nudges, were deployed only to the
+  restored hosted session-start maintenance nudges, were first deployed to the
   personal `jem-brain-mcp` app on 2026-08-24; the
   personal schema now has
   additive portable source/artifact identity and reviewed source-to-Brain links;
@@ -67,8 +67,13 @@ The hosted Brain rebuild has passed the first critical sync gates:
   unavailable destination state; all five hubs satisfy the contract, active
   Brain content has no bare URLs, and exact Quanta/Nitec destination regressions
   are in the routing golden set. The combined source-link and destination
-  sequence is preserved in `docs/brain-content-linking-runbook.md`; ERS replay
-  remains separately approval-gated. The complete 39-file JEM corpus also has a
+  sequence is preserved in `docs/brain-content-linking-runbook.md`. The approved
+  ERS replay is also complete on its dedicated development stack: all 39
+  evidence companions are directly linked with reciprocal declarations, 43
+  reviewed source-to-Brain relationships are persisted, all 17 adjacent
+  same-stem originals are linked, active content has zero bare URLs, and the
+  three current entity hubs satisfy the destination contract. The complete
+  39-file JEM corpus also has a
   freshness classification; nine cadence-controlled areas record review date,
   owner, cadence and trigger, and lint enforces declared cadence over mtime.
   Cockpit Maintenance now excludes graph/source locator telemetry from the
@@ -78,23 +83,24 @@ The hosted Brain rebuild has passed the first critical sync gates:
   remain available in a collapsed maintainer-only panel. Each safe mechanical
   proposal remains inspectable in full.
   Spec 014 remains deferred because no representative post-content
-  follow-up-read gap or weaker-harness gap has been measured. ERS schema,
-  content, credentials, and deployment remain unchanged and separately gated;
+  follow-up-read gap or weaker-harness gap has been measured. Shared releases
+  `v1.7.0`–`v1.7.3` added hosted ingestion preflight, tenant-specific source
+  categories, explicit project-bound source maintenance, complete reviewed-text
+  recovery and corrected graph/source classification. JEM and ERS retain
+  isolated credentials, databases, deployments and content authority;
 - multi-profile Monitor sync now requires an explicit revision store and binds
   each Postgres URL to an expected Supabase project ref, with ambient repo env
   loading disabled for managed profiles. This closes a discovered path by which
   a JEM-named local watcher could silently target the ERS database;
 - spec 013 server Phases 1–3 and both Brain-content migrations are deployed; the
-  corrective graph/sync baseline landed in `v1.4.5`, and the personal JEM
-  runtime is now current at `v1.6.4`: ranked structured search/evals, the
+  corrective graph/sync baseline landed in `v1.4.5`, and both dedicated
+  development runtimes are current at `v1.7.3`: ranked structured search/evals, the
   private Postgres FTS index, graph lint, bootstrap-budget/read-only lint,
   fail-closed structural-file roles, reserved external-namespace guards,
   idempotent conflict recording, and a parity-gated local state-rebase
-  procedure. Both Brains use graph reachability as the primary beta path while
-  legacy deltas remain the inverse comparator through 2026-07-24. JEM currently
-  has 39 hosted files; ERS currently has 51 hosted files, and its migration
-  baseline recorded 50/50 graph-reachable files with three deliberate history
-  exemptions. Both consolidated local Monitor profiles are healthy and
+  procedure. Both Brains use graph reachability as the primary beta path. JEM
+  currently has 39 hosted files; ERS has 52 hosted files after adding its
+  freshness register. Both consolidated local Monitor profiles are healthy and
   conflict-free. The task-context compiler remains unbuilt and spec 014 stays
   trigger-gated;
 - normal Brain operations no longer depend on GitHub repo backup, manual commit/push/merge, or Git conflict handling;

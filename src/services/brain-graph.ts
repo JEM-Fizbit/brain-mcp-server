@@ -126,6 +126,10 @@ function extractRawEdges(
 ): RawEdge[] {
   const graphContent = withoutFencedCodeBlocks(content);
   const linkContent = withoutInlineCodeSpans(graphContent);
+  const backtickContent = graphContent.replace(
+    /!?\[[^\]]*\]\((?:<[^>]+>|[^\s)]+)(?:\s+['"][^'"]*['"])?\)/g,
+    (match) => " ".repeat(match.length)
+  );
   const found: RawEdge[] = [];
   const seen = new Set<string>();
   const add = (edge: RawEdge) => {
@@ -146,6 +150,10 @@ function extractRawEdges(
   for (const match of linkContent.matchAll(/!?\[[^\]]*\]\((?:<([^>]+)>|([^\s)]+))(?:\s+['"][^'"]*['"])?\)/g)) {
     const target = (match[1] || match[2] || "").trim();
     if (!target) continue;
+    // Same-document anchors are valid navigation but do not create a graph
+    // edge. Other URI schemes (computer:, mailto:, file:, etc.) are external
+    // surfaces, not candidate Brain paths.
+    if (target.startsWith("#")) continue;
     if (/^https:\/\//i.test(target)) {
       for (const mapping of config.sharepoint_url_mappings || []) {
         if (!target.startsWith(mapping.url_prefix)) continue;
@@ -159,6 +167,7 @@ function extractRawEdges(
       }
       continue;
     }
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
     if (target.endsWith("/")) continue;
     add({
       raw: target,
@@ -168,7 +177,7 @@ function extractRawEdges(
     });
   }
 
-  for (const match of graphContent.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
+  for (const match of backtickContent.matchAll(/(?<!`)`([^`\n]+)`(?!`)/g)) {
     const target = match[1].trim();
     if (target.endsWith(".md")) {
       add({ raw: target, syntax: "backtick_file", resolution: "root_or_source", directory: false });

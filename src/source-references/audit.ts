@@ -69,7 +69,12 @@ function wikiLinks(content: string): WikiLink[] {
 
 function codeSpanSourceRefs(content: string): string[] {
   const refs: string[] = [];
-  const cleaned = withoutFencedCodeBlocks(content);
+  // A code-styled path can be the label of a valid Markdown hyperlink. Hide
+  // complete links before classifying the remaining code spans as non-clickable.
+  const cleaned = withoutFencedCodeBlocks(content).replace(
+    /!?\[[^\]]*\]\((?:<[^>]+>|[^\s)]+)(?:\s+["'][^"']*["'])?\)/g,
+    ""
+  );
   for (const match of cleaned.matchAll(/(?<!`)`([^`\n]+\.md)`(?!`)/g)) {
     const raw = match[1].trim();
     // Examples and naming templates are operator guidance, not navigable files.
