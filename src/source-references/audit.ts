@@ -72,7 +72,8 @@ function codeSpanSourceRefs(content: string): string[] {
   const cleaned = withoutFencedCodeBlocks(content);
   for (const match of cleaned.matchAll(/(?<!`)`([^`\n]+\.md)`(?!`)/g)) {
     const raw = match[1].trim();
-    if (raw.includes("sources/") && !/[{}]/.test(raw)) refs.push(raw);
+    // Examples and naming templates are operator guidance, not navigable files.
+    if (raw.includes("sources/") && !/[{}*?<>\[\]]/.test(raw)) refs.push(raw);
   }
   return refs;
 }
@@ -126,11 +127,15 @@ function normalizeAbsoluteSourceRef(target: string): string | null {
 }
 
 function suggestedMarkdownLink(source: string, target: string): string | undefined {
-  const normalized = target.startsWith("/")
-    ? normalizeAbsoluteSourceRef(target)
-    : target.replace(/^\.\//, "");
-  if (!normalized) return undefined;
-  const repoTarget = normalized.startsWith("sources/") ? normalized : `sources/${normalized}`;
+  let repoTarget: string | null;
+  if (target.startsWith("/")) {
+    repoTarget = normalizeAbsoluteSourceRef(target);
+  } else if (target.startsWith("sources/")) {
+    repoTarget = path.posix.normalize(target);
+  } else {
+    repoTarget = resolveTarget(source, target);
+  }
+  if (!repoTarget?.startsWith("sources/") || !repoTarget.endsWith(".md")) return undefined;
   let relative = path.posix.relative(path.posix.dirname(source), repoTarget);
   if (!relative.startsWith(".")) relative = `./${relative}`;
   const label = path.posix.basename(repoTarget, ".md").replace(/[-_]+/g, " ");
@@ -155,6 +160,7 @@ export function auditSourceLinks(input: {
   const backlinks = new Map<string, Set<string>>();
   const brokenLinks: SourceLinkIssue[] = [];
   const nonClickableSourceReferences: SourceLinkIssue[] = [];
+  const nonClickableSourceReferenceKeys = new Set<string>();
   const nonClickablePrimarySourceDeclarations: SourceLinkIssue[] = [];
 
   for (const [source, content] of files) {
@@ -214,6 +220,9 @@ export function auditSourceLinks(input: {
 
     if (source.startsWith("brain/")) {
       for (const target of codeSpanSourceRefs(content)) {
+        const key = `${source}\0${target}`;
+        if (nonClickableSourceReferenceKeys.has(key)) continue;
+        nonClickableSourceReferenceKeys.add(key);
         nonClickableSourceReferences.push({
           source,
           target,

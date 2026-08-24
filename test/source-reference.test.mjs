@@ -166,6 +166,31 @@ test("source-link audit excludes source folder indexes from evidence-companion c
   assert.deepEqual(result.companionsWithoutBacklinks, []);
 });
 
+test("source-link audit ignores patterns, deduplicates diagnostics, and preserves relative targets", () => {
+  const result = auditSourceLinks({
+    brainFiles: new Map([
+      [
+        "patterns/example.md",
+        [
+          "`sources/legal/2026-04-26_*.md`",
+          "`sources/company/YYYY-MM-DD_<slug>.md`",
+          "`../../sources/research/actual.md`",
+          "`../../sources/research/actual.md`",
+        ].join("\n"),
+      ],
+    ]),
+    sourceFiles: new Map([["research/actual.md", "# Actual"]]),
+  });
+
+  assert.deepEqual(result.nonClickableSourceReferences, [
+    {
+      source: "brain/patterns/example.md",
+      target: "../../sources/research/actual.md",
+      suggestion: "[actual](../../sources/research/actual.md)",
+    },
+  ]);
+});
+
 test("source-link audit requires clickable primary declarations and original artifacts", () => {
   const result = auditSourceLinks({
     brainFiles: new Map([

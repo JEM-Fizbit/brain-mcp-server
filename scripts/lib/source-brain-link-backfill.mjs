@@ -10,6 +10,11 @@ const RELATIONS = new Map([
   ["derived_from", "derived_from"],
 ]);
 
+export function isEvidenceCompanionName(name) {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".md") && lower !== "readme.md" && lower !== "index.md";
+}
+
 function posixRelative(root, filename) {
   return path.relative(root, filename).split(path.sep).join("/");
 }
@@ -72,7 +77,7 @@ export async function collectSourceBrainLinkDeclarations(brainRoot) {
         await walk(fullPath);
         continue;
       }
-      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      if (!entry.isFile() || !isEvidenceCompanionName(entry.name)) continue;
       const companionPath = `sources/${posixRelative(sourceRoot, fullPath)}`;
       const content = await fs.readFile(fullPath, "utf-8");
       const links = parseDeclaredBrainLinks(companionPath, content);
