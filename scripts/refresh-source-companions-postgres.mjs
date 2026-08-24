@@ -4,6 +4,7 @@ import pg from "pg";
 import { SupabaseArtifactStore } from "../dist/artifacts/index.js";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
+  assertCompanionRefreshScope,
   inventoryCompanions,
   loadMonitorProfile,
   planCompanionRefresh,
@@ -45,7 +46,7 @@ const refreshMode = flagValue("--mode") || "pointer_text";
 
 function usage() {
   return [
-    "Usage: npm run sources:refresh-companions:postgres -- --brain-root <path> --path <sources/file.md> [--path ...] [--brain-id ai-brain-jem] [--monitor-config <owner-only-config.json>] [--expected-project-ref <ref>] [--mode pointer_text|storage] [--apply]",
+    "Usage: npm run sources:refresh-companions:postgres -- --brain-root <path> --path <sources/file.md> [--path ...] --brain-id <id> [--monitor-config <owner-only-config.json>] [--expected-project-ref <ref>] [--mode pointer_text|storage] [--apply]",
     "",
     "Dry-run is the default. pointer_text versions the canonical reviewed Markdown in Postgres without requiring a broad Storage key; storage also snapshots bytes in private Storage.",
   ].join("\n");
@@ -291,9 +292,6 @@ try {
     if (!databaseUrl) console.error("A source-reference Postgres database URL is required.");
     process.exit(2);
   }
-  if (brainId !== "ai-brain-jem") {
-    throw new Error("Source companion refresh is JEM-pilot-only; refusing a different Brain id");
-  }
   if (!new Set(["pointer_text", "storage"]).has(refreshMode)) {
     throw new Error("--mode must be pointer_text or storage");
   }
@@ -305,12 +303,7 @@ try {
     throw new Error("Brain Monitor profile does not match --expected-project-ref");
   }
   const actualProjectRef = projectRefFromDatabaseUrl(databaseUrl);
-  if (expectedProjectRef && actualProjectRef !== expectedProjectRef) {
-    throw new Error("Database URL does not match --expected-project-ref");
-  }
-  if (apply && !expectedProjectRef) {
-    throw new Error("--expected-project-ref is required in apply mode");
-  }
+  assertCompanionRefreshScope({ brainId, actualProjectRef, expectedProjectRef, apply });
 
   const inventory = await inventoryCompanions(brainRoot, requestedPaths);
   pool = new pg.Pool({ connectionString: databaseUrl, max: 2 });

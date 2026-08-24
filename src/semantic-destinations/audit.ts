@@ -1,3 +1,5 @@
+import { isSourceCompanionPath } from "../source-references/audit.js";
+
 export type SemanticDestinationStatus =
   | "current"
   | "historical"
@@ -212,8 +214,7 @@ export function auditSemanticDestinations(input: {
 
   return {
     brainMarkdownFiles: input.brainFiles.size,
-    sourceCompanions: Array.from(sourceFiles.keys()).filter((name) => name.endsWith(".md"))
-      .length,
+    sourceCompanions: Array.from(sourceFiles.keys()).filter(isSourceCompanionPath).length,
     entityHubs: entityHubs.sort((a, b) => a.source.localeCompare(b.source)),
     missingCanonicalDestinationSections: missingCanonicalDestinationSections.sort(),
     incompleteCanonicalDestinationSections: incompleteCanonicalDestinationSections.sort(),

@@ -9,6 +9,24 @@ export function projectRefFromDatabaseUrl(databaseUrl) {
   return url.hostname.match(/^db\.([a-z0-9]{12,32})\.supabase\.co$/)?.[1] || null;
 }
 
+export function assertCompanionRefreshScope({
+  brainId,
+  actualProjectRef,
+  expectedProjectRef,
+  apply,
+}) {
+  if (!brainId || !String(brainId).trim()) {
+    throw new Error("A Brain id is required");
+  }
+  if (expectedProjectRef && actualProjectRef !== expectedProjectRef) {
+    throw new Error("Database URL does not match --expected-project-ref");
+  }
+  if (apply && !expectedProjectRef) {
+    throw new Error("--expected-project-ref is required in apply mode");
+  }
+  return { brainId, actualProjectRef, expectedProjectRef };
+}
+
 export function sha256Bytes(content) {
   return createHash("sha256").update(content).digest("hex");
 }

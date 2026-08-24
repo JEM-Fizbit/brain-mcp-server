@@ -96,3 +96,16 @@ empty inbox from an unseen operator-side inbox.
   mutation tool and receive a host approval prompt. The server cannot change a
   third-party host's approval rendering; it can provide correct annotations,
   descriptions and fail-before-write behavior.
+
+## ERS rollout refinement — 2026-08-24
+
+The first ERS report-only replay exposed two shared maintenance gaps before any
+semantic write. Source-folder `README.md`/`INDEX.md` files were being counted as
+evidence companions, and the project-ref-guarded companion refresh still
+refused every Brain except the JEM pilot. Release `v1.7.1` excludes source
+indexes from companion obligations and permits an explicitly named Brain when
+the database URL matches the supplied or owner-only Monitor project reference.
+Apply mode still fails closed without that project binding. JEM's existing
+strict 45-companion source and semantic audits remained clean before release;
+the ERS dry run reached only the ERS project and correctly stopped at the
+separate legacy `companion_path` backfill prerequisite.

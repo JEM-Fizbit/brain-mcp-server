@@ -149,6 +149,23 @@ test("source-link audit distinguishes direct, index-only, unlinked and non-click
   ]);
 });
 
+test("source-link audit excludes source folder indexes from evidence-companion counts", () => {
+  const result = auditSourceLinks({
+    brainFiles: new Map([["topic.md", "[Source](../sources/company/source.md)"]]),
+    sourceFiles: new Map([
+      ["README.md", "# Source archive"],
+      ["company/README.md", "# Company sources"],
+      ["company/INDEX.md", "# Company index"],
+      ["company/source.md", "[Back](../../brain/topic.md)"],
+    ]),
+  });
+
+  assert.equal(result.sourceCompanions, 1);
+  assert.deepEqual(result.directlyLinkedCompanions, ["sources/company/source.md"]);
+  assert.deepEqual(result.unlinkedCompanions, []);
+  assert.deepEqual(result.companionsWithoutBacklinks, []);
+});
+
 test("source-link audit requires clickable primary declarations and original artifacts", () => {
   const result = auditSourceLinks({
     brainFiles: new Map([

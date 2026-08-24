@@ -86,3 +86,16 @@ test("semantic audit separates portable links, bare URLs and source-only domains
   assert.equal(isStrictBrainSemanticContent("brain/LOG.md"), false);
   assert.equal(isStrictBrainSemanticContent("brain/archive/old.md"), false);
 });
+
+test("semantic audit excludes source folder indexes from companion counts", () => {
+  const result = auditSemanticDestinations({
+    brainFiles: new Map(),
+    sourceFiles: new Map([
+      ["README.md", "# Archive"],
+      ["company/INDEX.md", "# Index"],
+      ["company/source.md", "# Source"],
+    ]),
+  });
+
+  assert.equal(result.sourceCompanions, 1);
+});

@@ -1,7 +1,7 @@
 # Brain Content Linking, Source Trace And Freshness Runbook
 
-**Status:** active — JEM pilot completed; ERS replay pending separate approval
-**Last reviewed:** 2026-08-23
+**Status:** active — JEM pilot completed; approved ERS replay in progress
+**Last reviewed:** 2026-08-24
 **Related:** [Spec 013](specs/013-brain-context-architecture.md); [Spec 015](specs/015-compiled-source-ingestion.md); [Spec 016](specs/016-source-links-and-brain-library-pilot.md); [Brain Library](brain-library.md); [JEM freshness register](jem-brain-freshness-register.md)
 
 This runbook preserves the complete linking remediation so it can be replayed
@@ -125,7 +125,9 @@ location in the rollout evidence.
 This is the earlier JEM remediation sequence and must not be skipped when it has
 not already been completed for the target Brain.
 
-1. Inventory all Brain Markdown files and source companions.
+1. Inventory all Brain Markdown files and source companions. Treat
+   source-folder `README.md` and `INDEX.md` files as navigation indexes, not
+   evidence companions requiring direct synthesis links and backlinks.
 2. Classify each companion as directly linked, index-only or unlinked.
 3. Identify missing companion backlinks, broken paths and code-formatted
    non-clickable source references.
@@ -143,10 +145,12 @@ not already been completed for the target Brain.
    prove repeat application is idempotent and stored artifact hashes still
    match their content-addressed paths.
 8. When companion Markdown changes without changing its original binary, use
-   the project-ref-guarded companion refresh. `pointer_text` versions the exact
-   reviewed Markdown in `brain.source_artifact_text` through the owner-only
-   Monitor database profile; `storage` additionally requires the explicit
-   admin-only Storage credential. Retain prior artifacts as snapshots.
+   the project-ref-guarded companion refresh with an explicit Brain id.
+   `pointer_text` versions the exact reviewed Markdown in
+   `brain.source_artifact_text` through the owner-only Monitor database profile;
+   `storage` additionally requires the explicit admin-only Storage credential.
+   Apply mode requires an expected project reference and rejects a database URL
+   for any other project. Retain prior artifacts as snapshots.
 9. Run the source-link audit in strict mode and require zero index-only,
    unlinked, missing-backlink, broken and non-clickable source-reference
    findings, including primary-source declarations and original-artifact links.
@@ -297,6 +301,20 @@ reviewed hosted bytes, resolved the duplicate records, resumed the watcher and
 verified a healthy cycle with zero open conflicts. No content was lost and ERS
 was untouched. Future bulk passes should pause the target watcher first,
 consolidate per-file edits and verify exact hashes before resolving conflicts.
+
+## ERS replay baseline — 2026-08-24
+
+After the ERS schema migration, clean security gate and guarded `v1.7.0`
+deployment, live checks reported one accessible Brain (`ers-brain`), 51 hosted
+files, zero open conflicts, foreign-JEM denial and a correct seven-category
+Postgres ingestion preflight. The first local report found 51 Brain Markdown
+files and 39 evidence companions after excluding ten source navigation indexes:
+16 were directly linked, 23 were unlinked, 38 lacked reciprocal Brain-link
+declarations, 17 same-stem binaries lacked original-artifact links, 57 source
+references were non-clickable, and four active Brain URLs were bare. No links
+were broken. This baseline is evidence for the approved remediation, not a
+manual user-review queue; semantic relationships still require source-backed
+review before application.
 
 ## JEM acceptance remediation — 2026-08-23
 

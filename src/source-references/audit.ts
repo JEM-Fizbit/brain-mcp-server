@@ -111,6 +111,13 @@ function auditedMarkdownTarget(target: string): boolean {
   return target.endsWith(".md") && (target.startsWith("brain/") || target.startsWith("sources/"));
 }
 
+export function isSourceCompanionPath(name: string): boolean {
+  const normalized = name.replace(/\\/g, "/");
+  if (!normalized.toLowerCase().endsWith(".md")) return false;
+  const basename = path.posix.basename(normalized).toLowerCase();
+  return basename !== "readme.md" && basename !== "index.md";
+}
+
 function normalizeAbsoluteSourceRef(target: string): string | null {
   const normalized = target.replace(/\\/g, "/");
   const marker = "/sources/";
@@ -140,7 +147,7 @@ export function auditSourceLinks(input: {
   for (const [name, content] of input.sourceFiles) files.set(`sources/${name}`, content);
   const known = new Set(files.keys());
   const companions = Array.from(input.sourceFiles.keys())
-    .filter((name) => name.endsWith(".md"))
+    .filter(isSourceCompanionPath)
     .map((name) => `sources/${name}`)
     .sort();
   const substantiveLinkers = new Map<string, Set<string>>();
