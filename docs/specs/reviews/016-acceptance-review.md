@@ -460,3 +460,9 @@ the purpose of the bounded operator decision.
   lint reports three maintainer findings, no Capture queue, zero broken internal
   links, and 262 classified locators; sync reports 39 files and zero conflicts.
 - ERS content, schema, credentials, and deployment were not changed.
+- Reading note: "without obsolete Capture or lint-staleness nudges" above records
+  that JEM had no unhealthy signal at that moment — an empty queue and a same-day
+  lint — not that a silent bootstrap is the contract. Both nudges must still fire
+  when their signal is real. Contract and rationale: `docs/DECISIONS.md`
+  (2026-08-24, "Session-start nudges are a transport-independent contract");
+  enforcement: `test/load-context-nudges.test.mjs`.
