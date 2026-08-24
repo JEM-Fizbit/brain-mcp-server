@@ -404,6 +404,35 @@ the purpose of the bounded operator decision.
   and 261 automatically classified locators. Hosted sync remains at 39 files
   and zero open conflicts. ERS was not deployed or modified.
 
+### Post-release verification — JEM `v1.6.3`
+
+- Fly release 68 completed on 24 August 2026 from annotated tag `v1.6.3`
+  (`75d3e52`); the public health endpoint reported `brain-mcp-server` `1.6.3`
+  with the existing Postgres revision, Supabase artifact, and Postgres
+  OAuth-state modes unchanged. Superseded four minutes later by release 69
+  (`v1.6.4`), which carries this commit as an ancestor — verified with
+  `git merge-base --is-ancestor`.
+- Restores the session-start nudge block on the active-store path and adds the
+  Capture / Triage nudge, which had never existed on either path. Queue
+  staleness was computed correctly by `summarizeCaptureQueue` but reachable only
+  from an explicit `brain_lint` run, and the only prompt to run `brain_lint` was
+  the lint-staleness nudge that had itself gone dead — so the queue that this
+  spec's workflow was written to clear had breached both thresholds on every
+  session, unreported. Rationale locked in `docs/DECISIONS.md` (2026-08-24,
+  "Session-start nudges are a transport-independent contract").
+- `npm test`: 411 pass, 0 fail, 5 pre-existing environment-gated skips, up from
+  396 passing. `test/load-context-nudges.test.mjs` was confirmed to fail 2 of 7
+  with the nudge call disabled, so the guard detects the regression it exists to
+  prevent rather than merely passing alongside it.
+- Live hosted `brain_load_context` on release 68 exercised the new gather path
+  against Postgres — `LOG.md` and `TASKS.md` read through the store, and the
+  `scanInbox` S1 refusal caught — and correctly emitted no nudges for a Brain
+  with an empty queue and a same-day lint. That confirms the path runs clean and
+  raises no false positives; the positive firing behaviour is covered by tests
+  rather than by live traffic, because JEM had no unhealthy signal to trigger.
+- ERS content, schema, credentials, and deployment were not changed; the sole
+  Fly app targeted by `fly.toml` is `jem-brain-mcp`.
+
 ### Acceptance follow-up — successful triage and prompt-copy refinement
 
 - John confirmed that the LLM-assisted workflow completed successfully and
