@@ -1,5 +1,10 @@
 import pg from "pg";
-import { LOADER_FILE, NOW_FILE } from "../constants.js";
+import { LOADER_FILE, LOG_FILE, NOW_FILE } from "../constants.js";
+import { buildContextNudges } from "./context-nudges.js";
+import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
+import { scanInbox } from "./inbox.js";
+import { parseLastOpDate } from "./log.js";
+import { summarizeCaptureQueue, TASKS_FILE } from "./task-intake.js";
 import { filesystemBrainStore, type BrainStore, type FileMetadata } from "./brain-store.js";
 import { RevisionBrainStore } from "./revision-brain-store.js";
 import { revisionBrainStoreFromFile } from "./revision-brain-store.js";
@@ -86,10 +91,24 @@ export async function warmActiveBrainStore(
 
 export async function loadContextFromActiveStore(brainId: string): Promise<string> {
   const store = activeBrainStore();
-  const [loader, now] = await Promise.all([
-    store.readFile(brainId, LOADER_FILE).catch(() => null),
-    store.readFile(brainId, NOW_FILE).catch(() => null),
-  ]);
+
+  // Core files plus the nudge inputs, in one round trip. Every nudge source is
+  // independently fault-tolerant: a Brain whose backend cannot answer one of
+  // these still gets its loader and NOW.md.
+  const [loader, now, logContent, tasksContent, issues, inboxCount] =
+    await Promise.all([
+      store.readFile(brainId, LOADER_FILE).catch(() => null),
+      store.readFile(brainId, NOW_FILE).catch(() => null),
+      store.readFile(brainId, LOG_FILE).catch(() => null),
+      store.readFile(brainId, TASKS_FILE).catch(() => null),
+      getOpenMaintenanceIssues().catch((): OpenIssue[] => []),
+      // null distinguishes "no host inbox on this backend" (the S1-guard throws
+      // for Postgres-backed Brains) from "inbox exists and is empty". Only a
+      // real count can produce a nudge.
+      scanInbox(brainId)
+        .then((files) => files.length)
+        .catch((): null => null),
+    ]);
 
   if (!loader || !now) {
     const missing = [];
@@ -98,13 +117,25 @@ export async function loadContextFromActiveStore(brainId: string): Promise<strin
     throw new Error(`Missing required Brain files: ${missing.join(", ")}`);
   }
 
-  return [
+  const parts = [
     `--- FILE: ${LOADER_FILE} ---`,
     loader.trim(),
     "",
     `--- FILE: ${NOW_FILE} ---`,
     now.trim(),
-  ].join("\n");
+  ];
+
+  parts.push(
+    ...buildContextNudges({
+      lastLint: logContent ? parseLastOpDate(logContent, "LINT") : null,
+      lintKnown: logContent !== null,
+      issues,
+      inboxCount,
+      captureQueue: summarizeCaptureQueue(tasksContent ?? undefined),
+    })
+  );
+
+  return parts.join("\n");
 }
 
 export function asFileMetadata(files: FileMetadata[] | string[]): FileMetadata[] {

@@ -28,7 +28,7 @@ Both cases are success states for safety. The system chose not to guess.
 These checks should be automated or proactively surfaced by clients:
 
 - `npm run hosted:doctor` reports hosted health, sync health, hosted/local counts, and open conflicts.
-- `brain_load_context` should continue surfacing lint, inbox, and maintenance nudges when the Brain context is loaded.
+- `brain_load_context` should continue surfacing lint, capture-queue, inbox, and maintenance nudges when the Brain context is loaded. This is enforced by `test/load-context-nudges.test.mjs`: the nudge block regressed to silence once already, when the tool was rewired onto the store abstraction and the nudge-bearing function was left with no callers.
 - `brain_sync_status` reports hosted sync provider state and open conflict count.
 - `brain_list_conflicts` lists open conflicts without database access.
 - Future client integrations should alert the user when conflicts or stale sync health appear, instead of relying on manual polling.

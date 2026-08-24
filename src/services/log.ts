@@ -181,13 +181,16 @@ export async function readLog(
   return readLogContent(content, limit, offset);
 }
 
-export async function getLastOpDate(
-  opType: LogOpType,
-  brainId?: string
-): Promise<Date | null> {
-  const filePath = await ensureLogFile(brainId);
-
-  const content = await fs.readFile(filePath, "utf-8");
+/**
+ * Parse the most recent entry of a given op type out of LOG.md content.
+ *
+ * Split out from getLastOpDate so the hosted path can run the same parse over
+ * content read through the active Brain store, which has no host filesystem.
+ */
+export function parseLastOpDate(
+  content: string,
+  opType: LogOpType
+): Date | null {
   const pattern = new RegExp(`^## \\[(\\d{4}-\\d{2}-\\d{2})\\] ${opType}`);
 
   // Log is newest-first — scan from top, return first match.
@@ -198,4 +201,13 @@ export async function getLastOpDate(
   }
 
   return null;
+}
+
+export async function getLastOpDate(
+  opType: LogOpType,
+  brainId?: string
+): Promise<Date | null> {
+  const filePath = await ensureLogFile(brainId);
+  const content = await fs.readFile(filePath, "utf-8");
+  return parseLastOpDate(content, opType);
 }

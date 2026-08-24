@@ -196,7 +196,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 - `brain_resolve_conflict` — Resolve a sync conflict (per `docs/conflict-resolution.md`)
 
 **Core:**
-- `brain_load_context` — Entry point: returns loader + NOW.md + lint/issue/inbox nudges
+- `brain_load_context` — Entry point: returns loader + NOW.md + nudges (stale lint, stale/oversized Capture / Triage Queue, open maintenance issues, pending inbox files). Nudges are emitted on every transport; the inbox nudge is skipped on non-filesystem backends, which have no host inbox, rather than reported as empty.
 - `brain_read_file` — Read a specific Brain file by name. Accepts `scope`: "brain" (default) or "sources" to read from the source archive instead.
 - `brain_update_file` — Write changes to a Brain file (replace, append, or patch with find-and-replace)
 - `brain_delete_file` — Soft-delete a Brain file (tombstone revision; recoverable). Refuses `00_loader.md`/`NOW.md`; warns about inbound `[[wikilinks]]` that will dangle (spec 011)

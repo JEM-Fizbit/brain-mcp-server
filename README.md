@@ -18,7 +18,7 @@ Gives MCP clients persistent, context-aware access to a collection of Markdown f
 | `brain_list_conflicts` | List open sync conflicts |
 | `brain_resolve_conflict` | Resolve a sync conflict |
 | `brain_capture_item` | Capture a transient triage item into `TASKS.md` (`brain_report_item` is a compatibility alias) |
-| `brain_load_context` | Entry point — returns the loader + NOW.md, plus lint, issue, and inbox nudges |
+| `brain_load_context` | Entry point — returns the loader + NOW.md, plus nudges: stale lint, stale/oversized capture queue, open maintenance issues, and pending inbox files (inbox nudge is filesystem-backed Brains only) |
 | `brain_read_file` | Read a specific file. Accepts `scope` = `brain` (default) or `sources` to read from the sources/ archive |
 | `brain_update_file` | Update a Brain file (replace, append, or patch) |
 | `brain_commit` | Git commit changes, optionally push |
@@ -204,7 +204,7 @@ Skip when:
 
 Load sequence (when loading):
 1. Fetch tools (if deferred): ToolSearch(query="select:mcp__brain__brain_load_context,mcp__brain__brain_read_file,mcp__brain__brain_search,mcp__brain__brain_list_files,mcp__brain__brain_list_sources,mcp__brain__brain_update_file,mcp__brain__brain_commit,mcp__brain__brain_log,mcp__brain__brain_read_log,mcp__brain__brain_lint,mcp__brain__brain_ingest,mcp__brain__brain_ingest_complete,mcp__brain__brain_scan_inbox")
-2. Call brain_load_context — returns the loader navigation table, current priorities, and nudges (lint overdue, inbox pending). The loader contains the full ingestion protocol, source categories, and file-editing rules; follow it.
+2. Call brain_load_context — returns the loader navigation table, current priorities, and nudges (lint overdue, capture queue stale, maintenance issues open, inbox pending). The loader contains the full ingestion protocol, source categories, and file-editing rules; follow it.
 3. Call brain_read_file for task-relevant files per the navigation table.
 4. If brain_load_context flags a lint nudge, run brain_lint before accuracy-sensitive work.
 
@@ -228,7 +228,7 @@ See [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) for the exact text to paste, verifica
 ## How It Works
 
 1. Claude calls `brain_load_context` at session start (automatically, if configured per above)
-2. The response includes the loader, NOW.md, and nudges (lint overdue, open maintenance issues, pending inbox files)
+2. The response includes the loader, NOW.md, and nudges (lint overdue, capture queue stale or oversized, open maintenance issues, pending inbox files)
 3. Claude reads the navigation table and requests specific files via `brain_read_file`
 4. Edits are written via `brain_update_file`, then committed via `brain_commit`
 5. New information is processed via `brain_ingest` (dry-run analysis, then guided updates)
