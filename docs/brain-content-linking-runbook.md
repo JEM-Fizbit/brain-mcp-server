@@ -143,7 +143,10 @@ not already been completed for the target Brain.
 7. Compile/persist the Spec 015 source-reference manifest where that Brain uses
    the compiled source registry. Backfill only reviewed relationships, then
    prove repeat application is idempotent and stored artifact hashes still
-   match their content-addressed paths.
+   match their content-addressed paths. Bind backfill to the owner-only Monitor
+   profile or an equivalently explicit expected project ref; never select a
+   database from ambient credentials. Source-folder navigation indexes are not
+   evidence companions and must not be registered by this pass.
 8. When companion Markdown changes without changing its original binary, use
    the project-ref-guarded companion refresh with an explicit Brain id.
    `pointer_text` versions the exact reviewed Markdown in
@@ -315,6 +318,14 @@ references were non-clickable, and four active Brain URLs were bare. No links
 were broken. This baseline is evidence for the approved remediation, not a
 manual user-review queue; semantic relationships still require source-backed
 review before application.
+
+The pre-write classifier refinement in `v1.7.2` removed ten false or duplicate
+diagnostics from that raw count: wildcard/placeholder path examples are not
+navigable evidence, repeated occurrences are one maintenance issue, and
+already-relative suggestions preserve their correct path. The actionable
+non-clickable baseline is therefore 47 unique references. The relationship
+backfill now also excludes the same ten navigation indexes and can consume the
+exact ERS Brain Monitor database binding without exposing it in shell history.
 
 ## JEM acceptance remediation — 2026-08-23
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { collectSourceBrainLinkDeclarations } from "./lib/source-brain-link-backfill.mjs";
+import { loadMonitorProfile } from "./lib/source-companion-refresh.mjs";
 
 loadLocalEnv();
 const { Pool } = pg;
@@ -25,15 +26,22 @@ const brainRoot = path.resolve(
   flagValue("--brain-root") || process.env.BRAIN_REPO_ROOT || process.cwd()
 );
 const brainId = flagValue("--brain-id") || process.env.BRAIN_ID;
-const expectedProjectRef = flagValue("--expected-project-ref");
+const monitorConfig = flagValue("--monitor-config");
+const monitorProfile = monitorConfig
+  ? await loadMonitorProfile(monitorConfig, brainId)
+  : null;
+const expectedProjectRef =
+  flagValue("--expected-project-ref") || monitorProfile?.expectedProjectRef;
 const apply = argv.includes("--apply");
 const createMissing = argv.includes("--create-missing");
 const databaseUrl =
-  process.env.BRAIN_SOURCE_REFERENCE_DATABASE_URL || process.env.BRAIN_REVISION_DATABASE_URL;
+  monitorProfile?.databaseUrl ||
+  process.env.BRAIN_SOURCE_REFERENCE_DATABASE_URL ||
+  process.env.BRAIN_REVISION_DATABASE_URL;
 
 if (!brainId || !databaseUrl || !expectedProjectRef) {
   console.error(
-    "Usage: npm run sources:backfill-brain-links:postgres -- --brain-root <path> --brain-id <id> --expected-project-ref <ref> [--apply] [--create-missing]"
+    "Usage: npm run sources:backfill-brain-links:postgres -- --brain-root <path> --brain-id <id> [--monitor-config <owner-only-config.json>] [--expected-project-ref <ref>] [--apply] [--create-missing]"
   );
   process.exit(2);
 }

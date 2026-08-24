@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseDeclaredBrainLinks } from "../scripts/lib/source-brain-link-backfill.mjs";
+import {
+  collectSourceBrainLinkDeclarations,
+  parseDeclaredBrainLinks,
+} from "../scripts/lib/source-brain-link-backfill.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cliPath = path.join(repoRoot, "scripts/backfill-source-brain-links-postgres.mjs");
@@ -59,6 +64,28 @@ test("parseDeclaredBrainLinks rejects missing, empty, or escaping declarations",
       ),
     /escapes the Brain Markdown root/
   );
+});
+
+test("backfill collection excludes source indexes and README files", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "source-backfill-"));
+  await fs.mkdir(path.join(root, "brain"), { recursive: true });
+  await fs.mkdir(path.join(root, "sources", "company"), { recursive: true });
+  await fs.writeFile(path.join(root, "brain", "company.md"), "# Company\n");
+  const declaration = [
+    "# Evidence",
+    "",
+    "## Brain links",
+    "",
+    "- [Company](../../brain/company.md) — evidence",
+    "",
+  ].join("\n");
+  await fs.writeFile(path.join(root, "sources", "README.md"), "# Sources\n");
+  await fs.writeFile(path.join(root, "sources", "company", "INDEX.md"), "# Index\n");
+  await fs.writeFile(path.join(root, "sources", "company", "evidence.md"), declaration);
+
+  const declarations = await collectSourceBrainLinkDeclarations(root);
+  assert.equal(declarations.length, 1);
+  assert.equal(declarations[0].companionPath, "sources/company/evidence.md");
 });
 
 test("backfill CLI requires an expected project ref even in dry-run mode", () => {

@@ -109,3 +109,13 @@ Apply mode still fails closed without that project binding. JEM's existing
 strict 45-companion source and semantic audits remained clean before release;
 the ERS dry run reached only the ERS project and correctly stopped at the
 separate legacy `companion_path` backfill prerequisite.
+
+The complete ERS report then exposed four additional maintenance-path defects,
+still before content writes. Wildcard and placeholder examples were counted as
+navigable files; duplicate code references inflated the operator total;
+suggestions for already-relative source paths could point one directory too
+far; and the legacy relationship backfill included source indexes and lacked
+the owner-only Monitor credential path. Release `v1.7.2` corrects all four.
+Backfill and refresh now share the same explicit Brain/project binding, source
+indexes are excluded consistently, and every emitted link suggestion resolves
+to an evidence companion rather than a naming pattern.
