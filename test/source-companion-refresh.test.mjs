@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   addOriginalArtifactSection,
   assertCompanionPath,
+  assertCompanionRefreshScope,
   inventoryCompanions,
   loadMonitorProfile,
   planCompanionRefresh,
@@ -64,6 +65,45 @@ test("project reference guard understands direct and pooler Supabase URLs", () =
   assert.equal(
     projectRefFromDatabaseUrl("postgresql://postgres.abcdefghijkl:secret@aws-0-eu.pooler.supabase.com:6543/postgres"),
     "abcdefghijkl"
+  );
+});
+
+test("companion refresh scope supports an explicitly bound ERS Brain", () => {
+  assert.deepEqual(
+    assertCompanionRefreshScope({
+      brainId: "ers-brain",
+      actualProjectRef: "omnwbcdtmtvxasgdmvwr",
+      expectedProjectRef: "omnwbcdtmtvxasgdmvwr",
+      apply: true,
+    }),
+    {
+      brainId: "ers-brain",
+      actualProjectRef: "omnwbcdtmtvxasgdmvwr",
+      expectedProjectRef: "omnwbcdtmtvxasgdmvwr",
+    }
+  );
+});
+
+test("companion refresh scope fails closed on a project mismatch or unguarded apply", () => {
+  assert.throws(
+    () =>
+      assertCompanionRefreshScope({
+        brainId: "ers-brain",
+        actualProjectRef: "gfipcidoyrtgngauzijy",
+        expectedProjectRef: "omnwbcdtmtvxasgdmvwr",
+        apply: true,
+      }),
+    /does not match/
+  );
+  assert.throws(
+    () =>
+      assertCompanionRefreshScope({
+        brainId: "ers-brain",
+        actualProjectRef: "omnwbcdtmtvxasgdmvwr",
+        expectedProjectRef: undefined,
+        apply: true,
+      }),
+    /required in apply mode/
   );
 });
 

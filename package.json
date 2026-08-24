@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
