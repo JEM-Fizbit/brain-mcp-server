@@ -246,9 +246,10 @@ Planned work:
 - bind authorization to exact Entra tenant/object IDs, dedicated Entra
   app-role groups and a current private Postgres grant ledger; default new
   colleagues selected by an owner to `reader`;
-- provide a narrow ERS-hosted access UI so John, Cillian and IT/TDM can manage
-  fixed role groups and immediate Brain grants without a deployment or a TDM
-  ticket for each ordinary change;
+- extend the shared Brain Cockpit shell with a profile-scoped ERS **Access &
+  Roles** section so John, Cillian and IT/TDM can manage fixed role groups and
+  immediate Brain grants without a deployment or a TDM ticket for each ordinary
+  change; keep JEM GitHub-authenticated and without multi-user role controls;
 - enforce an exhaustive reader/member/admin/owner tool matrix and revalidate
   roles on tool calls and refreshes;
 - align SharePoint Brain-folder write permissions with the named curator set;
