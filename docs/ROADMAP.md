@@ -37,7 +37,9 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - the real hosted client shadow rehearsal passed for `ai-brain-jem`, so hosted MCP is now the normal remote JEM path;
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
-- the hosted runtime remains single-user: John is still the only user, with `ai-brain-jem` as the normal remote JEM Brain and `ers-brain` added as a John-only ERS Brain pilot;
+- the owner-isolated runtimes are live: JEM remains John's personal Brain;
+  ERS has a completed John+Cillian GitHub pilot on its dedicated stack, while
+  wider production access is governed by spec 018 and remains inactive;
 - specs 015–016 are implemented and validated on JEM: release `v1.5.0`
   (`379b965`) established the source/Library pilot, the `v1.6.0` acceptance
   remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`
@@ -222,24 +224,50 @@ Exit criteria:
 - no account-specific assumptions are hard-coded in code or docs;
 - private-org pilot can be retired or kept only as a non-production sandbox.
 
+**Status (2026-08-24): complete for the dedicated development baseline.** ERS
+owns the Fly app, Supabase project, private release mirror, custom hostname,
+runtime credentials and Brain data. Personal and ERS deployments now expose
+only their own Brain. Production team access remains Milestone 4, not evidence
+that Milestone 3 is incomplete.
+
 ## Milestone 4: ERS Multi-User Access
 
 Goal: allow controlled ERS user access to shared Brains.
 
+**Plan of record:**
+[`spec 018 — ERS Production Identity And Controlled Team Rollout`](specs/018-ers-production-identity-and-rollout.md).
+The GitHub-authenticated John+Cillian pilot is complete; Entra and wider access
+are not implemented.
+
 Planned work:
 
-- model ERS principals and roles;
-- add audit logging for hosted writes, conflict resolutions, source access, and admin actions;
-- formalize onboarding/offboarding;
-- define source artifact download/signed-URL policy;
-- define role-based access for source metadata, extracted text, and original bytes;
-- verify RLS policies and private schema boundaries for shared usage.
+- add single-tenant Entra OIDC behind the existing MCP authorization server and
+  move ERS from bounded GitHub/Entra canary to Entra-only workforce login;
+- bind authorization to exact Entra tenant/object IDs, dedicated Entra
+  app-role groups and a current private Postgres grant ledger; default new
+  colleagues selected by an owner to `reader`;
+- provide a narrow ERS-hosted access UI so John, Cillian and IT/TDM can manage
+  fixed role groups and immediate Brain grants without a deployment or a TDM
+  ticket for each ordinary change;
+- enforce an exhaustive reader/member/admin/owner tool matrix and revalidate
+  roles on tool calls and refreshes;
+- align SharePoint Brain-folder write permissions with the named curator set;
+- formalize onboarding, role change, offboarding and second-admin recovery;
+- complete real-client, wrong-tenant, unregistered-user and cross-Brain denial
+  tests, plus external health/alerting and the standing ELT rollout gate;
+- retain original-byte access as `metadata_only`; a signed-URL policy is not a
+  prerequisite while bytes remain unexposed.
 
 Exit criteria:
 
 - multiple ERS users can access only the Brains and operations they are authorized for;
-- write and resolution actions are attributable;
-- original artifact byte access has an explicit policy and audit trail.
+- every hosted write and resolution action is attributable to an exact Entra
+  principal;
+- broad SharePoint access cannot bypass hosted writer restrictions;
+- the intended Claude, ChatGPT and Codex surfaces pass under Entra;
+- GitHub is disabled for ERS production enrollment;
+- original artifact bytes remain unexposed unless a later policy and audit
+  trail are approved.
 
 ## Milestone 5: True Multi-Tenant Product Shape
 
@@ -277,12 +305,20 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Complete the graph-primary inverse-comparison window through 2026-07-24. Revert either Brain to `graph_shadow` on a new adjudicated graph false positive, routing/policy regression, mode-related operational failure or unresolved conflict; if clean, retire routine legacy comparison and retain `legacy` only as rollback.
-2. Harden Brain Cockpit into a user-launchable operator surface without Codex/terminal CLI. First slice: local LaunchAgent + stable loopback URL; hosted persistent admin website deferred until multi-user auth and local-first sync visibility are redesigned.
-3. Define the proactive nudge path for lint, sync health, open conflicts, stale daemon health, and source-ingestion issues.
-4. Rehearse hosted recovery/reseed from local Markdown and a restored Supabase project; decide whether PITR is worth enabling for the pilot before removing Git as emergency history.
-5. Run at least one daily doctor pass after promotion and keep local stdio `brain` as fallback.
-6. After the JEM/ERS content contract stabilises, complete the remaining downstream review: revise the public primer and review the ERS onboarding prototype without applying server-only controls to non-Brain surfaces. Edge pointer/source-of-truth reconciliation completed on 2026-07-17.
+1. Review and approve spec 018; then implement Entra, the narrow hosted access
+   administration surface and the explicit role/tool matrix upstream without
+   combining them with the MCP `2026-07-28` migration.
+2. Deploy the tenant-neutral release to JEM first in GitHub-only mode; intake it
+   through the private ERS overlay and run the three-owner dual-provider canary.
+3. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
+   and IT/TDM as owners; align SharePoint writer permissions; activate an
+   ERS-owned external health/alert path; and close the item-14 governance gate.
+4. Move ERS to Entra-only and stage a bounded reader cohort before granting any
+   additional curator role.
+5. Keep the restore rehearsal, automated ingestion, protocol migration and
+   deeper attribution work as separately sequenced follow-ons. Do not remove an
+   existing redundancy layer merely because the restore rehearsal is
+   non-blocking for Spec 018.
 
 ## Non-Goals For Now
 

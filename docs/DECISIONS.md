@@ -8,6 +8,58 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-25 — Use Entra and in-app role administration for ERS production
+
+**Decision:** Rollout of ERS Brain beyond the existing John+Cillian pilot
+requires single-tenant Microsoft Entra ID authentication. Entra proves the
+tenant and person through exact `tid` plus `oid`. Dedicated Entra security
+groups mapped to application roles govern workforce roles, while a private
+Postgres grant ledger provides immediate Brain enforcement and audit. Email
+address, UPN, display name and domain are not authorization. New colleagues
+selected by an owner default to `reader`; SharePoint Brain-folder writes are
+restricted to named curators so the human file plane cannot bypass MCP roles.
+GitHub remains only a bounded pilot/rollback provider and is disabled for ERS
+after the Entra canary.
+
+ERS will provide a narrow hosted access-administration UI. John, Cillian and
+the designated IT/TDM identity are the initial `owner`s. After TDM performs the
+one-time app/group setup and tenant consent, John and Cillian can search the
+basic ERS directory and add, change, suspend or revoke users without recurring
+TDM intervention. The UI may mutate only fixed allowlisted role groups through
+delegated Microsoft Graph permissions in the signed-in owner's context; it is
+not a generic Graph client and receives no app-only/background Graph writer.
+
+The timed restore rehearsal previously required by spec 012 is reclassified as
+non-blocking resilience work. Supabase-hosted state plus the SharePoint/OneDrive
+mirror and its version history are accepted as adequate rollout redundancy.
+The rehearsal remains tracked, and this decision does not claim a tested RTO or
+authorize removal of an existing redundancy layer.
+
+**Why:** Corporate identity and permission management are the material risks in
+wider access. Stable tenant/object identifiers, application-scoped role groups
+and a current private grant ledger fail closed; mutable identity claims and
+domain-wide grants do not. A dedicated in-app workflow avoids making every
+ordinary joiner/leaver change an IT ticket while preserving Entra as the
+workforce authority and an auditable local enforcement path. Aligning
+SharePoint writes with the same curator population prevents a stricter agent
+path from coexisting with a looser human bypass. A restore drill would improve
+assurance but does not materially reduce the immediate identity/authorization
+risk given the two current content copies and SharePoint history.
+
+**Alternatives rejected:** GitHub as the workforce login; email-domain or UPN
+authorization; an image-baked roster requiring deployment for every access
+change; unrestricted tenant self-enrolment; raw/nested group claims; an app-only
+Graph writer; per-principal RLS as a prerequisite; enabling every authenticated
+colleague as a writer; leaving broad SharePoint writes outside the MCP role
+model; bundling the MCP `2026-07-28` transport migration with the identity
+cutover; retaining a restore rehearsal as a hard launch gate.
+
+**Related:** `docs/specs/018-ers-production-identity-and-rollout.md`;
+`docs/specs/012-ers-mcp-fork.md`; `BACKLOG.md` access-control and recovery
+items; ERS Brain `governance/brain-mcp-fork-signoff.md` item 14.
+
+---
+
 ## 2026-08-24 — Preflight ingestion and preserve operator-side source custody
 
 **Decision:** Every ingestion begins with the read-only, idempotent

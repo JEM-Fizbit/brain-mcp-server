@@ -11,7 +11,10 @@
 
 The ERS-owned hosted Brain database may proceed through M1 deployment, provided credentials remain in a password manager or deployment secret store and the `brain` schema remains private until the hosted access model is explicitly designed.
 
-This gate does not approve broad client-side access, public API access, additional users, or the later irreversible cross-tenant purge. Those remain governed by spec 012's separate rollout and cutover gates.
+This gate does not approve broad client-side access, public API access or
+additional users. Production identity and permissions are governed by
+[spec 018](../specs/018-ers-production-identity-and-rollout.md); the completed
+infrastructure separation remains governed by spec 012.
 
 ## Verified Controls
 
@@ -87,9 +90,17 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - [x] Re-run this gate against the ERS project and record the project ref.
 - [x] Create an ERS-owned dedicated database login that inherits `brain_runtime`.
 - [x] Verify the dedicated login through the transaction pooler and prepare its strictly validated `BRAIN_REVISION_DATABASE_URL` for Fly secret loading.
-- Define the end-user access model before adding RLS policies.
-- Decide the narrower artifact download model before exposing original bytes through hosted MCP.
-- Confirm backup, retention, audit, and artifact deletion requirements for ERS-owned data.
+- [ ] Implement and verify the Entra identity, fixed app-role groups, private
+  grant ledger and hosted access-administration controls in spec 018 before
+  wider enrollment. Re-run this gate after the private grant/audit migration;
+  no additional client-side RLS policy is implied.
+- [ ] Align SharePoint Brain-folder writes with the named MCP curator population
+  and record the team-wide audit/read-logging posture.
+- [x] Keep original bytes unexposed (`metadata_only`) for this rollout; a
+  narrower download model is required only before hosted byte access is added.
+- [ ] Confirm current backup, retention and artifact-deletion requirements.
+  The timed isolated restore rehearsal remains recommended resilience work but,
+  by the 2026-08-25 decision, is not a Spec 018 production cutover gate.
 
 ## Verification Queries
 
