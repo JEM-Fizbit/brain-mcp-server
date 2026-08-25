@@ -6,6 +6,14 @@
 **Decisions impact:** implements [DECISIONS 2026-07-06](../DECISIONS.md) D1 (migration) + D2 (topology), as amended by the 2026-07-16 entry: the migration is ungated and the deployment-fork topology is a **mandatory private ERS-org mirror tracking upstream annotated tags plus a config/test/docs overlay**. All decisions in §9 are resolved and locked.
 **Related:** [OWNERSHIP_AND_LIFECYCLE.md](../OWNERSHIP_AND_LIFECYCLE.md) (destination state, exit portability); [spec 003](003-hosted-brain-sync-architecture.md) (tenant-agnostic constraints); [hosted-client-cutover.md](../hosted-client-cutover.md) (enrollment runbook template); [security gate](../security/hosted-brain-supabase-security-gate.md); **evidence base:** `claude-ops/plans/brain-platform/2026-07-12-ers-fork-dependency-audit.md` — 13-surface read-only dependency audit (2026-07-12) with file:line refs for every claim below. The evidence file stays in claude-ops (local-only) because this repo is public and the aggregate is recon-grade.
 
+> **Supersession note — 2026-08-25:** the dedicated ERS development stack and
+> personal-stack separation described here are complete. Wider production
+> identity, permissions and team rollout are now governed by
+> [spec 018](018-ers-production-identity-and-rollout.md). Spec 018 promotes Entra
+> from this spec's out-of-scope roadmap item and reclassifies the timed restore
+> rehearsal from a rollout blocker to non-blocking resilience work. This file
+> remains the historical infrastructure/cutover plan of record.
+
 ## Problem
 
 The hosted Brain MCP is personal-owned and ERS beta-shared (John sole user). The destination state — locked in OWNERSHIP_AND_LIFECYCLE.md and the 2026-07-06 review — is **owner-scoped stacks off one codebase John owns**: ERS runs its own deployment on fully ERS-owned infra (ERS GitHub org repo, ERS Fly org, ERS Supabase org, ERS-governed IdP); the personal stack stays pristine and travels with John at ERS exit. Today every piece of ERS Brain hosted state sits on personal infra, an ERS-scoped Slack bot token sits in personal Fly secrets (a reverse dependency), and several personal defaults are baked into code such that a naive ERS deploy would silently ship John's registry, alert into the wrong channels, and health-check the wrong stack. This spec is the complete fork/migration plan: what to build, in what order, how to cut data over, how to verify, how to roll back, and what must be true afterwards for both stacks.
