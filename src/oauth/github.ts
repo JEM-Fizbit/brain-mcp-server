@@ -1,7 +1,12 @@
 import { isResourceMatch, normalizeResource, type OauthConfig } from "./config.js";
 import { generateAuthCode, generateOauthState } from "./jwt.js";
 import type { StateProvider } from "./state.js";
-import { accessibleRoles, loadRegistry, type BrainPrincipal } from "../services/registry.js";
+import type { BrainPrincipal } from "../services/registry.js";
+import { currentRolesForPrincipal } from "../services/access-grants.js";
+import {
+  buildEntraAuthorizationUrl,
+  createEntraAuthorizationContext,
+} from "./entra.js";
 
 interface AuthorizeParams {
   response_type: string;
@@ -109,12 +114,55 @@ export async function handleAuthorizeGet(
 
   const oauthState = generateOauthState();
   const now = Math.floor(Date.now() / 1000);
+  const enabledProviders = config.identityProviders || ["github"];
+  const requestedProvider =
+    searchParams.get("provider") || config.identityDefaultProvider || enabledProviders[0];
+  if (requestedProvider !== "github" && requestedProvider !== "entra") {
+    return {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+      body: htmlError("Unsupported identity provider."),
+    };
+  }
+  if (!enabledProviders.includes(requestedProvider)) {
+    return {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+      body: htmlError("Requested identity provider is not enabled."),
+    };
+  }
+  const entraContext =
+    requestedProvider === "entra" ? createEntraAuthorizationContext() : undefined;
   await state.put("oauth_states", oauthState, {
     ...params,
     resource: validation.resource,
+    upstream_provider: requestedProvider,
+    ...(entraContext || {}),
     created_at: now,
     expires_at: now + config.oauthStateTtlSec,
   });
+
+  if (requestedProvider === "entra") {
+    return {
+      status: 302,
+      headers: {
+        Location: await buildEntraAuthorizationUrl(
+          oauthState,
+          entraContext!,
+          config
+        ),
+      },
+      body: "",
+    };
+  }
+
+  if (!config.githubClientId || !config.githubCallbackUrl) {
+    return {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+      body: htmlError("GitHub identity provider is incomplete."),
+    };
+  }
 
   const githubUrl = new URL("https://github.com/login/oauth/authorize");
   githubUrl.searchParams.set("client_id", config.githubClientId);
@@ -211,7 +259,7 @@ export async function handleGitHubCallback(
   }
 
   const session = await state.consumeOnce("oauth_states", oauthState);
-  if (!session) {
+  if (!session || (session.upstream_provider && session.upstream_provider !== "github")) {
     return {
       status: 400,
       headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -238,8 +286,7 @@ export async function handleGitHubCallback(
     name: identity.name,
   };
 
-  const registry = await loadRegistry();
-  const roles = accessibleRoles(registry, principal);
+  const roles = await currentRolesForPrincipal(principal);
   if (Object.keys(roles).length === 0) {
     return {
       status: 403,

@@ -18,11 +18,8 @@ import {
   deleteInboxFile,
 } from "../services/ingest.js";
 import { sourceCategoriesForBrain } from "../services/registry.js";
-import {
-  assertWriteRole,
-  authorIdentity,
-  resolveToolBrain,
-} from "../services/request-context.js";
+import { authorIdentity, resolveToolBrain } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 
 export function registerIngestTools(server: McpServer): void {
   server.tool(
@@ -90,6 +87,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
     async ({ brain_id, source_content, source_path, source_label, category, dry_run }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        assertToolRole(ctx, "brain_ingest");
         assertConfiguredSourceCategory(category, ctx.brain);
         if (dry_run) {
           const analysis = await analyzeForIngest(source_label, ctx.brain);
@@ -133,7 +131,6 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
               "No writes occurred. Call brain_prepare_ingest and complete source/inbox custody in the selected Brain's operator workflow before any Brain-content write."
           );
         }
-        assertWriteRole(ctx);
         const content = await resolveSourceContent(source_content, source_path);
         const savedPath = await saveSource(
           content,
@@ -176,6 +173,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
     async ({ brain_id, source_label, category, original_file, md_file, files_touched, inbox_file }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        assertToolRole(ctx, "brain_ingest_complete");
         assertConfiguredSourceCategory(category, ctx.brain);
         if (ctx.brain.storage_backend !== "filesystem") {
           throw new Error(
@@ -183,7 +181,6 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
               "No writes occurred. Use brain_prepare_ingest and finish provenance plus inbox verification in the selected Brain's operator workflow; use brain_log only for the hosted Brain revision receipt."
           );
         }
-        assertWriteRole(ctx);
         const result = await recordIngest(
           source_label,
           category,

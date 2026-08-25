@@ -1,6 +1,8 @@
 # 018 — ERS Production Identity, Access Administration And Team Rollout
 
-**Status:** draft — promoted 2026-08-25; implementation not authorized
+**Status:** in progress — tenant-neutral implementation complete in upstream
+release `v1.8.0`; migration, Entra consent, secret changes, JEM canary, ERS
+deployment and user enrollment remain approval-gated and are not activated
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -386,6 +388,17 @@ with immediate local suspension/reconciliation. There is no permission-
 management MCP tool: agent clients cannot grant access.
 
 ## Implementation work packages
+
+**Local implementation record (2026-08-25):** work packages A-E are complete
+in `v1.8.0`. The focused security suite covers provider modes, OIDC/PKCE,
+certificate `private_key_jwt`, immediate JWKS rollover, exact tenant/object
+identity, current-grant refresh enforcement, the complete role/tool matrix,
+fixed direct group membership, Graph/local failure ordering, Owner recovery,
+admin-session/CSRF/origin isolation, private append-only audit privileges and
+JEM/ERS route separation. The complete repository suite, Cockpit Playwright
+suite, dependency audit, desktop render and 390px render pass. Work packages
+F-G remain live/organizational rollout work and are not implied by the local
+result.
 
 ### A. Provider-neutral authorization shell
 

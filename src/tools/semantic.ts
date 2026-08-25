@@ -4,7 +4,8 @@ import {
   SemanticSearchSchema,
 } from "../schemas/tools.js";
 import { indexSources, semanticSearch } from "../services/semantic.js";
-import { assertWriteRole, resolveToolBrain } from "../services/request-context.js";
+import { resolveToolBrain } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 
 export function registerSemanticTools(server: McpServer): void {
   server.tool(
@@ -14,7 +15,7 @@ export function registerSemanticTools(server: McpServer): void {
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_semantic_index");
         const result = await indexSources(ctx.brainId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

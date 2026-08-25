@@ -6,10 +6,10 @@ import {
 } from "../schemas/tools.js";
 import { activeBrainStore } from "../services/active-brain-store.js";
 import {
-  assertWriteRole,
   resolveToolBrain,
   revisionActor,
 } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 import type { ConflictRecord } from "../sync/types.js";
 
 function shortHash(value?: string | null): string {
@@ -88,7 +88,7 @@ export function registerSyncTools(server: McpServer): void {
     async ({ brain_id, conflict_id, content }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_resolve_conflict");
         const result = await activeBrainStore().resolveConflict(
           ctx.brainId,
           conflict_id,

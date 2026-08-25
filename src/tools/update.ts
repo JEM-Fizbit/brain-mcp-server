@@ -16,11 +16,11 @@ import {
   revisionStoreModeEnabled,
 } from "../services/active-brain-store.js";
 import {
-  assertWriteRole,
   authorIdentity,
   revisionActor,
   resolveToolBrain,
 } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 import {
   countInboundLinkers,
   rewriteLinksAfterRename,
@@ -34,7 +34,7 @@ export function registerUpdateTools(server: McpServer): void {
     async ({ brain_id, filename, content, mode, old_content }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_update_file");
         const result = await activeBrainStore().writeFile(
           ctx.brainId,
           filename,
@@ -68,7 +68,7 @@ export function registerUpdateTools(server: McpServer): void {
     async ({ brain_id, filename }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_delete_file");
         const store = activeBrainStore();
         const linkers = await countInboundLinkers(store, ctx.brainId, filename);
         const result = await store.deleteFile(
@@ -102,7 +102,7 @@ export function registerUpdateTools(server: McpServer): void {
     async ({ brain_id, from, to }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_rename_file");
         const store = activeBrainStore();
         const result = await store.renameFile(
           ctx.brainId,
@@ -151,7 +151,7 @@ export function registerUpdateTools(server: McpServer): void {
     async ({ brain_id, filename }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_restore_file");
         const result = await activeBrainStore().restoreFile(
           ctx.brainId,
           filename,
@@ -179,7 +179,7 @@ export function registerUpdateTools(server: McpServer): void {
     async ({ brain_id, message, push }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_commit");
         const result = revisionStoreModeEnabled()
           ? (
               await activeBrainStore().commit(

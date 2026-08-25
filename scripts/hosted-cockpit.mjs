@@ -33,6 +33,11 @@ const requestedPort = process.env.BRAIN_COCKPIT_PORT;
 const port = Number(requestedPort || 8787);
 const host = process.env.BRAIN_COCKPIT_HOST || "127.0.0.1";
 const cockpitBrainId = process.env.BRAIN_ID || "ai-brain-jem";
+const accessAdminUrl =
+  cockpitBrainId === "ers-brain"
+    ? process.env.BRAIN_COCKPIT_ACCESS_ADMIN_URL ||
+      `${(process.env.BRAIN_HOSTED_BASE_URL || "https://brain.ersgenomics.online").replace(/\/+$/, "")}/admin/access`
+    : "";
 const localBrainDir = process.env.BRAIN_DIR ? path.resolve(process.env.BRAIN_DIR) : null;
 const localBrainRoot = localBrainDir ? path.resolve(localBrainDir, "..") : null;
 // Per-process CSRF nonce: embedded in the served page and required on the write
@@ -521,6 +526,16 @@ async function runDoctor({ fresh = false } = {}) {
   }
 }
 
+function escapeAttribute(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+}
+
 const page = String.raw`<!doctype html>
 <html lang="en">
   <head>
@@ -873,6 +888,22 @@ const page = String.raw`<!doctype html>
       }
 
       .tab-button:focus-visible {
+        outline: 2px solid var(--pass);
+        outline-offset: -2px;
+      }
+
+      .access-nav-link {
+        border: 1px solid #9fcdb7;
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--ink);
+        padding: 9px 14px;
+        white-space: nowrap;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .access-nav-link:focus-visible {
         outline: 2px solid var(--pass);
         outline-offset: -2px;
       }
@@ -1844,6 +1875,7 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
           <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Maintenance</button>
+          ${accessAdminUrl ? `<a class="access-nav-link" id="access-roles-link" href="${escapeAttribute(accessAdminUrl)}">Access &amp; Roles ↗</a>` : ""}
         </div>
 
         <div class="tab-context-strip" id="tab-context-strip" hidden>

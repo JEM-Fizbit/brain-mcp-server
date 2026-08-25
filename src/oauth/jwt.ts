@@ -19,6 +19,8 @@ export interface AccessTokenClaims {
   jti: string;
   provider?: string;
   provider_user_id?: string;
+  provider_tenant_id?: string;
+  upstream_role?: string;
   github_login?: string;
   email?: string;
   name?: string;
@@ -56,6 +58,8 @@ export function issueAccessToken(
     scope: string;
     provider?: string;
     providerUserId?: string;
+    providerTenantId?: string;
+    upstreamRole?: string;
     githubLogin?: string;
     email?: string;
     name?: string;
@@ -73,6 +77,8 @@ export function issueAccessToken(
     jti: randomHex(12),
     ...(args.provider ? { provider: args.provider } : {}),
     ...(args.providerUserId ? { provider_user_id: args.providerUserId } : {}),
+    ...(args.providerTenantId ? { provider_tenant_id: args.providerTenantId } : {}),
+    ...(args.upstreamRole ? { upstream_role: args.upstreamRole } : {}),
     ...(args.githubLogin ? { github_login: args.githubLogin } : {}),
     ...(args.email ? { email: args.email } : {}),
     ...(args.name ? { name: args.name } : {}),

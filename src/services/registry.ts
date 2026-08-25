@@ -57,6 +57,7 @@ export interface BrainDefinition {
 
 export interface RegistryPrincipal {
   provider: string;
+  provider_tenant_id?: string;
   provider_user_id?: string;
   login?: string;
   email?: string;
@@ -73,6 +74,7 @@ export interface BrainRegistry {
 
 export interface BrainPrincipal {
   provider: string;
+  providerTenantId?: string;
   providerUserId: string;
   login?: string;
   email?: string;
@@ -88,6 +90,7 @@ export interface BrainPaths {
 }
 
 const BRAIN_ID_RE = /^[a-z][a-z0-9-]{1,62}$/;
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BRAIN_ROLES = new Set<BrainRole>(["owner", "admin", "member", "reader"]);
 const LINT_MODES = new Set<BrainLintReachabilityMode>([
   "legacy",
@@ -246,9 +249,42 @@ function assertRegistryShape(registry: BrainRegistry): void {
     }
   }
 
+  const principalKeys = new Set<string>();
+  const entraOnly = (process.env.BRAIN_IDENTITY_PROVIDERS || "github")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .every((value) => value === "entra");
   for (const principal of registry.principals || []) {
     if (!principal || typeof principal.provider !== "string" || !principal.roles) {
       throw new Error("Every registry principal must define provider and roles.");
+    }
+    if (
+      principal.provider === "entra" &&
+      (!principal.provider_tenant_id || !principal.provider_user_id)
+    ) {
+      throw new Error(
+        "Every Entra registry principal must define provider_tenant_id and provider_user_id."
+      );
+    }
+    if (principal.provider === "entra") {
+      if (!GUID_RE.test(principal.provider_tenant_id!) || !GUID_RE.test(principal.provider_user_id!)) {
+        throw new Error("Entra registry tenant and object IDs must be exact GUIDs.");
+      }
+    }
+    if (entraOnly && principal.provider === "github") {
+      throw new Error("Entra-only mode refuses GitHub registry principals.");
+    }
+    if (principal.provider_user_id) {
+      const key = [
+        principal.provider,
+        normalise(principal.provider_tenant_id) || "",
+        principal.provider_user_id,
+      ].join(":");
+      if (principalKeys.has(key)) {
+        throw new Error(`Duplicate registry principal identity: ${key}`);
+      }
+      principalKeys.add(key);
     }
     for (const [brainId, role] of Object.entries(principal.roles)) {
       if (!seen.has(brainId)) {
@@ -349,11 +385,16 @@ function envList(name: string): Set<string> {
 
 function principalMatches(record: RegistryPrincipal, principal: BrainPrincipal): boolean {
   if (record.provider !== principal.provider) return false;
-  if (
-    record.provider_user_id &&
-    principal.providerUserId &&
-    record.provider_user_id === principal.providerUserId
-  ) {
+  if (record.provider_user_id) {
+    if (!principal.providerUserId || record.provider_user_id !== principal.providerUserId) {
+      return false;
+    }
+    if (record.provider_tenant_id) {
+      return (
+        normalise(record.provider_tenant_id) ===
+        normalise(principal.providerTenantId)
+      );
+    }
     return true;
   }
   if (normalise(record.login) && normalise(record.login) === normalise(principal.login)) {
@@ -388,6 +429,10 @@ export function principalFromAuthInfo(authInfo?: {
 
   return {
     provider,
+    providerTenantId:
+      typeof extra.provider_tenant_id === "string"
+        ? extra.provider_tenant_id
+        : undefined,
     providerUserId,
     login:
       typeof extra.github_login === "string"

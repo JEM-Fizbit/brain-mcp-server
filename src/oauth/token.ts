@@ -7,6 +7,37 @@ import {
 import { verifyChallenge } from "./pkce.js";
 import type { StateProvider } from "./state.js";
 import { constantTimeEqual } from "./crypto.js";
+import { currentRolesForPrincipal } from "../services/access-grants.js";
+import { runtimeBrainId } from "../services/runtime-env.js";
+import { entraRoleForBrainRole } from "./entra.js";
+import type { BrainPrincipal, BrainRole } from "../services/registry.js";
+
+interface GrantDependencies {
+  rolesForPrincipal?: (principal: BrainPrincipal) => Promise<Record<string, BrainRole>>;
+  brainId?: string;
+}
+
+async function currentGrantAllows(
+  record: any,
+  config: OauthConfig,
+  dependencies: GrantDependencies
+): Promise<boolean> {
+  if (!config.enforceCurrentGrants && record.provider !== "entra") return true;
+  const roles = await (dependencies.rolesForPrincipal || currentRolesForPrincipal)({
+    provider: record.provider,
+    providerTenantId: record.provider_tenant_id || undefined,
+    providerUserId: record.provider_user_id,
+    login: record.github_login || record.login || undefined,
+    email: record.email || undefined,
+    name: record.name || undefined,
+  });
+  const role = roles[dependencies.brainId || runtimeBrainId()];
+  if (!role) return false;
+  if (record.provider === "entra" && record.entra_role) {
+    return entraRoleForBrainRole(role) === record.entra_role;
+  }
+  return true;
+}
 
 function error(
   error: string,
@@ -55,7 +86,8 @@ async function authorizationCodeGrant(
   form: URLSearchParams,
   client: any,
   config: OauthConfig,
-  state: StateProvider
+  state: StateProvider,
+  dependencies: GrantDependencies
 ): Promise<{ status: number; body: any }> {
   const code = form.get("code") || "";
   const redirectUri = form.get("redirect_uri") || "";
@@ -92,6 +124,9 @@ async function authorizationCodeGrant(
   if (!isResourceMatch(effectiveResource, config.resourceUri)) {
     return error("invalid_target", "resource does not match this server's canonical URI");
   }
+  if (!(await currentGrantAllows(record, config, dependencies))) {
+    return error("access_denied", "current Brain grant is inactive or changed", 403);
+  }
 
   const { token } = issueAccessToken(config, {
     sub: `${record.provider}:${record.provider_user_id}`,
@@ -99,6 +134,8 @@ async function authorizationCodeGrant(
     scope: record.scope,
     provider: record.provider,
     providerUserId: record.provider_user_id,
+    providerTenantId: record.provider_tenant_id,
+    upstreamRole: record.entra_role,
     githubLogin: record.github_login,
     email: record.email || undefined,
     name: record.name || undefined,
@@ -110,6 +147,8 @@ async function authorizationCodeGrant(
     client_id: client.client_id,
     provider: record.provider,
     provider_user_id: record.provider_user_id,
+    provider_tenant_id: record.provider_tenant_id || null,
+    entra_role: record.entra_role || null,
     github_login: record.github_login,
     email: record.email || null,
     name: record.name || null,
@@ -136,7 +175,8 @@ async function refreshTokenGrant(
   form: URLSearchParams,
   client: any,
   config: OauthConfig,
-  state: StateProvider
+  state: StateProvider,
+  dependencies: GrantDependencies
 ): Promise<{ status: number; body: any }> {
   const submitted = form.get("refresh_token") || "";
   if (!submitted) return error("invalid_request", "refresh_token is required");
@@ -150,6 +190,9 @@ async function refreshTokenGrant(
   const resource = form.get("resource") || "";
   if (resource && !isResourceMatch(resource, record.resource)) {
     return error("invalid_target", "resource does not match original grant");
+  }
+  if (!(await currentGrantAllows(record, config, dependencies))) {
+    return error("invalid_grant", "current Brain grant is inactive or changed");
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -167,6 +210,8 @@ async function refreshTokenGrant(
     scope: record.scope,
     provider: record.provider,
     providerUserId: record.provider_user_id,
+    providerTenantId: record.provider_tenant_id,
+    upstreamRole: record.entra_role,
     githubLogin: record.github_login,
     email: record.email || undefined,
     name: record.name || undefined,
@@ -209,7 +254,8 @@ export async function handleToken(
   form: URLSearchParams,
   authHeader: string | null | undefined,
   config: OauthConfig,
-  state: StateProvider
+  state: StateProvider,
+  dependencies: GrantDependencies = {}
 ): Promise<{ status: number; body: any; clientId: string | null; grantType: string | null }> {
   // Surface the presented client id and grant type on every path (including
   // failures) so the HTTP layer can attach them to non-secret auth telemetry.
@@ -229,10 +275,10 @@ export async function handleToken(
   identity.clientId = auth.client.client_id || identity.clientId;
 
   if (grantType === "authorization_code") {
-    return { ...(await authorizationCodeGrant(form, auth.client, config, state)), ...identity };
+    return { ...(await authorizationCodeGrant(form, auth.client, config, state, dependencies)), ...identity };
   }
   if (grantType === "refresh_token") {
-    return { ...(await refreshTokenGrant(form, auth.client, config, state)), ...identity };
+    return { ...(await refreshTokenGrant(form, auth.client, config, state, dependencies)), ...identity };
   }
   return {
     ...error("unsupported_grant_type", `grant_type '${grantType}' is not supported`),
