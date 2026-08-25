@@ -90,10 +90,12 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - [x] Re-run this gate against the ERS project and record the project ref.
 - [x] Create an ERS-owned dedicated database login that inherits `brain_runtime`.
 - [x] Verify the dedicated login through the transaction pooler and prepare its strictly validated `BRAIN_REVISION_DATABASE_URL` for Fly secret loading.
-- [ ] Implement and verify the Entra identity, fixed app-role groups, private
-  grant ledger and hosted access-administration controls in spec 018 before
-  wider enrollment. Re-run this gate after the private grant/audit migration;
-  no additional client-side RLS policy is implied.
+- [x] Implement the tenant-neutral Entra identity, fixed-group adapter, private
+  grant/audit projection, hosted access-administration controls and automated
+  security tests in spec 018.
+- [ ] Apply the private grant/audit migration to ERS, rerun this live gate and
+  verify the fixed app-role groups before wider enrollment. No additional
+  client-side RLS policy is implied.
 - [ ] Align SharePoint Brain-folder writes with the named MCP curator population
   and record the team-wide audit/read-logging posture.
 - [x] Keep original bytes unexposed (`metadata_only`) for this rollout; a

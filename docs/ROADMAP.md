@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-08-24
+**Last updated:** 2026-08-25
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -236,8 +236,11 @@ Goal: allow controlled ERS user access to shared Brains.
 
 **Plan of record:**
 [`spec 018 — ERS Production Identity And Controlled Team Rollout`](specs/018-ers-production-identity-and-rollout.md).
-The GitHub-authenticated John+Cillian pilot is complete; Entra and wider access
-are not implemented.
+The GitHub-authenticated John+Cillian pilot is complete. The tenant-neutral
+Entra provider, private grant/audit projection, exhaustive tool-role policy and
+ERS-only hosted Access & Roles surface are implemented and verified in upstream
+release `v1.8.0`; migration, Entra consent, secrets, JEM canary, ERS deployment
+and wider access are not yet activated.
 
 Planned work:
 
@@ -306,17 +309,15 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Review and approve spec 018; then implement Entra, the narrow hosted access
-   administration surface and the explicit role/tool matrix upstream without
-   combining them with the MCP `2026-07-28` migration.
-2. Deploy the tenant-neutral release to JEM first in GitHub-only mode; intake it
+1. Deploy tenant-neutral release `v1.8.0` to JEM first in GitHub-only mode;
+   intake it
    through the private ERS overlay and run the three-owner dual-provider canary.
-3. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
+2. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
    and IT/TDM as owners; align SharePoint writer permissions; activate an
    ERS-owned external health/alert path; and close the item-14 governance gate.
-4. Move ERS to Entra-only and stage a bounded reader cohort before granting any
+3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
    additional curator role.
-5. Keep the restore rehearsal, automated ingestion, protocol migration and
+4. Keep the restore rehearsal, automated ingestion, protocol migration and
    deeper attribution work as separately sequenced follow-ons. Do not remove an
    existing redundancy layer merely because the restore rehearsal is
    non-blocking for Spec 018.

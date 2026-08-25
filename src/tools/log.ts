@@ -9,12 +9,8 @@ import {
   activeBrainStore,
   revisionStoreModeEnabled,
 } from "../services/active-brain-store.js";
-import {
-  assertWriteRole,
-  authorIdentity,
-  revisionActor,
-  resolveToolBrain,
-} from "../services/request-context.js";
+import { authorIdentity, revisionActor, resolveToolBrain } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 
 export function registerLogTools(server: McpServer): void {
   server.tool(
@@ -24,7 +20,7 @@ export function registerLogTools(server: McpServer): void {
     async ({ brain_id, opType, filesTouched, summary }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        assertWriteRole(ctx);
+        assertToolRole(ctx, "brain_log");
         const result = revisionStoreModeEnabled()
           ? await activeBrainStore().appendLog(
               ctx.brainId,

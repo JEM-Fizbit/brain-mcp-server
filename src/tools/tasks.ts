@@ -16,12 +16,8 @@ import {
   TASKS_FILE,
   type IntakeItem,
 } from "../services/task-intake.js";
-import {
-  assertWriteRole,
-  authorIdentity,
-  revisionActor,
-  resolveToolBrain,
-} from "../services/request-context.js";
+import { authorIdentity, revisionActor, resolveToolBrain } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification> | undefined;
 interface CaptureToolArgs extends IntakeItem {
@@ -34,7 +30,7 @@ async function captureItem(
 ) {
   try {
     const ctx = await resolveToolBrain(brain_id, extra);
-    assertWriteRole(ctx);
+    assertToolRole(ctx, "brain_capture_item");
     let existing = "";
     try {
       existing = await activeBrainStore().readFile(ctx.brainId, TASKS_FILE);

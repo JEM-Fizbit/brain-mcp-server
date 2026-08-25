@@ -37,6 +37,8 @@ export function resolveAuth(
         ...verified.payload,
         provider: verified.payload.provider,
         provider_user_id: verified.payload.provider_user_id,
+        provider_tenant_id: verified.payload.provider_tenant_id,
+        upstream_role: verified.payload.upstream_role,
         github_login: verified.payload.github_login,
         email: verified.payload.email,
         name: verified.payload.name,

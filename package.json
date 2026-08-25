@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.7.3",
+  "version": "1.8.0",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
@@ -39,6 +39,8 @@
     "hosted:test-drive": "node scripts/hosted-test-drive.mjs",
     "eval:brain:routing": "npm run build && node scripts/eval-brain-routing.mjs",
     "hosted:cockpit": "node scripts/hosted-cockpit.mjs",
+    "access:bootstrap:entra-owners": "npm run build && node scripts/bootstrap-entra-owners.mjs",
+    "access:emergency-suspend": "npm run build && node scripts/emergency-suspend-entra-principal.mjs",
     "brain:library": "npm run build && node scripts/brain-library.mjs",
     "hosted:cockpit:launchd:plist": "node scripts/write-cockpit-launchd-plist.mjs",
     "hosted:cockpit:launcher:install": "node scripts/install-cockpit-launcher.mjs",
@@ -73,6 +75,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@supabase/supabase-js": "^2.108.1",
+    "jose": "^6.2.10",
     "markdown-it": "^14.3.0",
     "pg": "^8.21.0",
     "zod": "^3.24.4"

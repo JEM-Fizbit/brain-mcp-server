@@ -187,3 +187,54 @@ test("refresh token can be retried inside configured reuse grace", async () => {
   assert.notEqual(second.body.refresh_token, refresh);
   assert.notEqual(second.body.refresh_token, first.body.refresh_token);
 });
+
+test("Entra tenant and upstream role survive code exchange while current downgrade revokes refresh", async () => {
+  const tenantId = "11111111-1111-4111-8111-111111111111";
+  const objectId = "22222222-2222-4222-8222-222222222222";
+  const entraConfig = { ...config, enforceCurrentGrants: true };
+  const record = {
+    code: "auth-code-1",
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: sha256Base64url(VERIFIER),
+    code_challenge_method: "S256",
+    resource: RESOURCE_URI,
+    scope: "mcp:tools",
+    provider: "entra",
+    provider_tenant_id: tenantId,
+    provider_user_id: objectId,
+    entra_role: "Brain.Owner",
+    name: "ERS Owner",
+    expires_at: Math.floor(Date.now() / 1000) + 600,
+  };
+  const state = makeState(record);
+  const form = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: CLIENT_ID,
+    code: "auth-code-1",
+    redirect_uri: REDIRECT_URI,
+    code_verifier: VERIFIER,
+  });
+  const issued = await handleToken(form, null, entraConfig, state, {
+    brainId: "ers-brain",
+    rolesForPrincipal: async () => ({ "ers-brain": "owner" }),
+  });
+  assert.equal(issued.status, 200);
+  const verified = verifyAccessToken(entraConfig, issued.body.access_token);
+  assert.equal(verified.ok, true);
+  assert.equal(verified.payload.provider_tenant_id, tenantId);
+  assert.equal(verified.payload.provider_user_id, objectId);
+  assert.equal(verified.payload.upstream_role, "Brain.Owner");
+
+  const refresh = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLIENT_ID,
+    refresh_token: issued.body.refresh_token,
+  });
+  const denied = await handleToken(refresh, null, entraConfig, state, {
+    brainId: "ers-brain",
+    rolesForPrincipal: async () => ({ "ers-brain": "reader" }),
+  });
+  assert.equal(denied.status, 400);
+  assert.equal(denied.body.error, "invalid_grant");
+});

@@ -658,7 +658,7 @@ test("reader can run read-only lint but cannot request fixes", async () => {
   assert.match(lint, /# Brain Lint Report/);
 
   const denied = await callTool(harness, "brain_lint", { fix: true });
-  assert.match(denied, /Write access denied/);
+  assert.match(denied, /requires member, current role is reader/);
   const store = new FileRevisionStore(harness.storeFile);
   await assert.rejects(
     () => store.readFile("ai-brain-jem", "LOG.md"),

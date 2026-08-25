@@ -9,6 +9,7 @@ import { buildOauthConfig, type OauthConfig } from "../oauth/config.js";
 import { protectedResourceMetadata, authorizationServerMetadata } from "../oauth/metadata.js";
 import { handleRegister } from "../oauth/register.js";
 import { handleAuthorizeGet, handleGitHubCallback } from "../oauth/github.js";
+import { handleEntraCallback } from "../oauth/entra.js";
 import { handleToken } from "../oauth/token.js";
 import { makeFileStateProvider, type StateProvider } from "../oauth/state.js";
 import { makePostgresStateProvider } from "../oauth/postgres-state.js";
@@ -23,6 +24,11 @@ import {
   authReasonCode,
   recordAuthEventBestEffort,
 } from "../services/auth-telemetry.js";
+import { AdminSessionStore } from "../admin/session.js";
+import { AccessAdministrationService } from "../admin/access-service.js";
+import { handleAdminRequest, type AdminRouteContext } from "../admin/routes.js";
+import { postgresAccessGrantStore } from "../services/access-grants.js";
+import { runtimeBrainId } from "../services/runtime-env.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -32,6 +38,7 @@ type AuthenticatedRequest = IncomingMessage & { auth?: AuthInfo };
 interface HttpContext {
   config: OauthConfig;
   state: StateProvider;
+  admin?: AdminRouteContext;
 }
 
 function log(level: string, message: string, extra?: unknown): void {
@@ -199,7 +206,20 @@ export async function handleHttpRequest(
   const pathname = url.pathname;
 
   try {
+    if (pathname.startsWith("/admin")) {
+      if (!ctx.admin) {
+        sendJson(res, 404, { error: "not found" });
+        return;
+      }
+      await handleAdminRequest(req, res, url, ctx.admin);
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/health") {
+      const certificateExpiresAt = ctx.config.entra?.clientCertificateExpiresAt;
+      const certificateDaysRemaining = certificateExpiresAt
+        ? Math.floor((Date.parse(certificateExpiresAt) - Date.now()) / 86_400_000)
+        : undefined;
       sendJson(res, 200, {
         ok: true,
         transport: "http",
@@ -213,6 +233,23 @@ export async function handleHttpRequest(
           authorization_endpoint: ctx.config.authorizationEndpoint,
           token_endpoint: ctx.config.tokenEndpoint,
           registration_endpoint: ctx.config.registrationEndpoint,
+          identity_providers: ctx.config.identityProviders || ["github"],
+          default_identity_provider:
+            ctx.config.identityDefaultProvider || "github",
+          entra_certificate:
+            ctx.config.entra && certificateExpiresAt
+              ? {
+                  expires_at: certificateExpiresAt,
+                  days_remaining: certificateDaysRemaining,
+                  status:
+                    Number(certificateDaysRemaining) < 0
+                      ? "expired"
+                      : Number(certificateDaysRemaining) <= 30
+                        ? "warn"
+                        : "ok",
+                }
+              : undefined,
+          access_admin_enabled: Boolean(ctx.admin),
         },
         runtime: runtimeStatus(),
       });
@@ -253,8 +290,26 @@ export async function handleHttpRequest(
       return;
     }
 
-    if (req.method === "GET" && pathname === "/authorize/github/callback") {
+    if (
+      req.method === "GET" &&
+      ctx.config.githubCallbackUrl &&
+      pathname === new URL(ctx.config.githubCallbackUrl).pathname
+    ) {
       const result = await handleGitHubCallback(url.searchParams, ctx.config, ctx.state);
+      if (result.status === 302 && result.headers.Location) {
+        redirect(res, result.headers.Location);
+      } else {
+        sendHtml(res, result.status, result.body, result.headers);
+      }
+      return;
+    }
+
+    if (
+      req.method === "GET" &&
+      ctx.config.entra &&
+      pathname === new URL(ctx.config.entra.callbackUrl).pathname
+    ) {
+      const result = await handleEntraCallback(url.searchParams, ctx.config, ctx.state);
       if (result.status === 302 && result.headers.Location) {
         redirect(res, result.headers.Location);
       } else {
@@ -331,10 +386,36 @@ export async function startHttpServer(): Promise<void> {
 
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
-  const ctx: HttpContext = {
-    config: buildOauthConfig(),
-    state: makeHttpStateProvider(),
-  };
+  const config = buildOauthConfig();
+  const state = makeHttpStateProvider();
+  const ctx: HttpContext = { config, state };
+  if (
+    runtimeBrainId() === "ers-brain" &&
+    config.entra?.adminGraphEnabled
+  ) {
+    const grants = postgresAccessGrantStore();
+    const requiredOwners = Number(process.env.ENTRA_REQUIRED_INITIAL_OWNER_COUNT || 3);
+    if (!Number.isInteger(requiredOwners) || requiredOwners < 2 || requiredOwners > 10) {
+      throw new Error("ENTRA_REQUIRED_INITIAL_OWNER_COUNT must be an integer between 2 and 10");
+    }
+    const activeOwners = await grants.countActiveOwners(
+      "ers-brain",
+      "entra",
+      config.entra.tenantId
+    );
+    if (activeOwners < requiredOwners) {
+      throw new Error(
+        `ERS access administration requires ${requiredOwners} active Owners; found ${activeOwners}`
+      );
+    }
+    ctx.admin = {
+      config,
+      state,
+      sessions: new AdminSessionStore(config),
+      grants,
+      service: new AccessAdministrationService("ers-brain", config.entra, grants),
+    };
+  }
 
   const server = http.createServer((req, res) => {
     handleHttpRequest(req as AuthenticatedRequest, res, ctx).catch((error) => {

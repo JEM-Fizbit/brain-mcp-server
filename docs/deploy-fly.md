@@ -37,6 +37,7 @@ db/migrations/2026-07-08_001_brain_file_tombstones.sql
 db/migrations/2026-07-17_001_brain_revision_fts.sql
 db/migrations/2026-08-19_001_bounded_sync_observability.sql
 db/migrations/2026-08-22_001_source_reference_identity.sql
+db/migrations/2026-08-25_001_entra_access_grants.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql
 docs/security/hosted-brain-supabase-security-gate.md
@@ -44,7 +45,7 @@ docs/security/hosted-brain-supabase-security-gate.md
 
 Migration `003` creates a no-login `brain_runtime` role with Brain-schema table grants and matching RLS policies. Create a separate login role/user for the hosted runtime, grant it membership in `brain_runtime`, and use that login in `BRAIN_REVISION_DATABASE_URL`. For Supabase pooler URLs, preserve the tenant suffix in the username format, for example `brain_runtime_user.<project-ref>`. Keep the database owner and Supabase service-role database credentials for administration only.
 
-The eight migrations above are the complete current sequence and must be applied in filename order. The 2026-07-17 migration adds only a tombstone-filtered GIN full-text index over private revision content. The 2026-08-19 migration adds the private, runtime-only `brain.sync_heartbeats` current-state table and a small partial index for hosted operational telemetry; it does not delete historical heartbeat events. The 2026-08-22 migration adds portable source-reference identity fields and the private, runtime-only `brain.source_brain_links` table without invalidating existing source or artifact rows. Apply and security-check each migration separately on every deployment database.
+The migrations above are the complete current sequence and must be applied in filename order. The 2026-07-17 migration adds only a tombstone-filtered GIN full-text index over private revision content. The 2026-08-19 migration adds the private, runtime-only `brain.sync_heartbeats` current-state table and a small partial index for hosted operational telemetry; it does not delete historical heartbeat events. The 2026-08-22 migration adds portable source-reference identity fields and the private, runtime-only `brain.source_brain_links` table without invalidating existing source or artifact rows. The 2026-08-25 migration adds tenant-stable principals, current grant status/version fields and the private append-only access audit. Apply and security-check each migration separately on every deployment database.
 
 > **`BRAIN_REVISION_DATABASE_URL` must use the Supabase _transaction_ pooler (port `6543`), not the _session_ pooler (port `5432`).** The runtime is a long-running server with a `pg.Pool`, and it shares the project's pooler client budget with the always-on local sync daemon and operator scripts. Session mode has a hard client cap (`pool_size`, ~15) and exhausts under that combined load with `EMAXCONNSESSION: max clients reached in session mode` (user-visible as failed Brain writes). The transaction pooler multiplexes short-lived clients and removes the ceiling; the code is compatible (client-scoped `begin`/`commit`, no named prepared statements / session GUCs / advisory locks / `LISTEN`). A secret reset that reverts this to `:5432` will re-trigger the outage — keep it on `:6543`. Use `sslmode=verify-full&sslrootcert=/app/config/prod-ca-2021.crt`; the image-bundled file is Supabase's public Root 2021 CA, not a tenant secret. Also keep `BRAIN_PG_POOL_MAX` (default 4) modest so the hosted runtime pool + telemetry pool + local sync pool sum well under the budget. Owned Postgres pools for the hosted runtime/source metadata, OAuth state, and local sync bound network stalls with `BRAIN_PG_CONNECTION_TIMEOUT_MS` (default `5000`), `BRAIN_PG_QUERY_TIMEOUT_MS` (default `30000`), `BRAIN_PG_STATEMENT_TIMEOUT_MS` (defaults to query timeout), and `BRAIN_PG_IDLE_TIMEOUT_MS` (default `10000`); OAuth state uses `BRAIN_OAUTH_STATE_PG_POOL_MAX` (default 2) for its pool size. Background and rationale: `ai-knowledge/protocols/SUPABASE_BEST_PRACTICES.md` § Connection Pooler Configuration.
 
@@ -96,6 +97,13 @@ Hosted OAuth client registration, auth-code, OAuth-state, and refresh-token meta
 When migrating an already-enrolled connector from file-backed OAuth state to Postgres-backed OAuth state, expect one re-enrollment per client account. Existing Claude-held refresh tokens cannot be migrated from the server side because the server only stores their hash. After re-enrollment, future redeploys and Fly machine replacement should not require reconnecting solely because the server lost OAuth state.
 
 The personal deployment must point only to a personal-owned, JEM-only Supabase project. The ERS deployment uses a separate ERS-owned project with the same migrations and environment contract.
+
+JEM explicitly uses `BRAIN_IDENTITY_PROVIDERS=github` and
+`BRAIN_IDENTITY_DEFAULT_PROVIDER=github`; it never loads Entra/Graph admin
+configuration. ERS Entra migration, fixed groups, Owner bootstrap, dual-mode
+canary, Entra-only cutover and rollback are governed by
+[`ers-entra-access-runbook.md`](ers-entra-access-runbook.md). Do not copy its
+private ERS values into this public Fly profile.
 
 The Fly runtime reads the non-secret JEM-only registry from `/app/config/brain-platform.john-ers-pilot.json`. The filename is retained for deployment compatibility; its contents, not its historical name, define the current single-Brain registry. Do not depend on `/data/config/registry.json` for the current deployment.
 
@@ -193,7 +201,7 @@ For a user-launchable local cockpit that does not require a Codex session or ter
 npm run hosted:cockpit:launchd:plist
 ```
 
-The generated plist binds cockpit to `127.0.0.1:8787`, disables port fallback so the URL stays stable, and writes logs beside the Brain sync health files. Review and install it per [`docs/hosted-cockpit.md`](./hosted-cockpit.md). This local LaunchAgent path is the current operator recommendation; a hosted persistent admin website is deferred until multi-user auth and local-first sync visibility are redesigned.
+The generated plist binds cockpit to `127.0.0.1:8787`, disables port fallback so the URL stays stable, and writes logs beside the Brain sync health files. Review and install it per [`docs/hosted-cockpit.md`](./hosted-cockpit.md). This local LaunchAgent path remains the maintenance/sync operator surface. Spec 018 adds only the separate, deployment-bound ERS `/admin/access` permissions route; a general hosted maintenance, content or Brain-administration site remains deferred.
 
 To include the hosted write/local mirror parity gate:
 

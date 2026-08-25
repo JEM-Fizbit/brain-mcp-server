@@ -3,14 +3,16 @@
 **Status:** active operator guide
 **Last updated:** 2026-08-25
 
-Brain Cockpit is currently the local, read-mostly operator surface for the
+Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
 hosted Brain be trusted right now, or does John need to intervene before using
 it? Its narrow shipped Maintenance actions are documented below; it is not a
-general Brain editor or permissions surface today.
+general Brain editor. The tenant-neutral Spec 018 build adds one ERS-only
+hosted permissions surface; activation remains gated on the ERS migration,
+Entra setup and canary.
 
 Spec 018 promotes Cockpit as the shared control-plane shell for the ERS
-production rollout. That planned change is profile-scoped: JEM keeps GitHub
+production rollout. The implemented navigation is profile-scoped: JEM keeps GitHub
 authentication and its single-owner posture, while only ERS gains the hosted,
 Entra-authenticated **Access & Roles** section. This is a shared user experience,
 not a shared trust boundary or a plan to publish the current loopback server.
@@ -46,7 +48,12 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
-- the cockpit browser surface exposes no general Brain editing, conflict resolution, source ingestion, or admin mutations; its narrow Maintenance exceptions are an explicit lint run that records one `LINT` receipt and the confirm-gated application of selected mechanical task fixes. The menu-bar app retains **Controls → "Apply Lint Fixes..."** as the secondary all-or-nothing path.
+- the cockpit browser surface exposes no general Brain editing, conflict resolution, source ingestion, or admin mutations; its narrow Maintenance exceptions are an explicit lint run that records one `LINT` receipt and the confirm-gated application of selected mechanical task fixes. The menu-bar app retains **Controls → "Apply Lint Fixes..."** as the secondary all-or-nothing path;
+- the local ERS navigation includes **Access & Roles**, which opens the hosted,
+  same-origin Entra Owner surface configured by
+  `BRAIN_COCKPIT_ACCESS_ADMIN_URL` (or the active ERS hosted base); the JEM
+  profile renders no access-administration link, and the local process never
+  receives a Graph token or permission mutation.
 
 Do not expose the current local Cockpit process as a hosted website. Its local
 signals and narrow maintenance endpoints remain loopback-only. Spec 018 adds a
@@ -57,6 +64,9 @@ JEM profile does not register or display ERS role-administration capability.
 This supersedes the earlier blanket deferral of any hosted admin surface only
 for the narrow Spec 018 permissions scope; it does not authorize a general
 hosted maintenance, content-editing or Brain administration site.
+
+Hosted operation, failure handling and onboarding/offboarding are documented in
+[`ers-entra-access-runbook.md`](ers-entra-access-runbook.md).
 
 ## Separate content-reading surface
 

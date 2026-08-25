@@ -7,10 +7,10 @@ import {
 } from "../services/lint-apply.js";
 import { brainDate } from "../services/date.js";
 import {
-  assertWriteRole,
   resolveToolBrain,
   revisionActor,
 } from "../services/request-context.js";
+import { assertToolRole } from "../services/tool-authority.js";
 
 function formatFixSummary(summary: LintFixSummary): string {
   const lines: string[] = [
@@ -48,7 +48,7 @@ export function registerLintTools(server: McpServer): void {
         let formatted = formatLintReport(report);
 
         if (fix) {
-          assertWriteRole(ctx);
+          assertToolRole(ctx, "brain_lint", "member");
           // The fix path logs its own LINT entry only when a change lands, so
           // it does not double-log with the detection auto-log below.
           const summary = await applyLintFixes(ctx.brainId, brainDate(), {
