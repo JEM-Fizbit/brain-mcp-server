@@ -21,13 +21,21 @@ restricted to named curators so the human file plane cannot bypass MCP roles.
 GitHub remains only a bounded pilot/rollback provider and is disabled for ERS
 after the Entra canary.
 
-ERS will provide a narrow hosted access-administration UI. John, Cillian and
-the designated IT/TDM identity are the initial `owner`s. After TDM performs the
-one-time app/group setup and tenant consent, John and Cillian can search the
-basic ERS directory and add, change, suspend or revoke users without recurring
-TDM intervention. The UI may mutate only fixed allowlisted role groups through
-delegated Microsoft Graph permissions in the signed-in owner's context; it is
-not a generic Graph client and receives no app-only/background Graph writer.
+Brain Cockpit will provide the shared control-plane shell, with capabilities
+selected by the active owner-isolated profile. John, Cillian and the designated
+IT/TDM identity are the initial ERS `owner`s. After TDM performs the one-time
+app/group setup and tenant consent, John and Cillian can use the ERS **Access &
+Roles** section to search the basic directory and add, change, suspend or revoke
+users without recurring TDM intervention. The UI may mutate only fixed
+allowlisted role groups through delegated Microsoft Graph permissions in the
+signed-in owner's context; it is not a generic Graph client and receives no
+app-only/background Graph writer.
+
+JEM remains GitHub-authenticated and single-owner. Its Cockpit profile does not
+register or display multi-user role administration. The current local Cockpit
+servers remain loopback-only; the shared shell transitions ERS access work to a
+hosted, Entra-authenticated ERS route. Sharing navigation and components does
+not share sessions, identities, grant records, credentials or Brain data.
 
 The timed restore rehearsal previously required by spec 012 is reclassified as
 non-blocking resilience work. Supabase-hosted state plus the SharePoint/OneDrive

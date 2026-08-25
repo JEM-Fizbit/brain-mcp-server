@@ -85,12 +85,15 @@ intervention.
    Spec 018 compatibility-gates the currently deployed transport against every
    target client. The protocol/SDK migration remains separate unless a target
    client makes it unavoidable.
-10. **The ERS deployment includes a hosted access-administration UI.** John,
-    Cillian and the designated IT/TDM identity are its initial `owner`s. After
-    one-time group creation, enterprise-app assignment and admin consent, those
-    owners can add, change, suspend and remove users without asking TDM to
-    perform each change. The local Brain cockpit remains a read-only maintenance
-    inspector; it is not the permissions authority.
+10. **Brain Cockpit is the shared control-plane shell, with profile-scoped
+    capabilities.** John, Cillian and the designated IT/TDM identity are the
+    initial ERS `owner`s. After one-time group creation, enterprise-app
+    assignment and admin consent, those owners use Cockpit's ERS **Access &
+    Roles** section to add, change, suspend and remove users without asking TDM
+    to perform each change. JEM continues to use GitHub authentication and does
+    not expose multi-user role administration. The existing local Cockpit
+    process remains loopback-only; privileged ERS mutations run only on the
+    hosted ERS origin.
 
 ## Acceptance criteria
 
@@ -145,11 +148,25 @@ intervention.
   non-pilot writer: broad colleagues are readers, and only named curators may
   edit the Markdown tree.
 
-### Hosted access administration
+### Cockpit access administration
 
-- A same-origin ERS-only surface is available at an equivalent of
-  `/admin/access`; it is not exposed by the JEM deployment unless explicitly
-  configured for a future separate use.
+- Cockpit uses one shared visual shell and profile-aware navigation. When the
+  active profile is ERS, it exposes **Access & Roles** at an equivalent of the
+  hosted `/admin/access` route. When the active profile is JEM, that capability
+  is absent or explicitly shown as unavailable for the single-owner profile.
+- JEM remains GitHub-authenticated. Enabling ERS Entra or Graph administration
+  cannot make JEM require Entra credentials, accept an Entra principal, expose
+  a role ledger or enable an access mutation route.
+- The local Cockpit remains bound to `127.0.0.1` for device, sync, lint and
+  maintenance functions. Its ERS navigation transitions to the hosted,
+  Entra-authenticated Access & Roles section; the local process never receives
+  a Graph token or proxies a permission mutation.
+- Cillian and IT/TDM can open the hosted ERS Cockpit section directly without
+  installing John's local Brain Monitor or sync stack.
+- Hosted access routes are deployment-bound to `ers-brain`; they do not accept
+  a caller-selected `brain_id`, cannot enumerate JEM, and are absent from the
+  JEM hosted deployment. JEM and ERS sessions, credentials, grant records and
+  audit rows remain owner-isolated.
 - John, Cillian and the designated IT/TDM identity are bootstrapped and
   verified as the three initial `owner`s. Losing any one person does not remove
   the remaining owners' ability to operate access.
@@ -407,8 +424,11 @@ management MCP tool: agent clients cannot grant access.
 
 ### D. Hosted access administration
 
-- Add the same-origin ERS-only access page and a separate recent Entra admin
-  session; keep ordinary MCP OIDC authentication free of Graph scopes.
+- Reuse the Cockpit shell, navigation and components for a profile-scoped
+  **Access & Roles** section, while keeping the local and hosted backends
+  separate.
+- Add the same-origin ERS-only hosted access page and a separate recent Entra
+  admin session; keep ordinary MCP OIDC authentication free of Graph scopes.
 - Add a least-privileged directory picker and fixed-group membership adapter
   using delegated Graph tokens only while an authorized owner is present.
 - Make Graph/local grant transitions fail closed, idempotent and auditable;
@@ -418,6 +438,8 @@ management MCP tool: agent clients cannot grant access.
   remediation.
 - Do not retain Graph access or refresh tokens beyond the short admin session,
   expose a generic Graph proxy, or allow a request to supply a group ID.
+- Keep the JEM profile GitHub-only and prove that neither its local nor hosted
+  surface registers the ERS access routes or loads ERS Entra/Graph config.
 
 ### E. Role enforcement
 
@@ -468,6 +490,10 @@ management MCP tool: agent clients cannot grant access.
 - Admin authorization: Reader, Curator and Admin denied; Owner controls all
   roles; reducing below two Owners is denied; admin routes are absent on JEM
   and disabled ERS profiles.
+- Profile isolation: switching the shared Cockpit shell between JEM and ERS
+  changes only presentation/navigation; JEM cannot call an ERS access endpoint,
+  ERS access APIs reject caller-selected Brain IDs, and no session or grant
+  crosses deployments.
 - Graph adapter fixtures: fixed-group allowlist, directory-search field bounds,
   add/change/remove idempotence, no arbitrary group ID, delegated-token expiry,
   partial failure, fail-closed revocation and drift reconciliation.
