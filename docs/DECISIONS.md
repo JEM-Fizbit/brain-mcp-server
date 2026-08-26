@@ -26,6 +26,13 @@ switched from its final legacy event at 16:49:51 UTC to the current-state row at
 events were unchanged. This cleanup is distinct from the earlier removal of
 481,170 misrouted JEM-labelled events from the ERS database.
 
+Release `v1.8.2` was then deployed to JEM as Fly release 76. Its health surface
+reported version 1.8.2, GitHub-only identity, Postgres/Supabase stores,
+metadata-only artifact access and no access-administration route. ERS remained
+untouched on version 1.7.3 / Fly release 15. Automatic vacuum completed on both
+event tables with zero estimated dead rows; allocated relation space remains
+available for PostgreSQL reuse, so no locking `VACUUM FULL` was justified.
+
 **Why:** The bounded-observability code had deployed correctly, but the JEM
 database had missed its per-database migration. The compatibility fallback
 therefore continued one append per minute and the doctor falsely showed green.

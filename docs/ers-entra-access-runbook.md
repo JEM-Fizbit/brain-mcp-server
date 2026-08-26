@@ -227,7 +227,11 @@ security gate, and its active watcher adopted the current-state row without a
 restart. After fresh state rows were proved on both Brains, 57,861 JEM and
 475,091 ERS obsolete heartbeat events were removed in bounded, profile-guarded
 batches; the 1,890 JEM and 1,404 ERS non-heartbeat events were unchanged. This
-is distinct from the earlier misrouted-telemetry cleanup above.
+is distinct from the earlier misrouted-telemetry cleanup above. JEM Fly release
+76 now reports version 1.8.2 and the expected GitHub-only runtime. ERS remained
+untouched on version 1.7.3 / Fly release 15. Automatic vacuum completed on both
+event tables with zero estimated dead rows; allocated relation space remains
+available for reuse and no locking `VACUUM FULL` was run.
 
 Private ERS overlay intake may proceed from the exact `v1.8.2` tag; this
 evidence does not authorize an ERS migration, secret change, Entra action or
