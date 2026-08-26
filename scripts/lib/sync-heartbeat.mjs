@@ -33,3 +33,21 @@ export function evaluateSyncHeartbeat(row, nowMs = Date.now(), maxAgeMs = 300_00
     metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
   };
 }
+
+export function evaluateSyncHeartbeatCheck(
+  row,
+  storageMode = "current_state",
+  nowMs = Date.now(),
+  maxAgeMs = 300_000
+) {
+  const evaluation = evaluateSyncHeartbeat(row, nowMs, maxAgeMs);
+  const legacyFallback = storageMode === "legacy_event_fallback";
+  return {
+    ...evaluation,
+    status: legacyFallback ? "warn" : evaluation.status,
+    storageMode,
+    migration: legacyFallback
+      ? "2026-08-19_001_bounded_sync_observability.sql_missing"
+      : "applied",
+  };
+}

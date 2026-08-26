@@ -1,8 +1,9 @@
 # 018 — ERS Production Identity, Access Administration And Team Rollout
 
 **Status:** in progress — tenant-neutral implementation complete in upstream
-release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`.
-The tagged release is deployed and has passed the profile-bound JEM re-canary.
+release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`,
+and the observability-acceptance correction is included in `v1.8.2`. The tagged
+release is deployed and has passed the profile-bound JEM re-canary.
 Private ERS overlay intake is the next gate. ERS migration, Entra consent,
 secret changes, deployment and user enrollment remain approval-gated and are
 not activated
@@ -415,8 +416,13 @@ tuple from the exact owner-only Brain Monitor profile. The tagged release was
 deployed to JEM on 2026-08-26 and passed GitHub refresh, authenticated read,
 bounded write, local sync and heartbeat checks with 40 hosted files and zero
 conflicts. Canary telemetry landed in the JEM database; the post-canary ERS
-check remained at zero JEM events and zero JEM heartbeats. Work package F may
-now proceed to private overlay intake from the exact `v1.8.1` tag.
+check remained at zero JEM events and zero JEM heartbeats. The follow-up
+`v1.8.2` release makes the legacy heartbeat compatibility path an actionable
+schema-migration warning. After the missing JEM migration passed its security
+gate and the live watcher adopted current-state storage, 57,861 JEM and 475,091
+ERS obsolete heartbeat events were removed without changing either Brain's
+non-heartbeat event count. Work package F may now proceed to private overlay
+intake from the exact `v1.8.2` tag.
 
 ### A. Provider-neutral authorization shell
 

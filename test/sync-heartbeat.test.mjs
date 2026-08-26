@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { evaluateSyncHeartbeat } from "../scripts/lib/sync-heartbeat.mjs";
+import {
+  evaluateSyncHeartbeat,
+  evaluateSyncHeartbeatCheck,
+} from "../scripts/lib/sync-heartbeat.mjs";
 import { LocalSyncAgent } from "../dist/sync/local-sync-agent.js";
 import { MemoryRevisionStore } from "../dist/sync/memory-revision-store.js";
 import { PostgresRevisionStore } from "../dist/sync/postgres-revision-store.js";
@@ -108,5 +111,30 @@ test("heartbeat evaluation warns when missing or stale", () => {
   assert.equal(
     evaluateSyncHeartbeat({ created_at: "2026-07-16T12:09:00.000Z" }, now, 300_000).status,
     "pass"
+  );
+});
+
+test("heartbeat check warns when a current heartbeat uses legacy event fallback", () => {
+  const now = Date.parse("2026-07-16T12:10:00.000Z");
+  const currentState = evaluateSyncHeartbeatCheck(
+    { created_at: "2026-07-16T12:09:00.000Z" },
+    "current_state",
+    now,
+    300_000
+  );
+  const legacyFallback = evaluateSyncHeartbeatCheck(
+    { created_at: "2026-07-16T12:09:00.000Z" },
+    "legacy_event_fallback",
+    now,
+    300_000
+  );
+
+  assert.equal(currentState.status, "pass");
+  assert.equal(currentState.migration, "applied");
+  assert.equal(legacyFallback.status, "warn");
+  assert.equal(legacyFallback.state, "current");
+  assert.equal(
+    legacyFallback.migration,
+    "2026-08-19_001_bounded_sync_observability.sql_missing"
   );
 });

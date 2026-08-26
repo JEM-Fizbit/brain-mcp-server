@@ -47,6 +47,16 @@ Migration `003` creates a no-login `brain_runtime` role with Brain-schema table 
 
 The migrations above are the complete current sequence and must be applied in filename order. The 2026-07-17 migration adds only a tombstone-filtered GIN full-text index over private revision content. The 2026-08-19 migration adds the private, runtime-only `brain.sync_heartbeats` current-state table and a small partial index for hosted operational telemetry; it does not delete historical heartbeat events. The 2026-08-22 migration adds portable source-reference identity fields and the private, runtime-only `brain.source_brain_links` table without invalidating existing source or artifact rows. The 2026-08-25 migration adds tenant-stable principals, current grant status/version fields and the private append-only access audit. Apply and security-check each migration separately on every deployment database.
 
+After the 2026-08-19 migration, require the doctor to report
+`sync_heartbeat.details.storageMode=current_state` and prove a fresh state row
+before considering legacy heartbeat cleanup. A missing table is an actionable
+migration warning even when the compatibility event is current. Historical
+`sync_heartbeat` deletion is a separate, explicitly approved operation: bind
+the command to one Brain/profile tuple, preserve the non-heartbeat count, use
+bounded batches, and verify the current-state row again afterward. The
+2026-08-26 JEM/ERS execution evidence is recorded in the Supabase security
+gate and Decisions log.
+
 > **`BRAIN_REVISION_DATABASE_URL` must use the Supabase _transaction_ pooler (port `6543`), not the _session_ pooler (port `5432`).** The runtime is a long-running server with a `pg.Pool`, and it shares the project's pooler client budget with the always-on local sync daemon and operator scripts. Session mode has a hard client cap (`pool_size`, ~15) and exhausts under that combined load with `EMAXCONNSESSION: max clients reached in session mode` (user-visible as failed Brain writes). The transaction pooler multiplexes short-lived clients and removes the ceiling; the code is compatible (client-scoped `begin`/`commit`, no named prepared statements / session GUCs / advisory locks / `LISTEN`). A secret reset that reverts this to `:5432` will re-trigger the outage — keep it on `:6543`. Use `sslmode=verify-full&sslrootcert=/app/config/prod-ca-2021.crt`; the image-bundled file is Supabase's public Root 2021 CA, not a tenant secret. Also keep `BRAIN_PG_POOL_MAX` (default 4) modest so the hosted runtime pool + telemetry pool + local sync pool sum well under the budget. Owned Postgres pools for the hosted runtime/source metadata, OAuth state, and local sync bound network stalls with `BRAIN_PG_CONNECTION_TIMEOUT_MS` (default `5000`), `BRAIN_PG_QUERY_TIMEOUT_MS` (default `30000`), `BRAIN_PG_STATEMENT_TIMEOUT_MS` (defaults to query timeout), and `BRAIN_PG_IDLE_TIMEOUT_MS` (default `10000`); OAuth state uses `BRAIN_OAUTH_STATE_PG_POOL_MAX` (default 2) for its pool size. Background and rationale: `ai-knowledge/protocols/SUPABASE_BEST_PRACTICES.md` § Connection Pooler Configuration.
 
 Create or update a GitHub OAuth app for the hosted callback:

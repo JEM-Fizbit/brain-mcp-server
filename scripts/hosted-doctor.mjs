@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import {
-  evaluateSyncHeartbeat,
+  evaluateSyncHeartbeatCheck,
   SYNC_HEARTBEAT_EVENT_TYPE,
 } from "./lib/sync-heartbeat.mjs";
 import {
@@ -843,6 +843,7 @@ async function checkSyncHeartbeat() {
   const pool = doctorPool;
   try {
     let result;
+    let storageMode = "current_state";
     try {
       result = await pool.query(
         `
@@ -854,6 +855,7 @@ async function checkSyncHeartbeat() {
       );
     } catch (error) {
       if (error?.code !== "42P01") throw error;
+      storageMode = "legacy_event_fallback";
       result = await pool.query(
         `
           select created_at, duration_ms, metadata
@@ -865,8 +867,9 @@ async function checkSyncHeartbeat() {
         [brainId, SYNC_HEARTBEAT_EVENT_TYPE]
       );
     }
-    const evaluation = evaluateSyncHeartbeat(
+    const evaluation = evaluateSyncHeartbeatCheck(
       result.rows[0] || null,
+      storageMode,
       Date.now(),
       maxSyncHeartbeatAgeMs
     );
@@ -1559,13 +1562,23 @@ function buildOperatorActions(status) {
   }
 
   if (heartbeat?.status === "warn") {
-    actions.push({
-      level: "warn",
-      reason: "sync_heartbeat_stale",
-      title: "Hosted sync heartbeat is missing or stale.",
-      detail:
-        "Confirm the profile's local sync watcher is running with the correct database target; a sleeping or offline sync host will stop emitting heartbeats.",
-    });
+    if (heartbeat.details?.storageMode === "legacy_event_fallback") {
+      actions.push({
+        level: "warn",
+        reason: "sync_heartbeat_legacy_fallback",
+        title: "Apply the bounded sync-observability migration to this Brain database.",
+        detail:
+          "Sync liveness is working through the temporary append-only fallback. Apply db/migrations/2026-08-19_001_bounded_sync_observability.sql to this profile's database, rerun the Supabase security gate, then refresh Brain Monitor.",
+      });
+    } else {
+      actions.push({
+        level: "warn",
+        reason: "sync_heartbeat_stale",
+        title: "Hosted sync heartbeat is missing or stale.",
+        detail:
+          "Confirm the profile's local sync watcher is running with the correct database target; a sleeping or offline sync host will stop emitting heartbeats.",
+      });
+    }
   }
 
   if (lint?.status === "warn") {

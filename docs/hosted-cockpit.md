@@ -415,6 +415,11 @@ warns when `last_seen_at` is older than five minutes; override the threshold
 with `BRAIN_SYNC_HEARTBEAT_MAX_AGE_MS` for a deliberately slower watcher
 cadence. Code deployed before the migration falls back to a coalesced legacy
 `sync_heartbeat` event, so migration/runtime ordering does not interrupt sync.
+That fallback is deliberately visible as an actionable Brain Monitor warning:
+apply `db/migrations/2026-08-19_001_bounded_sync_observability.sql` to the
+affected profile database, rerun the Supabase security gate, and refresh the
+Monitor. A current fallback event proves liveness but does not count as a
+healthy long-term observability configuration.
 
 ## Operator Contract
 
