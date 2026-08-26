@@ -218,9 +218,20 @@ the bounded hosted write, local sync verification, current heartbeat, 40 hosted
 files and zero conflicts all passed. JEM's database recorded the server, client
 end-to-end and sync-wait canary rows. The final ERS check remained exactly zero
 JEM events and zero JEM heartbeats, with the legitimate ERS event count
-unchanged at 476,494. Private ERS overlay intake may proceed from the exact
-`v1.8.1` tag; this evidence does not authorize an ERS migration, secret change,
-Entra action or deployment.
+unchanged at 476,494.
+
+Release `v1.8.2` adds the follow-up observability acceptance fix: a live legacy
+heartbeat fallback is now an actionable missing-migration warning rather than
+a false green. The JEM bounded-observability migration passed its complete
+security gate, and its active watcher adopted the current-state row without a
+restart. After fresh state rows were proved on both Brains, 57,861 JEM and
+475,091 ERS obsolete heartbeat events were removed in bounded, profile-guarded
+batches; the 1,890 JEM and 1,404 ERS non-heartbeat events were unchanged. This
+is distinct from the earlier misrouted-telemetry cleanup above.
+
+Private ERS overlay intake may proceed from the exact `v1.8.2` tag; this
+evidence does not authorize an ERS migration, secret change, Entra action or
+deployment.
 
 The 15:29 BST JEM auth alert was investigated separately. Two `token_expired`
 requests came from the registered Cursor client and were followed about 0.3

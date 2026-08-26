@@ -8,6 +8,44 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-26 — Fail visibly on heartbeat fallback and retire obsolete heartbeat events
+
+**Decision:** A current legacy `sync_heartbeat` event proves local-sync
+liveness but is not a healthy long-term observability configuration. If
+`brain.sync_heartbeats` is missing, the doctor must return an actionable warning
+that names `2026-08-19_001_bounded_sync_observability.sql`; it may not silently
+pass through the append-only fallback. Apply and security-check that migration
+on every Brain database before deleting legacy heartbeat history. Delete only
+profile-matched `sync_heartbeat` rows, in bounded batches, after proving a fresh
+current-state row and preserving the non-heartbeat event count.
+
+The JEM migration and security gate passed on 2026-08-26. The active watcher
+switched from its final legacy event at 16:49:51 UTC to the current-state row at
+16:50:54 UTC without a restart. The guarded cleanup then removed 57,861 JEM and
+475,091 ERS legacy heartbeat events; the 1,890 JEM and 1,404 ERS non-heartbeat
+events were unchanged. This cleanup is distinct from the earlier removal of
+481,170 misrouted JEM-labelled events from the ERS database.
+
+**Why:** The bounded-observability code had deployed correctly, but the JEM
+database had missed its per-database migration. The compatibility fallback
+therefore continued one append per minute and the doctor falsely showed green.
+Fallback must preserve availability during rollout without concealing schema
+drift indefinitely. Once current-state liveness is proven, retaining hundreds
+of thousands of routine heartbeat rows adds IO and storage cost without useful
+historical value.
+
+**Alternatives rejected:** keep a green compatibility fallback; disable the
+five-second sync loop; retain all heartbeat history; delete rows before proving
+the state table; combine cleanup with an automatic migration-time delete; or
+upgrade database compute to mask avoidable housekeeping IO.
+
+**Related:** `db/migrations/2026-08-19_001_bounded_sync_observability.sql`;
+`scripts/lib/sync-heartbeat.mjs`; `scripts/hosted-doctor.mjs`;
+`docs/hosted-cockpit.md`;
+`docs/security/hosted-brain-supabase-security-gate.md`.
+
+---
+
 ## 2026-08-26 — Bind hosted diagnostics and canaries to one Brain deployment
 
 **Decision:** Every hosted doctor/OAuth-canary process that has a Brain database

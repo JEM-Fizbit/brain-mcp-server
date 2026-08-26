@@ -1,11 +1,11 @@
 # Hosted Brain Supabase Security Gate
 
-**Status:** passed for the live ERS hosted runtime
-**Checked:** 2026-08-19
-**Project:** `brain-platform-pilot`
-**Supabase project ref:** `omnwbcdtmtvxasgdmvwr`
-**Organization:** `ERS Genomics`
-**Scope:** ERS-owned hosted Brain database, dedicated runtime role, private artifact bucket, and bounded operational-observability schema for the live ERS deployment.
+**Status:** passed for the live JEM and ERS hosted runtimes
+**Checked:** JEM 2026-08-26; ERS 2026-08-19
+**Projects:** `jem-brain-personal`; `brain-platform-pilot`
+**Supabase project refs:** `gfipcidoyrtgngauzijy`; `omnwbcdtmtvxasgdmvwr`
+**Organizations:** John E. Milad personal; `ERS Genomics`
+**Scope:** owner-isolated hosted Brain databases, dedicated runtime roles, private artifact buckets, and bounded operational-observability schemas.
 
 ## Gate Decision
 
@@ -18,6 +18,22 @@ infrastructure separation remains governed by spec 012.
 
 ## Verified Controls
 
+- The 2026-08-26 JEM bounded-observability gate reported 17/17 Brain
+  tables with RLS, zero `anon`/`authenticated`/`public` Brain grants, zero
+  non-`brain_runtime` Brain policies, one `brain_runtime`-only policy and no
+  other policy on `brain.sync_heartbeats`, a private artifact bucket, zero
+  client Storage policies, no client/public execute privilege on
+  `public.rls_auto_enable()`, and a valid/ready partial observability index.
+  The dedicated `brain_jem_sync_user` remained login-capable, inherited
+  `brain_runtime`, and had no elevated database privilege. A fresh Supabase
+  Security Advisor run returned 0 errors, 0 warnings, and 0 suggestions.
+- After the JEM watcher created a fresh current-state heartbeat, a bounded
+  cleanup removed 57,861 JEM and 475,091 ERS legacy `sync_heartbeat` events.
+  JEM's 1,890 and ERS's 1,404 non-heartbeat operational events were preserved
+  exactly, and both current-state heartbeat rows remained fresh. These deleted
+  low-value telemetry rows are recoverable only through the providers' backup
+  or point-in-time recovery facilities; no application-level archive was
+  retained.
 - The 2026-08-22 JEM-first source-reference migration was applied to the
   personal `jem-brain-personal` project (`gfipcidoyrtgngauzijy`) with ERS
   untouched. The post-migration gate reported 16/16 Brain tables with RLS,

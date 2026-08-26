@@ -508,6 +508,9 @@ test("hosted doctor bounds database work and caches deep operation telemetry", a
   assert.match(doctor, /15 \* 60 \* 1000/);
   assert.match(doctor, /BRAIN_DOCTOR_FORCE_DEEP/);
   assert.match(doctor, /from brain\.sync_heartbeats/);
+  assert.match(doctor, /legacy_event_fallback/);
+  assert.match(doctor, /sync_heartbeat_legacy_fallback/);
+  assert.match(doctor, /2026-08-19_001_bounded_sync_observability\.sql/);
   assert.match(doctor, /event_type in \('hosted_mcp_latency', 'hosted_mcp_auth'\)/);
   assert.equal((doctor.match(/new Pool\(/g) || []).length, 1);
 });

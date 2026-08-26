@@ -244,7 +244,11 @@ matrix but exposed an ambient operator-credential routing defect outside the
 server runtime. Corrective release `v1.8.1` binds doctor/smoke database access
 to an exact Brain/endpoint/Supabase profile. It is deployed to JEM and passed
 the profile-bound OAuth/read/write/sync re-canary with zero JEM events or
-heartbeats in the ERS database. Private ERS overlay intake is the next gate;
+heartbeats in the ERS database. Release `v1.8.2` makes a legacy heartbeat
+fallback an actionable migration warning; the missing JEM schema passed its
+security gate, both Brains now use fresh current-state heartbeats, and 532,952
+obsolete heartbeat events were removed without changing non-heartbeat
+telemetry. Private ERS overlay intake is the next gate;
 ERS migration, Entra consent, secrets, deployment and wider access are not yet
 activated.
 
@@ -315,7 +319,7 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Intake the JEM-validated `v1.8.1` tag through the private ERS overlay. Then
+1. Intake the JEM-validated `v1.8.2` tag through the private ERS overlay. Then
    complete the one-time Entra setup and run the three-owner dual-provider
    canary; do not deploy ERS from an untagged or locally modified upstream tree.
 2. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
