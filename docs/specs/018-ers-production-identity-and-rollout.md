@@ -2,7 +2,8 @@
 
 **Status:** in progress — tenant-neutral implementation complete in upstream
 release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`.
-The profile-bound JEM re-canary is the next gate. ERS migration, Entra consent,
+The tagged release is deployed and has passed the profile-bound JEM re-canary.
+Private ERS overlay intake is the next gate. ERS migration, Entra consent,
 secret changes, deployment and user enrollment remain approval-gated and are
 not activated
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
@@ -410,9 +411,12 @@ operational telemetry did. The exact 481,170 JEM-labelled event rows and one
 heartbeat were removed from the ERS database without changing legitimate ERS
 rows. `v1.8.1` makes every database-aware doctor/smoke command prove its Brain,
 HTTPS endpoint and Supabase project binding before network access, or load that
-tuple from the exact owner-only Brain Monitor profile. JEM must pass that
-profile-bound canary and a zero-row ERS contamination check before work package
-F proceeds to private overlay intake.
+tuple from the exact owner-only Brain Monitor profile. The tagged release was
+deployed to JEM on 2026-08-26 and passed GitHub refresh, authenticated read,
+bounded write, local sync and heartbeat checks with 40 hosted files and zero
+conflicts. Canary telemetry landed in the JEM database; the post-canary ERS
+check remained at zero JEM events and zero JEM heartbeats. Work package F may
+now proceed to private overlay intake from the exact `v1.8.1` tag.
 
 ### A. Provider-neutral authorization shell
 
