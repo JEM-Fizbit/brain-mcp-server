@@ -239,8 +239,12 @@ Goal: allow controlled ERS user access to shared Brains.
 The GitHub-authenticated John+Cillian pilot is complete. The tenant-neutral
 Entra provider, private grant/audit projection, exhaustive tool-role policy and
 ERS-only hosted Access & Roles surface are implemented and verified in upstream
-release `v1.8.0`; migration, Entra consent, secrets, JEM canary, ERS deployment
-and wider access are not yet activated.
+release `v1.8.0`. Its first JEM canary passed the functional GitHub/OAuth/tool
+matrix but exposed an ambient operator-credential routing defect outside the
+server runtime. Corrective release `v1.8.1` binds doctor/smoke database access
+to an exact Brain/endpoint/Supabase profile. A profile-bound JEM re-canary is
+the next gate; ERS migration, Entra consent, secrets, deployment and wider
+access are not yet activated.
 
 Planned work:
 
@@ -309,9 +313,10 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Deploy tenant-neutral release `v1.8.0` to JEM first in GitHub-only mode;
-   intake it
-   through the private ERS overlay and run the three-owner dual-provider canary.
+1. Deploy corrective release `v1.8.1` to JEM in GitHub-only mode; complete the
+   profile-bound OAuth/read/write/sync canary and prove zero JEM telemetry in the
+   ERS database. Then intake that exact tag through the private ERS overlay and
+   run the three-owner dual-provider canary.
 2. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
    and IT/TDM as owners; align SharePoint writer permissions; activate an
    ERS-owned external health/alert path; and close the item-14 governance gate.

@@ -158,10 +158,21 @@ https://jem-brain-mcp.fly.dev/mcp
 For an operator-controlled OAuth enrollment smoke, run:
 
 ```bash
+BRAIN_ID=ai-brain-jem \
+BRAIN_MONITOR_CONFIG_FILE="$HOME/Applications/Brain Monitor.app/Contents/Resources/brain-menubar-config.json" \
 npm run smoke:hosted:oauth
 ```
 
 The script reuses a local refresh-token cache when available, then performs read-only hosted MCP checks. On first run, or when the cached grant has expired or been revoked, it registers a temporary public OAuth client, opens or prints the GitHub authorization URL, listens on a local loopback callback, exchanges the authorization code, and updates the cache. Access tokens stay in memory; only the rotating refresh token is written locally with `0600` permissions. Set `BRAIN_HOSTED_OAUTH_OPEN=0` to print the URL without opening a browser, `BRAIN_HOSTED_OAUTH_TOKEN_CACHE` to override the cache path, or pass `--reauth` to force a new browser approval.
+
+The doctor and OAuth smoke are database/telemetry-aware operator commands. If
+`BRAIN_REVISION_DATABASE_URL` is present, both fail before network access unless
+the Brain id, hosted base URL and expected Supabase project ref form an explicit
+matching tuple. Selecting the owner-only generated Brain Monitor config as above
+loads that tuple from the named profile and overrides any ambient repo
+`.env.local` credential. A single-profile manual environment must instead set
+`BRAIN_EXPECTED_SUPABASE_PROJECT_REF` explicitly; changing only `BRAIN_ID` is
+not a safe profile switch.
 
 For a single operator rehearsal that runs the hosted doctor, OAuth MCP read/write parity, local-to-hosted parity, conflict lifecycle, latency snapshot, and final doctor summary, run:
 
@@ -176,7 +187,9 @@ After `hosted:test-drive` passes, follow [`docs/hosted-client-cutover.md`](./hos
 For a non-destructive hosted operator check, run:
 
 ```bash
-BRAIN_FLY_APP=jem-brain-mcp npm run hosted:doctor
+BRAIN_ID=ai-brain-jem \
+BRAIN_MONITOR_CONFIG_FILE="$HOME/Applications/Brain Monitor.app/Contents/Resources/brain-menubar-config.json" \
+npm run hosted:doctor
 ```
 
 The doctor reports public hosted health, Supabase Postgres summary counts, local sync state, last successful sync health, sync lock state, lint freshness, pending inbox files, launchd status on macOS, Fly app status when `flyctl` is available, and a `pooler_config` check that classifies `BRAIN_REVISION_DATABASE_URL` (warns on the session pooler `:5432`; reports active connection count + per-pool `max`). It redacts database credentials by reporting only whether the database URL is set. A failed hosted health, Postgres summary, or sync health error exits non-zero; stale local launchd/Fly/lint/inbox warnings are reported without blocking the command. Set `BRAIN_SYNC_HEALTH_MAX_AGE_MS` to change the stale-health threshold, `BRAIN_SYNC_CLOSE_TIMEOUT_MS` to change how long the local sync daemon waits for store shutdown before exiting for launchd restart, or `BRAIN_LINT_NUDGE_DAYS` to change the lint freshness threshold.
@@ -206,6 +219,8 @@ The generated plist binds cockpit to `127.0.0.1:8787`, disables port fallback so
 To include the hosted write/local mirror parity gate:
 
 ```bash
+BRAIN_ID=ai-brain-jem \
+BRAIN_MONITOR_CONFIG_FILE="$HOME/Applications/Brain Monitor.app/Contents/Resources/brain-menubar-config.json" \
 npm run smoke:hosted:oauth -- --write --verify-local
 ```
 

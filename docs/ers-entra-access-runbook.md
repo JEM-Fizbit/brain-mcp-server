@@ -1,7 +1,7 @@
 # ERS Brain Entra Access Runbook
 
 **Status:** implementation runbook; activation remains approval-gated
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-26
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
 This runbook activates and operates the Spec 018 identity and permissions
@@ -163,6 +163,19 @@ BRAIN_IDENTITY_DEFAULT_PROVIDER=github
 
 ## 5. Canary and cutover
 
+For local JEM or ERS doctor/smoke commands, select the exact owner-only Brain
+Monitor profile. Do not switch Brains by changing only `BRAIN_ID`:
+
+```bash
+BRAIN_ID=ai-brain-jem \
+BRAIN_MONITOR_CONFIG_FILE="$HOME/Applications/Brain Monitor.app/Contents/Resources/brain-menubar-config.json" \
+npm run hosted:doctor
+```
+
+If a database URL is present, the command refuses to run until the selected
+Brain id, HTTPS hosted endpoint and expected Supabase project ref match the
+credential. This guard applies before reads, telemetry or content writes.
+
 Run the Spec 018 live matrix in order:
 
 1. Deploy the shared release to JEM in GitHub-only mode; verify GitHub login,
@@ -184,6 +197,35 @@ Run the Spec 018 live matrix in order:
    prove ERS GitHub authorization no longer starts or completes.
 
 Do not broaden the cohort during the dual-provider canary.
+
+### 2026-08-26 JEM canary correction
+
+The first JEM `v1.8.0` canary passed GitHub login, refresh, read/write and route
+isolation. Its local smoke/doctor process nevertheless exposed a separate
+operator-configuration defect: ambient `.env.local` held the ERS runtime
+database while the command defaulted to the JEM Brain id and endpoint. No Brain
+content, source bytes, grants or OAuth state crossed deployments. The effect was
+limited to operational metadata, but it was material: 481,170 historical
+JEM-labelled `brain.sync_events` rows and one JEM heartbeat had accumulated in
+the ERS database. Those exact rows were deleted on 2026-08-26; legitimate ERS
+rows were unchanged.
+
+Corrective release `v1.8.1` adds a shared fail-closed binding assertion to the
+doctor and OAuth smoke, makes the local environment template realm-neutral, and
+uses the selected Brain Monitor profile as the durable manual-command source.
+JEM must pass a profile-bound canary on `v1.8.1`, followed by a zero-row
+cross-database check, before private ERS overlay intake. This is a release gate,
+not an ERS content or Entra change.
+
+The 15:29 BST JEM auth alert was investigated separately. Two `token_expired`
+requests came from the registered Cursor client and were followed about 0.3
+seconds later by refresh-token rotation and successful MCP requests. The single
+`missing_bearer` request was an isolated unauthenticated request whose caller is
+not identifiable from deliberately bounded telemetry. Successful JEM hosted
+tool calls followed at 15:32 BST. Treat this event as recovered client behavior,
+not an outage or evidence of the telemetry-routing defect. If the same client
+repeats failures without an immediate successful refresh/tool call, reconnect
+or re-enrol that client using the connector-recovery protocol.
 
 ## 6. Routine access operations
 

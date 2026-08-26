@@ -1,8 +1,10 @@
 # 018 — ERS Production Identity, Access Administration And Team Rollout
 
 **Status:** in progress — tenant-neutral implementation complete in upstream
-release `v1.8.0`; migration, Entra consent, secret changes, JEM canary, ERS
-deployment and user enrollment remain approval-gated and are not activated
+release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`.
+The profile-bound JEM re-canary is the next gate. ERS migration, Entra consent,
+secret changes, deployment and user enrollment remain approval-gated and are
+not activated
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -399,6 +401,18 @@ JEM/ERS route separation. The complete repository suite, Cockpit Playwright
 suite, dependency audit, desktop render and 390px render pass. Work packages
 F-G remain live/organizational rollout work and are not implied by the local
 result.
+
+**JEM correction record (2026-08-26):** The initial `v1.8.0` JEM canary passed
+the GitHub login/refresh/read/write and route-isolation checks, but its local
+doctor/smoke process inherited a stale ERS database URL from ambient
+`.env.local`. Hosted content, sources, grants and OAuth state did not cross;
+operational telemetry did. The exact 481,170 JEM-labelled event rows and one
+heartbeat were removed from the ERS database without changing legitimate ERS
+rows. `v1.8.1` makes every database-aware doctor/smoke command prove its Brain,
+HTTPS endpoint and Supabase project binding before network access, or load that
+tuple from the exact owner-only Brain Monitor profile. JEM must pass that
+profile-bound canary and a zero-row ERS contamination check before work package
+F proceeds to private overlay intake.
 
 ### A. Provider-neutral authorization shell
 

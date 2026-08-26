@@ -191,6 +191,8 @@ test("hosted OAuth smoke caches refresh grants without logging access tokens", a
   assert.match(script, /buildLatencySnapshot/);
   assert.match(script, /BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT/);
   assert.match(script, /BRAIN_REVISION_DATABASE_URL/);
+  assert.match(script, /applyBrainMonitorProfileEnv/);
+  assert.match(script, /assertHostedRuntimeBinding/);
   assert.match(script, /BRAIN_HOSTED_MCP_CLIENT_LATENCY_DB_WRITE/);
   assert.match(script, /BRAIN_HOSTED_MCP_SYNC_WAIT_DB_WRITE/);
   assert.match(script, /hosted_mcp_sync_wait/);
@@ -283,6 +285,8 @@ test("hosted doctor is non-destructive and redacts database credentials", async 
   assert.match(script, /launchd/);
   assert.match(script, /fly_status/);
   assert.match(script, /databaseUrl: "set"/);
+  assert.match(script, /applyBrainMonitorProfileEnv/);
+  assert.match(script, /assertHostedRuntimeBinding/);
   assert.doesNotMatch(script, /databaseUrl[,}]/);
   assert.doesNotMatch(script, /insert into|update brain|delete from|brain_update_file|brain_resolve_conflict/i);
 });

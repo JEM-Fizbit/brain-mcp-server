@@ -14,8 +14,14 @@ import {
   HOSTED_MCP_LATENCY_EVENT_TYPE,
   metadataForLatencyOperation,
 } from "./lib/latency-summary.mjs";
+import {
+  applyBrainMonitorProfileEnv,
+  assertHostedRuntimeBinding,
+} from "./lib/hosted-runtime-binding.mjs";
 
 loadLocalEnv();
+await applyBrainMonitorProfileEnv(process.env);
+assertHostedRuntimeBinding(process.env, "Hosted OAuth smoke");
 const exec = promisify(execFile);
 const { Pool } = pg;
 

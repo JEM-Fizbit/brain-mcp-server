@@ -302,6 +302,21 @@ expected Supabase project ref. Installation fails if the URL does not match the
 declared ref, and managed sync children ignore ambient repo `.env.local` files.
 The sync CLI repeats the project-ref check before opening a connection. This is
 a fail-closed cross-deployment guard, not a naming convention.
+
+Manual `hosted:doctor` and `smoke:hosted:oauth` commands use the same boundary.
+Select a profile from this owner-only generated config rather than relying on
+the repo's ambient `.env.local`:
+
+```bash
+BRAIN_ID=ai-brain-jem \
+BRAIN_MONITOR_CONFIG_FILE="$HOME/Applications/Brain Monitor.app/Contents/Resources/brain-menubar-config.json" \
+npm run hosted:doctor
+```
+
+The command loads only the selected profile's allowlisted runtime values and
+then verifies its database URL against `BRAIN_EXPECTED_SUPABASE_PROJECT_REF`
+before any network access. A missing profile, inconsistent Brain id, non-HTTPS
+hosted endpoint, absent expected ref, or cross-project URL is a hard refusal.
 The generated config is owner-readable only (`0600`) because a database URL is
 a credential; never commit or print the profiles JSON:
 

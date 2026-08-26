@@ -1,13 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { projectRefFromDatabaseUrl } from "./hosted-runtime-binding.mjs";
 
-export function projectRefFromDatabaseUrl(databaseUrl) {
-  const url = new URL(databaseUrl);
-  const suffix = decodeURIComponent(url.username).split(".").at(-1);
-  if (suffix && suffix !== "postgres" && /^[a-z0-9]{12,32}$/.test(suffix)) return suffix;
-  return url.hostname.match(/^db\.([a-z0-9]{12,32})\.supabase\.co$/)?.[1] || null;
-}
+export { projectRefFromDatabaseUrl };
 
 export function assertCompanionRefreshScope({
   brainId,
