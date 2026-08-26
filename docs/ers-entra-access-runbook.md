@@ -213,9 +213,14 @@ rows were unchanged.
 Corrective release `v1.8.1` adds a shared fail-closed binding assertion to the
 doctor and OAuth smoke, makes the local environment template realm-neutral, and
 uses the selected Brain Monitor profile as the durable manual-command source.
-JEM must pass a profile-bound canary on `v1.8.1`, followed by a zero-row
-cross-database check, before private ERS overlay intake. This is a release gate,
-not an ERS content or Entra change.
+It was deployed to JEM on 2026-08-26. GitHub OAuth refresh, authenticated reads,
+the bounded hosted write, local sync verification, current heartbeat, 40 hosted
+files and zero conflicts all passed. JEM's database recorded the server, client
+end-to-end and sync-wait canary rows. The final ERS check remained exactly zero
+JEM events and zero JEM heartbeats, with the legitimate ERS event count
+unchanged at 476,494. Private ERS overlay intake may proceed from the exact
+`v1.8.1` tag; this evidence does not authorize an ERS migration, secret change,
+Entra action or deployment.
 
 The 15:29 BST JEM auth alert was investigated separately. Two `token_expired`
 requests came from the registered Cursor client and were followed about 0.3
@@ -226,6 +231,14 @@ tool calls followed at 15:32 BST. Treat this event as recovered client behavior,
 not an outage or evidence of the telemetry-routing defect. If the same client
 repeats failures without an immediate successful refresh/tool call, reconnect
 or re-enrol that client using the connector-recovery protocol.
+
+The rolling count later reached four because of one additional isolated
+`token_expired` request at 15:51 BST during the release window. Its caller
+cannot be safely attributed from the bounded failure row. Five successful JEM
+MCP requests began 17 seconds later in the profile-bound canary, and no service,
+sync or database check failed. The Cockpit warning therefore needs no manual
+clear; it expires with the 60-minute observation window. Reopen the incident
+only if new failures recur without subsequent successful traffic.
 
 ## 6. Routine access operations
 
