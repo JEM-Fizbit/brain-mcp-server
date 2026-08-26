@@ -8,6 +8,45 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-26 — Bind hosted diagnostics and canaries to one Brain deployment
+
+**Decision:** Every hosted doctor/OAuth-canary process that has a Brain database
+URL must fail before network access unless it can prove one explicit deployment tuple:
+`BRAIN_ID`, HTTPS `BRAIN_HOSTED_BASE_URL`, and
+`BRAIN_EXPECTED_SUPABASE_PROJECT_REF`, with the project ref matching the
+Supabase tenant encoded in the database URL. `hosted:doctor` and
+`smoke:hosted:oauth` now enforce the same boundary already used by the sync and
+source-companion paths. For the normal two-Brain local stack, manual commands
+select the exact Brain from the owner-only generated Brain Monitor config with
+`BRAIN_MONITOR_CONFIG_FILE`; the selected profile's allowlisted values override
+ambient repo `.env.local` values. JEM and ERS still use separate databases,
+hosted endpoints, Fly apps, OAuth state and credentials.
+
+The operator template is realm-neutral and requires the expected project ref.
+Changing only `BRAIN_ID`, or relying on a default Brain id beside an unrelated
+database credential, is not a supported profile switch.
+
+**Why:** The first JEM Spec 018 canary passed the MCP/OAuth behavior checks, but
+the smoke and doctor processes inherited a stale repo `.env.local` containing
+the ERS database URL while defaulting to the JEM Brain id and endpoint. Hosted
+content and OAuth remained isolated, but historical client telemetry was
+mislabelled into the ERS operational database: 481,170 JEM-labelled
+`brain.sync_events` rows and one JEM heartbeat were removed on 2026-08-26.
+An identity label is not a deployment boundary unless it is cryptographically
+or structurally tied to the credential it selects.
+
+**Alternatives rejected:** trust `.env.local` plus command-line `BRAIN_ID`;
+infer ownership from the hosted URL or Fly app name; silently disable telemetry
+on ambiguity; keep separate ad hoc shell files without a shared assertion; or
+merge the two Brain databases to make misrouting impossible by convention.
+
+**Related:** `scripts/lib/hosted-runtime-binding.mjs`;
+`scripts/hosted-doctor.mjs`; `scripts/smoke-hosted-oauth.mjs`;
+`.env.local.example`; `docs/hosted-cockpit.md`;
+`docs/ers-entra-access-runbook.md`.
+
+---
+
 ## 2026-08-25 — Use Entra and in-app role administration for ERS production
 
 **Decision:** Rollout of ERS Brain beyond the existing John+Cillian pilot

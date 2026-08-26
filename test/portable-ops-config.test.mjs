@@ -17,6 +17,9 @@ test("local operator template configures the hosted doctor target", () => {
   const template = read(".env.local.example");
   assert.match(template, /^BRAIN_HOSTED_BASE_URL=https:\/\/.+$/m);
   assert.match(template, /^BRAIN_FLY_APP=\S+$/m);
+  assert.match(template, /^BRAIN_EXPECTED_SUPABASE_PROJECT_REF=\S+$/m);
+  assert.match(template, /BRAIN_MONITOR_CONFIG_FILE/);
+  assert.doesNotMatch(template, /omnwbcdtmtvxasgdmvwr/);
 });
 
 test("source pipeline requires an explicit repository root", () => {

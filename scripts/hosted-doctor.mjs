@@ -35,8 +35,14 @@ import {
   classifyLintFindings,
   OPERATOR_ALARM_CHECKS,
 } from "./lib/doctor-actionability.mjs";
+import {
+  applyBrainMonitorProfileEnv,
+  assertHostedRuntimeBinding,
+} from "./lib/hosted-runtime-binding.mjs";
 
 loadLocalEnv();
+await applyBrainMonitorProfileEnv(process.env);
+assertHostedRuntimeBinding(process.env, "Hosted doctor");
 
 const exec = promisify(execFile);
 const { Pool } = pg;

@@ -38,7 +38,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - `npm run build` - TypeScript compile.
 - `npm test` - build plus Node test runner. Safe for logic verification; may be broader than needed for docs-only edits.
 - `npm run eval:brain:routing -- --jem-dir ... --ers-dir ...` - read-only routing eval against supplied local Brain roots.
-- `npm run hosted:doctor` - non-destructive hosted/local operator check. It reads hosted health, Postgres summaries, local sync state, launchd status, Fly status when available, lint freshness, and inbox state. It may require local secrets for full Postgres visibility.
+- `npm run hosted:doctor` - non-destructive hosted/local operator check. It reads hosted health, Postgres summaries, local sync state, launchd status, Fly status when available, lint freshness, and inbox state. If a database URL is present, the command requires an explicit matching `BRAIN_ID` + `BRAIN_HOSTED_BASE_URL` + `BRAIN_EXPECTED_SUPABASE_PROJECT_REF` tuple, or an owner-only Brain Monitor profile selected with `BRAIN_MONITOR_CONFIG_FILE`; it fails before network access on an absent or mismatched binding.
 - `npm run hosted:cockpit` - starts a local read-only browser surface on loopback.
 - `npm run test:cockpit:e2e` - Playwright cockpit E2E using deterministic fixture data; requires installed chromium.
 - `npm run sources:inventory:postgres`, `npm run sources:verify-list:postgres` - read/report source metadata when configured.
@@ -55,7 +55,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - `npm run sync -- push`, `sync:canary:postgres`, `sync:seed:core:postgres`, `sync:seed:all-markdown:postgres`, and `sync:reconcile:duplicate-brain-paths` can write hosted revision/conflict state.
 - `npm run sources:upload:postgres` and `sources:extract-text:postgres` write source artifact metadata, Storage objects, or extracted text records depending on configuration.
 - `npm run smoke:http:postgres` is read-only by default, but writes when `BRAIN_HTTP_SMOKE_WRITE=1`.
-- `npm run smoke:hosted:oauth` is read-only by default, but `--write`, `--local-write`, and `--conflict` perform hosted/local parity or conflict-lifecycle writes.
+- `npm run smoke:hosted:oauth` is read-only by default, but it records client latency/sync telemetry when database telemetry is enabled; `--write`, `--local-write`, and `--conflict` perform hosted/local parity or conflict-lifecycle writes. It applies the same fail-closed Brain/endpoint/Supabase binding as the doctor before any network request or telemetry write.
 - `npm run hosted:test-drive` includes write/conflict gates by default. Use `--read-only` for a non-mutating operator check.
 
 ### Deploy-Affecting Or Secret-Affecting
