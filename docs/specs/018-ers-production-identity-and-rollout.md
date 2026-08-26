@@ -422,7 +422,9 @@ schema-migration warning. After the missing JEM migration passed its security
 gate and the live watcher adopted current-state storage, 57,861 JEM and 475,091
 ERS obsolete heartbeat events were removed without changing either Brain's
 non-heartbeat event count. Work package F may now proceed to private overlay
-intake from the exact `v1.8.2` tag.
+intake from the exact `v1.8.2` tag. JEM Fly release 76 reports version 1.8.2
+and the expected GitHub-only runtime; ERS remained untouched on version 1.7.3
+and Fly release 15.
 
 ### A. Provider-neutral authorization shell
 

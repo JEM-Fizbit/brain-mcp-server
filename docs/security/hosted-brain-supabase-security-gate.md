@@ -33,7 +33,10 @@ infrastructure separation remains governed by spec 012.
   exactly, and both current-state heartbeat rows remained fresh. These deleted
   low-value telemetry rows are recoverable only through the providers' backup
   or point-in-time recovery facilities; no application-level archive was
-  retained.
+  retained. Automatic vacuum completed on both event tables with zero estimated
+  dead rows. PostgreSQL retained 54,591,488 JEM and 527,908,864 ERS allocated
+  relation bytes for internal reuse; a locking `VACUUM FULL` was deliberately
+  not run.
 - The 2026-08-22 JEM-first source-reference migration was applied to the
   personal `jem-brain-personal` project (`gfipcidoyrtgngauzijy`) with ERS
   untouched. The post-migration gate reported 16/16 Brain tables with RLS,
