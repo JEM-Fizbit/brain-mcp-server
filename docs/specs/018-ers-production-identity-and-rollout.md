@@ -6,9 +6,10 @@ and the observability-acceptance correction is included in `v1.8.2`. The tagged
 release is deployed and has passed the profile-bound JEM re-canary.
 The private ERS overlay has passed intake. TDM completed the single-tenant app,
 fixed-role groups, consent and certificate upload; the ERS access-ledger
-migration and live Supabase security gate passed on 2026-08-28. Initial Owner
-bootstrap, Fly secret changes, dual-provider deployment/canary and user
-enrollment remain separately approval-gated and are not activated.
+migration and live Supabase security gate passed on 2026-08-28; and John,
+Cillian and Rick were bootstrapped as the three exact Entra-backed ERS Brain
+Owners. Fly secret changes, dual-provider deployment/canary and user enrollment
+remain separately approval-gated and are not activated.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather

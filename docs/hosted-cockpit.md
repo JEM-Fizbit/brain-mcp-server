@@ -9,8 +9,8 @@ hosted Brain be trusted right now, or does John need to intervene before using
 it? Its narrow shipped Maintenance actions are documented below; it is not a
 general Brain editor. The tenant-neutral Spec 018 build adds one ERS-only
 hosted permissions surface. The ERS migration and one-time Entra setup are
-complete; activation remains gated on Owner bootstrap, Fly secret loading and
-the dual-provider canary.
+complete, and the three initial Owners are bootstrapped; activation remains
+gated on Fly secret loading and the dual-provider canary.
 
 Spec 018 promotes Cockpit as the shared control-plane shell for the ERS
 production rollout. The implemented navigation is profile-scoped: JEM keeps GitHub

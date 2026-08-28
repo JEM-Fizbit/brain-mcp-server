@@ -18,6 +18,14 @@ infrastructure separation remains governed by spec 012.
 
 ## Verified Controls
 
+- The 2026-08-28 guarded ERS initial-Owner bootstrap created exactly three
+  active `ers-brain` Owner grants for John E. Milad, Cillian McGorman and Rick
+  Price. All three use exact Entra tenant/object identity, `Brain.Owner`, the
+  fixed Owner group and `initial_owner_bootstrap`; the audit contains exactly
+  three metadata-only `grant` rows with empty metadata and
+  `graph_outcome=preverified`. The post-write recheck retained 18/18 Brain
+  tables under RLS, zero client/public Brain grants and zero non-runtime Brain
+  policies.
 - The 2026-08-28 ERS Spec 018 access-ledger migration added tenant-stable
   principals, explicit grant status/source/version fields and the private
   append-only `brain.access_audit_events` table. The post-migration gate
@@ -129,6 +137,8 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
   security tests in spec 018.
 - [x] Apply the private grant/audit migration to ERS and rerun this live gate.
   No additional client-side RLS policy is implied.
+- [x] Bootstrap the three reviewed initial Owners into the private ERS grant
+  ledger with metadata-only audit evidence.
 - [ ] Verify the fixed app-role groups through the deployed ERS adapter before
   wider enrollment.
 - [ ] Align SharePoint Brain-folder writes with the named MCP curator population

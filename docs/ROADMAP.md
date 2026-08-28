@@ -250,8 +250,9 @@ security gate, both Brains now use fresh current-state heartbeats, and 532,952
 obsolete heartbeat events were removed without changing non-heartbeat
 telemetry. The private ERS overlay passed intake; TDM completed the Entra app,
 fixed-role groups, consent and certificate upload; and the ERS access-ledger
-migration plus live Supabase security gate passed on 2026-08-28. Initial Owner
-bootstrap, Fly secret loading, the dual-provider canary and wider access are not
+migration plus live Supabase security gate passed on 2026-08-28. John, Cillian
+and Rick are now the three exact Entra-backed Owners in the private ERS grant
+ledger. Fly secret loading, the dual-provider canary and wider access are not
 yet activated.
 
 Planned work:
@@ -321,9 +322,8 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Bootstrap John, Cillian and IT/TDM into the private ERS Owner ledger, load
-   the approved certificate/provider values into Fly secrets, then deploy the
-   reviewed `v1.8.2` overlay in dual-provider mode and run the three-owner
+1. Load the approved certificate/provider values into Fly secrets, then deploy
+   the reviewed `v1.8.2` overlay in dual-provider mode and run the three-owner
    canary; do not deploy from an untagged or locally modified upstream tree.
 2. Align SharePoint writer permissions, activate an ERS-owned external
    health/alert path and close the item-14 governance gate.

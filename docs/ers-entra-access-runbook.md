@@ -129,6 +129,17 @@ The command records metadata-only audit rows and refuses fewer than three
 reviewed Owners. Delete the temporary JSON securely after the OIDs are retained
 in the private grant ledger/password-manager record.
 
+**Completed 2026-08-28:** the guarded bootstrap created exactly three active
+`ers-brain` Owners: John E. Milad, Cillian McGorman and Rick Price. Each
+principal is bound to the exact ERS tenant and reviewed Entra object ID; each
+grant records `Brain.Owner`, the fixed Owner group and
+`initial_owner_bootstrap`. The command created three metadata-only `grant`
+audit rows with `graph_outcome=preverified` and empty metadata. Post-write
+checks retained 18/18 Brain tables under RLS with zero client/public grants and
+zero non-`brain_runtime` policies. The temporary owner JSON was removed after
+the identities were retained in the private ledger. This completion does not
+authorize Fly secret changes, deployment or enrollment.
+
 ## 4. ERS canary configuration
 
 The private ERS overlay supplies non-secret deployment values and Fly supplies
