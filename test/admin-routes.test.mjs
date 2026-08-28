@@ -90,6 +90,12 @@ test("ERS hosted access page is available but its APIs require a current Owner",
   await handleAdminRequest(request(), page, new URL("https://brain.example.test/admin/access"), owner.ctx);
   assert.equal(page.statusCode, 200);
   assert.match(page.body, /Access & Roles/);
+  assert.match(page.body, /ERS Brain role guide/);
+  assert.match(page.body, /What does “Review &amp; reconcile” mean/);
+  assert.match(page.body, /system never chooses a role automatically/);
+  assert.match(page.body, /GitHub fallback · not managed here/);
+  assert.match(page.body, /Review & reconcile/);
+  assert.match(page.body, /roleHelp/);
 
   const admin = context("admin");
   const denied = response();

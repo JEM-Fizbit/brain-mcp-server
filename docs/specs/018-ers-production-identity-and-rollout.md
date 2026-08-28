@@ -159,10 +159,11 @@ intervention.
 
 ### Cockpit access administration
 
-- Cockpit uses one shared visual shell and profile-aware navigation. When the
-  active profile is ERS, it exposes **Access & Roles** at an equivalent of the
-  hosted `/admin/access` route. When the active profile is JEM, that capability
-  is absent or explicitly shown as unavailable for the single-owner profile.
+- Cockpit is the normal shared entry and uses profile-aware navigation. When
+  the active profile is ERS, its first-screen Overview exposes a prominent
+  **Identity & Access** module plus a matching navigation link; both transition
+  to the hosted `/admin/access` route. When the active profile is JEM, both
+  entries are absent for the single-owner profile.
 - JEM remains GitHub-authenticated. Enabling ERS Entra or Graph administration
   cannot make JEM require Entra credentials, accept an Entra principal, expose
   a role ledger or enable an access mutation route.
@@ -170,7 +171,7 @@ intervention.
   maintenance functions. Its ERS navigation transitions to the hosted,
   Entra-authenticated Access & Roles section; the local process never receives
   a Graph token or proxies a permission mutation.
-- Cillian and IT/TDM can open the hosted ERS Cockpit section directly without
+- Cillian and IT/TDM can open the hosted ERS Access & Roles surface directly without
   installing John's local Brain Monitor or sync stack.
 - Hosted access routes are deployment-bound to `ers-brain`; they do not accept
   a caller-selected `brain_id`, cannot enumerate JEM, and are absent from the
@@ -185,6 +186,11 @@ intervention.
 - UI labels map `Curator` to the internal `member` role. Only Owners can mutate
   access. Admins remain content/operations administrators and cannot grant
   roles, change managed group IDs or alter identity-provider configuration.
+- The UI explains all four roles beside directory search and shows the selected
+  role's authority inside the confirmation modal. Drift actions are labelled
+  **Review & reconcile** and explain that opening the modal is read-only,
+  confirmation reapplies a deliberately reviewed state, and the system never
+  chooses a role automatically. GitHub fallback rows offer no Entra action.
 - Role changes operate only on an allowlisted set of dedicated, cloud-only,
   non-role-assignable Entra security-group IDs. The UI is not a generic Graph
   client and accepts no caller-supplied group ID.
@@ -440,6 +446,14 @@ managed groups using the already-approved delegated permission, performs one
 bounded group-read set per access-page reconciliation and leaves the wider
 directory unread. The three-owner and Reader lifecycle canary remains required
 before Entra-only cutover.
+
+**Access UX correction record (2026-08-28):** Release `v1.8.4` makes the ERS
+Cockpit first screen the normal Identity & Access entry, explains all four
+roles both before selection and inside the confirmation modal, and replaces
+the ambiguous `Reconcile` action with a review-first workflow. GitHub fallback
+rows remain visible for the dual-provider rollback window but no longer expose
+an Entra action they cannot complete. This changes no role authority, provider
+mode, Graph scope or Entra-only activation gate.
 
 ### A. Provider-neutral authorization shell
 

@@ -8,6 +8,34 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-28 — Make Cockpit the normal ERS identity entry without merging trust boundaries
+
+**Decision:** The ERS Cockpit first screen exposes a prominent **Identity &
+Access** module, backed by the same ERS-only navigation link, as the normal way
+for John to reach Access & Roles. It opens the hosted Entra Owner surface in a
+separate tab. The loopback Cockpit still receives no Graph token and proxies no
+permission mutation. Direct hosted access remains available to other Owners.
+JEM displays neither entry. The hosted page explains the role model and
+**Review & reconcile** workflow, and legacy GitHub fallback rows expose no
+Entra action.
+
+**Why:** A unified control plane must be discoverable from Cockpit, but placing
+delegated Graph mutation inside the loopback maintenance process would weaken
+the existing origin, session and deployment boundary. Clear user guidance also
+prevents an Owner from treating reconciliation as an automatic repair or
+trying to reconcile a principal that Entra does not manage.
+
+**Alternatives rejected:** require operators to remember the hosted URL; move
+Graph sessions and mutations into the local Cockpit; hide legacy grants during
+the dual-provider canary; rely only on native title tooltips; or let the UI
+offer a broken reconciliation action for GitHub principals.
+
+**Related:** `scripts/hosted-cockpit.mjs`; `src/admin/page.ts`;
+`docs/hosted-cockpit.md`; `docs/ers-entra-access-runbook.md`;
+`docs/specs/018-ers-production-identity-and-rollout.md`.
+
+---
+
 ## 2026-08-28 — Reconcile Entra roles from the fixed managed groups
 
 **Decision:** The ERS access-administration surface reads direct membership from

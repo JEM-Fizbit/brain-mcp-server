@@ -1,7 +1,7 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** implementation runbook; activation remains approval-gated
-**Last updated:** 2026-08-26
+**Status:** dual-provider canary active; Entra-only cutover remains approval-gated
+**Last updated:** 2026-08-28
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
 This runbook activates and operates the Spec 018 identity and permissions
@@ -18,8 +18,10 @@ does not expose hosted role administration.
 - The hosted ERS `/admin/access` page is the only normal role-mutation UI.
 - Its Graph token is delegated, held only in a short server-memory session and
   never sent to the browser, database, logs or telemetry.
-- The local ERS Cockpit links to the hosted page. It never receives or proxies
-  a Graph token. The JEM Cockpit does not show that link.
+- Brain Cockpit is the normal operator entry: the ERS Overview presents a
+  dedicated **Identity & Access** module and matching navigation link to the
+  hosted page. It never receives or proxies a Graph token. The JEM Cockpit
+  presents neither entry.
 
 ## Approval boundaries
 
@@ -286,19 +288,34 @@ only if new failures recur without subsequent successful traffic.
 
 ## 6. Routine access operations
 
-An Owner opens `https://brain.ersgenomics.online/admin/access`, completes a
-fresh Microsoft sign-in, searches the basic ERS directory and selects the
-person. Reader is the default. A higher role requires deliberate selection and
-explicit confirmation.
+An Owner normally opens the ERS Brain Cockpit and selects **Identity & Access →
+Open Access & Roles**. Direct access at
+`https://brain.ersgenomics.online/admin/access` remains available for another
+Owner who does not operate John's local Brain Monitor. Complete a fresh
+Microsoft sign-in, search the basic ERS directory and select the person. Reader
+is the default. A higher role requires deliberate selection and explicit
+confirmation. The page and confirmation modal describe the roles:
+
+- Reader can search and read Brain content and status, but cannot change it;
+- Curator adds ordinary non-structural content updates;
+- Admin adds structural, recovery and conflict operations, but cannot manage
+  access; and
+- Owner has Admin-level content authority plus access administration and
+  governance responsibility.
 
 - Grant/elevation: Graph succeeds first; the local grant becomes usable only
   after the private projection commits.
 - Downgrade/suspend/revoke: the local grant is restricted first; Graph follows.
 - Multiple, missing, mismatched or unexpected group membership is shown as
-  drift. Use **Reconcile** to reapply the reviewed local role/status.
+  drift. **Review & reconcile** opens a confirmation form prefilled with the
+  audited local role/status; opening it changes nothing. The Owner must confirm
+  or deliberately revise the intended state. Confirmation reapplies the fixed
+  Entra groups and local grant using the normal fail-closed order. The system
+  never chooses a role automatically.
 - A fixed-group read failure marks Entra drift unavailable as a unit and never
-  widens local access. GitHub rollback grants are not Graph-managed and are
-  therefore expected to show Graph reconciliation as unavailable.
+  widens local access. GitHub rollback grants are not Graph-managed: they stay
+  visible during dual-provider validation as **not managed here** and expose no
+  Entra reconciliation button.
 - Admins can administer Brain content/recovery but cannot administer identity.
   Only Owners can use the access mutation APIs.
 - The active Owner roster cannot be reduced below two.
@@ -354,7 +371,7 @@ use the ERS database-owner break-glass process with two-person review.
 
 If the UI reports `reconciliationRequired`, do not repeatedly click. Capture
 the phase and time (never a token), inspect the four fixed groups, keep the
-stricter local state, then use **Reconcile** once Graph is healthy.
+stricter local state, then use **Review & reconcile** once Graph is healthy.
 
 ## 9. Rollback
 

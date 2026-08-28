@@ -8,15 +8,17 @@ hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
 hosted Brain be trusted right now, or does John need to intervene before using
 it? Its narrow shipped Maintenance actions are documented below; it is not a
 general Brain editor. The tenant-neutral Spec 018 build adds one ERS-only
-hosted permissions surface. The ERS migration and one-time Entra setup are
-complete, and the three initial Owners are bootstrapped; activation remains
-gated on Fly secret loading and the dual-provider canary.
+hosted permissions surface. The ERS migration, one-time Entra setup, Fly secret
+loading, three-Owner bootstrap and first Reader grant are complete. The
+dual-provider canary is active; Entra-only cutover remains acceptance-gated.
 
-Spec 018 promotes Cockpit as the shared control-plane shell for the ERS
+Spec 018 promotes Cockpit as the normal shared control-plane entry for the ERS
 production rollout. The implemented navigation is profile-scoped: JEM keeps GitHub
-authentication and its single-owner posture, while only ERS gains the hosted,
-Entra-authenticated **Access & Roles** section. This is a shared user experience,
-not a shared trust boundary or a plan to publish the current loopback server.
+authentication and its single-owner posture, while only the ERS Overview gains a
+prominent **Identity & Access** module and matching navigation link. Both open the
+hosted, Entra-authenticated **Access & Roles** surface. This is a unified user
+journey, not a shared trust boundary or a plan to publish the current loopback
+server.
 
 ## Current Recommendation
 
@@ -50,17 +52,23 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
 - the cockpit browser surface exposes no general Brain editing, conflict resolution, source ingestion, or admin mutations; its narrow Maintenance exceptions are an explicit lint run that records one `LINT` receipt and the confirm-gated application of selected mechanical task fixes. The menu-bar app retains **Controls → "Apply Lint Fixes..."** as the secondary all-or-nothing path;
-- the local ERS navigation includes **Access & Roles**, which opens the hosted,
-  same-origin Entra Owner surface configured by
+- the local ERS Overview includes a dedicated **Identity & Access** card, with a
+  matching top-level navigation link; both open the hosted, same-origin Entra
+  Owner surface configured by
   `BRAIN_COCKPIT_ACCESS_ADMIN_URL` (or the active ERS hosted base); the JEM
-  profile renders no access-administration link, and the local process never
-  receives a Graph token or permission mutation.
+  profile renders neither the card nor the access-administration link, and the
+  local process never receives a Graph token or permission mutation;
+- the hosted Access & Roles surface provides an always-visible role guide,
+  contextual role help inside the confirmation modal, plain-language Entra
+  drift labels, and an expandable explanation of **Review & reconcile**;
+  legacy GitHub fallback rows remain visible during dual-provider validation
+  but cannot offer a non-functional Entra reconciliation action.
 
 Do not expose the current local Cockpit process as a hosted website. Its local
 signals and narrow maintenance endpoints remain loopback-only. Spec 018 adds a
-bounded hosted ERS Access & Roles backend and reuses the Cockpit shell and
+bounded hosted ERS Access & Roles backend and reuses the Cockpit entry and
 navigation for it: the local ERS profile transitions to that Entra-authenticated
-route, while Cillian and IT/TDM can open the hosted ERS section directly. The
+route, while Cillian and IT/TDM can open the hosted ERS surface directly. The
 JEM profile does not register or display ERS role-administration capability.
 This supersedes the earlier blanket deferral of any hosted admin surface only
 for the narrow Spec 018 permissions scope; it does not authorize a general

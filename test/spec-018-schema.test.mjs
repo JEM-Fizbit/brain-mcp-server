@@ -30,6 +30,9 @@ test("local Cockpit exposes hosted Access & Roles navigation only for ers-brain"
   const source = await fs.readFile(path.join(repo, "scripts", "hosted-cockpit.mjs"), "utf-8");
   assert.match(source, /cockpitBrainId === "ers-brain"/);
   assert.match(source, /id="access-roles-link"/);
+  assert.match(source, /id="identity-access-card"/);
+  assert.match(source, /id="identity-access-action"/);
+  assert.match(source, /secure Microsoft Owner sign-in/);
   assert.match(source, /BRAIN_COCKPIT_ACCESS_ADMIN_URL/);
   assert.doesNotMatch(source, /Graph access token|graphAccessToken/);
 });
@@ -68,8 +71,10 @@ test("ERS Cockpit profile starts with the hosted Access & Roles navigation", asy
   try {
     await started;
   } finally {
-    const exited = new Promise((resolve) => child.once("exit", resolve));
-    child.kill("SIGTERM");
-    await exited;
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = new Promise((resolve) => child.once("exit", resolve));
+      child.kill("SIGTERM");
+      await exited;
+    }
   }
 });

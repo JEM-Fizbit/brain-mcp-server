@@ -908,6 +908,45 @@ const page = String.raw`<!doctype html>
         outline-offset: -2px;
       }
 
+      .identity-access-card {
+        border-left: 4px solid #9fcdb7;
+      }
+
+      .identity-access-card h2 {
+        color: var(--ink);
+        font-size: 16px;
+        text-transform: none;
+      }
+
+      .identity-access-card p {
+        margin: 0 0 12px;
+      }
+
+      .identity-access-meta {
+        display: block;
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .identity-access-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--pass);
+        border-radius: 6px;
+        background: var(--pass);
+        color: #fff;
+        padding: 9px 12px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .identity-access-action:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 2px;
+      }
+
       .tab-context-strip {
         display: grid;
         grid-template-columns: minmax(180px, 1.25fr) repeat(4, minmax(120px, 1fr));
@@ -1875,7 +1914,7 @@ const page = String.raw`<!doctype html>
           <button class="tab-button" id="tab-latency" type="button" role="tab" aria-controls="panel-latency" aria-selected="false">Latency</button>
           <button class="tab-button" id="tab-checks" type="button" role="tab" aria-controls="panel-checks" aria-selected="false">Checks</button>
           <button class="tab-button" id="tab-fixes" type="button" role="tab" aria-controls="panel-fixes" aria-selected="false">Maintenance</button>
-          ${accessAdminUrl ? `<a class="access-nav-link" id="access-roles-link" href="${escapeAttribute(accessAdminUrl)}">Access &amp; Roles ↗</a>` : ""}
+          ${accessAdminUrl ? `<a class="access-nav-link" id="access-roles-link" href="${escapeAttribute(accessAdminUrl)}" target="_blank" rel="noopener noreferrer">Identity &amp; Access ↗</a>` : ""}
         </div>
 
         <div class="tab-context-strip" id="tab-context-strip" hidden>
@@ -2055,6 +2094,12 @@ const page = String.raw`<!doctype html>
             </section>
 
             <div class="overview-side">
+              ${accessAdminUrl ? `<section class="identity-access-card" id="identity-access-card" aria-labelledby="identity-access-heading">
+                <h2 id="identity-access-heading">Identity &amp; Access</h2>
+                <p>Manage who can use ERS Brain and whether they are a Reader, Curator, Admin, or Owner.</p>
+                <a class="identity-access-action" id="identity-access-action" href="${escapeAttribute(accessAdminUrl)}" target="_blank" rel="noopener noreferrer">Open Access &amp; Roles ↗</a>
+                <span class="identity-access-meta">ERS only · secure Microsoft Owner sign-in</span>
+              </section>` : ""}
               <section aria-labelledby="overview-usage-heading">
                 <h2 id="overview-usage-heading">Usage Snapshot</h2>
                 <div class="activity-list" id="operation-usage"></div>
