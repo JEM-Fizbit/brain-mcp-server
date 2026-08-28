@@ -115,6 +115,12 @@ canary, Entra-only cutover and rollback are governed by
 [`ers-entra-access-runbook.md`](ers-entra-access-runbook.md). Do not copy its
 private ERS values into this public Fly profile.
 
+The enabled-provider set is also a live token boundary. Authorization-code
+exchange, refresh and MCP bearer authentication reject any provider absent from
+`BRAIN_IDENTITY_PROVIDERS` before consulting the grant store. This makes an
+Entra-only ERS deployment deny pre-cutover GitHub tokens while leaving JEM's
+separate GitHub-only deployment unaffected.
+
 The Fly runtime reads the non-secret JEM-only registry from `/app/config/brain-platform.john-ers-pilot.json`. The filename is retained for deployment compatibility; its contents, not its historical name, define the current single-Brain registry. Do not depend on `/data/config/registry.json` for the current deployment.
 
 For local operator scripts, copy `.env.local.example` to `.env.local` and fill the secret values once. The Postgres/Supabase smoke, seed, verify, inventory, and upload scripts load `.env.local` automatically; deployment still uses the hosting secret manager.

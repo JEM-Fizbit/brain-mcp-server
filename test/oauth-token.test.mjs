@@ -23,6 +23,7 @@ const VERIFIER = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ";
 const config = {
   issuer: "https://brain.example.com",
   resourceUri: RESOURCE_URI,
+  identityProviders: ["github"],
   accessTokenTtlSec: 3600,
   refreshTokenTtlSec: 30 * 24 * 60 * 60,
   refreshTokenReuseGraceSec: 0,
@@ -168,6 +169,68 @@ test("refresh token rotates and cannot be reused", async () => {
   assert.equal(second.body.error, "invalid_grant");
 });
 
+test("Entra-only switch denies a pending GitHub code before grant lookup", async () => {
+  const record = {
+    code: "auth-code-1",
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    code_challenge: sha256Base64url(VERIFIER),
+    code_challenge_method: "S256",
+    resource: RESOURCE_URI,
+    scope: "mcp:tools",
+    provider: "github",
+    provider_user_id: "123",
+    github_login: "johnemilad",
+    expires_at: Math.floor(Date.now() / 1000) + 600,
+  };
+  const state = makeState(record);
+  const form = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: CLIENT_ID,
+    code: "auth-code-1",
+    redirect_uri: REDIRECT_URI,
+    code_verifier: VERIFIER,
+  });
+  const result = await handleToken(
+    form,
+    null,
+    { ...config, identityProviders: ["entra"], enforceCurrentGrants: true },
+    state,
+    {
+      rolesForPrincipal: async () => {
+        throw new Error("disabled providers must not reach the grant store");
+      },
+    }
+  );
+
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error, "access_denied");
+});
+
+test("Entra-only switch denies an existing GitHub refresh token before grant lookup", async () => {
+  const { result: issued, state } = await exchange();
+  assert.equal(issued.status, 200);
+  const form = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: CLIENT_ID,
+    refresh_token: issued.body.refresh_token,
+  });
+  const result = await handleToken(
+    form,
+    null,
+    { ...config, identityProviders: ["entra"], enforceCurrentGrants: true },
+    state,
+    {
+      rolesForPrincipal: async () => {
+        throw new Error("disabled providers must not reach the grant store");
+      },
+    }
+  );
+
+  assert.equal(result.status, 400);
+  assert.equal(result.body.error, "invalid_grant");
+});
+
 test("refresh token can be retried inside configured reuse grace", async () => {
   const { result, state } = await exchange();
   const refresh = result.body.refresh_token;
@@ -191,7 +254,11 @@ test("refresh token can be retried inside configured reuse grace", async () => {
 test("Entra tenant and upstream role survive code exchange while current downgrade revokes refresh", async () => {
   const tenantId = "11111111-1111-4111-8111-111111111111";
   const objectId = "22222222-2222-4222-8222-222222222222";
-  const entraConfig = { ...config, enforceCurrentGrants: true };
+  const entraConfig = {
+    ...config,
+    identityProviders: ["entra"],
+    enforceCurrentGrants: true,
+  };
   const record = {
     code: "auth-code-1",
     client_id: CLIENT_ID,

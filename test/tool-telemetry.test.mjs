@@ -124,6 +124,10 @@ test("auth telemetry reason codes are sanitized", () => {
     "missing_bearer"
   );
   assert.equal(authReasonCode("token expired"), "token_expired");
+  assert.equal(
+    authReasonCode("identity provider is not enabled"),
+    "provider_disabled"
+  );
   assert.equal(authReasonCode("invalid_grant"), "invalid_grant");
   assert.equal(
     authReasonCode("oauth failed for Bearer secret-token with spaces"),
