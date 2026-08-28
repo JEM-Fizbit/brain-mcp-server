@@ -453,7 +453,11 @@ roles both before selection and inside the confirmation modal, and replaces
 the ambiguous `Reconcile` action with a review-first workflow. GitHub fallback
 rows remain visible for the dual-provider rollback window but no longer expose
 an Entra action they cannot complete. This changes no role authority, provider
-mode, Graph scope or Entra-only activation gate.
+mode, Graph scope or Entra-only activation gate. The annotated release was
+deployed JEM-first on 2026-08-28 as Fly releases 78 (JEM) and 18 (ERS). Live
+health and Machine checks passed, and the profile-bound ERS hosted doctor
+returned `pass` with no operator action. Cillian's Owner sign-in and Jeronimo's
+Reader sign-in/read remain the human acceptance gate.
 
 ### A. Provider-neutral authorization shell
 
