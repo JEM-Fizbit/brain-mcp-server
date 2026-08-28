@@ -1,15 +1,16 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-08-25
+**Last updated:** 2026-08-28
 
 Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
 hosted Brain be trusted right now, or does John need to intervene before using
 it? Its narrow shipped Maintenance actions are documented below; it is not a
 general Brain editor. The tenant-neutral Spec 018 build adds one ERS-only
-hosted permissions surface; activation remains gated on the ERS migration,
-Entra setup and canary.
+hosted permissions surface. The ERS migration and one-time Entra setup are
+complete; activation remains gated on Owner bootstrap, Fly secret loading and
+the dual-provider canary.
 
 Spec 018 promotes Cockpit as the shared control-plane shell for the ERS
 production rollout. The implemented navigation is profile-scoped: JEM keeps GitHub
