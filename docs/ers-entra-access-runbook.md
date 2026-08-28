@@ -57,7 +57,13 @@ Grant only these delegated Microsoft Graph permissions for the separate admin
 session and complete tenant admin consent:
 
 - `User.ReadBasic.All` for the directory picker;
-- `GroupMember.ReadWrite.All` for fixed-group membership changes.
+- `GroupMember.ReadWrite.All` for reading and changing direct membership of the
+  four fixed role groups.
+
+Reconciliation enumerates only those four managed groups and compares their
+member object IDs with the private grant ledger. It does not request permission
+to enumerate another user's wider directory memberships. Do not add
+`User.Read.All`, `GroupMember.Read.All` or `Directory.Read.All` for this flow.
 
 Do not grant app-only Graph write permission. Make John and Cillian group
 owners for the four groups; retain the designated IT/TDM identity as the third
@@ -290,6 +296,9 @@ explicit confirmation.
 - Downgrade/suspend/revoke: the local grant is restricted first; Graph follows.
 - Multiple, missing, mismatched or unexpected group membership is shown as
   drift. Use **Reconcile** to reapply the reviewed local role/status.
+- A fixed-group read failure marks Entra drift unavailable as a unit and never
+  widens local access. GitHub rollback grants are not Graph-managed and are
+  therefore expected to show Graph reconciliation as unavailable.
 - Admins can administer Brain content/recovery but cannot administer identity.
   Only Owners can use the access mutation APIs.
 - The active Owner roster cannot be reduced below two.

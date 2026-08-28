@@ -75,21 +75,26 @@ export class AccessAdministrationService {
   async list(accessToken: string): Promise<GrantWithDrift[]> {
     const graph = this.graph(accessToken);
     const grants = await this.grants.listGrants(this.brainId);
-    const result: GrantWithDrift[] = [];
-    for (let index = 0; index < grants.length; index += 5) {
-      const batch = await Promise.all(
-        grants.slice(index, index + 5).map(async (grant) => {
-        try {
-          const graphRoles = await graph.rolesForUser(grant.providerUserId);
-          return { ...grant, graphRoles, drift: driftFor(grant, graphRoles) };
-        } catch {
-          return { ...grant, graphRoles: [], drift: "unavailable" as const };
-        }
-        })
-      );
-      result.push(...batch);
+    const tenantId = this.entra.tenantId.toLowerCase();
+    const entraGrants = grants.filter(
+      (grant) =>
+        grant.provider === "entra" &&
+        (grant.providerTenantId || "").toLowerCase() === tenantId &&
+        GUID_RE.test(grant.providerUserId)
+    );
+    let graphRoles: Map<string, BrainRole[]> | undefined;
+    try {
+      graphRoles = await graph.rolesForUsers(entraGrants.map((grant) => grant.providerUserId));
+    } catch {
+      // Drift is unavailable as a unit when any managed group cannot be read.
+      // The local projection remains authoritative and no access is widened.
     }
-    return result;
+    return grants.map((grant) => {
+      const roles = graphRoles?.get(grant.providerUserId.toLowerCase());
+      return roles
+        ? { ...grant, graphRoles: roles, drift: driftFor(grant, roles) }
+        : { ...grant, graphRoles: [], drift: "unavailable" as const };
+    });
   }
 
   async mutate(

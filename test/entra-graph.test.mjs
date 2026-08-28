@@ -19,31 +19,55 @@ test("Graph adapter checks direct managed-group membership and flags multiple ro
   const calls = [];
   const client = new EntraGraphClient(entra, "delegated-token", async (url, init) => {
     calls.push({ url: String(url), init });
-    return Response.json({ value: [{ id: groups.reader }, { id: groups.owner }, { id: target }] });
+    const groupId = Object.values(groups).find((id) => String(url).includes(`/groups/${id}/`));
+    return Response.json({ value: groupId === groups.reader || groupId === groups.owner ? [{ id: target }] : [] });
   });
   assert.deepEqual(await client.rolesForUser(target), ["reader", "owner"]);
-  assert.match(calls[0].url, new RegExp(`/users/${target}/memberOf/microsoft\\.graph\\.group`));
-  assert.equal(new URL(calls[0].url).searchParams.get("$select"), "id");
-  assert.equal(calls[0].init.headers.Authorization, "Bearer delegated-token");
+  assert.equal(calls.length, 4);
+  assert.ok(calls.every((call) => /\/groups\/[0-9a-f-]+\/members/.test(call.url)));
+  assert.ok(calls.every((call) => new URL(call.url).searchParams.get("$select") === "id"));
+  assert.ok(calls.every((call) => call.init.headers.Authorization === "Bearer delegated-token"));
 });
 
 test("Graph adapter follows only bounded same-origin membership pages", async () => {
-  let call = 0;
-  const client = new EntraGraphClient(entra, "delegated-token", async () => {
-    call += 1;
-    return Response.json(
-      call === 1
-        ? { value: [{ id: groups.member }], "@odata.nextLink": `https://graph.microsoft.com/v1.0/users/${target}/memberOf?$skiptoken=safe` }
-        : { value: [{ id: groups.admin }] }
-    );
+  let readerCalls = 0;
+  const client = new EntraGraphClient(entra, "delegated-token", async (url) => {
+    if (String(url).includes(`/groups/${groups.reader}/members`)) {
+      readerCalls += 1;
+      return Response.json(
+        readerCalls === 1
+          ? { value: [], "@odata.nextLink": `https://graph.microsoft.com/v1.0/groups/${groups.reader}/members?$skiptoken=safe` }
+          : { value: [{ id: target }] }
+      );
+    }
+    return Response.json({ value: String(url).includes(groups.admin) ? [{ id: target }] : [] });
   });
-  assert.deepEqual(await client.rolesForUser(target), ["member", "admin"]);
-  assert.equal(call, 2);
+  assert.deepEqual(await client.rolesForUser(target), ["reader", "admin"]);
+  assert.equal(readerCalls, 2);
 
-  const unsafe = new EntraGraphClient(entra, "delegated-token", async () =>
-    Response.json({ value: [], "@odata.nextLink": "https://attacker.example/steal" })
+  const unsafe = new EntraGraphClient(entra, "delegated-token", async (url) =>
+    Response.json(
+      String(url).includes(groups.reader)
+        ? { value: [], "@odata.nextLink": "https://attacker.example/steal" }
+        : { value: [] }
+    )
   );
-  await assert.rejects(() => unsafe.rolesForUser(target), /unsafe membership continuation URL/);
+  await assert.rejects(() => unsafe.rolesForUser(target), /unsafe managed-group continuation URL/);
+});
+
+test("Graph adapter reads each fixed group once for a batch of users", async () => {
+  const second = "77777777-7777-4777-8777-777777777777";
+  let calls = 0;
+  const client = new EntraGraphClient(entra, "delegated-token", async (url) => {
+    calls += 1;
+    if (String(url).includes(groups.reader)) return Response.json({ value: [{ id: target }, { id: second }] });
+    if (String(url).includes(groups.owner)) return Response.json({ value: [{ id: second }] });
+    return Response.json({ value: [] });
+  });
+  const result = await client.rolesForUsers([target, second, target.toUpperCase()]);
+  assert.deepEqual(result.get(target), ["reader"]);
+  assert.deepEqual(result.get(second), ["reader", "owner"]);
+  assert.equal(calls, 4);
 });
 
 test("Graph role mutation adds one fixed group and removes every other fixed group", async () => {
@@ -65,8 +89,11 @@ test("partial cleanup never removes a desired membership that predated the reque
   const client = new EntraGraphClient(entra, "delegated-token", async (url, init) => {
     calls.push({ url: String(url), init });
     if (init.method === "POST") return new Response(null, { status: 400 });
-    if (String(url).includes(`/users/${target}/memberOf`)) {
-      return Response.json({ value: [{ id: groups.member }] });
+    if (String(url).includes(`/groups/${groups.member}/members`)) {
+      return Response.json({ value: [{ id: target }] });
+    }
+    if (init.method === undefined) {
+      return Response.json({ value: [] });
     }
     return new Response(null, { status: 503 });
   });

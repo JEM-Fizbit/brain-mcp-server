@@ -63,6 +63,33 @@ test("Graph failure after local restriction is an explicit fail-closed reconcili
   assert.deepEqual(order, ["local:reader:active", "graph:set:reader", "audit:failed"]);
 });
 
+test("grant listing reconciles Entra users in one fixed-group batch and leaves other providers unavailable", async () => {
+  const second = "88888888-8888-4888-8888-888888888888";
+  const github = "12345678";
+  const grants = {
+    async listGrants() {
+      return [
+        { brainId: "ers-brain", provider: "entra", providerTenantId: tenantId, providerUserId: target.id, role: "reader", status: "active", version: 1 },
+        { brainId: "ers-brain", provider: "entra", providerTenantId: tenantId, providerUserId: second, role: "owner", status: "active", version: 1 },
+        { brainId: "ers-brain", provider: "github", providerUserId: github, role: "owner", status: "active", version: 1 },
+      ];
+    },
+  };
+  const service = new AccessAdministrationService("ers-brain", { tenantId, roleGroupIds: groups }, grants);
+  let requested;
+  service.graph = () => ({
+    async rolesForUsers(ids) {
+      requested = ids;
+      return new Map([[target.id, ["reader"]], [second, ["reader", "owner"]]]);
+    },
+  });
+  const listed = await service.list("token");
+  assert.deepEqual(requested, [target.id, second]);
+  assert.equal(listed[0].drift, "none");
+  assert.equal(listed[1].drift, "multiple");
+  assert.equal(listed[2].drift, "unavailable");
+});
+
 test("unconfirmed changes and caller-supplied invalid roles fail before mutation", async () => {
   const { service, order } = harness(null);
   await assert.rejects(() => service.mutate(actor, "token", { target, role: "reader", status: "active", confirmed: false }), /confirmation/);

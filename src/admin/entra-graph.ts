@@ -3,6 +3,7 @@ import type { BrainRole } from "../services/registry.js";
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BRAIN_ROLES = ["reader", "member", "admin", "owner"] as const satisfies readonly BrainRole[];
 
 export interface DirectoryUser {
   id: string;
@@ -121,20 +122,10 @@ export class EntraGraphClient {
     };
   }
 
-  async rolesForUser(objectId: string): Promise<BrainRole[]> {
-    const target = requireObjectId(objectId);
-    const roleGroupIds = Object.fromEntries(
-      (["reader", "member", "admin", "owner"] as BrainRole[]).map((role) => [
-        role,
-        this.groupId(role),
-      ])
-    ) as Record<BrainRole, string>;
-    // App-role groups are managed as direct membership. Do not use
-    // checkMemberGroups here: it is transitive and could make a nested-group
-    // relationship appear to be a Brain grant even though group-based app-role
-    // assignment does not use that relationship as our authority boundary.
+  private async directMemberIds(role: BrainRole): Promise<Set<string>> {
+    const groupId = this.groupId(role);
     const memberships = new Set<string>();
-    let pathname = `/users/${target}/memberOf/microsoft.graph.group?$select=id&$top=999`;
+    let pathname = `/groups/${groupId}/members?$select=id&$top=999`;
     for (let page = 0; page < 10 && pathname; page += 1) {
       const { response } = await this.request(pathname);
       const json = (await response.json()) as {
@@ -149,16 +140,39 @@ export class EntraGraphClient {
         pathname = "";
       } else {
         const next = new URL(nextLink);
-        if (next.origin !== "https://graph.microsoft.com" || !next.pathname.startsWith("/v1.0/")) {
-          throw new Error("Microsoft Graph returned an unsafe membership continuation URL");
+        const expectedPath = `/v1.0/groups/${groupId}/members`;
+        if (next.origin !== "https://graph.microsoft.com" || next.pathname !== expectedPath) {
+          throw new Error("Microsoft Graph returned an unsafe managed-group continuation URL");
         }
         pathname = `${next.pathname.slice("/v1.0".length)}${next.search}`;
       }
     }
-    if (pathname) throw new Error("Microsoft Graph membership result exceeded the safety page limit");
-    return (["reader", "member", "admin", "owner"] as BrainRole[]).filter(
-      (role) => memberships.has(roleGroupIds[role])
-    );
+    if (pathname) throw new Error("Microsoft Graph managed-group result exceeded the safety page limit");
+    return memberships;
+  }
+
+  async rolesForUsers(objectIds: string[]): Promise<Map<string, BrainRole[]>> {
+    const targets = [...new Set(objectIds.map(requireObjectId))];
+    const result = new Map<string, BrainRole[]>(targets.map((target) => [target, []]));
+    if (targets.length === 0) return result;
+
+    // The Brain authority boundary is the four fixed direct-membership groups.
+    // Reading those groups works with the same delegated GroupMember.ReadWrite.All
+    // permission used for mutations and avoids broader permission to enumerate
+    // another user's directory memberships.
+    const memberSets = await Promise.all(BRAIN_ROLES.map((role) => this.directMemberIds(role)));
+    for (const target of targets) {
+      result.set(
+        target,
+        BRAIN_ROLES.filter((_role, index) => memberSets[index].has(target))
+      );
+    }
+    return result;
+  }
+
+  async rolesForUser(objectId: string): Promise<BrainRole[]> {
+    const target = requireObjectId(objectId);
+    return (await this.rolesForUsers([target])).get(target) || [];
   }
 
   async setRole(objectId: string, role: BrainRole): Promise<GraphMutationResult> {
@@ -187,7 +201,7 @@ export class EntraGraphClient {
 
     const removedRoles: BrainRole[] = [];
     try {
-      for (const other of ["reader", "member", "admin", "owner"] as BrainRole[]) {
+      for (const other of BRAIN_ROLES) {
         if (other === role) continue;
         const result = await this.request(
           `/groups/${this.groupId(other)}/members/${target}/$ref`,
@@ -214,7 +228,7 @@ export class EntraGraphClient {
     const target = requireObjectId(objectId);
     const requestIds: string[] = [];
     const removedRoles: BrainRole[] = [];
-    for (const role of ["reader", "member", "admin", "owner"] as BrainRole[]) {
+    for (const role of BRAIN_ROLES) {
       const result = await this.request(
         `/groups/${this.groupId(role)}/members/${target}/$ref`,
         { method: "DELETE" },
