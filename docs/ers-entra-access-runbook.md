@@ -1,6 +1,6 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** `v1.8.4` dual-provider canary active; Entra-only cutover remains approval-gated
+**Status:** `v1.8.5` dual-provider canary active; Entra-only cutover remains approval-gated
 **Last updated:** 2026-08-28
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
@@ -31,13 +31,14 @@ Owner bootstrap, changing Fly secrets, deploying either runtime, SharePoint
 permission changes and enrolling users. A successful local test does not imply
 that any of these actions occurred.
 
-Release `v1.8.4` was deployed on 2026-08-28 to JEM Fly release 78 and then the
-reviewed private ERS overlay at Fly release 18. JEM remained GitHub-only with no
+Release `v1.8.5` was deployed on 2026-08-28 to JEM Fly release 79 and then the
+reviewed private ERS overlay at Fly release 19. JEM remained GitHub-only with no
 access-admin route. ERS remained dual-provider with Entra as default and the
 access-admin route enabled. The ERS health check, Fly Machine check and
-profile-bound hosted doctor passed; the doctor reported no operator action.
-This deployment does not satisfy the remaining human sign-in acceptance or
-authorize Entra-only cutover.
+live Owner-session UI check passed. The UI displays each bounded GitHub fallback
+principal by human name and login while retaining its immutable numeric ID as
+audit detail. This deployment does not satisfy the remaining human sign-in
+acceptance or authorize Entra-only cutover.
 
 ## 1. One-time TDM setup
 

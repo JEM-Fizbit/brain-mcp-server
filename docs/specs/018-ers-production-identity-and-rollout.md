@@ -465,7 +465,12 @@ immutable numeric GitHub ID retained underneath as audit detail. Display
 metadata is accepted only from the deployment registry entry whose provider,
 tenant and user ID exactly match the enforced grant; names and logins never
 participate in authorization. This adds no external GitHub lookup, database
-migration, grant mutation, provider change or Graph scope.
+migration, grant mutation, provider change or Graph scope. The annotated release
+was deployed JEM-first as Fly release 79 and then as the reviewed private ERS
+overlay at Fly release 19. Both health and Machine checks passed. A live ERS
+Owner-session UI check confirmed the two fallback rows render as Cillian
+McGorman / `@Cillianm-ers` and John E. Milad / `@jemilad-ers`, with their
+immutable GitHub IDs retained beneath.
 
 ### A. Provider-neutral authorization shell
 
