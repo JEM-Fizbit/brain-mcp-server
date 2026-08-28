@@ -459,6 +459,14 @@ health and Machine checks passed, and the profile-bound ERS hosted doctor
 returned `pass` with no operator action. Cillian's Owner sign-in and Jeronimo's
 Reader sign-in/read remain the human acceptance gate.
 
+**GitHub display-label correction record (2026-08-28):** Release `v1.8.5`
+shows each bounded GitHub fallback principal by human name and login, with the
+immutable numeric GitHub ID retained underneath as audit detail. Display
+metadata is accepted only from the deployment registry entry whose provider,
+tenant and user ID exactly match the enforced grant; names and logins never
+participate in authorization. This adds no external GitHub lookup, database
+migration, grant mutation, provider change or Graph scope.
+
 ### A. Provider-neutral authorization shell
 
 - Separate shared MCP authorize-request validation/state creation from the

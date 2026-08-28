@@ -4,7 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const { AccessAdministrationService, AccessReconciliationError } = await import(path.join(__dirname, "..", "dist", "admin", "access-service.js"));
+const {
+  AccessAdministrationService,
+  AccessReconciliationError,
+  applyRegistryDisplayMetadata,
+} = await import(path.join(__dirname, "..", "dist", "admin", "access-service.js"));
 
 const tenantId = "11111111-1111-4111-8111-111111111111";
 const target = { id: "22222222-2222-4222-8222-222222222222", displayName: "Target" };
@@ -88,6 +92,22 @@ test("grant listing reconciles Entra users in one fixed-group batch and leaves o
   assert.equal(listed[0].drift, "none");
   assert.equal(listed[1].drift, "multiple");
   assert.equal(listed[2].drift, "unavailable");
+});
+
+test("registry display metadata enriches grants by immutable identity only", () => {
+  const grants = [
+    { provider: "github", providerUserId: "12345678", role: "owner", status: "active" },
+    { provider: "github", providerUserId: "87654321", login: "stored-login", role: "owner", status: "active" },
+  ];
+  const enriched = applyRegistryDisplayMetadata(grants, [
+    { provider: "github", provider_user_id: "12345678", login: "human-login", name: "Human Name", roles: { "ers-brain": "owner" } },
+    { provider: "github", provider_user_id: "00000000", login: "stored-login", name: "Wrong Identity", roles: { "ers-brain": "owner" } },
+  ]);
+
+  assert.equal(enriched[0].name, "Human Name");
+  assert.equal(enriched[0].login, "human-login");
+  assert.equal(enriched[1].login, "stored-login");
+  assert.equal(enriched[1].name, undefined);
 });
 
 test("unconfirmed changes and caller-supplied invalid roles fail before mutation", async () => {

@@ -61,6 +61,8 @@ export function accessAdminPage(): string {
     .help-panel summary { cursor: pointer; font-weight: 650; }
     .help-panel p { margin: 8px 0 0; color: var(--muted); }
     .role-help { margin: 5px 0 0; color: var(--muted); font-size: 13px; min-height: 2.8em; }
+    .user-primary { font-weight: 600; }
+    .user-meta { color: var(--muted); font-size: 12px; }
     .reconcile-context { border-left: 3px solid var(--amber); padding: 8px 10px; background: var(--paper); }
     dialog { width: min(640px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 10px; padding: 0; background: var(--panel); color: var(--ink); }
     dialog::backdrop { background: #17211b66; }
@@ -182,6 +184,28 @@ async function api(path, options = {}) {
   return data;
 }
 function td(text) { const cell = document.createElement("td"); cell.textContent = text == null ? "—" : String(text); return cell; }
+function userCell(grant) {
+  const cell = document.createElement("td");
+  const primary = grant.name || grant.login || grant.email || grant.providerUserId;
+  const primaryLine = document.createElement("div");
+  primaryLine.className = "user-primary";
+  primaryLine.textContent = primary;
+  cell.append(primaryLine);
+  const metadata = [];
+  if (grant.provider === "github") {
+    if (grant.login && grant.login !== primary) metadata.push("@" + grant.login);
+    metadata.push("GitHub ID " + grant.providerUserId);
+  } else if (grant.email && grant.email !== primary) {
+    metadata.push(grant.email);
+  }
+  if (metadata.length) {
+    const metaLine = document.createElement("div");
+    metaLine.className = "user-meta";
+    metaLine.textContent = metadata.join(" · ");
+    cell.append(metaLine);
+  }
+  return cell;
+}
 function roleLabel(role) { return role === "member" ? "Curator" : role.charAt(0).toUpperCase() + role.slice(1); }
 function updateRoleHelp() { $("roleHelp").textContent = roleDescriptions[$("role").value] || ""; }
 function entraCheck(grant) {
@@ -236,7 +260,7 @@ async function refresh() {
       const check = entraCheck(grant);
       const checkCell = td(check.text);
       checkCell.className = check.className;
-      row.append(td(grant.name || grant.email || grant.providerUserId), td(roleLabel(grant.role)), td(grant.status), checkCell, td(grant.updatedAt ? new Date(grant.updatedAt).toLocaleString() : "—"));
+      row.append(userCell(grant), td(roleLabel(grant.role)), td(grant.status), checkCell, td(grant.updatedAt ? new Date(grant.updatedAt).toLocaleString() : "—"));
       const action = td("");
       if (grant.provider === "entra") {
         const button = document.createElement("button");

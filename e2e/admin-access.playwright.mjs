@@ -20,6 +20,8 @@ const fixture = {
     {
       provider: "github",
       providerUserId: "257652621",
+      login: "cillian-example",
+      name: "Cillian Example",
       role: "owner",
       status: "active",
       graphRoles: [],
@@ -102,7 +104,9 @@ for (const colorScheme of ["light", "dark"]) {
         await reconcileHelp.click();
         await expect(page.getByText(/system never chooses a role automatically/i)).toBeVisible();
 
-        const githubRow = page.locator("#grants tr", { hasText: "257652621" });
+        const githubRow = page.locator("#grants tr", { hasText: "Cillian Example" });
+        await expect(githubRow.locator(".user-primary")).toHaveText("Cillian Example");
+        await expect(githubRow.locator(".user-meta")).toHaveText("@cillian-example · GitHub ID 257652621");
         await expect(githubRow).toContainText("GitHub fallback · not managed here");
         await expect(githubRow).toContainText("Not managed here");
         await expect(githubRow.locator("button")).toHaveCount(0);
