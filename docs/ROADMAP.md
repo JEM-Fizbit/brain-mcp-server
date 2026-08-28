@@ -322,11 +322,10 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Deploy the ERS Identity & Access discoverability and guidance release
-   (`v1.8.4`) to JEM first and then the reviewed ERS overlay. Complete Cillian's
-   Owner sign-in plus Jeronimo's Reader sign-in/read acceptance in
-   dual-provider mode; do not cut over from an untagged or locally modified
-   upstream tree.
+1. Release `v1.8.4` is live on JEM Fly release 78 and the reviewed ERS overlay
+   at Fly release 18. Complete Cillian's Owner sign-in plus Jeronimo's Reader
+   sign-in/read acceptance in dual-provider mode; do not activate Entra-only
+   before both pass.
 2. Align SharePoint writer permissions, activate an ERS-owned external
    health/alert path and close the item-14 governance gate.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
