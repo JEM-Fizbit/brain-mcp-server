@@ -494,6 +494,15 @@ and GUID for Entra. The gate rejects a numeric ID presented as Entra. This is a
 test/release-contract correction only; it adds no runtime, schema, provider,
 secret or Brain-content change.
 
+The annotated `v1.8.7` release was deployed first to JEM as Fly release 81.
+Live health reported GitHub as the sole enabled provider and no access-admin
+route, while an authenticated hosted sync-status call returned 40 files and no
+open conflicts. The private `ers/v1.8.7` Entra-only overlay passed all 490 tests
+apart from five intentional skips, has zero protected upstream drift and is
+pushed for deployment. Live ERS remains on the `v1.8.5` dual-provider release
+until the Cillian Owner and Jeronimo Reader human acceptance gate is satisfied
+or expressly waived by John.
+
 ### A. Provider-neutral authorization shell
 
 - Separate shared MCP authorize-request validation/state creation from the
