@@ -322,9 +322,10 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Load the approved certificate/provider values into Fly secrets, then deploy
-   the reviewed `v1.8.2` overlay in dual-provider mode and run the three-owner
-   canary; do not deploy from an untagged or locally modified upstream tree.
+1. Promote the fixed-group reconciliation correction as `v1.8.3`, intake it
+   into the reviewed ERS overlay, then complete the three-owner and Reader
+   lifecycle canary in dual-provider mode; do not cut over from an untagged or
+   locally modified upstream tree.
 2. Align SharePoint writer permissions, activate an ERS-owned external
    health/alert path and close the item-14 governance gate.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any

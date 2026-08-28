@@ -189,9 +189,12 @@ intervention.
   non-role-assignable Entra security-group IDs. The UI is not a generic Graph
   client and accepts no caller-supplied group ID.
 - Directory search uses least-privileged delegated `User.ReadBasic.All`.
-  Membership changes use delegated `GroupMember.ReadWrite.All` in the signed-in
-  owner's context. No app-only Graph write permission or background Graph
-  credential is accepted for this release.
+  Direct membership reads and changes for the four fixed groups use delegated
+  `GroupMember.ReadWrite.All` in the signed-in owner's context. Reconciliation
+  reads those groups once and maps their member object IDs to local grants; it
+  does not enumerate each target user's broader directory memberships. No
+  app-only Graph write permission or background Graph credential is accepted
+  for this release.
 - Group creation, enterprise-app role assignment and tenant admin consent are
   one-time IT/TDM setup. John and Cillian are group owners so subsequent
   membership changes do not require TDM. Licensing for group assignment to the
@@ -428,6 +431,15 @@ non-heartbeat event count. Work package F may now proceed to private overlay
 intake from the exact `v1.8.2` tag. JEM Fly release 76 reports version 1.8.2
 and the expected GitHub-only runtime; ERS remained untouched on version 1.7.3
 and Fly release 15.
+
+**ERS Graph correction record (2026-08-28):** The first live John Entra Owner
+session proved certificate-backed admin authentication but exposed unavailable
+drift checks for other Owners because the adapter enumerated each target user's
+directory memberships. Release `v1.8.3` instead enumerates only the four fixed
+managed groups using the already-approved delegated permission, performs one
+bounded group-read set per access-page reconciliation and leaves the wider
+directory unread. The three-owner and Reader lifecycle canary remains required
+before Entra-only cutover.
 
 ### A. Provider-neutral authorization shell
 

@@ -8,6 +8,34 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-28 — Reconcile Entra roles from the fixed managed groups
+
+**Decision:** The ERS access-administration surface reads direct membership from
+the four allowlisted Brain role groups and maps those member object IDs back to
+the private grant ledger. It does not enumerate each target user's directory
+memberships. One bounded reconciliation load reads each fixed group once, even
+when several grants are displayed. GitHub fallback grants remain visible but
+are explicitly outside Graph drift reconciliation.
+
+**Why:** The first live Entra Owner canary proved the certificate-backed admin
+login but exposed that `/users/{id}/memberOf` requires a broader delegated read
+permission for other users. The already-consented `GroupMember.ReadWrite.All`
+permission can read the dedicated groups it manages. Querying that fixed set is
+the narrower authority boundary, avoids another tenant-consent request and
+keeps reconciliation proportional to four small groups rather than to the
+number of users.
+
+**Alternatives rejected:** add `User.Read.All`, `GroupMember.Read.All` or
+`Directory.Read.All`; accept `unavailable` drift for non-current users; trust
+mutable token group claims; query transitive membership; or make a Graph call
+for every grant/group pair.
+
+**Related:** `src/admin/entra-graph.ts`; `src/admin/access-service.ts`;
+`docs/ers-entra-access-runbook.md`;
+`docs/specs/018-ers-production-identity-and-rollout.md`.
+
+---
+
 ## 2026-08-26 — Fail visibly on heartbeat fallback and retire obsolete heartbeat events
 
 **Decision:** A current legacy `sync_heartbeat` event proves local-sync
