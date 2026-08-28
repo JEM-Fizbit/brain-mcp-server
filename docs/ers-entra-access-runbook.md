@@ -1,6 +1,6 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** `v1.8.5` dual-provider canary active; Entra-only cutover remains approval-gated
+**Status:** JEM canary is live on `v1.8.7`; the verified ERS Entra-only `ers/v1.8.7` overlay is prepared but not deployed pending human acceptance
 **Last updated:** 2026-08-28
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
@@ -39,6 +39,14 @@ live Owner-session UI check passed. The UI displays each bounded GitHub fallback
 principal by human name and login while retaining its immutable numeric ID as
 audit detail. This deployment does not satisfy the remaining human sign-in
 acceptance or authorize Entra-only cutover.
+
+Release `v1.8.7` was deployed to JEM Fly release 81 on 2026-08-28. Live health
+reported server 1.8.7, GitHub as the sole enabled provider and no access-admin
+route; an authenticated hosted sync-status call returned 40 files and zero open
+conflicts. The private `ers/v1.8.7` overlay was then verified with all 490 tests
+passing apart from five intentional skips, zero protected upstream drift and
+exactly the four permitted private overlay files. It is pushed but not deployed:
+Cillian's Owner and Jeronimo's Reader acceptance remain the final cutover gate.
 
 ## 1. One-time TDM setup
 
