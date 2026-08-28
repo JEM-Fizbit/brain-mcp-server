@@ -150,6 +150,11 @@ intervention.
   refresh-token exchange. An in-app removal, suspension or downgrade revokes
   existing Brain sessions and takes effect without a Fly deployment even if
   the user still holds a previously issued access or refresh token.
+- The current enabled-provider set is checked before grant lookup during
+  authorization-code exchange, refresh-token exchange and MCP bearer
+  authentication. Entra-only therefore denies existing GitHub codes and tokens
+  even while their Postgres grants are retained inert for the bounded rollback
+  window.
 - No principal can list, read or mutate a Brain absent from its explicit role
   map. The ERS endpoint still denies `ai-brain-jem`; the JEM endpoint still
   denies `ers-brain`.
@@ -472,6 +477,16 @@ Owner-session UI check confirmed the two fallback rows render as Cillian
 McGorman / `@Cillianm-ers` and John E. Milad / `@jemilad-ers`, with their
 immutable GitHub IDs retained beneath.
 
+**Provider kill-switch correction record (2026-08-28):** Release `v1.8.6`
+makes `BRAIN_IDENTITY_PROVIDERS` a complete runtime authorization boundary,
+not only an authorization-redirect choice. Disabled-provider authorization
+codes, refresh tokens and signed bearer tokens fail before grant lookup. The
+denial has a bounded `provider_disabled` auth-telemetry reason on the bearer
+path and records no credential material. The ERS GitHub grants may remain inert
+during the approved rollback window; no permanent legacy GitHub-user controls
+are added. JEM's explicit GitHub-only provider remains enabled and covered by
+the same positive-path regression suite.
+
 ### A. Provider-neutral authorization shell
 
 - Separate shared MCP authorize-request validation/state creation from the
@@ -612,7 +627,8 @@ immutable GitHub IDs retained beneath.
 8. Real-client matrix: Claude ERS, ChatGPT Business browser workspace, fresh
    Codex app/session, and any other surface named in the rollout cohort.
 9. Switch ERS to Entra-only; prove GitHub can no longer start or complete an ERS
-   authorization while JEM GitHub remains unaffected.
+   authorization and that pre-cutover GitHub codes, refresh tokens and bearer
+   tokens are denied before grant lookup, while JEM GitHub remains unaffected.
 
 ### Commands
 
@@ -644,8 +660,8 @@ immutable GitHub IDs retained beneath.
 7. **Close governance/access gates.** SharePoint permissions, production
    alerting, second-admin evidence and ELT item 14.
 8. **Deploy Entra-only and stage readers.** John or Cillian adds the bounded
-   cohort through the hosted UI; observe auth/support load before adding
-   curators.
+   cohort through the hosted UI; verify the provider kill-switch against stale
+   GitHub credentials and observe auth/support load before adding curators.
 9. **Disable GitHub ERS credentials after the rollback window.** Preserve JEM's
    separate GitHub provider and credentials.
 

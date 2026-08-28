@@ -53,6 +53,16 @@ export interface OauthConfig {
   enforceCurrentGrants: boolean;
 }
 
+export function isIdentityProviderEnabled(
+  config: Pick<OauthConfig, "identityProviders">,
+  provider: unknown
+): provider is IdentityProvider {
+  return (
+    (provider === "github" || provider === "entra") &&
+    config.identityProviders.includes(provider)
+  );
+}
+
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }

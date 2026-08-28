@@ -1,5 +1,8 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { type OauthConfig } from "../oauth/config.js";
+import {
+  isIdentityProviderEnabled,
+  type OauthConfig,
+} from "../oauth/config.js";
 import { verifyAccessToken } from "../oauth/jwt.js";
 
 function extractBearerToken(authHeader?: string | null): string | null {
@@ -23,6 +26,9 @@ export function resolveAuth(
   if (!verified.ok) return { ok: false, reason: verified.reason };
   if (verified.payload.aud !== config.resourceUri) {
     return { ok: false, reason: "audience mismatch" };
+  }
+  if (!isIdentityProviderEnabled(config, verified.payload.provider)) {
+    return { ok: false, reason: "identity provider is not enabled" };
   }
 
   return {

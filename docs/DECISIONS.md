@@ -8,6 +8,34 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-28 — Treat the enabled provider set as a live authorization boundary
+
+**Decision:** Every Brain authorization-code exchange, refresh-token exchange
+and authenticated MCP request must reject an identity whose provider is not in
+the deployment's current `BRAIN_IDENTITY_PROVIDERS` set. An Entra-only ERS
+release therefore makes existing GitHub codes, refresh tokens and bearer tokens
+inert immediately, even if bounded GitHub grants remain in private Postgres for
+the approved rollback window. JEM remains explicitly GitHub-only. Retained
+GitHub grants are retired with the ERS credentials after the rollback window;
+they do not require a legacy-user administration UI.
+
+**Why:** Blocking only new GitHub redirects is not a complete provider cutover:
+a previously issued Brain token can still carry a valid signature, and the
+grant ledger deliberately remains live across deployments. Provider mode must
+be enforced before grant lookup so the deployment configuration is a real kill
+switch and disabled-provider requests cannot reactivate through refresh.
+
+**Alternatives rejected:** rely on access-token expiry; remove only the GitHub
+login button and callback; require manual revocation of every GitHub grant at
+cutover; delete rollback grants before the rollback window closes; or build a
+permanent GitHub-user administration surface for a provider being retired.
+
+**Related:** `src/http/mcp-auth.ts`; `src/oauth/token.ts`;
+`docs/ers-entra-access-runbook.md`;
+`docs/specs/018-ers-production-identity-and-rollout.md`.
+
+---
+
 ## 2026-08-28 — Make Cockpit the normal ERS identity entry without merging trust boundaries
 
 **Decision:** The ERS Cockpit first screen exposes a prominent **Identity &

@@ -234,7 +234,14 @@ Run the Spec 018 live matrix in order:
 8. Activate an ERS-owned external `/health` check and actionable alert route.
 9. Only after John and Cillian accept the results, switch ERS to
    `BRAIN_IDENTITY_PROVIDERS=entra`, remove GitHub fallback configuration and
-   prove ERS GitHub authorization no longer starts or completes.
+   prove ERS GitHub authorization no longer starts or completes. Test a GitHub
+   authorization code created before the switch, an existing refresh token and
+   an existing bearer token: all three must fail before grant lookup while a
+   current Entra token succeeds and JEM GitHub remains unaffected.
+10. Keep the two GitHub grants inert during the bounded rollback window. After
+    that window, retire the ERS GitHub OAuth credentials and revoke/archive the
+    retained grants through approved maintenance. Do not build or expose legacy
+    GitHub-user controls in the Access & Roles UI.
 
 Do not broaden the cohort during the dual-provider canary.
 
@@ -387,7 +394,9 @@ stricter local state, then use **Review & reconcile** once Graph is healthy.
 - Before Entra-only: keep the existing bounded GitHub pilot available while
   correcting Entra. Do not alter Brain data.
 - After Entra-only but before GitHub credentials are retired: a guarded ERS
-  release may temporarily restore dual mode only with owner approval.
+  release may temporarily restore dual mode only with owner approval. The
+  retained GitHub grants become usable only because GitHub is explicitly
+  restored to the enabled-provider set.
 - After GitHub retirement: redeploy the prior tested Entra release/config;
   GitHub is not an automatic fallback.
 - Never point ERS at JEM credentials, database, registry or OAuth registration.

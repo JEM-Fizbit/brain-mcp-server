@@ -1,4 +1,8 @@
-import { isResourceMatch, type OauthConfig } from "./config.js";
+import {
+  isIdentityProviderEnabled,
+  isResourceMatch,
+  type OauthConfig,
+} from "./config.js";
 import {
   generateRefreshToken,
   hashRefreshToken,
@@ -22,6 +26,7 @@ async function currentGrantAllows(
   config: OauthConfig,
   dependencies: GrantDependencies
 ): Promise<boolean> {
+  if (!isIdentityProviderEnabled(config, record.provider)) return false;
   if (!config.enforceCurrentGrants && record.provider !== "entra") return true;
   const roles = await (dependencies.rolesForPrincipal || currentRolesForPrincipal)({
     provider: record.provider,

@@ -60,6 +60,7 @@ export function authReasonCode(reason: unknown): string {
   if (/missing Authorization: Bearer header/i.test(text)) return "missing_bearer";
   if (/token expired/i.test(text)) return "token_expired";
   if (/audience mismatch/i.test(text)) return "audience_mismatch";
+  if (/identity provider is not enabled/i.test(text)) return "provider_disabled";
   if (/invalid JWT/i.test(text)) return "invalid_token";
   if (/\bbearer\b/i.test(text)) return "auth_failed";
   return safeText(text, "auth_failed");

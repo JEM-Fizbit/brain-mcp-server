@@ -49,6 +49,7 @@ function oauthConfig(baseUrl) {
     authorizationServerMetadataUrl:
       `${baseUrl}/.well-known/oauth-authorization-server`,
     scopes: ["mcp:tools"],
+    identityProviders: ["github"],
     signingSecret: "test",
     accessTokenTtlSec: 3600,
   };
