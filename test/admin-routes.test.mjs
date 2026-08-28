@@ -94,6 +94,7 @@ test("ERS hosted access page is available but its APIs require a current Owner",
   assert.match(page.body, /What does “Review &amp; reconcile” mean/);
   assert.match(page.body, /system never chooses a role automatically/);
   assert.match(page.body, /GitHub fallback · not managed here/);
+  assert.match(page.body, /GitHub ID/);
   assert.match(page.body, /Review & reconcile/);
   assert.match(page.body, /roleHelp/);
 

@@ -19,6 +19,7 @@ export interface AccessGrant {
   provider: string;
   providerTenantId?: string;
   providerUserId: string;
+  login?: string;
   name?: string;
   email?: string;
   role: BrainRole;
@@ -155,6 +156,7 @@ export class PostgresAccessGrantStore {
           p.provider,
           p.provider_tenant_id,
           p.provider_user_id,
+          p.login,
           p.name,
           p.email,
           r.role,
@@ -186,6 +188,7 @@ export class PostgresAccessGrantStore {
       provider: row.provider,
       providerTenantId: row.provider_tenant_id || undefined,
       providerUserId: row.provider_user_id,
+      login: row.login || undefined,
       name: row.name || undefined,
       email: row.email || undefined,
       role: row.role,
@@ -207,6 +210,7 @@ export class PostgresAccessGrantStore {
           p.provider,
           p.provider_tenant_id,
           p.provider_user_id,
+          p.login,
           p.name,
           p.email,
           r.role,
@@ -236,6 +240,7 @@ export class PostgresAccessGrantStore {
       provider: row.provider,
       providerTenantId: row.provider_tenant_id || undefined,
       providerUserId: row.provider_user_id,
+      login: row.login || undefined,
       name: row.name || undefined,
       email: row.email || undefined,
       role: row.role,

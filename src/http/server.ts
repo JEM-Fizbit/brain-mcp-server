@@ -29,6 +29,7 @@ import { AccessAdministrationService } from "../admin/access-service.js";
 import { handleAdminRequest, type AdminRouteContext } from "../admin/routes.js";
 import { postgresAccessGrantStore } from "../services/access-grants.js";
 import { runtimeBrainId } from "../services/runtime-env.js";
+import { loadRegistry } from "../services/registry.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
@@ -413,7 +414,12 @@ export async function startHttpServer(): Promise<void> {
       state,
       sessions: new AdminSessionStore(config),
       grants,
-      service: new AccessAdministrationService("ers-brain", config.entra, grants),
+      service: new AccessAdministrationService(
+        "ers-brain",
+        config.entra,
+        grants,
+        (await loadRegistry()).principals || []
+      ),
     };
   }
 

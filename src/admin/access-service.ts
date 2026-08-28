@@ -5,7 +5,11 @@ import {
   type GrantStatus,
   PostgresAccessGrantStore,
 } from "../services/access-grants.js";
-import type { BrainPrincipal, BrainRole } from "../services/registry.js";
+import type {
+  BrainPrincipal,
+  BrainRole,
+  RegistryPrincipal,
+} from "../services/registry.js";
 import { EntraGraphClient, type DirectoryUser, type GraphMutationResult } from "./entra-graph.js";
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -61,11 +65,58 @@ function driftFor(grant: AccessGrant, graphRoles: BrainRole[]): GrantWithDrift["
   return graphRoles[0] === grant.role ? "none" : "mismatch";
 }
 
+function displayIdentityKey(
+  provider: string,
+  providerTenantId: string | undefined,
+  providerUserId: string
+): string {
+  return [
+    provider.trim().toLowerCase(),
+    providerTenantId?.trim().toLowerCase() || "",
+    providerUserId.trim().toLowerCase(),
+  ].join(":");
+}
+
+export function applyRegistryDisplayMetadata(
+  grants: AccessGrant[],
+  principals: readonly RegistryPrincipal[]
+): AccessGrant[] {
+  const displayByIdentity = new Map(
+    principals
+      .filter((principal) => Boolean(principal.provider_user_id))
+      .map((principal) => [
+        displayIdentityKey(
+          principal.provider,
+          principal.provider_tenant_id,
+          principal.provider_user_id!
+        ),
+        principal,
+      ])
+  );
+  return grants.map((grant) => {
+    const principal = displayByIdentity.get(
+      displayIdentityKey(
+        grant.provider,
+        grant.providerTenantId,
+        grant.providerUserId
+      )
+    );
+    if (!principal) return grant;
+    return {
+      ...grant,
+      login: grant.login || principal.login,
+      name: grant.name || principal.name,
+      email: grant.email || principal.email,
+    };
+  });
+}
+
 export class AccessAdministrationService {
   constructor(
     private readonly brainId: string,
     private readonly entra: EntraProviderConfig,
-    private readonly grants: PostgresAccessGrantStore
+    private readonly grants: PostgresAccessGrantStore,
+    private readonly registryPrincipals: readonly RegistryPrincipal[] = []
   ) {}
 
   graph(accessToken: string): EntraGraphClient {
@@ -74,7 +125,10 @@ export class AccessAdministrationService {
 
   async list(accessToken: string): Promise<GrantWithDrift[]> {
     const graph = this.graph(accessToken);
-    const grants = await this.grants.listGrants(this.brainId);
+    const grants = applyRegistryDisplayMetadata(
+      await this.grants.listGrants(this.brainId),
+      this.registryPrincipals
+    );
     const tenantId = this.entra.tenantId.toLowerCase();
     const entraGrants = grants.filter(
       (grant) =>
