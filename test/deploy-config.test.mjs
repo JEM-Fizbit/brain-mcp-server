@@ -7,7 +7,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assertUniversalLintProfile } from "./lib/deploy-profile-contract.mjs";
+import {
+  assertUniversalLintProfile,
+  isStableOwnerPrincipal,
+} from "./lib/deploy-profile-contract.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(__dirname, "..");
@@ -106,10 +109,12 @@ test("image-baked registry satisfies universal and profile expectations", async 
   assert.match(dockerfile, /COPY config \.\/config/);
   assert.equal(registry.version, 1);
   assert.ok(registry.brains.some((brain) => brain.id === registry.default_brain_id));
-  assert.ok(registry.principals.some((principal) =>
-    /^\d+$/.test(principal.provider_user_id || "") &&
-    principal.roles?.[registry.default_brain_id] === "owner"
-  ));
+  assert.ok(
+    registry.principals.some((principal) =>
+      isStableOwnerPrincipal(principal, registry.default_brain_id)
+    ),
+    "deployment registry must retain a provider-appropriate stable Owner identity"
+  );
   assert.ok(registry.brains.every((brain) => brain.storage_backend === "postgres"));
   assert.ok(registry.brains.every((brain) =>
     Array.isArray(brain.source_categories) &&

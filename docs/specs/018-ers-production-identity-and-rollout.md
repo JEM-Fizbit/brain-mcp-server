@@ -487,6 +487,13 @@ during the approved rollback window; no permanent legacy GitHub-user controls
 are added. JEM's explicit GitHub-only provider remains enabled and covered by
 the same positive-path regression suite.
 
+**Entra-only release-contract correction (2026-08-28):** Release `v1.8.7`
+retains the exact `v1.8.6` runtime behavior and corrects the shared deployment
+gate to recognize provider-appropriate immutable Owner IDs: numeric for GitHub
+and GUID for Entra. The gate rejects a numeric ID presented as Entra. This is a
+test/release-contract correction only; it adds no runtime, schema, provider,
+secret or Brain-content change.
+
 ### A. Provider-neutral authorization shell
 
 - Separate shared MCP authorize-request validation/state creation from the
