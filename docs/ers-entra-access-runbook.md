@@ -87,6 +87,18 @@ The required result is:
 
 Do not run the migration from a routine test or deployment smoke.
 
+**Completed 2026-08-28:** migration
+`db/migrations/2026-08-25_001_entra_access_grants.sql` (SHA-256
+`9452e1b88a4b263ca6255f144824c5f5f1dd38d2996b1a63c58c82c759617702`)
+was applied to the ERS-owned `brain-platform-pilot` project. The complete live
+security gate passed: 18/18 Brain tables retain RLS, client/public Brain grants
+and non-runtime Brain policies remain zero, the access audit is append-only for
+`brain_runtime`, pre-existing content/telemetry counts were preserved, the
+artifact bucket remains private, and Security Advisor reports no issues. The
+active `brain_runtime_user_v3` login passed a direct `verify-full` smoke; older
+`brain_runtime_user` and `_v2` roles are `NOLOGIN`. This completion does not
+authorize the Owner bootstrap, Fly secret changes, deployment or enrollment.
+
 ## 3. Initial Owner bootstrap
 
 First place John, Cillian and the designated IT/TDM identity in the dedicated

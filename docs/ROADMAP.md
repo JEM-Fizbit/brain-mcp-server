@@ -248,9 +248,11 @@ heartbeats in the ERS database. Release `v1.8.2` makes a legacy heartbeat
 fallback an actionable migration warning; the missing JEM schema passed its
 security gate, both Brains now use fresh current-state heartbeats, and 532,952
 obsolete heartbeat events were removed without changing non-heartbeat
-telemetry. Private ERS overlay intake is the next gate;
-ERS migration, Entra consent, secrets, deployment and wider access are not yet
-activated.
+telemetry. The private ERS overlay passed intake; TDM completed the Entra app,
+fixed-role groups, consent and certificate upload; and the ERS access-ledger
+migration plus live Supabase security gate passed on 2026-08-28. Initial Owner
+bootstrap, Fly secret loading, the dual-provider canary and wider access are not
+yet activated.
 
 Planned work:
 
@@ -319,12 +321,12 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Intake the JEM-validated `v1.8.2` tag through the private ERS overlay. Then
-   complete the one-time Entra setup and run the three-owner dual-provider
-   canary; do not deploy ERS from an untagged or locally modified upstream tree.
-2. Complete one-time TDM consent and fixed-group setup; bootstrap John, Cillian
-   and IT/TDM as owners; align SharePoint writer permissions; activate an
-   ERS-owned external health/alert path; and close the item-14 governance gate.
+1. Bootstrap John, Cillian and IT/TDM into the private ERS Owner ledger, load
+   the approved certificate/provider values into Fly secrets, then deploy the
+   reviewed `v1.8.2` overlay in dual-provider mode and run the three-owner
+   canary; do not deploy from an untagged or locally modified upstream tree.
+2. Align SharePoint writer permissions, activate an ERS-owned external
+   health/alert path and close the item-14 governance gate.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
    additional curator role.
 4. Keep the restore rehearsal, automated ingestion, protocol migration and

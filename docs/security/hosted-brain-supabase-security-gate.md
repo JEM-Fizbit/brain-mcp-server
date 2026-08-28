@@ -1,7 +1,7 @@
 # Hosted Brain Supabase Security Gate
 
 **Status:** passed for the live JEM and ERS hosted runtimes
-**Checked:** JEM 2026-08-26; ERS 2026-08-19
+**Checked:** JEM 2026-08-26; ERS 2026-08-28
 **Projects:** `jem-brain-personal`; `brain-platform-pilot`
 **Supabase project refs:** `gfipcidoyrtgngauzijy`; `omnwbcdtmtvxasgdmvwr`
 **Organizations:** John E. Milad personal; `ERS Genomics`
@@ -18,6 +18,21 @@ infrastructure separation remains governed by spec 012.
 
 ## Verified Controls
 
+- The 2026-08-28 ERS Spec 018 access-ledger migration added tenant-stable
+  principals, explicit grant status/source/version fields and the private
+  append-only `brain.access_audit_events` table. The post-migration gate
+  reported 18/18 Brain tables with RLS, zero
+  `anon`/`authenticated`/`public` Brain grants, zero non-`brain_runtime` Brain
+  policies, exactly two `brain_runtime`-only audit policies (`SELECT` and
+  `INSERT`), no runtime `UPDATE`/`DELETE` privilege on the audit table, a
+  private artifact bucket, zero Storage policies and no client/public execute
+  privilege on `public.rls_auto_enable()`. All pre-existing Brain, file,
+  revision, source, artifact, chunk and telemetry row counts were preserved;
+  all three new indexes and the role-status constraint were valid. The active
+  `brain_runtime_user_v3` pooler login inherited `brain_runtime`, remained
+  non-elevated and passed a direct `verify-full` read/privilege smoke. Supabase
+  Security Advisor returned no issues; Performance Advisor returned no
+  Critical or Warning findings and nine informational notices only.
 - The 2026-08-26 JEM bounded-observability gate reported 17/17 Brain
   tables with RLS, zero `anon`/`authenticated`/`public` Brain grants, zero
   non-`brain_runtime` Brain policies, one `brain_runtime`-only policy and no
@@ -61,7 +76,7 @@ infrastructure separation remains governed by spec 012.
 - All `brain.*` tables have Row Level Security enabled.
 - The `brain.*` tables have server-side RLS policies only for the no-login `brain_runtime` database role; web/client roles still have no row access.
 - The `brain_runtime` role is a no-login group role for private MCP runtime database connections. Dedicated login roles may inherit it, but `anon`, `authenticated`, and `public` must not.
-- The ERS-owned `brain_runtime_user` login exists, has a user-generated Dashlane-custodied password, inherits `brain_runtime`, and has no superuser, role-creation, database-creation, replication, or RLS-bypass privilege. Direct read-only authentication through the shared transaction pooler on `:6543` passed with `verify-full` against Supabase's published CA; the password and encoded runtime URL were never exposed to the agent.
+- The ERS-owned active `brain_runtime_user_v3` login exists, has a user-generated Dashlane-custodied password, inherits `brain_runtime`, and has no superuser, role-creation, database-creation, replication, or RLS-bypass privilege. Direct read-only authentication through the shared transaction pooler on `:6543` passed with `verify-full` against Supabase's published CA; the password and encoded runtime URL were never exposed to the agent. The superseded `brain_runtime_user` and `brain_runtime_user_v2` roles are retained as `NOLOGIN` roles rather than active credentials.
 - The `brain-artifacts` Storage bucket exists and is private.
 - Storage has no public policies granting object access.
 - The `public.rls_auto_enable()` helper no longer grants execute privileges to `public`, `anon`, or `authenticated`.
@@ -112,9 +127,10 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - [x] Implement the tenant-neutral Entra identity, fixed-group adapter, private
   grant/audit projection, hosted access-administration controls and automated
   security tests in spec 018.
-- [ ] Apply the private grant/audit migration to ERS, rerun this live gate and
-  verify the fixed app-role groups before wider enrollment. No additional
-  client-side RLS policy is implied.
+- [x] Apply the private grant/audit migration to ERS and rerun this live gate.
+  No additional client-side RLS policy is implied.
+- [ ] Verify the fixed app-role groups through the deployed ERS adapter before
+  wider enrollment.
 - [ ] Align SharePoint Brain-folder writes with the named MCP curator population
   and record the team-wide audit/read-logging posture.
 - [x] Keep original bytes unexposed (`metadata_only`) for this rollout; a
