@@ -1,7 +1,38 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertUniversalLintProfile } from "./lib/deploy-profile-contract.mjs";
+import {
+  assertUniversalLintProfile,
+  isStableOwnerPrincipal,
+} from "./lib/deploy-profile-contract.mjs";
+
+test("stable deployment Owners use provider-appropriate immutable IDs", () => {
+  assert.equal(
+    isStableOwnerPrincipal(
+      { provider: "github", provider_user_id: "259372947", roles: { brain: "owner" } },
+      "brain"
+    ),
+    true
+  );
+  assert.equal(
+    isStableOwnerPrincipal(
+      {
+        provider: "entra",
+        provider_user_id: "3de174b1-a84d-4d81-b403-f0e7d411a340",
+        roles: { brain: "owner" },
+      },
+      "brain"
+    ),
+    true
+  );
+  assert.equal(
+    isStableOwnerPrincipal(
+      { provider: "entra", provider_user_id: "259372947", roles: { brain: "owner" } },
+      "brain"
+    ),
+    false
+  );
+});
 
 const lint = {
   graph_roots: ["00_loader.md", "NOW.md"],
