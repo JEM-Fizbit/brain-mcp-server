@@ -175,7 +175,7 @@ async function writeDoctorStub(testInfo) {
   return doctorScript;
 }
 
-async function startCockpit(testInfo) {
+async function startCockpit(testInfo, { brainId = "ai-brain-jem" } = {}) {
   const port = await openPort();
   const doctorScript = await writeDoctorStub(testInfo);
   const brainDir = testInfo.outputPath("brain");
@@ -200,12 +200,13 @@ async function startCockpit(testInfo) {
       ...process.env,
       BRAIN_DIR: brainDir,
       BRAIN_INBOX_DIR: inboxDir,
-      BRAIN_ID: "ai-brain-jem",
+      BRAIN_ID: brainId,
       BRAIN_REVISION_STORE: "filesystem",
       BRAIN_COCKPIT_DOCTOR_SCRIPT: doctorScript,
       BRAIN_COCKPIT_HOST: "127.0.0.1",
       BRAIN_COCKPIT_PORT: String(port),
       BRAIN_COCKPIT_PORT_FALLBACK: "0",
+      BRAIN_COCKPIT_ACCESS_ADMIN_URL: "https://brain.example.test/admin/access",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -611,6 +612,24 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await expectCockpitNavigationHierarchy(page, { desktop: false });
     await expectInformationalFlyCheck(page);
     await expectMaintenanceLayout(page, { desktop: false });
+  } finally {
+    await stopCockpit(child);
+  }
+});
+
+test("ERS Cockpit is the clear entry point for Identity & Access", async ({ page }, testInfo) => {
+  const { child, url } = await startCockpit(testInfo, { brainId: "ers-brain" });
+  try {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(url);
+    await expect(page.locator("#identity-access-card")).toBeVisible();
+    await expect(page.locator("#identity-access-card")).toContainText("Manage who can use ERS Brain");
+    await expect(page.locator("#identity-access-action")).toHaveAttribute(
+      "href",
+      "https://brain.example.test/admin/access"
+    );
+    await expect(page.locator("#identity-access-action")).toContainText("Open Access & Roles");
+    await expect(page.locator("#access-roles-link")).toContainText("Identity & Access");
   } finally {
     await stopCockpit(child);
   }

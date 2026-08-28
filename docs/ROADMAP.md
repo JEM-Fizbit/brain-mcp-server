@@ -322,10 +322,11 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Promote the fixed-group reconciliation correction as `v1.8.3`, intake it
-   into the reviewed ERS overlay, then complete the three-owner and Reader
-   lifecycle canary in dual-provider mode; do not cut over from an untagged or
-   locally modified upstream tree.
+1. Deploy the ERS Identity & Access discoverability and guidance release
+   (`v1.8.4`) to JEM first and then the reviewed ERS overlay. Complete Cillian's
+   Owner sign-in plus Jeronimo's Reader sign-in/read acceptance in
+   dual-provider mode; do not cut over from an untagged or locally modified
+   upstream tree.
 2. Align SharePoint writer permissions, activate an ERS-owned external
    health/alert path and close the item-14 governance gate.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
