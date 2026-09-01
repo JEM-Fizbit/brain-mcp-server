@@ -1,6 +1,6 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, and the human client/role acceptance gate is complete. Entra-only deployment remains separately approval-gated.
+**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, the human client/role acceptance gate is complete, and independent external health monitoring is live. Entra-only deployment remains separately approval-gated.
 **Last updated:** 2026-09-01
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
@@ -419,16 +419,23 @@ stricter local state, then use **Review & reconcile** once Graph is healthy.
 
 ## 9. External uptime monitoring
 
-Use an ERS-owned UptimeRobot monitor independent of Fly, Supabase and John's
-Mac:
+An ERS-owned UptimeRobot monitor independent of Fly, Supabase and John's Mac
+was activated on 2026-09-01:
 
 - monitor name: `ERS Brain production health`;
 - URL: `https://brain.ersgenomics.online/health`;
 - interval: five minutes on the free plan;
-- require HTTPS, HTTP 200 and a successful health-body check;
-- alert at least John and one second ERS owner;
+- type: Keyword, with an incident when `"ok":true` is absent from the response;
+- the initial live check reported Up and 100%;
+- the free account alerts John immediately by email with no repeat;
 - keep certificate-expiry and internal store diagnostics in Brain Cockpit—the
   external monitor proves public reachability and must not replace Cockpit.
+
+The free plan permits one personal email notification channel. A second email
+recipient requires a paid notify-only seat, so it is desirable before hardened
+production but is not a blocker for the bounded development/pilot phase. Do not
+purchase a seat without separate approval. Reference:
+[`UptimeRobot personal notification channels`](https://help.uptimerobot.com/en/articles/11360953-uptimerobot-personal-notification-channels-setup-guide).
 
 On an alert, first open the public health URL from a separate network. Then
 check Fly Machine status and the ERS Cockpit checks. Do not weaken health-body

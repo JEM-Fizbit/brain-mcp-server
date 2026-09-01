@@ -14,8 +14,10 @@ passed the Reader acceptance check and was promoted to Curator for the bounded
 write test. On 2026-09-01 Cillian confirmed that his Claude Brain connection,
 hosted admin portal, role page and displayed Owner role all work; John then
 reported Jeronimo's oral confirmation that the Curator test passed. This closes
-the human client/role acceptance gate. Entra-only cutover still requires the
-external health monitor, governance closeout and separate deployment approval.
+the human client/role acceptance gate. On the same date John activated a
+five-minute ERS-owned UptimeRobot Keyword monitor against the public health
+endpoint and its first live check passed. Entra-only cutover still requires
+governance closeout and separate deployment approval.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -540,6 +542,15 @@ scope. Exact `lastModifiedBy` passthrough remains a non-blocking refinement.
 John's ERS Brain Monitor profile has adopted the setting and restarted healthy
 with zero pushed/pulled files and zero conflicts. Hosted JEM and ERS deployments
 remain unchanged pending the normal guarded release sequence.
+
+**External-monitor acceptance record (2026-09-01):** John activated the
+ERS-owned UptimeRobot Keyword monitor `ERS Brain production health` against
+`https://brain.ersgenomics.online/health` at the free-plan five-minute interval.
+It opens an incident when `"ok":true` is absent, alerts John's ERS email with no
+delay, and reported Up/100% on its first live check. The free plan's single
+personal email channel is accepted for the bounded development/pilot phase; a
+paid second-recipient seat remains an optional hardening step and is not a
+Spec 018 cutover blocker.
 
 ### A. Provider-neutral authorization shell
 
