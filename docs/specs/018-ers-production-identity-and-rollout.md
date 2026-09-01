@@ -12,8 +12,10 @@ Owners. ERS is live on the `v1.8.5` dual-provider release; the verified
 `ers/v1.8.7` Entra-only overlay remains prepared but not deployed. Jeronimo
 passed the Reader acceptance check and was promoted to Curator for the bounded
 write test. On 2026-09-01 Cillian confirmed that his Claude Brain connection,
-hosted admin portal, role page and displayed Owner role all work. The remaining
-human gate is Jeronimo's Curator write test before Entra-only cutover.
+hosted admin portal, role page and displayed Owner role all work; John then
+reported Jeronimo's oral confirmation that the Curator test passed. This closes
+the human client/role acceptance gate. Entra-only cutover still requires the
+external health monitor, governance closeout and separate deployment approval.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -479,8 +481,9 @@ deployed JEM-first on 2026-08-28 as Fly releases 78 (JEM) and 18 (ERS). Live
 health and Machine checks passed, and the profile-bound ERS hosted doctor
 returned `pass` with no operator action. Jeronimo subsequently passed Reader
 sign-in and read acceptance. On 2026-09-01 Cillian confirmed his Claude
-connection, admin portal access, role-page access and displayed Owner role.
-Jeronimo's promoted Curator write check is the remaining human acceptance gate.
+connection, admin portal access, role-page access and displayed Owner role;
+John then reported Jeronimo's oral confirmation that the bounded Curator test
+passed. The human client/role acceptance gate is complete.
 
 **GitHub display-label correction record (2026-08-28):** Release `v1.8.5`
 shows each bounded GitHub fallback principal by human name and login, with the
@@ -517,10 +520,11 @@ Live health reported GitHub as the sole enabled provider and no access-admin
 route, while an authenticated hosted sync-status call returned 40 files and no
 open conflicts. The private `ers/v1.8.7` Entra-only overlay passed all 490 tests
 apart from five intentional skips, has zero protected upstream drift and is
-pushed for deployment. Live ERS remains on the `v1.8.5` dual-provider release
-until the human acceptance gate is satisfied or expressly waived by John.
-Cillian's Owner path and Jeronimo's Reader path have passed; Jeronimo's bounded
-Curator write remains open.
+pushed for deployment. Live ERS remains on the `v1.8.5` dual-provider release.
+Cillian's Owner path and Jeronimo's Reader path passed; on 2026-09-01 John
+reported Jeronimo's oral confirmation that the bounded Curator test also
+passed. The human acceptance gate is satisfied, but this does not itself
+authorize deployment.
 
 **Dual-write-plane and truthful file attribution correction (2026-09-01):**
 Release `v1.8.8` makes the product boundary explicit: ERS Reader, Curator,

@@ -255,8 +255,10 @@ and Rick are now the three exact Entra-backed Owners in the private ERS grant
 ledger. ERS is live on the `v1.8.5` dual-provider release. Jeronimo passed
 Reader acceptance and was promoted to Curator for the bounded write test. On
 2026-09-01 Cillian confirmed his Claude connection, admin portal, role page and
-displayed Owner role. The verified `ers/v1.8.7` Entra-only overlay remains
-prepared pending Jeronimo's Curator acceptance.
+displayed Owner role; John then reported Jeronimo's oral confirmation that the
+Curator test passed. The human client/role acceptance gate is complete. The
+verified `ers/v1.8.7` Entra-only overlay remains prepared but is no longer the
+final intake target after the shared `v1.8.8` correction.
 
 Planned work:
 
@@ -335,9 +337,9 @@ Recommended order:
    release 19; the verified private `ers/v1.8.7` Entra-only overlay is not the
    final intake target after this correction.
    Cillian's Owner sign-in and Jeronimo's Reader sign-in/read acceptance have
-   passed. Complete Jeronimo's bounded Curator write test; do not deploy the
-   prepared Entra-only overlay before it passes or John expressly waives that
-   gate.
+   passed. On 2026-09-01 John reported Jeronimo's oral confirmation that the
+   bounded Curator test also passed. This closes the human client/role gate but
+   does not itself authorize deployment.
 2. Ship the explicit dual-write-plane contract and truthful SharePoint-origin
    attribution, activate an ERS-owned external health/alert path and close the
    item-14 governance gate.
