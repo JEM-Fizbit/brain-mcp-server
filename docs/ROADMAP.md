@@ -341,8 +341,9 @@ Recommended order:
    bounded Curator test also passed. This closes the human client/role gate but
    does not itself authorize deployment.
 2. Ship the explicit dual-write-plane contract and truthful SharePoint-origin
-   attribution, activate an ERS-owned external health/alert path and close the
-   item-14 governance gate.
+   attribution and close the item-14 governance gate. The ERS-owned external
+   health/alert path went live on 2026-09-01 as a five-minute UptimeRobot
+   Keyword monitor and its first check passed.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
    additional curator role.
 4. Keep the restore rehearsal, automated ingestion, protocol migration and
