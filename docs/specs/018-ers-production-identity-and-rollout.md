@@ -8,16 +8,18 @@ The private ERS overlay has passed intake. TDM completed the single-tenant app,
 fixed-role groups, consent and certificate upload; the ERS access-ledger
 migration and live Supabase security gate passed on 2026-08-28; and John,
 Cillian and Rick were bootstrapped as the three exact Entra-backed ERS Brain
-Owners. ERS is live on the `v1.8.5` dual-provider release; the verified
-`ers/v1.8.7` Entra-only overlay remains prepared but not deployed. Jeronimo
-passed the Reader acceptance check and was promoted to Curator for the bounded
-write test. On 2026-09-01 Cillian confirmed that his Claude Brain connection,
-hosted admin portal, role page and displayed Owner role all work; John then
-reported Jeronimo's oral confirmation that the Curator test passed. This closes
-the human client/role acceptance gate. On the same date John activated a
-five-minute ERS-owned UptimeRobot Keyword monitor against the public health
-endpoint and its first live check passed. Entra-only cutover still requires
-governance closeout and separate deployment approval.
+Owners. Shared release `v1.8.8` was deployed JEM-first as Fly release 82 and
+then through the reviewed private ERS overlay as Fly release 20. ERS is now
+Entra-only; JEM remains GitHub-only. Jeronimo passed the Reader acceptance
+check and was promoted to Curator for the bounded write test. On 2026-09-01
+Cillian confirmed that his Claude Brain connection, hosted admin portal, role
+page and displayed Owner role all work; John then reported Jeronimo's oral
+confirmation that the Curator test passed. This closed the human client/role
+acceptance gate. On the same date John activated a five-minute ERS-owned
+UptimeRobot Keyword monitor against the public health endpoint and its first
+live check passed. The Entra-only technical cutover is complete; the final
+item-14 governance closeout remains the gate before broader workforce
+enrolment.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -522,7 +524,8 @@ Live health reported GitHub as the sole enabled provider and no access-admin
 route, while an authenticated hosted sync-status call returned 40 files and no
 open conflicts. The private `ers/v1.8.7` Entra-only overlay passed all 490 tests
 apart from five intentional skips, has zero protected upstream drift and is
-pushed for deployment. Live ERS remains on the `v1.8.5` dual-provider release.
+pushed for deployment. At that checkpoint ERS still ran the `v1.8.5`
+dual-provider release.
 Cillian's Owner path and Jeronimo's Reader path passed; on 2026-09-01 John
 reported Jeronimo's oral confirmation that the bounded Curator test also
 passed. The human acceptance gate is satisfied, but this does not itself
@@ -539,9 +542,16 @@ editor and points audit users to SharePoint version history instead of falsely
 naming the Mac sync operator; ordinary local profiles preserve their local
 operator actor. This adds no schema migration, SharePoint ACL change or Graph
 scope. Exact `lastModifiedBy` passthrough remains a non-blocking refinement.
-John's ERS Brain Monitor profile has adopted the setting and restarted healthy
-with zero pushed/pulled files and zero conflicts. Hosted JEM and ERS deployments
-remain unchanged pending the normal guarded release sequence.
+John's ERS Brain Monitor profile adopted the setting and restarted healthy
+with zero pushed/pulled files and zero conflicts. The annotated release was
+then deployed first to JEM as Fly release 82. Its live GitHub-only health,
+absent admin route, profile-bound doctor, authenticated read and
+hosted-write-to-local canary all passed. The reviewed four-file ERS overlay
+passed the full 492-test release gate and was deployed as Fly release 20. Live
+ERS health reports 1.8.8, Entra as the sole provider and the access-admin route
+enabled. A fresh Entra login, authenticated read, hosted-write-to-local canary,
+reciprocal JEM/ERS isolation probes and the explicit GitHub-start denial all
+passed with zero open conflicts.
 
 **External-monitor acceptance record (2026-09-01):** John activated the
 ERS-owned UptimeRobot Keyword monitor `ERS Brain production health` against
@@ -724,12 +734,15 @@ Spec 018 cutover blocker.
 6. **Three-owner pilot.** Stop on any identity ambiguity, mutable-claim grant,
    permission bypass, foreign-Brain visibility, client incompatibility or
    unactionable auth failure.
-7. **Close governance/access gates.** Document the independent SharePoint
-   manual-curation policy, activate production alerting, capture second-owner
-   evidence and complete ELT item 14.
-8. **Deploy Entra-only and stage readers.** John or Cillian adds the bounded
-   cohort through the hosted UI; verify the provider kill-switch against stale
-   GitHub credentials and observe auth/support load before adding curators.
+7. **Deploy Entra-only and verify the technical baseline.** The guarded
+   v1.8.8 cutover is complete: Entra positive paths, GitHub-start denial,
+   reciprocal Brain isolation, hosted write/local propagation, health and
+   external monitoring passed. Do not add the broader cohort yet.
+8. **Close governance/access gates last, then stage readers.** Complete ELT
+   item 14 against the already documented SharePoint policy, second-owner
+   evidence and production alerting. Only then may John or Cillian add the
+   bounded cohort through the hosted UI and observe auth/support load before
+   adding curators.
 9. **Disable GitHub ERS credentials after the rollback window.** Preserve JEM's
    separate GitHub provider and credentials.
 

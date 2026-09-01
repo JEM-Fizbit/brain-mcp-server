@@ -252,13 +252,15 @@ telemetry. The private ERS overlay passed intake; TDM completed the Entra app,
 fixed-role groups, consent and certificate upload; and the ERS access-ledger
 migration plus live Supabase security gate passed on 2026-08-28. John, Cillian
 and Rick are now the three exact Entra-backed Owners in the private ERS grant
-ledger. ERS is live on the `v1.8.5` dual-provider release. Jeronimo passed
+ledger. ERS was validated on the `v1.8.5` dual-provider release. Jeronimo passed
 Reader acceptance and was promoted to Curator for the bounded write test. On
 2026-09-01 Cillian confirmed his Claude connection, admin portal, role page and
 displayed Owner role; John then reported Jeronimo's oral confirmation that the
 Curator test passed. The human client/role acceptance gate is complete. The
-verified `ers/v1.8.7` Entra-only overlay remains prepared but is no longer the
-final intake target after the shared `v1.8.8` correction.
+shared `v1.8.8` release was deployed JEM-first and then through the reviewed
+private ERS overlay. ERS is now Entra-only on Fly release 20; JEM remains
+GitHub-only on Fly release 82. The technical cutover passed live auth,
+write/sync, isolation, health and GitHub-start denial checks.
 
 Planned work:
 
@@ -330,23 +332,19 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Release `v1.8.7` is live on JEM Fly release 81 as the GitHub-only canary.
-   Shared `v1.8.8` adds the approved dual-write-plane contract and truthful
-   SharePoint-origin attribution and is prepared for the guarded JEM-first/
-   private-overlay sequence. Live ERS remains on the `v1.8.5` dual-provider Fly
-   release 19; the verified private `ers/v1.8.7` Entra-only overlay is not the
-   final intake target after this correction.
-   Cillian's Owner sign-in and Jeronimo's Reader sign-in/read acceptance have
-   passed. On 2026-09-01 John reported Jeronimo's oral confirmation that the
-   bounded Curator test also passed. This closes the human client/role gate but
-   does not itself authorize deployment.
-2. Ship the explicit dual-write-plane contract and truthful SharePoint-origin
-   attribution and close the item-14 governance gate. The ERS-owned external
-   health/alert path went live on 2026-09-01 as a five-minute UptimeRobot
-   Keyword monitor and its first check passed.
-3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
-   additional curator role.
-4. Keep the restore rehearsal, automated ingestion, protocol migration and
+1. The technical baseline is complete. Shared `v1.8.8` is live on JEM Fly
+   release 82 and ERS Fly release 20. ERS is Entra-only, JEM is GitHub-only,
+   and the dual-write-plane contract plus truthful SharePoint-origin
+   attribution are deployed. The guarded suites, live auth/read/write/sync,
+   reciprocal isolation, GitHub-start denial, Fly health and profile-bound
+   doctors passed with zero conflicts.
+2. Close the item-14 governance gate last, using the already recorded
+   second-owner, Curator, SharePoint policy and ERS-owned UptimeRobot evidence.
+3. After that decision, stage a bounded reader cohort through Access & Roles,
+   observe auth/support load and only then grant any additional curator role.
+4. Retire the inert ERS GitHub credentials and grants after the approved
+   rollback window; do not alter JEM's separate GitHub authentication.
+5. Keep the restore rehearsal, automated ingestion, protocol migration and
    deeper attribution work as separately sequenced follow-ons. Do not remove an
    existing redundancy layer merely because the restore rehearsal is
    non-blocking for Spec 018.
