@@ -1,6 +1,6 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, and Entra-only deployment remains pending Jeronimo's Curator write acceptance.
+**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, and the human client/role acceptance gate is complete. Entra-only deployment remains separately approval-gated.
 **Last updated:** 2026-09-01
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
@@ -52,8 +52,9 @@ passing apart from five intentional skips, zero protected upstream drift and
 exactly the four permitted private overlay files. It is pushed but not deployed:
 Cillian's Owner path and Jeronimo's Reader path have passed. On 2026-09-01
 Cillian confirmed that Claude connection, the admin portal, the role page and
-his displayed Owner role all work. Jeronimo has been promoted to Curator; his
-bounded non-structural write is the final human cutover gate.
+his displayed Owner role all work. John then reported Jeronimo's oral
+confirmation that his bounded Curator test passed. This closes the human
+client/role acceptance gate; it does not itself authorize deployment.
 
 ## 1. One-time TDM setup
 
