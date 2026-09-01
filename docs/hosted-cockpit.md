@@ -298,8 +298,9 @@ not appear in a shell command. Each profile supports `id` or
 environment allow-list is `BRAIN_REVISION_STORE`,
 `BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, `BRAIN_FLY_APP`,
 `BRAIN_EXPECTED_SUPABASE_PROJECT_REF`,
-`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_DOCTOR_OPERATION_REFRESH_MS`,
-`BRAIN_DOCTOR_DB_TIMEOUT_MS`, and `BRAIN_LINT_MODE_OVERRIDES`; `FLY_CONFIG_DIR`
+`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_SYNC_LOCAL_EDIT_SURFACE`,
+`BRAIN_DOCTOR_OPERATION_REFRESH_MS`, `BRAIN_DOCTOR_DB_TIMEOUT_MS`, and
+`BRAIN_LINT_MODE_OVERRIDES`; `FLY_CONFIG_DIR`
 may also be supplied when different profiles use isolated Fly CLI identities.
 These values are passed only to that profile's sync, cockpit, and doctor
 processes. This lets two profiles target different hosted stacks, lint
@@ -311,6 +312,13 @@ expected Supabase project ref. Installation fails if the URL does not match the
 declared ref, and managed sync children ignore ambient repo `.env.local` files.
 The sync CLI repeats the project-ref check before opening a connection. This is
 a fail-closed cross-deployment guard, not a naming convention.
+
+Set `BRAIN_SYNC_LOCAL_EDIT_SURFACE=sharepoint` for a profile whose Markdown tree
+is a SharePoint/OneDrive mirror. The sync agent then records the file-plane
+revision as an unresolved SharePoint manual edit instead of falsely naming the
+Mac sync operator. SharePoint version history remains the exact human-editor
+record until Graph editor passthrough is implemented. Omit the setting for an
+ordinary local filesystem profile; it defaults to `local_filesystem`.
 
 Manual `hosted:doctor` and `smoke:hosted:oauth` commands use the same boundary.
 Select a profile from this owner-only generated config rather than relying on
@@ -360,6 +368,7 @@ BRAIN_MENUBAR_PROFILES_JSON='[
       "BRAIN_REVISION_STORE": "postgres",
       "BRAIN_REVISION_DATABASE_URL": "<ERS_RUNTIME_DATABASE_URL>",
       "BRAIN_EXPECTED_SUPABASE_PROJECT_REF": "omnwbcdtmtvxasgdmvwr",
+      "BRAIN_SYNC_LOCAL_EDIT_SURFACE": "sharepoint",
       "BRAIN_LINT_MODE_OVERRIDES": "{\"ers-brain\":\"graph\"}"
     }
   }

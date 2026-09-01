@@ -8,8 +8,12 @@ The private ERS overlay has passed intake. TDM completed the single-tenant app,
 fixed-role groups, consent and certificate upload; the ERS access-ledger
 migration and live Supabase security gate passed on 2026-08-28; and John,
 Cillian and Rick were bootstrapped as the three exact Entra-backed ERS Brain
-Owners. Fly secret changes, dual-provider deployment/canary and user enrollment
-remain separately approval-gated and are not activated.
+Owners. ERS is live on the `v1.8.5` dual-provider release; the verified
+`ers/v1.8.7` Entra-only overlay remains prepared but not deployed. Jeronimo
+passed the Reader acceptance check and was promoted to Curator for the bounded
+write test. On 2026-09-01 Cillian confirmed that his Claude Brain connection,
+hosted admin portal, role page and displayed Owner role all work. The remaining
+human gate is Jeronimo's Curator write test before Entra-only cutover.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather
@@ -44,17 +48,17 @@ its authentication and access model are still the two-person GitHub pilot:
   identity rejection, but only through GitHub;
 - the current generic write guard distinguishes `reader` from every other
   role, while `member`, `admin` and `owner` share too much mutation authority;
-- SharePoint/OneDrive is a parallel human write plane whose permissions can
-  bypass the MCP role model; and
+- SharePoint/OneDrive is a parallel, deliberately broader human write plane
+  whose authority and audit source are separate from the MCP role model; and
 - the standing ERS governance gate remains open for rollout beyond John and
   Cillian.
 
 GitHub is appropriate for the engineering pilot but not for ordinary ERS
 workforce identity. Wider rollout needs single-tenant Microsoft Entra ID
 authentication, exact durable principal matching, a comprehensible role model,
-one access policy across hosted MCP and SharePoint, and a narrow hosted
-administration surface that ERS owners can operate without recurring IT/TDM
-intervention.
+an explicit contract separating hosted MCP permissions from SharePoint manual
+editing, and a narrow hosted administration surface that ERS owners can
+operate without recurring IT/TDM intervention.
 
 ## Decisions locked by promotion
 
@@ -77,10 +81,15 @@ intervention.
    choice. There is no wildcard or email-domain grant and no automatically
    content-enabled self-enrolment. An unassigned tenant user receives no Brain
    access.
-6. **SharePoint Brain-folder writes are restricted to the same named curator
-   population that may write through MCP.** Reader access can remain broader.
-   The hosted role model must not claim enforcement while a broader file-plane
-   write path bypasses it.
+6. **MCP roles and SharePoint manual-edit permissions are separate authority
+   planes.** Reader, Curator, Admin and Owner govern ERS Brain MCP and connected
+   AI clients only. Systems & IT SharePoint permissions independently govern
+   direct Markdown editing through SharePoint, OneDrive or Obsidian and may be
+   broader by ERS policy. The Access & Roles page must say this plainly. Direct
+   file-plane revisions must never be falsely attributed to the sync operator;
+   until Graph editor passthrough ships, they are recorded as unresolved
+   SharePoint manual edits and the human editor is traced through SharePoint
+   version history.
 7. **The identity migration is dual-provider only during the bounded canary.**
    John and Cillian each complete an Entra login and the complete negative test
    matrix before the ERS runtime becomes Entra-only.
@@ -158,9 +167,12 @@ intervention.
 - No principal can list, read or mutate a Brain absent from its explicit role
   map. The ERS endpoint still denies `ai-brain-jem`; the JEM endpoint still
   denies `ers-brain`.
-- SharePoint/OneDrive Brain-folder permissions are reconciled before the first
-  non-pilot writer: broad colleagues are readers, and only named curators may
-  edit the Markdown tree.
+- SharePoint/OneDrive Brain-folder permissions and MCP roles are reviewed as
+  two explicit policies before wider rollout. The Systems & IT site may retain
+  broad manual curation rights; this does not grant MCP mutation authority.
+  Sync-origin revisions identify the SharePoint file plane honestly, and
+  SharePoint version history remains the source for the exact human editor
+  until editor passthrough is implemented.
 
 ### Cockpit access administration
 
@@ -196,6 +208,9 @@ intervention.
   **Review & reconcile** and explain that opening the modal is read-only,
   confirmation reapplies a deliberately reviewed state, and the system never
   chooses a role automatically. GitHub fallback rows offer no Entra action.
+- The page and confirmation modal state that role changes govern MCP and
+  connected AI clients only and do not add or remove SharePoint, OneDrive or
+  Obsidian manual-edit permissions.
 - Role changes operate only on an allowlisted set of dedicated, cloud-only,
   non-role-assignable Entra security-group IDs. The UI is not a generic Graph
   client and accepts no caller-supplied group ID.
@@ -263,9 +278,10 @@ intervention.
 - Automated SharePoint source ingestion, Spec 014, vector search, a hosted
   Brain Library, or a general-purpose administration/content UI. Spec 018's
   narrow access-administration surface is in scope.
-- Perfect attribution for edits made directly through SharePoint. Restricting
-  file-plane writers closes the privilege bypass; editor passthrough remains a
-  separately tracked audit-quality refinement.
+- Automatic passthrough of the exact SharePoint editor into Brain revision
+  metadata. Until that refinement ships, the revision actor identifies the
+  SharePoint file plane and an unresolved editor without naming the sync
+  operator; SharePoint version history supplies the exact human trace.
 
 ## Target authentication flow
 
@@ -461,8 +477,10 @@ an Entra action they cannot complete. This changes no role authority, provider
 mode, Graph scope or Entra-only activation gate. The annotated release was
 deployed JEM-first on 2026-08-28 as Fly releases 78 (JEM) and 18 (ERS). Live
 health and Machine checks passed, and the profile-bound ERS hosted doctor
-returned `pass` with no operator action. Cillian's Owner sign-in and Jeronimo's
-Reader sign-in/read remain the human acceptance gate.
+returned `pass` with no operator action. Jeronimo subsequently passed Reader
+sign-in and read acceptance. On 2026-09-01 Cillian confirmed his Claude
+connection, admin portal access, role-page access and displayed Owner role.
+Jeronimo's promoted Curator write check is the remaining human acceptance gate.
 
 **GitHub display-label correction record (2026-08-28):** Release `v1.8.5`
 shows each bounded GitHub fallback principal by human name and login, with the
@@ -500,8 +518,24 @@ route, while an authenticated hosted sync-status call returned 40 files and no
 open conflicts. The private `ers/v1.8.7` Entra-only overlay passed all 490 tests
 apart from five intentional skips, has zero protected upstream drift and is
 pushed for deployment. Live ERS remains on the `v1.8.5` dual-provider release
-until the Cillian Owner and Jeronimo Reader human acceptance gate is satisfied
-or expressly waived by John.
+until the human acceptance gate is satisfied or expressly waived by John.
+Cillian's Owner path and Jeronimo's Reader path have passed; Jeronimo's bounded
+Curator write remains open.
+
+**Dual-write-plane and truthful file attribution correction (2026-09-01):**
+Release `v1.8.8` makes the product boundary explicit: ERS Reader, Curator,
+Admin and Owner govern MCP and connected AI clients, while Systems & IT
+SharePoint permissions separately govern manual editing through SharePoint,
+OneDrive and Obsidian. The Access & Roles page and confirmation modal state
+that distinction. The sync CLI adds a fail-closed per-profile local edit-surface
+setting. The ERS SharePoint profile records an unresolved SharePoint manual
+editor and points audit users to SharePoint version history instead of falsely
+naming the Mac sync operator; ordinary local profiles preserve their local
+operator actor. This adds no schema migration, SharePoint ACL change or Graph
+scope. Exact `lastModifiedBy` passthrough remains a non-blocking refinement.
+John's ERS Brain Monitor profile has adopted the setting and restarted healthy
+with zero pushed/pulled files and zero conflicts. Hosted JEM and ERS deployments
+remain unchanged pending the normal guarded release sequence.
 
 ### A. Provider-neutral authorization shell
 
@@ -580,8 +614,10 @@ or expressly waived by John.
 
 ### G. Production access and governance closeout
 
-- Restrict SharePoint Brain Markdown writes to the curator group; preserve
-  appropriate read access to Brain/source links.
+- Document and surface the independent MCP and SharePoint write planes; retain
+  the approved broad Systems & IT manual-curation path without granting MCP
+  mutation authority, and record SharePoint-origin revisions without falsely
+  naming the sync operator.
 - Reverify second-admin custody, external health/alerting and the onboarding/
   offboarding runbook.
 - Complete the item-14 evidence package and record the ELT decision.
@@ -673,8 +709,9 @@ or expressly waived by John.
 6. **Three-owner pilot.** Stop on any identity ambiguity, mutable-claim grant,
    permission bypass, foreign-Brain visibility, client incompatibility or
    unactionable auth failure.
-7. **Close governance/access gates.** SharePoint permissions, production
-   alerting, second-admin evidence and ELT item 14.
+7. **Close governance/access gates.** Document the independent SharePoint
+   manual-curation policy, activate production alerting, capture second-owner
+   evidence and complete ELT item 14.
 8. **Deploy Entra-only and stage readers.** John or Cillian adds the bounded
    cohort through the hosted UI; verify the provider kill-switch against stale
    GitHub credentials and observe auth/support load before adding curators.
@@ -701,14 +738,15 @@ or expressly waived by John.
 
 **Critical path:** Entra implementation and validation; the narrow hosted
 access-administration surface and least-privileged delegated Graph path; exact
-principal/grant enforcement; role enforcement; SharePoint write-plane
-alignment; three-owner Entra canary; cross-identity/cross-Brain negative tests;
+principal/grant enforcement; role enforcement; explicit MCP/SharePoint
+write-plane separation and truthful file-plane attribution; three-owner Entra
+canary; cross-identity/cross-Brain negative tests;
 target-client compatibility; external health/alerts; owner recovery evidence;
 and the standing ELT rollout decision.
 
 **Non-blocking residuals:** timed restore rehearsal, PITR, automated ingestion,
 dedicated Slack-app migration if another ERS-owned alert route is live,
-SharePoint editor passthrough, full MCP `2026-07-28` migration, original-byte
+automatic SharePoint editor passthrough, full MCP `2026-07-28` migration, original-byte
 downloads, Spec 014, vector search and a hosted reader UI.
 
 ## Assumptions requiring confirmation before implementation approval
@@ -718,7 +756,7 @@ downloads, Spec 014, vector search and a hosted reader UI.
 - The ERS tenant licensing supports assigning security groups to enterprise-
   application roles. If not, implementation returns to design review rather
   than silently widening access or substituting raw email/domain matching.
-- ERS can restrict write access on the Brain Markdown folder independently of
-  broader read/source navigation.
+- ERS accepts broad Systems & IT manual curation through SharePoint, OneDrive
+  and Obsidian as a separate policy from MCP roles.
 - A certificate/private-key credential can be held and rotated through the ERS
   Fly/Dashlane custody path; no Azure-hosted managed identity is available.

@@ -57,6 +57,9 @@ export function accessAdminPage(): string {
     .role-guide { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
     .role-guide-item { border: 1px solid var(--line); border-radius: 8px; padding: 11px; background: var(--paper); }
     .role-guide-item p { margin: 0; color: var(--muted); font-size: 13px; }
+    .scope-note { margin: 12px 0 14px; border-left: 3px solid var(--blue); padding: 10px 12px; background: var(--paper); }
+    .scope-note strong { display: block; margin-bottom: 3px; }
+    .scope-note p { margin: 0; color: var(--muted); }
     .help-panel { margin: 12px 0 14px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--paper); }
     .help-panel summary { cursor: pointer; font-weight: 650; }
     .help-panel p { margin: 8px 0 0; color: var(--muted); }
@@ -122,12 +125,16 @@ export function accessAdminPage(): string {
   <section id="controls" class="hidden">
     <div class="card">
       <h2>Add or change access</h2>
-      <p class="muted">Search the ERS directory, then confirm exactly one managed role. Reader is the safe default.</p>
+      <p class="muted">Search the ERS directory, then confirm exactly one managed MCP role. Reader is the safe default.</p>
+      <div class="scope-note" role="note">
+        <strong>MCP access and manual editing are separate</strong>
+        <p>This page controls what a person can do through ERS Brain MCP and connected AI clients. Manual editing in SharePoint, OneDrive or Obsidian follows the Systems &amp; IT SharePoint permissions and is not granted or removed here.</p>
+      </div>
       <div class="role-guide" aria-label="ERS Brain role guide">
-        <div class="role-guide-item"><h3>Reader</h3><p>Searches and reads Brain content and status. Cannot change content.</p></div>
-        <div class="role-guide-item"><h3>Curator</h3><p>Reader access plus ordinary, non-structural content updates.</p></div>
-        <div class="role-guide-item"><h3>Admin</h3><p>Curator access plus structural, recovery, and conflict operations. Cannot manage access.</p></div>
-        <div class="role-guide-item"><h3>Owner</h3><p>Admin-level content authority plus access administration and governance responsibility.</p></div>
+        <div class="role-guide-item"><h3>Reader</h3><p>Through MCP: searches and reads Brain content and status. Cannot ask an AI client to change content.</p></div>
+        <div class="role-guide-item"><h3>Curator</h3><p>Through MCP: Reader access plus ordinary, non-structural content updates.</p></div>
+        <div class="role-guide-item"><h3>Admin</h3><p>Through MCP: Curator access plus structural, recovery, and conflict operations. Cannot manage access.</p></div>
+        <div class="role-guide-item"><h3>Owner</h3><p>Through MCP: Admin-level content authority plus access administration and governance responsibility.</p></div>
       </div>
       <div><input id="search" type="search" placeholder="Name or ERS email" autocomplete="off"><button id="searchBtn">Search directory</button></div>
       <ul id="results" class="results"></ul>
@@ -158,7 +165,7 @@ export function accessAdminPage(): string {
       <label>Status<select id="grantStatus"><option value="active">Active</option><option value="suspended">Suspended</option><option value="revoked">Revoked</option></select></label>
       <label class="wide">Reason<textarea id="reason" rows="2" maxlength="500">Owner-confirmed access change</textarea></label>
     </div>
-    <p class="muted">Confirmation changes both the audited local Brain grant and fixed Entra managed-group membership. Revocation and downgrade take effect locally first.</p>
+    <p class="muted">Confirmation changes both the audited MCP grant and fixed Entra managed-group membership. Revocation and downgrade take effect in MCP locally first. It does not change separate SharePoint, OneDrive or Obsidian editing permissions.</p>
     <div class="dialog-actions"><button id="cancel">Cancel</button><button id="confirm" class="primary">Confirm change</button></div>
   </div>
 </dialog>
@@ -166,10 +173,10 @@ export function accessAdminPage(): string {
 let csrf = "", selected = null;
 const $ = id => document.getElementById(id);
 const roleDescriptions = {
-  reader: "Can search and read Brain content and status. Cannot change content.",
-  member: "Can read and make ordinary, non-structural content updates. Cannot perform structural, recovery, conflict, or access administration.",
-  admin: "Can perform content, structural, recovery, and conflict operations. Cannot grant or revoke user access.",
-  owner: "Has Admin-level content authority and can manage user access. Reserve this role for the small accountable Owner group."
+  reader: "Through MCP: can search and read Brain content and status. Cannot ask an AI client to change content. Separate SharePoint manual-edit permissions are unaffected.",
+  member: "Through MCP: can read and make ordinary, non-structural content updates. Cannot perform structural, recovery, conflict, or access administration. Separate SharePoint manual-edit permissions are unaffected.",
+  admin: "Through MCP: can perform content, structural, recovery, and conflict operations. Cannot grant or revoke user access. Separate SharePoint manual-edit permissions are unaffected.",
+  owner: "Through MCP: has Admin-level content authority and can manage user access. Reserve this role for the small accountable Owner group. Separate SharePoint manual-edit permissions are unaffected."
 };
 function showError(message) { $("error").textContent = message; $("error").classList.remove("hidden"); }
 function clearError() { $("error").classList.add("hidden"); $("error").textContent = ""; }

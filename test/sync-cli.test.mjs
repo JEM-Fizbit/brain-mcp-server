@@ -88,6 +88,7 @@ function envWithoutSyncConfig() {
     "BRAIN_REVISION_STORE",
     "BRAIN_REVISION_DATABASE_URL",
     "BRAIN_EXPECTED_SUPABASE_PROJECT_REF",
+    "BRAIN_SYNC_LOCAL_EDIT_SURFACE",
     "BRAIN_SYNC_LOAD_LOCAL_ENV",
   ]) {
     delete env[key];
@@ -115,6 +116,49 @@ test("sync CLI push writes local Markdown to file-backed revision store", async 
   const store = new FileRevisionStore(config.storeFile);
   const hosted = await store.readFile("ai-brain-jem", "NOW.md");
   assert.equal(hosted.content, "CLI local push\n");
+  assert.equal(hosted.actor.provider, "local_sync_cli");
+});
+
+test("sync CLI records SharePoint manual edits without falsely naming the sync operator", async () => {
+  const config = dirs("sharepoint-actor");
+  await writeBrainFile(config.brainDir, "NOW.md", "Manual SharePoint edit\n");
+
+  const output = await runCliWithEnv("push", config, {
+    BRAIN_SYNC_LOCAL_EDIT_SURFACE: "sharepoint",
+    USER: "sync-operator-who-is-not-the-editor",
+  });
+
+  assert.equal(output.config.localEditSurface, "sharepoint");
+  const store = new FileRevisionStore(config.storeFile);
+  const hosted = await store.readFile("ai-brain-jem", "NOW.md");
+  assert.deepEqual(hosted.actor, {
+    provider: "sharepoint_file_plane",
+    id: "editor-unresolved",
+    name: "SharePoint/OneDrive manual edit (editor in version history)",
+  });
+  assert.doesNotMatch(JSON.stringify(hosted.actor), /sync-operator/);
+});
+
+test("sync CLI rejects an unknown local edit surface", async () => {
+  const config = dirs("invalid-edit-surface");
+
+  await assert.rejects(
+    exec(process.execPath, [cliPath, "status"], {
+      env: {
+        ...process.env,
+        BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+        BRAIN_ID: "ai-brain-jem",
+        BRAIN_DIR: config.brainDir,
+        BRAIN_SYNC_STATE_FILE: config.stateFile,
+        BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_HEALTH_FILE: config.healthFile,
+        BRAIN_SYNC_STORE_FILE: config.storeFile,
+        BRAIN_REVISION_STORE: "file",
+        BRAIN_SYNC_LOCAL_EDIT_SURFACE: "somewhere-else",
+      },
+    }),
+    /BRAIN_SYNC_LOCAL_EDIT_SURFACE must be local_filesystem or sharepoint/
+  );
 });
 
 test("sync CLI pull writes hosted revision into clean local Markdown tree", async () => {

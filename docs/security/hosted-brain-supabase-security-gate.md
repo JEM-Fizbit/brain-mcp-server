@@ -141,8 +141,10 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
   ledger with metadata-only audit evidence.
 - [ ] Verify the fixed app-role groups through the deployed ERS adapter before
   wider enrollment.
-- [ ] Align SharePoint Brain-folder writes with the named MCP curator population
-  and record the team-wide audit/read-logging posture.
+- [ ] Verify and document the independent SharePoint manual-curation policy.
+  Broad Systems & IT file-plane editing must not grant MCP mutation authority;
+  SharePoint-origin revisions must not be falsely attributed to the sync
+  operator. Record the team-wide audit/read-logging posture.
 - [x] Keep original bytes unexposed (`metadata_only`) for this rollout; a
   narrower download model is required only before hosted byte access is added.
 - [ ] Confirm current backup, retention and artifact-deletion requirements.

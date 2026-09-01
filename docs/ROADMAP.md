@@ -252,8 +252,11 @@ telemetry. The private ERS overlay passed intake; TDM completed the Entra app,
 fixed-role groups, consent and certificate upload; and the ERS access-ledger
 migration plus live Supabase security gate passed on 2026-08-28. John, Cillian
 and Rick are now the three exact Entra-backed Owners in the private ERS grant
-ledger. Fly secret loading, the dual-provider canary and wider access are not
-yet activated.
+ledger. ERS is live on the `v1.8.5` dual-provider release. Jeronimo passed
+Reader acceptance and was promoted to Curator for the bounded write test. On
+2026-09-01 Cillian confirmed his Claude connection, admin portal, role page and
+displayed Owner role. The verified `ers/v1.8.7` Entra-only overlay remains
+prepared pending Jeronimo's Curator acceptance.
 
 Planned work:
 
@@ -268,7 +271,9 @@ Planned work:
   change; keep JEM GitHub-authenticated and without multi-user role controls;
 - enforce an exhaustive reader/member/admin/owner tool matrix and revalidate
   roles on tool calls and refreshes;
-- align SharePoint Brain-folder write permissions with the named curator set;
+- document and surface separate MCP-role and SharePoint manual-curation
+  policies; preserve broad Systems & IT manual editing while ensuring it does
+  not grant MCP mutation authority;
 - formalize onboarding, role change, offboarding and second-admin recovery;
 - complete real-client, wrong-tenant, unregistered-user and cross-Brain denial
   tests, plus external health/alerting and the standing ELT rollout gate;
@@ -280,7 +285,8 @@ Exit criteria:
 - multiple ERS users can access only the Brains and operations they are authorized for;
 - every hosted write and resolution action is attributable to an exact Entra
   principal;
-- broad SharePoint access cannot bypass hosted writer restrictions;
+- broad SharePoint manual editing is clearly separate from hosted MCP writer
+  restrictions and is honestly attributed to the file plane;
 - the intended Claude, ChatGPT and Codex surfaces pass under Entra;
 - GitHub is disabled for ERS production enrollment;
 - original artifact bytes remain unexposed unless a later policy and audit
@@ -322,14 +328,19 @@ hardware exists; requires a self-host substrate story for Postgres + object stor
 
 Recommended order:
 
-1. Release `v1.8.7` is live on JEM Fly release 81 as the GitHub-only canary. The
-   verified private `ers/v1.8.7` overlay is pushed with Entra as the sole enabled
-   provider, while live ERS remains on the `v1.8.5` dual-provider Fly release 19.
-   Complete Cillian's Owner sign-in plus Jeronimo's Reader sign-in/read
-   acceptance in dual-provider mode; do not deploy the prepared Entra-only
-   overlay before both pass or John expressly waives that gate.
-2. Align SharePoint writer permissions, activate an ERS-owned external
-   health/alert path and close the item-14 governance gate.
+1. Release `v1.8.7` is live on JEM Fly release 81 as the GitHub-only canary.
+   Shared `v1.8.8` adds the approved dual-write-plane contract and truthful
+   SharePoint-origin attribution and is prepared for the guarded JEM-first/
+   private-overlay sequence. Live ERS remains on the `v1.8.5` dual-provider Fly
+   release 19; the verified private `ers/v1.8.7` Entra-only overlay is not the
+   final intake target after this correction.
+   Cillian's Owner sign-in and Jeronimo's Reader sign-in/read acceptance have
+   passed. Complete Jeronimo's bounded Curator write test; do not deploy the
+   prepared Entra-only overlay before it passes or John expressly waives that
+   gate.
+2. Ship the explicit dual-write-plane contract and truthful SharePoint-origin
+   attribution, activate an ERS-owned external health/alert path and close the
+   item-14 governance gate.
 3. Move ERS to Entra-only and stage a bounded reader cohort before granting any
    additional curator role.
 4. Keep the restore rehearsal, automated ingestion, protocol migration and
