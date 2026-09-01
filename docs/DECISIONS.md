@@ -8,6 +8,32 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-01 — Complete the Entra-only technical cutover before final governance closeout
+
+**Decision:** Deploy the already accepted `v1.8.8` technical baseline to JEM
+first and then to ERS in Entra-only mode before completing the final item-14
+governance review. Treat that review as the last gate before broader workforce
+enrolment, not as a prerequisite for validating the reversible technical
+cutover. Do not add the broader cohort until the governance decision is
+recorded.
+
+**Why:** John explicitly prioritized completing and testing the technical
+mechanism first. The cutover was reversible through a guarded dual-provider
+rollback, the existing John/Cillian/Jeronimo acceptance evidence was complete,
+and external monitoring was already live. Separating technical validation from
+the final governance decision makes that decision evidence-based without
+silently authorizing new users.
+
+**Alternatives rejected:** keep ERS dual-provider until item 14 closes; treat
+the deployment itself as approval for company-wide enrolment; or retire GitHub
+credentials before the rollback window and final governance decision.
+
+**Related:** Spec 018; `docs/ers-entra-access-runbook.md`; private ERS
+`docs/ers-deploy-and-operations.md`; ERS Brain
+`governance/brain-mcp-fork-signoff.md` item 14.
+
+---
+
 ## 2026-09-01 — Separate MCP roles from broad SharePoint manual curation
 
 **Decision:** ERS Brain Reader, Curator, Admin and Owner roles govern access

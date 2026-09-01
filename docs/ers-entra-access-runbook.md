@@ -1,6 +1,6 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, the human client/role acceptance gate is complete, and independent external health monitoring is live. Entra-only deployment remains separately approval-gated.
+**Status:** ERS is live on guarded `v1.8.8` in Entra-only mode; the human client/role acceptance gate and technical cutover checks are complete, independent external health monitoring is live, and final governance closeout remains the gate before broader workforce enrolment.
 **Last updated:** 2026-09-01
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
@@ -55,6 +55,17 @@ Cillian confirmed that Claude connection, the admin portal, the role page and
 his displayed Owner role all work. John then reported Jeronimo's oral
 confirmation that his bounded Curator test passed. This closes the human
 client/role acceptance gate; it does not itself authorize deployment.
+
+Release `v1.8.8` was deployed on 2026-09-01 to JEM Fly release 82 and then to
+the private ERS overlay as Fly release 20. JEM remained GitHub-only with no
+access-admin route. ERS now reports Entra as its sole and default provider,
+keeps the access-admin route enabled and rejects an explicit GitHub
+authorization start with HTTP 400. John's fresh Entra login, authenticated
+read and dedicated hosted-write-to-local canary passed. The ERS profile-bound
+doctor passed with 54 hosted files, zero conflicts and a current heartbeat;
+reciprocal ERS-to-JEM and JEM-to-ERS access probes were denied. This completes
+the Entra-only technical cutover. Do not enrol the broader workforce until the
+final item-14 governance decision is recorded.
 
 ## 1. One-time TDM setup
 
