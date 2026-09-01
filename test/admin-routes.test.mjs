@@ -91,6 +91,11 @@ test("ERS hosted access page is available but its APIs require a current Owner",
   assert.equal(page.statusCode, 200);
   assert.match(page.body, /Access & Roles/);
   assert.match(page.body, /ERS Brain role guide/);
+  assert.match(page.body, /MCP access and manual editing are separate/);
+  assert.match(page.body, /Manual editing in SharePoint, OneDrive or Obsidian/);
+  assert.match(page.body, /not granted or removed here/);
+  assert.match(page.body, /Through MCP:/);
+  assert.match(page.body, /does not change separate SharePoint, OneDrive or Obsidian editing permissions/);
   assert.match(page.body, /What does “Review &amp; reconcile” mean/);
   assert.match(page.body, /system never chooses a role automatically/);
   assert.match(page.body, /GitHub fallback · not managed here/);

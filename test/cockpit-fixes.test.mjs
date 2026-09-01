@@ -16,6 +16,9 @@ const inboxDir = path.join(tmpRoot, "inbox");
 const doctorOutputPath = path.join(tmpRoot, "hosted-doctor.out.json");
 const freshDoctorScriptPath = path.join(tmpRoot, "fresh-doctor.mjs");
 const lintReportPath = path.join(tmpRoot, "hosted-lint-report.json");
+const recentCaptureDate = new Date(Date.now() - 86_400_000)
+  .toISOString()
+  .slice(0, 10);
 
 const LOADER = [
   "# Loader",
@@ -44,7 +47,7 @@ const TASKS = [
   "",
   "- [ ] 2026-08-01 — FOLLOW-UP — stale captured item",
   "  - Triage: Route to canonical destination, then mark transferred/closed.",
-  "- [ ] 2026-08-24 — NOTE — recent captured item",
+  `- [ ] ${recentCaptureDate} — NOTE — recent captured item`,
   "  - Triage: Route to canonical destination, then mark transferred/closed.",
   "",
   "## Done",

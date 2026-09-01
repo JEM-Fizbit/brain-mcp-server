@@ -96,6 +96,9 @@ for (const colorScheme of ["light", "dark"]) {
       try {
         await page.goto(url);
         await expect(page.getByRole("heading", { name: "ERS Brain · Access & Roles" })).toBeVisible();
+        await expect(page.getByText("MCP access and manual editing are separate", { exact: true })).toBeVisible();
+        await expect(page.getByText(/Manual editing in SharePoint, OneDrive or Obsidian/)).toBeVisible();
+        await expect(page.getByText(/not granted or removed here/)).toBeVisible();
         await expect(page.locator(".role-guide-item")).toHaveCount(4);
         await expect(page.getByText("Cannot manage access.", { exact: false })).toBeVisible();
 
@@ -120,7 +123,8 @@ for (const colorScheme of ["light", "dark"]) {
         await driftRow.getByRole("button", { name: "Review & reconcile" }).click();
         await expect(page.getByRole("heading", { name: "Review and reconcile access" })).toBeVisible();
         await expect(page.getByText(/Nothing changes until you confirm/i)).toBeVisible();
-        await expect(page.locator("#roleHelp")).toContainText("Cannot change content");
+        await expect(page.locator("#roleHelp")).toContainText("Cannot ask an AI client to change content");
+        await expect(page.locator("#roleHelp")).toContainText("Separate SharePoint manual-edit permissions are unaffected");
         await page.locator("#role").selectOption("owner");
         await expect(page.locator("#roleHelp")).toContainText("manage user access");
         await expect(page.getByRole("button", { name: "Confirm intended access" })).toBeVisible();

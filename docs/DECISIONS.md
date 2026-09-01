@@ -8,6 +8,38 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-01 — Separate MCP roles from broad SharePoint manual curation
+
+**Decision:** ERS Brain Reader, Curator, Admin and Owner roles govern access
+through MCP and connected AI clients only. Systems & IT SharePoint permissions
+separately govern direct Markdown editing through SharePoint, OneDrive and
+Obsidian and may remain broader by ERS policy. The hosted Access & Roles page
+must make this boundary explicit and must not imply that changing an MCP role
+adds or removes SharePoint access.
+
+SharePoint-origin revisions must not be attributed to the Mac sync operator.
+Until exact Graph editor passthrough is implemented, they carry an honest
+file-plane actor—SharePoint manual edit, editor unresolved—and SharePoint
+version history is the exact human-editor audit source.
+
+**Why:** Manual curation is normal company practice, not a privilege bypass.
+Trying to force SharePoint ACLs to mirror agent roles would remove a useful
+human workflow and confuse two different controls. The existing sync fallback
+was nonetheless unacceptable because it confidently named John for edits made
+by someone else. Surface-level attribution plus version history preserves
+traceability without pretending the sync process observed an identity it did
+not observe.
+
+**Alternatives rejected:** restrict SharePoint writers to MCP Curators; grant
+MCP write authority to every SharePoint editor; leave the two planes implicit;
+continue attributing every file-plane edit to the sync operator; or block wider
+rollout until per-file Graph editor lookup is implemented.
+
+**Related:** Spec 018 decision 6; `src/sync/local-revision-actor.ts`;
+`docs/ers-entra-access-runbook.md`; SharePoint version history.
+
+---
+
 ## 2026-08-28 — Treat the enabled provider set as a live authorization boundary
 
 **Decision:** Every Brain authorization-code exchange, refresh-token exchange

@@ -612,6 +612,7 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
         BRAIN_EXPECTED_SUPABASE_PROJECT_REF: "ersprojectref12",
         BRAIN_HOSTED_BASE_URL: "https://brain.example.com",
         BRAIN_FLY_APP: "example-brain-mcp",
+        BRAIN_SYNC_LOCAL_EDIT_SURFACE: "sharepoint",
         BRAIN_LINT_MODE_OVERRIDES: JSON.stringify({ "ers-brain": "graph" }),
         FLY_CONFIG_DIR: path.join(tmpRoot, "fly-secondary"),
       },
@@ -680,6 +681,7 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
     JSON.stringify({ "ers-brain": "graph" })
   );
   assert.equal(config.brains[1].syncProcess.env.BRAIN_HOSTED_BASE_URL, "https://brain.example.com");
+  assert.equal(config.brains[1].syncProcess.env.BRAIN_SYNC_LOCAL_EDIT_SURFACE, "sharepoint");
   assert.equal(config.brains[1].cockpitProcess.env.BRAIN_FLY_APP, "example-brain-mcp");
   assert.equal(
     config.brains[1].cockpitProcess.env.FLY_CONFIG_DIR,

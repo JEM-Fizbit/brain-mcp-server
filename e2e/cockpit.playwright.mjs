@@ -188,9 +188,12 @@ async function startCockpit(testInfo, { brainId = "ai-brain-jem" } = {}) {
     "utf8"
   );
   await fs.writeFile(path.join(brainDir, "NOW.md"), "# NOW\n", "utf8");
+  const recentCaptureDate = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   await fs.writeFile(
     path.join(brainDir, "TASKS.md"),
-    "# TASKS\n\n## Capture / Triage Queue\n\nTemporary holding area for captured items.\n\n- [ ] 2026-08-01 — FOLLOW-UP — stale captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n- [ ] 2026-08-24 — NOTE — recent captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n",
+    `# TASKS\n\n## Capture / Triage Queue\n\nTemporary holding area for captured items.\n\n- [ ] 2026-08-01 — FOLLOW-UP — stale captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n- [ ] ${recentCaptureDate} — NOTE — recent captured item\n  - Triage: Route to canonical destination, then mark transferred/closed.\n\n## Done\n- [x] Archive candidate *(done 2026-05-01)*\n- [x] Stamp candidate\n`,
     "utf8"
   );
   await fs.writeFile(path.join(inboxDir, "pending-source.md"), "# Pending source\n", "utf8");

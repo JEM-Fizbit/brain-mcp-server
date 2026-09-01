@@ -3,6 +3,11 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import { BRAIN_DIR } from "../constants.js";
 import { FileRevisionStore } from "./file-revision-store.js";
+import {
+  parseLocalEditSurface,
+  revisionActorForLocalEdit,
+  type LocalEditSurface,
+} from "./local-revision-actor.js";
 import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import { summarizeReport } from "./report-summary.js";
@@ -26,6 +31,7 @@ interface SyncCliConfig {
   healthFile: string;
   storeFile: string;
   revisionStore: RevisionStoreProvider;
+  localEditSurface: LocalEditSurface;
   databaseUrl?: string;
   expectedSupabaseProjectRef?: string;
   includeFiles?: string[];
@@ -119,6 +125,9 @@ function usage(): string {
     "  BRAIN_EXPECTED_SUPABASE_PROJECT_REF",
     "                            Optional fail-closed binding for the Postgres URL",
     "  BRAIN_SYNC_LOAD_LOCAL_ENV Set to 0 for explicitly configured supervisors",
+    "  BRAIN_SYNC_LOCAL_EDIT_SURFACE",
+    "                            local_filesystem|sharepoint (default: local_filesystem)",
+    "                            SharePoint records an unresolved manual editor instead of the sync operator",
   ].join("\n");
 }
 
@@ -164,6 +173,9 @@ function readConfig(): SyncCliConfig {
       process.env.BRAIN_SYNC_STORE_FILE ||
       defaultStoreFile(process.env.BRAIN_DIR || BRAIN_DIR),
     revisionStore,
+    localEditSurface: parseLocalEditSurface(
+      process.env.BRAIN_SYNC_LOCAL_EDIT_SURFACE
+    ),
     databaseUrl: process.env.BRAIN_REVISION_DATABASE_URL,
     expectedSupabaseProjectRef:
       process.env.BRAIN_EXPECTED_SUPABASE_PROJECT_REF,
@@ -389,11 +401,10 @@ async function runWithConfig(
     stateFile: config.stateFile,
     store,
     includeFiles: config.includeFiles,
-    actor: {
-      provider: "local_sync_cli",
-      id: process.env.USER || "local",
-      name: process.env.USER || "local",
-    },
+    actor: revisionActorForLocalEdit(
+      config.localEditSurface,
+      process.env.USER
+    ),
   });
 
   try {

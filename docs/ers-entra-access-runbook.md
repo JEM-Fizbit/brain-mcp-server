@@ -1,7 +1,7 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** JEM canary is live on `v1.8.7`; the verified ERS Entra-only `ers/v1.8.7` overlay is prepared but not deployed pending human acceptance
-**Last updated:** 2026-08-28
+**Status:** ERS is live on the `v1.8.5` dual-provider release; shared `v1.8.8` is prepared for the guarded JEM-first/private-overlay sequence, and Entra-only deployment remains pending Jeronimo's Curator write acceptance.
+**Last updated:** 2026-09-01
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
 This runbook activates and operates the Spec 018 identity and permissions
@@ -15,6 +15,10 @@ does not expose hosted role administration.
 - Four dedicated Entra security groups map to Reader, Curator, Admin and Owner
   application roles.
 - Private Postgres grants are the immediate Brain enforcement and audit layer.
+- Reader, Curator, Admin and Owner govern MCP and connected AI clients only.
+- Systems & IT SharePoint permissions separately govern manual Markdown edits
+  through SharePoint, OneDrive and Obsidian; the hosted role UI does not grant
+  or remove that access.
 - The hosted ERS `/admin/access` page is the only normal role-mutation UI.
 - Its Graph token is delegated, held only in a short server-memory session and
   never sent to the browser, database, logs or telemetry.
@@ -46,7 +50,10 @@ route; an authenticated hosted sync-status call returned 40 files and zero open
 conflicts. The private `ers/v1.8.7` overlay was then verified with all 490 tests
 passing apart from five intentional skips, zero protected upstream drift and
 exactly the four permitted private overlay files. It is pushed but not deployed:
-Cillian's Owner and Jeronimo's Reader acceptance remain the final cutover gate.
+Cillian's Owner path and Jeronimo's Reader path have passed. On 2026-09-01
+Cillian confirmed that Claude connection, the admin portal, the role page and
+his displayed Owner role all work. Jeronimo has been promoted to Curator; his
+bounded non-structural write is the final human cutover gate.
 
 ## 1. One-time TDM setup
 
@@ -238,7 +245,8 @@ Run the Spec 018 live matrix in order:
    reader-denied mutation, curator write and immediate refresh/tool denial.
 6. Exercise Claude ERS, ChatGPT Business browser workspace and a fresh Codex
    session. Record reconnect versus recreate behavior without credentials.
-7. Reconcile SharePoint Brain-folder writes to the named Curator population.
+7. Confirm the separate SharePoint manual-curation policy remains intentional;
+   do not treat broad Systems & IT file editing as an MCP grant.
 8. Activate an ERS-owned external `/health` check and actionable alert route.
 9. Only after John and Cillian accept the results, switch ERS to
    `BRAIN_IDENTITY_PROVIDERS=entra`, remove GitHub fallback configuration and
@@ -320,12 +328,16 @@ Microsoft sign-in, search the basic ERS directory and select the person. Reader
 is the default. A higher role requires deliberate selection and explicit
 confirmation. The page and confirmation modal describe the roles:
 
-- Reader can search and read Brain content and status, but cannot change it;
-- Curator adds ordinary non-structural content updates;
-- Admin adds structural, recovery and conflict operations, but cannot manage
-  access; and
-- Owner has Admin-level content authority plus access administration and
+- Reader can search and read through MCP, but cannot ask an AI client to change
+  Brain content;
+- Curator adds ordinary non-structural updates through MCP;
+- Admin adds MCP structural, recovery and conflict operations, but cannot
+  manage access; and
+- Owner has Admin-level MCP content authority plus access administration and
   governance responsibility.
+
+These roles do not change separate manual-edit rights in SharePoint, OneDrive
+or Obsidian. Those rights follow the Systems & IT SharePoint policy.
 
 - Grant/elevation: Graph succeeds first; the local grant becomes usable only
   after the private projection commits.
@@ -347,6 +359,11 @@ confirmation. The page and confirmation modal describe the roles:
 Every action records immutable actor/target tenant and object IDs, old/new
 role/status, bounded reason and Graph outcome. Display name and email are for
 display only.
+
+Hosted MCP revisions use the authenticated Entra principal. A revision detected
+from the SharePoint/OneDrive mirror is recorded as a SharePoint manual edit with
+an unresolved editor, never as the sync operator. Use SharePoint version history
+for the exact human editor until Graph editor passthrough is implemented.
 
 ## 7. Onboarding, changes and offboarding
 
@@ -371,8 +388,10 @@ Offboarding:
 1. Suspend or revoke in the hosted UI first. This immediately denies Brain
    tools and refresh even while the old Brain-issued token still exists.
 2. Verify removal from all four managed groups and the successful audit row.
-3. Remove SharePoint Brain-folder access and complete normal Entra offboarding.
-4. Recheck client denial. Disabling the Entra account alone is insufficient.
+3. Handle SharePoint/site access through normal ERS Microsoft 365 offboarding.
+   The Brain role change neither grants nor removes that separate access.
+4. Recheck MCP client denial. Disabling the Entra account alone is insufficient
+   until the Brain grant is suspended or revoked.
 
 ## 8. Emergency and partial failure
 
@@ -397,7 +416,24 @@ If the UI reports `reconciliationRequired`, do not repeatedly click. Capture
 the phase and time (never a token), inspect the four fixed groups, keep the
 stricter local state, then use **Review & reconcile** once Graph is healthy.
 
-## 9. Rollback
+## 9. External uptime monitoring
+
+Use an ERS-owned UptimeRobot monitor independent of Fly, Supabase and John's
+Mac:
+
+- monitor name: `ERS Brain production health`;
+- URL: `https://brain.ersgenomics.online/health`;
+- interval: five minutes on the free plan;
+- require HTTPS, HTTP 200 and a successful health-body check;
+- alert at least John and one second ERS owner;
+- keep certificate-expiry and internal store diagnostics in Brain Cockpit—the
+  external monitor proves public reachability and must not replace Cockpit.
+
+On an alert, first open the public health URL from a separate network. Then
+check Fly Machine status and the ERS Cockpit checks. Do not weaken health-body
+matching merely to clear an incident.
+
+## 10. Rollback
 
 - Before Entra-only: keep the existing bounded GitHub pilot available while
   correcting Entra. Do not alter Brain data.
