@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-08-28
+**Last updated:** 2026-09-02
 
 Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
@@ -51,6 +51,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
+- each Brain's parent menu row uses that profile's **overall** state under the same precedence as the aggregate header (`fail` → `offline` → `action` → `warn` → `checking` → `ok`); its Overview submenu labels **Overall status**, **Sync status**, and **Doctor** separately so a healthy local sync watcher cannot be mistaken for an all-clear doctor verdict;
 - the cockpit browser surface exposes no general Brain editing, conflict resolution, source ingestion, or admin mutations; its narrow Maintenance exceptions are an explicit lint run that records one `LINT` receipt and the confirm-gated application of selected mechanical task fixes. The menu-bar app retains **Controls → "Apply Lint Fixes..."** as the secondary all-or-nothing path;
 - the local ERS Overview includes a dedicated **Identity & Access** card, with a
   matching top-level navigation link; both open the hosted, same-origin Entra
@@ -456,6 +457,13 @@ Offline means the local Mac could not reach the hosted Brain health endpoint.
 This is reported separately from a Brain MCP stack fault: check Wi-Fi, VPN,
 DNS, or local network access first, then let Brain Monitor's next automatic
 doctor refresh clear the status.
+
+A transport timeout that returns no HTTP response is also an offline/local
+connectivity warning. It does not prove that the hosted runtime is unhealthy.
+A reachable health response that violates the hosted runtime contract, or a
+non-transport error while interpreting that response, remains a hosted stack
+failure. This distinction prevents a transient Mac-to-Fly timeout from turning
+the menu-bar header red while the service itself is healthy.
 
 Info means an optional diagnostic is unavailable or has context worth showing,
 but no operator intervention is required for readiness. Missing or expired local

@@ -845,6 +845,43 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return NO;
 }
 
+- (NSString *)profileStatusForProfile:(NSDictionary *)profile {
+  NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+  NSDictionary *doctor = [self readDoctorReportForProfile:profile];
+  NSArray *actions = [self actionItemsForDoctorReport:doctor];
+  NSString *doctorStatus = [[self stringFromValue:doctor[@"status"] fallback:@""] lowercaseString];
+  NSString *connectivityState = [self connectivityStateForDoctorReport:doctor];
+  NSString *syncStatus = [self healthStatusFrom:health];
+
+  if ([self actionsContainFail:actions] ||
+      [doctorStatus isEqualToString:@"fail"] ||
+      [doctorStatus isEqualToString:@"error"] ||
+      [syncStatus isEqualToString:@"fail"] ||
+      [syncStatus isEqualToString:@"error"]) {
+    return @"fail";
+  }
+  if ([connectivityState isEqualToString:@"local_offline"]) {
+    return @"offline";
+  }
+  if (actions.count > 0) {
+    return @"action";
+  }
+  if ([doctorStatus isEqualToString:@"warn"] ||
+      [doctorStatus isEqualToString:@"warning"] ||
+      [syncStatus isEqualToString:@"warn"] ||
+      [syncStatus isEqualToString:@"warning"] ||
+      [syncStatus isEqualToString:@"missing"]) {
+    return @"warn";
+  }
+  if ([syncStatus isEqualToString:@"ok"] || [syncStatus isEqualToString:@"pass"]) {
+    return @"ok";
+  }
+  if ([self.runningDoctorProfiles containsObject:[self brainIdForProfile:profile]]) {
+    return @"checking";
+  }
+  return @"unknown";
+}
+
 - (NSString *)truncatedMenuText:(NSString *)text maxLength:(NSUInteger)maxLength {
   if (text.length <= maxLength || maxLength <= 3) {
     return text;
@@ -1238,35 +1275,24 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   BOOL sawKnown = NO;
   BOOL sawChecking = NO;
   for (NSDictionary *profile in [self brainProfiles]) {
-    NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
-    NSDictionary *doctor = [self readDoctorReportForProfile:profile];
-    NSArray *actions = [self actionItemsForDoctorReport:doctor];
-    NSString *doctorStatus = [[self stringFromValue:doctor[@"status"] fallback:@""] lowercaseString];
-    NSString *connectivityState = [self connectivityStateForDoctorReport:doctor];
-    if ([self.runningDoctorProfiles containsObject:[self brainIdForProfile:profile]]) {
-      sawChecking = YES;
+    NSString *profileStatus = [self profileStatusForProfile:profile];
+    if ([profileStatus isEqualToString:@"fail"]) {
+      return @"Brain Fail";
     }
-    if ([connectivityState isEqualToString:@"local_offline"]) {
+    if ([profileStatus isEqualToString:@"offline"]) {
       sawOffline = YES;
       continue;
     }
-    if ([self actionsContainFail:actions] || [doctorStatus isEqualToString:@"fail"] || [doctorStatus isEqualToString:@"error"]) {
-      return @"Brain Fail";
-    }
-    if (actions.count > 0) {
+    if ([profileStatus isEqualToString:@"action"]) {
       sawAction = YES;
     }
-    if ([doctorStatus isEqualToString:@"warn"] || [doctorStatus isEqualToString:@"warning"]) {
+    if ([profileStatus isEqualToString:@"warn"]) {
       sawWarn = YES;
     }
-    NSString *status = [self healthStatusFrom:health];
-    if ([status isEqualToString:@"fail"] || [status isEqualToString:@"error"]) {
-      return @"Brain Fail";
+    if ([profileStatus isEqualToString:@"checking"]) {
+      sawChecking = YES;
     }
-    if ([status isEqualToString:@"warn"] || [status isEqualToString:@"warning"] || [status isEqualToString:@"missing"]) {
-      sawWarn = YES;
-    }
-    if ([status isEqualToString:@"ok"] || [status isEqualToString:@"pass"]) {
+    if ([profileStatus isEqualToString:@"ok"]) {
       sawKnown = YES;
     }
   }
@@ -1382,7 +1408,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if ([reportValue isKindOfClass:[NSDictionary class]]) {
     report = (NSDictionary *)reportValue;
   }
-  NSString *status = [self healthStatusFrom:health];
+  NSString *syncStatus = [self healthStatusFrom:health];
   NSString *checkedAt = [self stringFromValue:health[@"checkedAt"] fallback:nil];
   if (checkedAt.length == 0) {
     checkedAt = [self stringFromValue:health[@"lastCheckedAt"] fallback:nil];
@@ -1423,15 +1449,17 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *doctorCheckedAt = [self stringFromValue:doctorReport[@"checkedAt"] fallback:@"not reported"];
   NSString *doctorCheckedAtDisplay = [self displayTimestamp:doctorCheckedAt];
   NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
+  NSString *overallStatus = [self profileStatusForProfile:profile];
 
-  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@", displayName, status];
+  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@", displayName, overallStatus];
   NSMenuItem *profileItem = [[NSMenuItem alloc] initWithTitle:profileTitle action:nil keyEquivalent:@""];
   NSMenu *profileMenu = [[NSMenu alloc] initWithTitle:displayName];
   [profileItem setSubmenu:profileMenu];
   [menu addItem:profileItem];
 
   [self addDisabledItem:profileMenu title:@"Overview"];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Status: %@", status]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Overall status: %@", overallStatus]];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Sync status: %@", syncStatus]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAtDisplay]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
