@@ -411,11 +411,17 @@ test("hosted doctor distinguishes local connectivity from stack faults", async (
     path.join(repoRoot, "scripts", "hosted-doctor.mjs"),
     "utf-8"
   );
+  const classifier = await fs.readFile(
+    path.join(repoRoot, "scripts", "lib", "hosted-health-failure.mjs"),
+    "utf-8"
+  );
 
-  assert.match(doctor, /function hostedHealthFailureDetails/);
-  assert.match(doctor, /faultDomain: "local_connectivity"/);
-  assert.match(doctor, /faultDomain: "hosted_stack"/);
-  assert.match(doctor, /connectivity: "unreachable"/);
+  assert.match(doctor, /hostedHealthFailureDetails\(error, baseUrl\)/);
+  assert.match(classifier, /export function hostedHealthFailureDetails/);
+  assert.match(classifier, /faultDomain: "local_connectivity"/);
+  assert.match(classifier, /faultDomain: "hosted_stack"/);
+  assert.match(classifier, /connectivity: "unreachable"/);
+  assert.match(classifier, /timeout/);
   assert.match(doctor, /reason: "local_connectivity"/);
 });
 

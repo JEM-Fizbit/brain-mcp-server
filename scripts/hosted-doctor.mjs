@@ -39,6 +39,7 @@ import {
   applyBrainMonitorProfileEnv,
   assertHostedRuntimeBinding,
 } from "./lib/hosted-runtime-binding.mjs";
+import { hostedHealthFailureDetails } from "./lib/hosted-health-failure.mjs";
 
 loadLocalEnv();
 await applyBrainMonitorProfileEnv(process.env);
@@ -425,37 +426,6 @@ async function cacheOperationCheck(check) {
   }
 }
 
-function hostedHealthFailureDetails(error) {
-  const cause = error?.cause || {};
-  const code = cause.code || error?.code || "";
-  const causeMessage = cause.message || "";
-  const combined = [error?.message, causeMessage, code].filter(Boolean).join(" ");
-  const localConnectivity = /fetch failed|network|offline|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT|ECONNRESET|ECONNREFUSED/i.test(
-    combined
-  );
-  const details = {
-    baseUrl,
-    error: error?.message || "hosted health request failed",
-    ...(causeMessage ? { cause: causeMessage } : {}),
-    ...(code ? { code } : {}),
-    connectivity: "unreachable",
-  };
-  if (localConnectivity) {
-    return {
-      ...details,
-      faultDomain: "local_connectivity",
-      diagnosis:
-        "The local device could not reach the hosted Brain endpoint. Check Wi-Fi, VPN, DNS, or local network access before treating this as a Brain MCP stack fault.",
-    };
-  }
-  return {
-    ...details,
-    faultDomain: "hosted_stack",
-    diagnosis:
-      "The hosted Brain endpoint did not return health. Treat as a hosted stack fault if local network access is otherwise working.",
-  };
-}
-
 async function checkHostedHealth() {
   try {
     const response = await fetch(`${baseUrl}/health`, {
@@ -485,7 +455,7 @@ async function checkHostedHealth() {
       faultDomain: ok ? "none" : "hosted_stack",
     });
   } catch (error) {
-    const details = hostedHealthFailureDetails(error);
+    const details = hostedHealthFailureDetails(error, baseUrl);
     addCheck(
       "hosted_health",
       details.faultDomain === "local_connectivity" ? "warn" : "fail",
