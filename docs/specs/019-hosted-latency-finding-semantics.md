@@ -1,6 +1,6 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** in-progress — phase 1 landed 2026-09-07 (local scripts, both Brains); phases 2 and 3 open
+**Status:** in-progress — phase 1 landed 2026-09-07 (local scripts, both Brains); phase 0 validated 2026-09-07 on JEM and passed its gate; phases 2 and 3 open
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
@@ -108,9 +108,9 @@ phase alone.
 
 ### Phase 3 — Connection warmth (runtime code, evidence-gated)
 
-Gated on the Phase 0 validation below. If warm-bucket p50 is not materially
-lower than cold-bucket p50, connection setup is the wrong lever and this phase
-is abandoned rather than shipped.
+Gate satisfied by Phase 0 below: warm spans cost 5.5ms against 70.3ms when
+both connection layers are cold. Scope Phase 3 to the first call of a burst,
+which is where the cost actually lands — not to every call.
 
 - `postgresPoolOptions` (`postgres-revision-store.ts:55`) sets `keepAlive: true`
   with an env-overridable initial delay. This is a prerequisite, not an option:
@@ -130,7 +130,7 @@ is abandoned rather than shipped.
   (`postgres-revision-store.ts:289`) and ERS has already had to purge 475k of
   them (`docs/ers-entra-access-runbook.md:303`).
 
-### Phase 0 — Validation before Phase 3 (no code)
+### Phase 0 — Validation before Phase 3 — PASSED (JEM, 2026-09-07)
 
 Runs against existing stored telemetry, metadata-only. Join each
 `hosted_mcp_latency` row to its predecessor's `created_at`, bucket first-span
@@ -139,6 +139,44 @@ cold-both — and compare p50 per bucket. A step at 10s confirms client
 cold-connect and quantifies Phase 3's benefit; a further step at 5 minutes
 confirms the Supavisor backend layer; a flat profile falsifies the hypothesis
 and cancels Phase 3.
+
+**Result — both steps are present, and Phase 3 proceeds.** Run against
+`jem-brain-personal` over 60 days (4,111 spans across 943 operations),
+metadata only:
+
+| gap since previous operation | spans | span p50 | operations | handler p50 |
+|---|---|---|---|---|
+| under 10s (pool warm) | 2,509 | **5.5ms** | 506 (53.7%) | 31.4ms |
+| 10s to 5m (client cold) | 899 | **21.9ms** | 229 (24.3%) | 86.5ms |
+| over 5m (client and Supavisor cold) | 703 | **70.3ms** | 208 (22.1%) | 119.0ms |
+
+A warm span costs 5.5ms — that is the real query cost on a 41-file Brain, and
+it confirms the span-measurement defect: the 44ms average that opened this
+investigation is roughly 8x the actual work. The two predicted steps are both
+real and independent: about 16ms for the client handshake and a further 48ms
+for the Supavisor backend. **The Supavisor layer is the larger of the two**,
+which settles the fix design — a held client connection keeps Supavisor's
+upstream backend alive, so pool `min` addresses both layers where a bare idle
+increase only reaches the first.
+
+**This falsifies one of the claims that motivated Phase 3.** The earlier
+reading was that sparse traffic leaves the pool empty at essentially every tool
+call. It does not: 53.7% of operations arrive within 10s of the previous one,
+because usage is bursty — an agent session issues a run of calls that keeps the
+pool warm. The penalty lands on the **first call of each burst**, not on every
+call. Phase 3 is still worth doing (46% of operations pay some connection cost,
+and the coldest 22% carry an 88ms handler penalty at p50, which is exactly when
+a human is waiting on a first response) but the prize is smaller and more
+concentrated than "44ms off every call".
+
+Note also that cold-both operations report a DB total of 190.8ms inside a
+119.0ms handler. Summed spans exceeding wall-clock is the concurrency artifact
+Phase 2 exists to fix, visible here in production data.
+
+Not yet run for `ers-brain`: its database is in the ERSG Prototypes Supabase
+organization and the connector reaches one organization at a time. Re-scope the
+connector before assuming JEM's profile transfers — ERS has a different traffic
+shape and a different project.
 
 ## Acceptance criteria
 
