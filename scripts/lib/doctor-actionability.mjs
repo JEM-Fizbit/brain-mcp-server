@@ -132,3 +132,165 @@ export function classifyFlyStatusOutput(stdout, app) {
     },
   };
 }
+
+// --- Spec 019 phase 1: Postgres error classification and transient tolerance ---
+
+/**
+ * Postgres failure classes, worst-first. Durable classes name a fault an
+ * operator must act on; transient classes describe a condition that commonly
+ * self-heals — a laptop sleep/darkwake cycle, a resolver blip, a pooler
+ * restart. Collapsing the two is why a `getaddrinfo ENOTFOUND` during a
+ * darkwake once rendered as `fail / urgency now` while hosted MCP calls were
+ * succeeding throughout (ers-brain, 2026-08-20).
+ */
+const POSTGRES_ERROR_CLASSES = [
+  {
+    class: "authentication",
+    durable: true,
+    test: (text, code) =>
+      code === "28P01" ||
+      code === "28000" ||
+      /password authentication failed|no pg_hba\.conf entry|role .* does not exist|tenant or user not found/i.test(text),
+    summary: "Postgres rejected the credentials.",
+    resolution:
+      "Verify the profile database URL, user and password, then reload Brain Monitor.",
+  },
+  {
+    class: "permission",
+    durable: true,
+    test: (text, code) => code === "42501" || /permission denied/i.test(text),
+    summary: "The database user lacks permission for the diagnostic query.",
+    resolution:
+      "Grant the Monitor role read access to the `brain` schema, then reload Brain Monitor.",
+  },
+  {
+    class: "schema",
+    durable: true,
+    test: (text, code) =>
+      code === "42P01" ||
+      code === "3F000" ||
+      /relation .* does not exist|schema .* does not exist|column .* does not exist/i.test(text),
+    summary: "The expected Brain schema is missing or has drifted.",
+    resolution:
+      "Check that migrations have been applied to this project, then reload Brain Monitor.",
+  },
+  {
+    class: "resolution",
+    durable: false,
+    test: (text, code) =>
+      code === "ENOTFOUND" || code === "EAI_AGAIN" || /getaddrinfo/i.test(text),
+    summary: "The database hostname did not resolve.",
+    resolution:
+      "Usually a transient local network or DNS condition, including a laptop sleep/wake cycle. Confirm connectivity if it persists across cycles.",
+  },
+  {
+    class: "connectivity",
+    durable: false,
+    test: (text, code) =>
+      code === "ECONNREFUSED" ||
+      code === "ECONNRESET" ||
+      code === "EHOSTUNREACH" ||
+      code === "ENETUNREACH" ||
+      code === "EPIPE" ||
+      /connection terminated|connection refused|socket hang up/i.test(text),
+    summary: "The database connection was refused or dropped.",
+    resolution:
+      "Usually transient. If it persists across cycles, check Supabase status and the pooler host and port.",
+  },
+  {
+    class: "timeout",
+    durable: false,
+    test: (text, code) =>
+      code === "ETIMEDOUT" ||
+      /timeout exceeded when trying to connect|query read timeout|statement timeout|timed? ?out/i.test(text),
+    summary: "The diagnostic query timed out.",
+    resolution:
+      "Usually transient load or a cold pooler connection. If it persists across cycles, check pooler saturation.",
+  },
+];
+
+/**
+ * Classify a Postgres error into a durable or transient class. Unknown errors
+ * are treated as durable: an unrecognised fault should not be quietly softened.
+ */
+export function classifyPostgresError(error) {
+  const text = String(error?.message || error || "").slice(0, 400);
+  const code = String(error?.code || "");
+  const matched = POSTGRES_ERROR_CLASSES.find((candidate) =>
+    candidate.test(text, code)
+  );
+  if (!matched) {
+    return {
+      class: "unknown",
+      durable: true,
+      summary: "The Postgres summary query failed for an unrecognised reason.",
+      resolution:
+        "Verify the profile database URL and Supabase reachability, then reload Brain Monitor.",
+      error: text,
+      code: code || null,
+    };
+  }
+  return {
+    class: matched.class,
+    durable: matched.durable,
+    summary: matched.summary,
+    resolution: matched.resolution,
+    error: text,
+    code: code || null,
+  };
+}
+
+/**
+ * Map a classified Postgres failure to a check status. Durable classes keep
+ * `fail`. A transient class degrades to `warn` until it has recurred across
+ * enough consecutive doctor cycles to stop being plausibly momentary — at
+ * which point it is no longer transient in any useful sense and earns `fail`.
+ */
+export function postgresFailureStatus(classification, consecutiveFailures = 1) {
+  if (classification.durable) return "fail";
+  return consecutiveFailures >= TRANSIENT_FAILURE_ESCALATION_CYCLES ? "fail" : "warn";
+}
+
+export const TRANSIENT_FAILURE_ESCALATION_CYCLES = 3;
+
+/**
+ * Length of the current run of non-passing cycles for one check, walking back
+ * from the newest entry. Stops at the first pass, so a check that recovered and
+ * broke again reports the current streak rather than a lifetime total. Entries
+ * that never recorded the check are skipped, not treated as a pass, so adding a
+ * check does not reset the streaks of the ones beside it.
+ */
+export function consecutiveFailureStreak(entries, checkName) {
+  const history = Array.isArray(entries) ? entries : [];
+  let streak = 0;
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const status = history[index]?.checks?.[checkName];
+    if (status === "fail" || status === "warn") {
+      streak += 1;
+      continue;
+    }
+    if (status === undefined) continue;
+    break;
+  }
+  return streak;
+}
+
+/**
+ * Operator-facing detail for a failed Postgres check: what class of fault,
+ * when it was seen, how long it has persisted, and how many retries it
+ * survived — so a reader can tell a live incident from one that self-healed
+ * without opening the raw snapshot.
+ */
+export function postgresFailureDetail(details = {}) {
+  const parts = [details.summary || "The Postgres summary query failed."];
+  if (details.error) parts.push(`Reported: ${String(details.error).slice(0, 160)}`);
+  if (details.observedAt) parts.push(`Observed ${details.observedAt}`);
+  if (Number(details.attempts) > 1) parts.push(`after ${details.attempts} attempts`);
+  if (Number(details.consecutiveFailures) > 1) {
+    parts.push(`${details.consecutiveFailures} consecutive cycles`);
+  } else if (details.transient) {
+    parts.push("first cycle — not yet treated as a durable fault");
+  }
+  if (details.resolution) parts.push(details.resolution);
+  return parts.join(". ");
+}
