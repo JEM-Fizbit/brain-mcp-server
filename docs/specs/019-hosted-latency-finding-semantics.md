@@ -1,6 +1,6 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** in-progress — phases 0, 1, 2 and 3 complete in the working tree (2026-09-07). Phase 1 is live on both Brains (local scripts, no deploy). Phases 2 and 3 are runtime code and need a JEM release; ERS follows at its next planned annotated tag.
+**Status:** in-progress — phases 0, 1 and 2 complete and verified in production on JEM (v1.8.9, 2026-09-07). Phase 1 is live on both Brains (local scripts, no deploy). Phase 3 is deployed and partially effective: it defeats the 10s local eviction but an external ~30s idle cutoff caps the benefit — open question below. ERS follows at its next planned annotated tag.
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
@@ -309,3 +309,68 @@ shape and a different project.
 - The operator Fly CLI currently authenticates to the personal org only and
   cannot see `ers-brain-mcp`. Any ERS deploy in Phase 2 or 3 requires the ERS
   Fly identity; Phase 1 needs no Fly access at all.
+
+
+## Production verification — JEM v1.8.9, 2026-09-07
+
+Seven `brain_sync_status` calls against the hosted server, the same operation
+as the original incident. Telemetry read back from `brain.sync_events`:
+
+| gap since previous call | handler | SQL total | acquire | new connections |
+|---|---|---|---|---|
+| first call after deploy | 95.1ms | 1.5ms | 83.7ms | 1 |
+| 9.4s | 21.6ms | 0.6ms | 0 | 0 |
+| 28.8s | 9.3ms | 0.15ms | 0 | 0 |
+| 30.2s | 62.7ms | 4.0ms | 56.2ms | 1 |
+| 50.2s | 65.3ms | 1.0ms | 61.3ms | 1 |
+| 115.0s | 81.4ms | 1.4ms | 72.6ms | 1 |
+| 199.7s | 97.4ms | 3.4ms | 224.0ms | 3 |
+
+**Phase 2 is confirmed, and it settles the original question.** The two SQL
+statements of a `brain_sync_status` call cost **1.5ms**. Under the previous
+instrumentation the first call would have reported an ~84ms `select` on
+`brain.brain_files+brain.brain_file_revisions` — about 98% of it connection
+setup attributed to a table and a SQL verb. That is the misattribution behind
+the 542ms span that opened this spec, now measured rather than argued.
+
+**Phase 3 is partially effective, with a sharp and unexplained ceiling.** The
+survival boundary sits between 28.8s (reused) and 30.2s (new connection). The
+28.8s reuse is itself the proof that `min: 1` works: under the previous
+configuration (`min: 0`, `idleTimeoutMillis: 10_000`) a 28.8s gap would
+certainly have evicted. So the change moved connection survival from ~10s to
+~30s, and the realised benefit is the band of 10-30s gaps rather than the
+open-ended warmth intended.
+
+Ruled out as causes of the ~30s ceiling:
+
+- `BRAIN_PG_POOL_MIN=1` is present in the deployed machine config, and
+  `positiveNumberEnv` returns 1 for it.
+- `activeBrainStore()` memoises by connection string, so this is one pool
+  instance, not a pool per request.
+- pg-pool 3.14 `min` retains connections as documented — verified in isolation
+  against a stub client: `min: 0` drains and reconnects, `min: 1` retains one
+  and reuses it. (A first version of that check appeared to prove the opposite;
+  its stub omitted `_queryable`, which makes pg-pool discard every client on
+  release. The harness was testing itself.)
+- No `[pg-pool:brain_runtime] idle client error` in hosted logs across the
+  window, so the client was not torn down through the path we log.
+
+Two candidate causes remain, and they are cheaply separable:
+
+1. **An external Supavisor client-idle timeout.** Fable's review flagged that
+   Supavisor's behaviour toward idle *clients* was unconfirmed; a ~30s cutoff
+   would be outside application control and would cap Phase 3 permanently.
+2. **Our own `keepAliveInitialDelayMillis: 30_000`.** The boundary coincides
+   exactly with the first TCP keepalive probe. If an intermediary resets the
+   connection on that probe, the keepalive intended to protect the connection
+   would be killing it — an own goal introduced by this phase.
+
+**Next experiment:** set `BRAIN_PG_KEEPALIVE_DELAY_MS` to 10000 and re-measure
+the boundary. If it moves to ~10s, cause 2 is confirmed and the fix is ours. If
+it stays at ~30s, cause 1 is confirmed and Phase 3's ceiling is external — in
+which case the honest conclusion is that connection warmth cannot be held past
+~30s on this pooler and the remaining latency belongs to Phase 2's reporting
+rather than to a fix.
+
+Phase 3 is not harmful in its current state: `keepAlive` is on, no regression
+was observed, and removing one line from `fly.toml` reverts it.
