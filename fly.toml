@@ -24,12 +24,13 @@ primary_region = "lhr"
   BRAIN_ARTIFACT_STORE = "supabase"
   BRAIN_ARTIFACT_BYTE_ACCESS = "metadata_only"
   BRAIN_SUPABASE_STORAGE_BUCKET = "brain-artifacts"
-  # Spec 019 phase 3. Hold one warm Postgres connection per pool. Measured on
-  # 60 days of JEM telemetry: a warm span costs 5.5ms, a cold one 70.3ms, split
-  # across a ~16ms client handshake and a ~48ms Supavisor backend start. A held
-  # client keeps both layers warm, so the first call of a burst — the one a
-  # human is waiting on — stops paying for them. Remove this line to revert.
-  BRAIN_PG_POOL_MIN = "1"
+  # Spec 019 phase 3, set from a 4-arm A/B on the live deployment. Keeping a
+  # pooled connection past the 10s default is the whole effect: at a ~26s gap,
+  # idle=10s reused 0/6 across two keepalive settings, idle=120s reused 6/6 and
+  # cut handler latency from ~60ms to ~20ms. pg-pool "min" made no measurable
+  # difference either way and is deliberately not set. Remove this line to
+  # revert to the 10s default.
+  BRAIN_PG_IDLE_TIMEOUT_MS = "120000"
   BRAIN_HTTP_TIMING_LOGS = "1"
   BRAIN_DATE_TIME_ZONE = "Asia/Ho_Chi_Minh"
   BRAIN_SLACK_ALERT_CHANNEL = "C0B27NK40H4"
