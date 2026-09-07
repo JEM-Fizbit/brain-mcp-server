@@ -1,6 +1,6 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** in-progress — phase 1 landed 2026-09-07 (local scripts, both Brains); phase 0 validated 2026-09-07 on JEM and passed its gate; phases 2 and 3 open
+**Status:** in-progress — phases 0, 1, 2 and 3 complete in the working tree (2026-09-07). Phase 1 is live on both Brains (local scripts, no deploy). Phases 2 and 3 are runtime code and need a JEM release; ERS follows at its next planned annotated tag.
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
@@ -122,8 +122,15 @@ which is where the cost actually lands — not to every call.
   one warm connection while the remaining three still evict at 10s. Note that
   `min` does not itself create connections; boot warmup creates the first, and
   after a purge the pool sits empty until the next call.
-- Only then consider raising `BRAIN_PG_IDLE_TIMEOUT_MS` toward the ~5 minutes at
-  which Supavisor closes its own Postgres-side connection.
+- Raising `BRAIN_PG_IDLE_TIMEOUT_MS` turned out to be unnecessary and was not
+  done. pg-pool evicts an idle client only while the pool is above `min`
+  (`pg-pool/index.js:124,409`), so `min: 1` holds exactly one connection open
+  indefinitely while every other client still evicts on the existing 10s timer.
+  That is a strictly smaller change than lengthening the idle window for the
+  whole pool, and it targets the measured cost directly. The default stays 0 so
+  CLI and script pools keep their current exit behaviour — a held connection
+  would keep their event loop alive unless they also set `allowExitOnIdle` — and
+  the hosted runtime opts in through `fly.toml`.
 - `/health` (`src/http/server.ts:219-258`) touches no Postgres, so Fly's 30s
   health check does not keep the pool warm. If a keepalive query is added
   instead, it must be a read; the sync-heartbeat write path inserts rows

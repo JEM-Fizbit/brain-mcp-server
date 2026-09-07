@@ -162,7 +162,7 @@ async function recordToolLatency(input: {
   const kind = classifyToolOperation(input.toolName, input.args);
   const target = targetForToolOperation(input.toolName, input.args);
   const metadata = {
-    version: 3,
+    version: 4,
     source: "hosted_mcp_server",
     timingLayer: "server_tool",
     durationType: "server_tool_handler",
