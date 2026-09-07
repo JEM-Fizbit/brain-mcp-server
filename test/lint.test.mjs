@@ -483,6 +483,30 @@ test("technical graph telemetry does not inflate the maintenance finding count",
   }
 });
 
+test("graph lint resolves Markdown links to files nested more than one directory deep", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\n[[NOW]]\n[[references/README]]\n",
+    "NOW.md": "# NOW\n",
+    "references/README.md": [
+      "# References",
+      "",
+      "[Deck template](templates/ers-deck-template.md)",
+      "",
+    ].join("\n"),
+    "references/templates/ers-deck-template.md": "# ERS deck template\n",
+  });
+  process.env.BRAIN_LINT_MODE_OVERRIDES = JSON.stringify({
+    "ai-brain-jem": "graph",
+  });
+  try {
+    const report = await runLint();
+    assert.equal(report.graphReachability.diagnostics.length, 0);
+    assert.deepEqual(report.graphReachability.unreachable, []);
+  } finally {
+    delete process.env.BRAIN_LINT_MODE_OVERRIDES;
+  }
+});
+
 test("legacy lint remains the default and bootstrap budget excess is review-only", async () => {
   await writeFixture({
     "00_loader.md": `# Loader\n\n${"x".repeat(10_100)}\n`,
