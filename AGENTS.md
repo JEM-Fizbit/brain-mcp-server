@@ -59,7 +59,7 @@ Use Supabase Postgres for hosted operational telemetry.
 
 - User-facing hosted MCP latency samples belong in `brain.sync_events` with `event_type = 'hosted_mcp_latency'`.
 - Real hosted MCP server tool calls are the normal telemetry source and should use metadata `source = 'hosted_mcp_server'`.
-- Server tool-call telemetry should include `timingLayer = 'server_tool'`, `durationType = 'server_tool_handler'`, and bounded sanitized DB summaries/spans when Postgres work occurs.
+- Server tool-call telemetry should include `timingLayer = 'server_tool'`, `durationType = 'server_tool_handler'`, and bounded sanitized DB summaries/spans when Postgres work occurs. From `version: 4`, connection acquisition is its own `acquire` span rather than being billed to a SQL statement, every span carries `startOffsetMs`, and the summary reports `wallMs` (union of intervals) alongside `totalMs` (sum) so concurrent fan-out cannot overstate elapsed database time.
 - DB telemetry may record operation/table names, durations, row counts, status, and bounded error text. It must not record SQL text, query parameters, file content, patch text, source content, or search query text.
 - Hosted telemetry writes are best-effort and non-blocking by default so measurement does not add user-facing latency; use `BRAIN_HOSTED_MCP_LATENCY_AWAIT_DB_WRITE=1` only for explicit diagnostics.
 - Hosted OAuth client/session state belongs in Supabase Postgres via `BRAIN_OAUTH_STATE_STORE=postgres`; file-backed OAuth state is local/dev fallback only and should not be the Fly-hosted connector authority.

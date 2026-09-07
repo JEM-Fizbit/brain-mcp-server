@@ -105,6 +105,10 @@ function normalizeDbSpan(span) {
     ok: span.ok !== false,
     rowCount: Number.isFinite(Number(span.rowCount)) ? Number(span.rowCount) : null,
     error: span.error ? String(span.error) : null,
+    // Spec 019 phase 2. Absent on rows written before that release; an older
+    // row is treated as a sequential query span, which is what it was.
+    kind: span.kind === "acquire" ? "acquire" : "query",
+    startOffsetMs: asFiniteLatency(span.startOffsetMs) ?? 0,
   };
 }
 
@@ -125,6 +129,12 @@ function normalizeDbSummary(db) {
     rowCount: Math.max(0, Number(db.rowCount || 0)),
     failedCount: Math.max(0, Number(db.failedCount || 0)),
     truncatedCount: Math.max(0, Number(db.truncatedCount || 0)),
+    // Spec 019 phase 2 fields. Null on older rows rather than zero, so "not
+    // measured" stays distinguishable from "measured as none".
+    wallMs: asFiniteLatency(db.wallMs),
+    acquireCount: Number.isFinite(Number(db.acquireCount)) ? Number(db.acquireCount) : null,
+    acquireMs: asFiniteLatency(db.acquireMs),
+    newConnections: Number.isFinite(Number(db.newConnections)) ? Number(db.newConnections) : null,
     spans,
   };
 }

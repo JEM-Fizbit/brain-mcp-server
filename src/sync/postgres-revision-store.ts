@@ -61,8 +61,25 @@ export function postgresPoolOptions(
   const poolOptions: pg.PoolConfig = {
     connectionString,
     max: positiveNumberEnv(options.maxEnv || "BRAIN_PG_POOL_MAX", options.defaultMax ?? 4),
+    // Spec 019 phase 3. pg-pool evicts an idle client only while the pool is
+    // above `min`, so `min: 1` holds exactly one connection open and the rest
+    // still evict on the normal idle timer. Default 0 keeps CLI and script
+    // pools unchanged — a held connection would keep their event loop alive
+    // unless they also set `allowExitOnIdle`. The hosted runtime opts in
+    // explicitly through fly.toml.
+    min: positiveNumberEnv("BRAIN_PG_POOL_MIN", 0),
     connectionTimeoutMillis: positiveNumberEnv("BRAIN_PG_CONNECTION_TIMEOUT_MS", 5_000),
     idleTimeoutMillis: positiveNumberEnv("BRAIN_PG_IDLE_TIMEOUT_MS", 10_000),
+    // Without TCP keepalive a connection held open across an idle gap can be
+    // dropped silently by the pooler, a NAT or Fly egress, then handed to the
+    // next caller — which hangs until `query_timeout` (30s) rather than
+    // failing fast. This is a prerequisite for holding connections at all, not
+    // an optimisation.
+    keepAlive: process.env.BRAIN_PG_KEEPALIVE !== "0",
+    keepAliveInitialDelayMillis: positiveNumberEnv(
+      "BRAIN_PG_KEEPALIVE_DELAY_MS",
+      30_000
+    ),
     query_timeout: queryTimeoutMs,
     statement_timeout: positiveNumberEnv("BRAIN_PG_STATEMENT_TIMEOUT_MS", queryTimeoutMs),
   };
