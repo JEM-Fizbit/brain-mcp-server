@@ -1,6 +1,6 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** in-progress — phases 0, 1 and 2 complete and verified in production on JEM (v1.8.9, 2026-09-07). Phase 1 is live on both Brains (local scripts, no deploy). Phase 3 is deployed and partially effective: it defeats the 10s local eviction but an external ~30s idle cutoff caps the benefit — open question below. ERS follows at its next planned annotated tag.
+**Status:** complete — phases 0-3 shipped and verified in production on JEM (2026-09-07). Phase 1 is live on both Brains via the local scripts (no deploy). Phases 2 and 3 are runtime code; ERS follows at its next planned annotated tag.
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
@@ -374,3 +374,56 @@ rather than to a fix.
 
 Phase 3 is not harmful in its current state: `keepAlive` is on, no regression
 was observed, and removing one line from `fly.toml` reverts it.
+
+
+## Phase 3 A/B — the mechanism was not what the spec assumed
+
+Phase 3 originally shipped `BRAIN_PG_POOL_MIN=1` on the reasoning that pg-pool
+evicts an idle client only while the pool is above `min`. Production said
+otherwise, so the question was settled by a four-arm A/B on the live
+deployment, each arm a Fly secret change (restart, no image rebuild), each
+probed with repeated `brain_sync_status` calls at a controlled ~26s gap.
+
+| arm | idle timeout | `min` | keepalive | reuse at ~26s | handler |
+|---|---|---|---|---|---|
+| A | 10s | 1 | on, 30s probe | **0/3** | 48-124ms |
+| C | 10s | 1 | **off** | **0/3** | 53-81ms |
+| D | **120s** | 1 | on, 30s probe | **3/3** (also 116s) | 22-36ms |
+| E | **120s** | **0** | on, 30s probe | **3/3** (also 73s) | 18-28ms |
+
+**Conclusion: the idle timeout is the whole effect. `min` does nothing here,
+and keepalive does not affect retention.** Raising the idle timeout to 120s
+cuts handler latency at a ~26s gap from roughly 60ms to roughly 20ms and
+removes the acquire span entirely. It also makes the boot warmup useful for the
+first time — with a 10s idle its connections were evicted before any request
+arrived, and under arm E the first tool call after a restart reused a warmup
+connection.
+
+Deployed configuration: `BRAIN_PG_IDLE_TIMEOUT_MS=120000` in `fly.toml`,
+`min` deliberately unset, `keepAlive` left on as a cheap safety net against
+the half-open-socket stall (its cost is nil and it is a prerequisite for
+holding connections at all, even though it did not change retention here).
+
+### Two wrong conclusions reached on the way, both from single samples
+
+Recorded because the failure mode is more instructive than the fix.
+
+1. **"Phase 3 does not work."** Drawn from one probe at a 115s gap. Arm A had
+   in fact reused once at 28.8s, which looked like evidence `min` worked.
+   Both readings were noise.
+2. **"The keepalive probe kills the connection."** Arms A and B each died close
+   to their configured `keepAliveInitialDelayMillis` (~30s and ~10s), which
+   looked like clean one-for-one causation and was reported as confirmed. Arm C
+   — keepalive off entirely — then died at 27.2s, which the model forbade. With
+   n=1 per condition the apparent "boundary tracking" was coincidence.
+
+Every one of those readings came from a single observation per condition. The
+repeated fixed-gap protocol above was what actually separated the variables,
+and it reversed the answer. The same lesson applies to the earlier isolated
+pg-pool check, whose stub omitted `_queryable` and so "proved" the opposite of
+the truth: a harness that has not been validated against the real code path is
+evidence about the harness.
+
+Phase 3's realised benefit is therefore real but bounded: roughly 40ms off any
+call arriving 10-120s after the previous one. Calls inside 10s were already
+warm, and calls beyond ~2 minutes still pay full connection setup.

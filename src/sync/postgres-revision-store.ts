@@ -61,12 +61,12 @@ export function postgresPoolOptions(
   const poolOptions: pg.PoolConfig = {
     connectionString,
     max: positiveNumberEnv(options.maxEnv || "BRAIN_PG_POOL_MAX", options.defaultMax ?? 4),
-    // Spec 019 phase 3. pg-pool evicts an idle client only while the pool is
-    // above `min`, so `min: 1` holds exactly one connection open and the rest
-    // still evict on the normal idle timer. Default 0 keeps CLI and script
-    // pools unchanged — a held connection would keep their event loop alive
-    // unless they also set `allowExitOnIdle`. The hosted runtime opts in
-    // explicitly through fly.toml.
+    // Spec 019 phase 3. Exposed, but measured to have no effect on the hosted
+    // deployment: at a ~26s gap, min:1 and min:0 behaved identically under both
+    // a 10s and a 120s idle timeout. The idle timeout is the lever that works.
+    // Left available (default 0, which also keeps CLI and script pools' exit
+    // behaviour unchanged) rather than removed, but do not reach for it
+    // expecting connection warmth.
     min: positiveNumberEnv("BRAIN_PG_POOL_MIN", 0),
     connectionTimeoutMillis: positiveNumberEnv("BRAIN_PG_CONNECTION_TIMEOUT_MS", 5_000),
     idleTimeoutMillis: positiveNumberEnv("BRAIN_PG_IDLE_TIMEOUT_MS", 10_000),

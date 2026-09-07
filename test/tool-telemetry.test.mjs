@@ -268,8 +268,12 @@ test("pool options keep connections alive and default to holding none", async ()
   }
 });
 
-test("the hosted deployment opts in to a warm connection", async () => {
+test("the hosted deployment keeps pooled connections past the default", async () => {
+  // A/B measured on the live deployment: the idle timeout is what retains a
+  // connection; pg-pool "min" made no difference and must not be set here in
+  // the belief that it does.
   const fs = await import("node:fs/promises");
   const flyToml = await fs.readFile(new URL("../fly.toml", import.meta.url), "utf-8");
-  assert.match(flyToml, /BRAIN_PG_POOL_MIN = "1"/);
+  assert.match(flyToml, /BRAIN_PG_IDLE_TIMEOUT_MS = "120000"/);
+  assert.doesNotMatch(flyToml, /BRAIN_PG_POOL_MIN/);
 });
