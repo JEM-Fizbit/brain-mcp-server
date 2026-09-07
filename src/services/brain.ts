@@ -215,24 +215,22 @@ export async function renameFile(
 
 export async function listFileNames(brainId?: string): Promise<string[]> {
   const { brainDir } = await getBrainPaths(brainId);
-  const entries = await fs.readdir(brainDir, { withFileTypes: true });
   const files: string[] = [];
 
-  for (const entry of entries) {
-    if (entry.isFile() && entry.name.endsWith(".md")) {
-      files.push(entry.name);
-    }
-    if (entry.isDirectory()) {
-      const subPath = path.join(brainDir, entry.name);
-      const subEntries = await fs.readdir(subPath, { withFileTypes: true });
-      for (const sub of subEntries) {
-        if (sub.isFile() && sub.name.endsWith(".md")) {
-          files.push(path.join(entry.name, sub.name));
-        }
+  async function walk(directory: string): Promise<void> {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        files.push(path.relative(brainDir, fullPath));
       }
     }
   }
 
+  await walk(brainDir);
   return files.sort();
 }
 
