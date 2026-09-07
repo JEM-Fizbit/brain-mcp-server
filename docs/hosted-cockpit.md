@@ -635,10 +635,33 @@ The cockpit now applies conservative latency SLOs over the bounded telemetry win
 - client-observed read p95 warns at `2000ms` and fails at `5000ms`;
 - client-observed write p95 warns at `3500ms` and fails at `8000ms`;
 - sync-wait p95 warns at `10000ms` and fails at `30000ms`;
-- max DB span warns at `500ms` and fails at `2500ms`;
-- any failed DB span warns.
+- the DB span measure warns at `500ms` and fails at `2500ms`;
+- any failed DB span in the window warns.
 
 Override those thresholds with `BRAIN_SLO_SERVER_READ_P95_WARN_MS`, `BRAIN_SLO_SERVER_READ_P95_FAIL_MS`, `BRAIN_SLO_SERVER_WRITE_P95_WARN_MS`, `BRAIN_SLO_SERVER_WRITE_P95_FAIL_MS`, `BRAIN_SLO_CLIENT_READ_P95_WARN_MS`, `BRAIN_SLO_CLIENT_READ_P95_FAIL_MS`, `BRAIN_SLO_CLIENT_WRITE_P95_WARN_MS`, `BRAIN_SLO_CLIENT_WRITE_P95_FAIL_MS`, `BRAIN_SLO_SYNC_WAIT_P95_WARN_MS`, `BRAIN_SLO_SYNC_WAIT_P95_FAIL_MS`, `BRAIN_SLO_DB_MAX_SPAN_WARN_MS`, `BRAIN_SLO_DB_MAX_SPAN_FAIL_MS`, and `BRAIN_SLO_DB_FAILED_QUERY_WARN_COUNT`. The SLO layer does not write telemetry or add a background metrics job. It evaluates the same bounded rows already read by `hosted:doctor`.
+
+### DB span scoring is windowed, not all-time (spec 019)
+
+The DB span measure is scored as a **percentile over a bounded time window**, never as an all-time maximum. It reports `DB span p99` over the `last 24h` by default.
+
+This matters because the underlying row read is bounded by *count*, not time: `hosted:doctor` selects the most recent `BRAIN_HOSTED_MCP_LATENCY_HISTORY_LIMIT` rows (default `240`) with no date filter. Scoring an un-windowed maximum over that set meant a single slow span latched the check for as long as those rows took to turn over — roughly three weeks on a sparse personal Brain. A cold-connection outlier therefore read as a live incident days after it resolved, which trains an operator to dismiss the check most likely to catch a real regression.
+
+Two guards separate signal from noise:
+
+- **the percentile**, so one outlier among hundreds of spans cannot carry the verdict; and
+- **a recurrence floor** (`BRAIN_SLO_DB_SPAN_MIN_BREACH_COUNT`, default `2`), which is what actually bites at low sample counts, where a percentile degenerates to the maximum. A single breaching span is reported in the finding detail but held at `pass`.
+
+A Brain with no hosted MCP traffic inside the window reports zero samples and passes, rather than scoring stale rows. Findings carry `observedAt`, the window label, and the sample count, so a reader can tell a live breach from an aged one without opening the raw snapshot. The slowest-DB-target finding is scored on the same window and only fires when the SLO itself escalated, so the two cannot contradict each other.
+
+Tune with `BRAIN_SLO_DB_SPAN_WINDOW_MS` (default 24h), `BRAIN_SLO_DB_SPAN_PERCENTILE` (default `99`, clamped to 1-100), and `BRAIN_SLO_DB_SPAN_MIN_BREACH_COUNT` (default `2`). Failed DB spans are counted on the same window.
+
+**Caveat on what a DB span currently measures.** A span wraps `pool.query`, and node-postgres acquires a connection before running the SQL, so a span bills connection setup — TCP, TLS, SCRAM — to the query, and attributes it to a table and a SQL verb. Spans taken on a client acquired explicitly through `pool.connect()` exclude that cost, so spans are not yet mutually comparable. Spec 019 phase 2 separates acquisition into its own span; until then, read a slow span as "this operation waited on Postgres", not as "this SQL was slow".
+
+### Doctor findings carry provenance and tolerate transients (spec 019)
+
+`postgres_summary` retries before judging (`BRAIN_DOCTOR_POSTGRES_RETRY_ATTEMPTS`, default `3`; `BRAIN_DOCTOR_POSTGRES_RETRY_BACKOFF_MS`, default `400`, applied with linear backoff) and then classifies the failure. Durable classes — authentication, permission, schema, and unrecognised errors — keep `fail` and are not retried, since they will not resolve in a few hundred milliseconds. Transient classes — name resolution, connectivity, and timeouts — degrade to `warn` and escalate to `fail` only after three consecutive cycles. The check records the fault class, attempt count, consecutive-cycle count, and `observedAt`, and the operator action names the actual class rather than one generic instruction.
+
+A bounded verdict history is written beside the report at `hosted-doctor-history.json` (`BRAIN_DOCTOR_HISTORY_FILE`, `BRAIN_DOCTOR_HISTORY_LIMIT`, default `40` cycles), recording only brain id, timestamp, overall status, and per-check status. It exists so a one-off can be told from a pattern: `hosted-doctor.out.json` is overwritten every cycle, so a failing snapshot used to be gone before it could be examined. Persisting it is best-effort and never gates the verdict.
 
 The Activity tab separates content-state activity from operation telemetry with an in-tab sub-menu rather than stacked sections. Operation Log, Auth, Recent Brain Activity, and Cockpit Watch each get the full content width and are reachable from the top of the tab. Operation Log is the primary troubleshooting feed: a bounded metadata feed from `brain.sync_events`, not Brain content. By default it shows up to 60 events from the last 30 days; tune this with `BRAIN_HOSTED_MCP_EVENT_LOG_LIMIT` and `BRAIN_HOSTED_MCP_EVENT_LOG_DAYS`. Operation Log is a compact table with one row per operation or auth event: tool/auth name, latency where applicable, operation kind, timing layer, status, safe target metadata, telemetry source, DB summary, and timestamp. Rows with DB spans expose a bounded drill-down table with operation, target, duration, row count, and status. Auth is the focused troubleshooting view for `hosted_mcp_auth_failures`: it shows summary cards, a bucketed trend, reason/client/grant/target/name/HTTP breakdowns, and a bounded recent-failures table so the operator can tell active failures from stale telemetry aging out. When the summary classifies a stale connector it shows a banner naming the looping client id and noting the fail→warn downgrade, so a benign post-migration zombie connector is visibly distinguished from a real auth incident. Recent Brain Activity shows Brain state changes, such as file revisions and conflict open/resolution events. Cockpit Watch is local to the open browser session and reports refresh-observed status, sync, and conflict-count changes.
 

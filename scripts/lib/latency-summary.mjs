@@ -36,6 +36,13 @@ export const DEFAULT_LATENCY_SLO_THRESHOLDS = Object.freeze({
   dbMaxSpanWarnMs: 500,
   dbMaxSpanFailMs: 2500,
   dbFailedQueryWarnCount: 1,
+  // Spec 019 phase 1. The DB span SLO is scored over a bounded window with a
+  // percentile and a recurrence floor, never as an all-time maximum: a single
+  // cold-connection outlier used to latch the check for as long as the row
+  // window took to turn over (~3 weeks at JEM's traffic).
+  dbSpanWindowMs: 24 * 60 * 60 * 1000,
+  dbSpanPercentile: 99,
+  dbSpanMinBreachCount: 2,
 });
 const STATUS_RANK = {
   pass: 0,
@@ -517,6 +524,164 @@ function normalizeThreshold(value, fallback) {
   return Number.isFinite(number) && number >= 0 ? number : fallback;
 }
 
+function clampPercentile(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(100, Math.max(1, number));
+}
+
+/**
+ * DB spans carry no timestamp of their own — they inherit the timestamp of the
+ * operation that issued them. Collect every span in the window, newest-relevant
+ * first, so the SLO and the slowest-target finding score the same samples.
+ * `now` is injectable so a doctor run and its tests agree on the window edge.
+ */
+function collectWindowedDbSpans(history, windowMs, now = Date.now()) {
+  const bounded = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0
+    ? Number(windowMs)
+    : null;
+  const windowStartedAt = bounded ? now - bounded : null;
+  const samples = [];
+  for (const operation of history) {
+    const at = Date.parse(operation.at);
+    // An operation with an unparseable timestamp cannot be placed in the
+    // window. Drop it rather than let it score forever, which is the defect
+    // this window exists to fix.
+    if (!Number.isFinite(at)) continue;
+    if (windowStartedAt !== null && at < windowStartedAt) continue;
+    const spans = Array.isArray(operation.db?.spans) ? operation.db.spans : [];
+    if (spans.length) {
+      for (const span of spans) {
+        const durationMs = Number(span.durationMs);
+        if (!Number.isFinite(durationMs)) continue;
+        samples.push({
+          durationMs,
+          at: operation.at,
+          atMs: at,
+          name: operation.name,
+          operation: span.operation || "query",
+          target: span.target || span.name || "db.query",
+        });
+      }
+      continue;
+    }
+    // Spans can be absent (older rows) or truncated by the span cap. The
+    // per-operation max is the honest fallback for "slowest span here".
+    const maxMs = Number(operation.db?.maxMs);
+    if (!Number.isFinite(maxMs)) continue;
+    samples.push({
+      durationMs: maxMs,
+      at: operation.at,
+      atMs: at,
+      name: operation.name,
+      operation: "query",
+      target: operation.db?.target || "db.query",
+    });
+  }
+  return { samples, windowStartedAt, windowMs: bounded, now };
+}
+
+function withinWindow(history, windowMs, now = Date.now()) {
+  const bounded = Number.isFinite(Number(windowMs)) && Number(windowMs) > 0
+    ? Number(windowMs)
+    : null;
+  if (bounded === null) return history;
+  const startedAt = now - bounded;
+  return history.filter((operation) => {
+    const at = Date.parse(operation.at);
+    return Number.isFinite(at) && at >= startedAt;
+  });
+}
+
+function windowLabelFromMs(windowMs) {
+  if (!Number.isFinite(Number(windowMs)) || Number(windowMs) <= 0) return "all recorded";
+  const hours = Number(windowMs) / (60 * 60 * 1000);
+  if (hours >= 48 && hours % 24 === 0) return `last ${hours / 24}d`;
+  if (hours >= 1) return `last ${Number.isInteger(hours) ? hours : hours.toFixed(1)}h`;
+  return `last ${Math.round(Number(windowMs) / 60000)}m`;
+}
+
+function ageLabel(fromMs, toMs) {
+  const deltaMs = Math.max(0, toMs - fromMs);
+  const minutes = Math.round(deltaMs / 60000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = deltaMs / (60 * 60 * 1000);
+  if (hours < 48) return `${hours.toFixed(hours < 10 ? 1 : 0)}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+/**
+ * Score the windowed spans. Two guards separate a real regression from noise:
+ * a percentile (so one outlier among hundreds cannot carry the verdict) and a
+ * recurrence floor (which is what actually bites at low sample counts, where a
+ * percentile degenerates to the maximum).
+ */
+function evaluateDbSpans(window, thresholds) {
+  const { samples, windowStartedAt, windowMs, now } = window;
+  const windowLabel = windowLabelFromMs(windowMs);
+  const windowStartedAtIso = windowStartedAt === null
+    ? null
+    : new Date(windowStartedAt).toISOString();
+
+  if (!samples.length) {
+    return {
+      valueMs: 0,
+      sampleCount: 0,
+      status: "pass",
+      breachCount: 0,
+      maxMs: null,
+      observedAt: null,
+      suppressed: false,
+      windowMs,
+      windowLabel,
+      windowStartedAt: windowStartedAtIso,
+      detail: `No bounded Postgres spans recorded inside hosted MCP server handlers in the ${windowLabel}.`,
+    };
+  }
+
+  const durations = samples.map((sample) => sample.durationMs).sort((a, b) => a - b);
+  const percentileMs = percentile(durations, thresholds.dbSpanPercentile);
+  const slowest = samples.reduce(
+    (worst, sample) => (sample.durationMs > worst.durationMs ? sample : worst),
+    samples[0]
+  );
+  const breaching = samples.filter(
+    (sample) => sample.durationMs >= thresholds.dbMaxSpanWarnMs
+  );
+  const rawStatus = thresholdStatus(
+    percentileMs,
+    thresholds.dbMaxSpanWarnMs,
+    thresholds.dbMaxSpanFailMs
+  );
+  const minBreachCount = Math.max(1, Number(thresholds.dbSpanMinBreachCount) || 1);
+  const suppressed = rawStatus !== "pass" && breaching.length < minBreachCount;
+
+  const detailParts = [
+    `p${thresholds.dbSpanPercentile} of ${samples.length} bounded Postgres spans in the ${windowLabel}`,
+    `slowest ${Math.round(slowest.durationMs)}ms (${ageLabel(slowest.atMs, now)}, ${slowest.operation} ${slowest.target})`,
+    `${breaching.length} span${breaching.length === 1 ? "" : "s"} at or above ${Math.round(thresholds.dbMaxSpanWarnMs)}ms`,
+  ];
+  if (suppressed) {
+    detailParts.push(
+      `held at pass: a breach escalates only from ${minBreachCount} slow spans in the window, so a single cold-connection outlier does not latch the check`
+    );
+  }
+
+  return {
+    valueMs: percentileMs,
+    sampleCount: samples.length,
+    status: suppressed ? "pass" : rawStatus,
+    breachCount: breaching.length,
+    maxMs: Math.round(slowest.durationMs),
+    observedAt: slowest.at,
+    suppressed,
+    windowMs,
+    windowLabel,
+    windowStartedAt: windowStartedAtIso,
+    detail: `${detailParts.join("; ")}.`,
+  };
+}
+
 function durationEvaluation({
   id,
   label,
@@ -525,6 +690,8 @@ function durationEvaluation({
   failMs,
   sampleCount = null,
   detail = null,
+  statusOverride = null,
+  ...extra
 }) {
   if (!Number.isFinite(Number(valueMs))) return null;
   return {
@@ -535,8 +702,9 @@ function durationEvaluation({
     warnMs: rounded(warnMs),
     failMs: rounded(failMs),
     sampleCount,
-    status: thresholdStatus(valueMs, warnMs, failMs),
+    status: statusOverride || thresholdStatus(valueMs, warnMs, failMs),
     detail,
+    ...extra,
   };
 }
 
@@ -833,7 +1001,9 @@ export function normalizeLatencySloThresholds(overrides = {}) {
   return Object.fromEntries(
     Object.entries(DEFAULT_LATENCY_SLO_THRESHOLDS).map(([key, value]) => [
       key,
-      normalizeThreshold(overrides[key], value),
+      key === "dbSpanPercentile"
+        ? clampPercentile(overrides[key], value)
+        : normalizeThreshold(overrides[key], value),
     ])
   );
 }
@@ -842,6 +1012,7 @@ export function evaluateLatencySlo({
   history = [],
   clientHistory = [],
   thresholds = {},
+  now = Date.now(),
 } = {}) {
   const normalizedThresholds = normalizeLatencySloThresholds(thresholds);
   const serverHistory = normalizedLatencyHistory(history);
@@ -853,15 +1024,25 @@ export function evaluateLatencySlo({
   const syncWait = summaryByKind(serverSummaries, "sync_wait");
   const clientRead = summaryByKind(clientSummaries, "read");
   const clientWrite = summaryByKind(clientSummaries, "write");
-  const dbMaxValues = serverHistory
-    .map((operation) => operation.db?.maxMs)
-    .filter((value) => Number.isFinite(Number(value)));
-  const dbMaxSpanMs = dbMaxValues.length ? Math.max(...dbMaxValues) : null;
-  const dbFailedQueryCount = serverHistory.reduce(
+  const dbSpanWindow = collectWindowedDbSpans(
+    serverHistory,
+    normalizedThresholds.dbSpanWindowMs,
+    now
+  );
+  const dbSpanEvaluation = evaluateDbSpans(dbSpanWindow, normalizedThresholds);
+  // Failed queries are windowed on the same terms as spans. A failure three
+  // weeks old is history, not an incident, and latching on it trains the
+  // operator to dismiss the check that would catch a live one.
+  const dbCountedHistory = withinWindow(
+    serverHistory,
+    normalizedThresholds.dbSpanWindowMs,
+    now
+  );
+  const dbFailedQueryCount = dbCountedHistory.reduce(
     (total, operation) => total + Number(operation.db?.failedCount || 0),
     0
   );
-  const dbQueryCount = serverHistory.reduce(
+  const dbQueryCount = dbCountedHistory.reduce(
     (total, operation) => total + Number(operation.db?.queryCount || 0),
     0
   );
@@ -914,12 +1095,22 @@ export function evaluateLatencySlo({
     }),
     durationEvaluation({
       id: "db_max_span",
-      label: "Max DB span",
-      valueMs: dbMaxSpanMs,
+      label: `DB span p${normalizedThresholds.dbSpanPercentile}`,
+      valueMs: dbSpanEvaluation.valueMs,
       warnMs: normalizedThresholds.dbMaxSpanWarnMs,
       failMs: normalizedThresholds.dbMaxSpanFailMs,
-      sampleCount: dbQueryCount || null,
-      detail: "Slowest single bounded Postgres span observed inside hosted MCP server handlers.",
+      sampleCount: dbSpanEvaluation.sampleCount,
+      statusOverride: dbSpanEvaluation.status,
+      windowMs: dbSpanEvaluation.windowMs,
+      windowLabel: dbSpanEvaluation.windowLabel,
+      windowStartedAt: dbSpanEvaluation.windowStartedAt,
+      percentile: normalizedThresholds.dbSpanPercentile,
+      breachCount: dbSpanEvaluation.breachCount,
+      minBreachCount: normalizedThresholds.dbSpanMinBreachCount,
+      maxMs: dbSpanEvaluation.maxMs,
+      observedAt: dbSpanEvaluation.observedAt,
+      suppressed: dbSpanEvaluation.suppressed,
+      detail: dbSpanEvaluation.detail,
     }),
     countEvaluation({
       id: "db_failed_queries",
@@ -943,9 +1134,11 @@ export function evaluateLatencySlo({
   };
 }
 
-function collectDbSpanTargets(history, limit = 8) {
+function collectDbSpanTargets(history, limit = 8, windowMs = null, now = Date.now()) {
   const groups = new Map();
-  const operations = normalizedLatencyHistory(history);
+  // Scored on the same window as the SLO, so the "slowest DB target" finding
+  // cannot contradict the verdict by reporting an outlier the SLO has aged out.
+  const operations = withinWindow(normalizedLatencyHistory(history), windowMs, now);
   for (const operation of operations) {
     const spans = Array.isArray(operation.db?.spans) ? operation.db.spans : [];
     for (const span of spans) {
@@ -1019,6 +1212,11 @@ function sloFindingFromEvaluation(evaluation) {
     title: `${evaluation.label} breached ${evaluation.status} threshold`,
     detail: [observed, warn, fail, evaluation.detail].filter(Boolean).join("; "),
     metricId: evaluation.id,
+    // Provenance travels with the finding so a reader can tell a live breach
+    // from a stale one without opening the raw snapshot.
+    observedAt: evaluation.observedAt || null,
+    windowLabel: evaluation.windowLabel || null,
+    sampleCount: evaluation.sampleCount ?? null,
   };
 }
 
@@ -1026,6 +1224,7 @@ export function diagnoseLatencyPerformance({
   history = [],
   clientHistory = [],
   thresholds = {},
+  now = Date.now(),
 } = {}) {
   const normalizedThresholds = normalizeLatencySloThresholds(thresholds);
   const serverHistory = normalizedLatencyHistory(history);
@@ -1034,21 +1233,38 @@ export function diagnoseLatencyPerformance({
     history: serverHistory,
     clientHistory: clientObservedHistory,
     thresholds: normalizedThresholds,
+    now,
   });
   const findings = slo.evaluations
     .map(sloFindingFromEvaluation)
     .filter(Boolean);
-  const dbSpanTargets = collectDbSpanTargets(serverHistory);
+  const dbSpanEvaluation = slo.evaluations.find(
+    (evaluation) => evaluation.id === "db_max_span"
+  );
+  const dbSpanTargets = collectDbSpanTargets(
+    serverHistory,
+    8,
+    normalizedThresholds.dbSpanWindowMs,
+    now
+  );
   const slowestDbTarget = dbSpanTargets[0] || null;
 
-  if (slowestDbTarget?.maxMs >= normalizedThresholds.dbMaxSpanWarnMs) {
+  // Only raise the per-target finding when the windowed SLO itself escalated.
+  // Previously this fired on the raw maximum, so a single suppressed outlier
+  // still produced a warn under a different metric id.
+  if (
+    dbSpanEvaluation &&
+    dbSpanEvaluation.status !== "pass" &&
+    slowestDbTarget?.maxMs >= normalizedThresholds.dbMaxSpanWarnMs
+  ) {
     findings.push({
-      level: slowestDbTarget.maxMs >= normalizedThresholds.dbMaxSpanFailMs
-        ? "fail"
-        : "warn",
+      level: dbSpanEvaluation.status,
       title: `Slowest DB target: ${slowestDbTarget.target}`,
-      detail: `${slowestDbTarget.operation} max ${slowestDbTarget.maxMs}ms, average ${slowestDbTarget.averageMs}ms across ${slowestDbTarget.spanCount} spans.`,
+      detail: `${slowestDbTarget.operation} max ${slowestDbTarget.maxMs}ms, average ${slowestDbTarget.averageMs}ms across ${slowestDbTarget.spanCount} spans in the ${dbSpanEvaluation.windowLabel}.`,
       metricId: "slowest_db_target",
+      observedAt: slowestDbTarget.latestAt || null,
+      windowLabel: dbSpanEvaluation.windowLabel || null,
+      sampleCount: slowestDbTarget.spanCount ?? null,
     });
   }
 

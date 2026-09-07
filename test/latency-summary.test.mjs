@@ -771,7 +771,11 @@ test("latency SLOs warn on slow reads and identify DB hotspots", () => {
     dbMaxSpanFailMs: 2500,
   });
 
-  const slo = evaluateLatencySlo({ history, clientHistory, thresholds });
+  // The fixture is scored against a fixed clock so the spec 019 window is
+  // deterministic rather than relative to when the suite runs.
+  const now = Date.parse("2026-06-18T10:10:00.000Z");
+
+  const slo = evaluateLatencySlo({ history, clientHistory, thresholds, now });
   assert.equal(slo.status, "warn");
   assert.equal(
     slo.evaluations.find((evaluation) => evaluation.id === "server_read_p95").status,
@@ -786,10 +790,188 @@ test("latency SLOs warn on slow reads and identify DB hotspots", () => {
     "warn"
   );
 
-  const diagnosis = diagnoseLatencyPerformance({ history, clientHistory, thresholds });
+  const diagnosis = diagnoseLatencyPerformance({ history, clientHistory, thresholds, now });
   assert.equal(diagnosis.status, "warn");
   assert.equal(diagnosis.dbSpanTargets[0].target, "brain.sync_conflicts");
   assert.ok(
     diagnosis.findings.some((finding) => finding.metricId === "server_read_p95")
+  );
+});
+
+// --- Spec 019 phase 1: windowed DB span SLO ---
+
+const HOUR_MS = 60 * 60 * 1000;
+
+function dbSpanRow(atMs, spanDurationsMs, name = "brain_sync_status") {
+  const spans = spanDurationsMs.map((durationMs) => ({
+    operation: "select",
+    target: "brain.brain_files+brain.brain_file_revisions",
+    durationMs,
+    ok: true,
+    rowCount: 1,
+  }));
+  return {
+    event_type: "hosted_mcp_latency",
+    filename: null,
+    duration_ms: String(Math.max(...spanDurationsMs) + 2),
+    created_at: new Date(atMs).toISOString(),
+    metadata: {
+      source: "hosted_mcp_server",
+      timingLayer: "server_tool",
+      name,
+      kind: "read",
+      target: "ai-brain-jem",
+      ok: true,
+      db: {
+        queryCount: spans.length,
+        totalMs: spanDurationsMs.reduce((total, value) => total + value, 0),
+        averageMs: spanDurationsMs.reduce((total, value) => total + value, 0) / spans.length,
+        maxMs: Math.max(...spanDurationsMs),
+        rowCount: spans.length,
+        failedCount: 0,
+        truncatedCount: 0,
+        spans,
+      },
+    },
+  };
+}
+
+function dbSpanEvaluationOf(rows, now) {
+  const slo = evaluateLatencySlo({
+    history: latencyHistoryFromSyncEventRows(rows),
+    clientHistory: [],
+    thresholds: normalizeLatencySloThresholds({}),
+    now,
+  });
+  return slo.evaluations.find((evaluation) => evaluation.id === "db_max_span");
+}
+
+test("a stale outlier outside the window no longer latches the DB span SLO", () => {
+  // Shape of the real ai-brain-jem 2026-09-07 warning: one 542ms span five days
+  // old, every recent span fast. Under the old all-time max this warned for
+  // roughly three weeks.
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [dbSpanRow(now - 5 * 24 * HOUR_MS, [542, 530])];
+  for (let index = 1; index <= 40; index += 1) {
+    rows.push(dbSpanRow(now - index * 20 * 60 * 1000, [44, 38]));
+  }
+
+  const evaluation = dbSpanEvaluationOf(rows, now);
+  assert.equal(evaluation.status, "pass");
+  assert.equal(evaluation.breachCount, 0);
+  assert.equal(evaluation.windowLabel, "last 24h");
+  assert.ok(evaluation.valueMs < 500);
+});
+
+test("a sustained in-window breach still escalates the DB span SLO", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [];
+  for (let index = 1; index <= 30; index += 1) {
+    rows.push(dbSpanRow(now - index * 10 * 60 * 1000, [900, 850]));
+  }
+
+  const evaluation = dbSpanEvaluationOf(rows, now);
+  assert.equal(evaluation.status, "warn");
+  assert.equal(evaluation.suppressed, false);
+  assert.ok(evaluation.breachCount >= 2);
+});
+
+test("a sustained in-window breach past the fail threshold fails", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [];
+  for (let index = 1; index <= 30; index += 1) {
+    rows.push(dbSpanRow(now - index * 10 * 60 * 1000, [3200, 3100]));
+  }
+
+  assert.equal(dbSpanEvaluationOf(rows, now).status, "fail");
+});
+
+test("a single recent outlier is held at pass by the recurrence floor", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [dbSpanRow(now - 30 * 60 * 1000, [1400])];
+  for (let index = 1; index <= 10; index += 1) {
+    rows.push(dbSpanRow(now - index * 60 * 60 * 1000 - 60_000, [40]));
+  }
+
+  const evaluation = dbSpanEvaluationOf(rows, now);
+  assert.equal(evaluation.status, "pass");
+  assert.equal(evaluation.suppressed, true);
+  assert.equal(evaluation.breachCount, 1);
+  assert.match(evaluation.detail, /single cold-connection outlier/);
+});
+
+test("a Brain with no recent telemetry reports an empty window rather than a breach", () => {
+  // ers-brain on 2026-09-07: last hosted MCP operation four days earlier.
+  const now = Date.parse("2026-09-07T16:52:00.000Z");
+  const rows = [dbSpanRow(now - 4 * 24 * HOUR_MS, [281, 196])];
+
+  const evaluation = dbSpanEvaluationOf(rows, now);
+  assert.equal(evaluation.status, "pass");
+  assert.equal(evaluation.sampleCount, 0);
+  assert.match(evaluation.detail, /No bounded Postgres spans/);
+});
+
+test("DB span findings carry observation provenance", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [];
+  for (let index = 1; index <= 30; index += 1) {
+    rows.push(dbSpanRow(now - index * 10 * 60 * 1000, [900, 850]));
+  }
+
+  const diagnosis = diagnoseLatencyPerformance({
+    history: latencyHistoryFromSyncEventRows(rows),
+    clientHistory: [],
+    thresholds: normalizeLatencySloThresholds({}),
+    now,
+  });
+  const finding = diagnosis.findings.find(
+    (candidate) => candidate.metricId === "db_max_span"
+  );
+  assert.ok(finding);
+  assert.ok(finding.observedAt);
+  assert.equal(finding.windowLabel, "last 24h");
+  assert.ok(finding.sampleCount > 0);
+  assert.match(finding.detail, /ago/);
+});
+
+test("the slowest-DB-target finding does not fire while the SLO is suppressed", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const rows = [dbSpanRow(now - 30 * 60 * 1000, [1400])];
+  for (let index = 1; index <= 10; index += 1) {
+    rows.push(dbSpanRow(now - index * 60 * 60 * 1000 - 60_000, [40]));
+  }
+
+  const diagnosis = diagnoseLatencyPerformance({
+    history: latencyHistoryFromSyncEventRows(rows),
+    clientHistory: [],
+    thresholds: normalizeLatencySloThresholds({}),
+    now,
+  });
+  // The 1.4s operation still warns on the read SLO — that is a real,
+  // user-facing latency. What must not fire is a second DB finding derived
+  // from the same suppressed outlier.
+  assert.equal(
+    diagnosis.findings.some((finding) => finding.metricId === "slowest_db_target"),
+    false
+  );
+  assert.equal(
+    diagnosis.findings.some((finding) => finding.metricId === "db_max_span"),
+    false
+  );
+});
+
+test("failed DB queries are counted inside the window only", () => {
+  const now = Date.parse("2026-09-07T16:44:00.000Z");
+  const stale = dbSpanRow(now - 5 * 24 * HOUR_MS, [40]);
+  stale.metadata.db.failedCount = 3;
+  const slo = evaluateLatencySlo({
+    history: latencyHistoryFromSyncEventRows([stale, dbSpanRow(now - HOUR_MS, [40])]),
+    clientHistory: [],
+    thresholds: normalizeLatencySloThresholds({}),
+    now,
+  });
+  assert.equal(
+    slo.evaluations.find((evaluation) => evaluation.id === "db_failed_queries").status,
+    "pass"
   );
 });

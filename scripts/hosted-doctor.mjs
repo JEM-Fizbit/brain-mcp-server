@@ -33,6 +33,10 @@ import {
   classifyFlyStatusError,
   classifyFlyStatusOutput,
   classifyLintFindings,
+  classifyPostgresError,
+  consecutiveFailureStreak,
+  postgresFailureDetail,
+  postgresFailureStatus,
   OPERATOR_ALARM_CHECKS,
 } from "./lib/doctor-actionability.mjs";
 import {
@@ -84,6 +88,24 @@ const userOperationTelemetryCacheFile =
 const userOperationTelemetryRefreshMs = Math.max(
   60_000,
   Number(process.env.BRAIN_DOCTOR_OPERATION_REFRESH_MS || 15 * 60 * 1000)
+);
+// Spec 019 phase 1. `hosted-doctor.out.json` is overwritten every cycle, so a
+// failing snapshot is gone before it can be examined and a one-off cannot be
+// told from a pattern. Keep a small bounded verdict history beside it.
+const doctorHistoryFile =
+  process.env.BRAIN_DOCTOR_HISTORY_FILE ||
+  path.join(path.dirname(healthFile), "hosted-doctor-history.json");
+const doctorHistoryLimit = Math.max(
+  2,
+  Number(process.env.BRAIN_DOCTOR_HISTORY_LIMIT || 40)
+);
+const postgresRetryAttempts = Math.max(
+  1,
+  Number(process.env.BRAIN_DOCTOR_POSTGRES_RETRY_ATTEMPTS || 3)
+);
+const postgresRetryBackoffMs = Math.max(
+  0,
+  Number(process.env.BRAIN_DOCTOR_POSTGRES_RETRY_BACKOFF_MS || 400)
 );
 const forceDeepOperationRefresh = process.env.BRAIN_DOCTOR_FORCE_DEEP === "1";
 const userOperationLatencyHistoryLimit = Math.max(
@@ -158,6 +180,9 @@ const latencySloThresholds = normalizeLatencySloThresholds({
   syncWaitP95FailMs: numericEnv("BRAIN_SLO_SYNC_WAIT_P95_FAIL_MS"),
   dbMaxSpanWarnMs: numericEnv("BRAIN_SLO_DB_MAX_SPAN_WARN_MS"),
   dbMaxSpanFailMs: numericEnv("BRAIN_SLO_DB_MAX_SPAN_FAIL_MS"),
+  dbSpanWindowMs: numericEnv("BRAIN_SLO_DB_SPAN_WINDOW_MS"),
+  dbSpanPercentile: numericEnv("BRAIN_SLO_DB_SPAN_PERCENTILE"),
+  dbSpanMinBreachCount: numericEnv("BRAIN_SLO_DB_SPAN_MIN_BREACH_COUNT"),
   dbFailedQueryWarnCount: numericEnv("BRAIN_SLO_DB_FAILED_QUERY_WARN_COUNT"),
 });
 const CHECK_STATUS_RANK = {
@@ -175,6 +200,44 @@ function addCheck(name, status, details = {}) {
   const check = { name, status, details };
   checks.push(check);
   return check;
+}
+
+// --- Spec 019 phase 1: bounded verdict history ---
+
+let doctorHistory = [];
+
+async function loadDoctorHistory() {
+  try {
+    const parsed = JSON.parse(await fs.readFile(doctorHistoryFile, "utf-8"));
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+    doctorHistory = entries.filter(
+      (entry) => entry && entry.brainId === brainId && entry.checkedAt
+    );
+  } catch {
+    doctorHistory = [];
+  }
+}
+
+function previousConsecutiveFailures(checkName) {
+  return consecutiveFailureStreak(doctorHistory, checkName);
+}
+
+async function appendDoctorHistory(entry) {
+  const entries = [...doctorHistory, entry].slice(-doctorHistoryLimit);
+  const tempPath = `${doctorHistoryFile}.${process.pid}.next`;
+  try {
+    await fs.mkdir(path.dirname(doctorHistoryFile), { recursive: true });
+    await fs.writeFile(
+      tempPath,
+      `${JSON.stringify({ version: 1, brainId, entries }, null, 2)}\n`,
+      "utf-8"
+    );
+    await fs.rename(tempPath, doctorHistoryFile);
+  } catch {
+    // History is diagnostic context, never a gate. A failure to persist it must
+    // not change the verdict the operator sees this cycle.
+    await fs.rm(tempPath, { force: true }).catch(() => undefined);
+  }
 }
 
 function numericEnv(name) {
@@ -474,33 +537,77 @@ async function checkPostgresSummary() {
   }
 
   const pool = doctorPool;
-  try {
-    const result = await pool.query(
-      `
-        select
-          (select count(*)::int from brain.brain_files where brain_id = $1) as hosted_files,
-          (select count(*)::int from brain.sync_conflicts where brain_id = $1 and status = 'open') as open_conflicts,
-          (select max(updated_at) from brain.brain_files where brain_id = $1) as latest_hosted_update
-      `,
-      [brainId]
-    );
-    const row = result.rows[0];
-    addCheck("postgres_summary", "pass", {
-      brainId,
-      databaseUrl: "set",
-      hostedFiles: row.hosted_files,
-      openConflicts: row.open_conflicts,
-      latestHostedUpdate: row.latest_hosted_update
-        ? row.latest_hosted_update.toISOString()
-        : null,
-    });
-  } catch (error) {
-    addCheck("postgres_summary", "fail", {
-      brainId,
-      databaseUrl: "set",
-      error: error.message,
-    });
+  const attempts = [];
+  // Retry before judging. A single momentary exception used to reach the top
+  // severity with no retry, no threshold and no classification, so a resolver
+  // blip during a laptop darkwake was indistinguishable from a dead database.
+  for (let attempt = 1; attempt <= postgresRetryAttempts; attempt += 1) {
+    try {
+      await runPostgresSummaryQuery(pool, attempts.length);
+      return;
+    } catch (error) {
+      const classification = classifyPostgresError(error);
+      attempts.push(classification);
+      // A durable fault will not fix itself in 400ms; stop burning cycles.
+      if (classification.durable) break;
+      if (attempt < postgresRetryAttempts) {
+        await delay(postgresRetryBackoffMs * attempt);
+      }
+    }
   }
+
+  const classification = attempts.at(-1);
+  const consecutiveFailures = previousConsecutiveFailures("postgres_summary") + 1;
+  addCheck(
+    "postgres_summary",
+    postgresFailureStatus(classification, consecutiveFailures),
+    {
+      brainId,
+      databaseUrl: "set",
+      state: "query_failed",
+      errorClass: classification.class,
+      durable: classification.durable,
+      transient: !classification.durable,
+      attempts: attempts.length,
+      consecutiveFailures,
+      observedAt: new Date().toISOString(),
+      summary: classification.summary,
+      resolution: classification.resolution,
+      error: classification.error,
+    }
+  );
+}
+
+function delay(ms) {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
+
+async function runPostgresSummaryQuery(pool, retriedAfterFailures) {
+  const result = await pool.query(
+    `
+      select
+        (select count(*)::int from brain.brain_files where brain_id = $1) as hosted_files,
+        (select count(*)::int from brain.sync_conflicts where brain_id = $1 and status = 'open') as open_conflicts,
+        (select max(updated_at) from brain.brain_files where brain_id = $1) as latest_hosted_update
+    `,
+    [brainId]
+  );
+  const row = result.rows[0];
+  addCheck("postgres_summary", "pass", {
+    brainId,
+    databaseUrl: "set",
+    hostedFiles: row.hosted_files,
+    openConflicts: row.open_conflicts,
+    latestHostedUpdate: row.latest_hosted_update
+      ? row.latest_hosted_update.toISOString()
+      : null,
+    observedAt: new Date().toISOString(),
+    // A pass that needed retries is still a pass, but the operator should be
+    // able to see that the connection was flaky rather than clean.
+    ...(retriedAfterFailures > 0
+      ? { recoveredAfterFailures: retriedAfterFailures }
+      : {}),
+  });
 }
 
 async function checkRecentActivity() {
@@ -1461,7 +1568,11 @@ function buildOperatorActions(status) {
     });
   }
 
-  if (postgres?.status === "warn") {
+  // Three distinct conditions share this check. A missing URL is a setup gap; a
+  // transient class is a degraded observation that usually self-heals; a
+  // durable class is a fault to act on now. Rendering them identically is what
+  // trained the operator to dismiss the check.
+  if (postgres?.status === "warn" && postgres.details?.databaseUrl === "missing") {
     actions.push({
       level: "warn",
       reason: "postgres_diagnostics_unconfigured",
@@ -1469,13 +1580,19 @@ function buildOperatorActions(status) {
       detail:
         "Set BRAIN_REVISION_DATABASE_URL for the profile, restart its local stack, then reload Brain Monitor.",
     });
+  } else if (postgres?.status === "warn") {
+    actions.push({
+      level: "warn",
+      reason: "postgres_diagnostics_degraded",
+      title: "Watch Brain database connectivity.",
+      detail: postgresFailureDetail(postgres.details),
+    });
   } else if (postgres?.status === "fail") {
     actions.push({
       level: "fail",
       reason: "postgres_diagnostics_failed",
       title: "Restore Brain database diagnostic access.",
-      detail:
-        `The Postgres summary query failed${postgres.details?.error ? `: ${String(postgres.details.error).slice(0, 160)}` : "."} Verify the profile database URL and Supabase reachability, then reload Brain Monitor.`,
+      detail: postgresFailureDetail(postgres.details),
     });
   }
 
@@ -1784,6 +1901,10 @@ async function checkPoolerConfig() {
 
 const doctorStartedAt = Date.now();
 
+// Loaded before any check runs: the Postgres check consults the prior streak
+// to decide whether a transient class has stopped being plausibly momentary.
+await loadDoctorHistory();
+
 try {
   await Promise.all([
     timedCheck("hosted_health", checkHostedHealth),
@@ -1820,6 +1941,13 @@ const summary = {
   checks,
   actions: buildOperatorActions(status),
 };
+
+await appendDoctorHistory({
+  brainId,
+  checkedAt: summary.checkedAt,
+  status,
+  checks: Object.fromEntries(checks.map((check) => [check.name, check.status])),
+});
 
 console.log(JSON.stringify(summary, null, 2));
 if (failed.length > 0) process.exitCode = 1;

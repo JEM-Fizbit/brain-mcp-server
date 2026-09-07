@@ -1,6 +1,6 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** draft
+**Status:** in-progress — phase 1 landed 2026-09-07 (local scripts, both Brains); phases 2 and 3 open
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
