@@ -8,6 +8,43 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-08 — Hosted latency findings are windowed, spans are annotated, and connection warmth comes from the idle timeout
+
+**Decision:** Three locks from spec 019. (1) The `db_max_span` SLO is scored as
+a percentile over a bounded time window (default 24h) with a recurrence floor,
+never as a maximum over an unbounded row count. (2) Connection acquisition is
+measured as its own `acquire` span, and concurrent spans are annotated with
+`startOffsetMs` plus a `wallMs` union — never de-duplicated. (3) Pooled
+connection warmth comes from `BRAIN_PG_IDLE_TIMEOUT_MS` (120000 on both hosted
+deployments); pg-pool `min` is deliberately not set, and `keepAlive` stays on
+as a prerequisite for holding a connection at all.
+
+**Why:** The old SLO read a single maximum over the last 240 telemetry rows with
+no time filter, so one cold-connection outlier latched a warning for about three
+weeks on a sparse Brain — training the operator to dismiss the check most likely
+to catch a real regression. The old span wrapped `pool.query`, which acquires a
+connection before running SQL, so a handshake was billed to whichever SELECT
+triggered it: measured in production, a `brain_sync_status` call spent 0.4-1.5ms
+on SQL and 53-84ms acquiring connections, all of it previously reported as a slow
+table read. On concurrency, summed spans exceeded the handler duration (1072ms of
+"DB time" inside a 544ms handler), so both a sum and a union are needed for
+either to be honest.
+
+**Alternatives rejected:** De-duplicating concurrent spans — they are independent
+costs that happened to overlap, and collapsing them would erase the evidence
+needed to diagnose a common-cause stall. Raising the idle timeout without TCP
+keepalive — a silently dropped socket would be handed to the next caller and
+stall for the full 30s query timeout. Tuning the 500ms/2500ms thresholds — the
+defect was the statistic, not the cutoff. Relying on pg-pool `min`, which was
+shipped first on a plausible reading of the pg-pool source and then measured to
+do nothing: a four-arm A/B on the live JEM deployment found that at a ~26s
+inter-call gap the 10s default reused 0/6 connections under two keepalive
+settings while a 120s timeout reused 6/6, with `min` making no difference in
+either direction. ERS independently reproduced the benefit on its own pooler.
+
+**Related:** `docs/specs/archive/019-hosted-latency-finding-semantics.md`;
+upstream `v1.8.10`; ERS overlay `475902c`.
+
 ## 2026-09-01 — Complete the Entra-only technical cutover before final governance closeout
 
 **Decision:** Deploy the already accepted `v1.8.8` technical baseline to JEM
