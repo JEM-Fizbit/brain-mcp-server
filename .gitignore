@@ -4,6 +4,10 @@ dist/
 .DS_Store
 .env
 .env.local
+# Any local variant, including timestamped backups — these carry live database
+# URLs, the Supabase service-role key and the OAuth signing secret.
+.env.local.*
+!.env.local.example
 .brain-sync/
 tmp/
 *.tsbuildinfo
