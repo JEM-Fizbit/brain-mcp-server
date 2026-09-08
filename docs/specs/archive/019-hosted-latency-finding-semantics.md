@@ -1,6 +1,7 @@
 # 019 — Hosted Latency Finding Semantics And Connection Warmth
 
-**Status:** complete — phases 0-3 shipped and verified in production on JEM (2026-09-07). Phase 1 is live on both Brains via the local scripts (no deploy). Phases 2 and 3 are runtime code; ERS follows at its next planned annotated tag.
+**Status:** done
+**Shipped:** 2026-09-08 — upstream `v1.8.10` (commit `b75f961`); JEM deployed 2026-09-07, ERS deployed 2026-09-08 via overlay `475902c`. Phase 1 reached both Brains on 2026-09-07 through the local operator scripts with no deployment.
 **Source:** `BACKLOG.md` — the `db_max_span` re-specification item and the doctor transient-tolerance item, which that backlog explicitly directs to be promoted together
 **Roadmap link:** ad-hoc — hosted observability maintenance, follows spec 004 (auth-failure alerting) and spec 005 (stale-connector classification)
 **Decisions impact:** locks three decisions on ship — the `db_max_span` SLO becomes a windowed percentile rather than an un-windowed max; concurrent DB spans are annotated, never de-duplicated; the Postgres pool idle timeout is not raised without TCP keepalive
