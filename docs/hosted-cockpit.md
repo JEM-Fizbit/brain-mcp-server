@@ -293,7 +293,17 @@ last usable report when a launch fails.
 For one operator app that supervises both JEM and ERS, pass
 `BRAIN_MENUBAR_PROFILES_JSON` as a JSON array, or point
 `BRAIN_MENUBAR_PROFILES_FILE` at an owner-readable JSON file so credentials do
-not appear in a shell command. Each profile supports `id` or
+not appear in a shell command.
+
+**Prefer the file, and keep it as the source of truth.** The installer writes
+its generated config inside the app bundle; that copy is derived output, not a
+record. If profiles were supplied inline and never persisted, a later reinstall
+has nothing to read and silently falls back to a single default profile, taking
+a two-Brain setup down to one — and any hand-edit of the bundle copy is lost at
+the same moment. The convention on the current operator machine is
+`~/.config/brain-monitor/profiles.json`, mode 0600, alongside the per-profile
+Fly credential directories it names in `FLY_CONFIG_DIR`. Edit that file and
+reinstall; do not edit the bundle. Each profile supports `id` or
 `brainId`, `name` or `displayName`, `brainRoot` or `brainDir`, `stateFile`,
 `healthFile`, `logDir`, `cockpitUrl`, and an optional `env` object. The profile
 environment allow-list is `BRAIN_REVISION_STORE`,
