@@ -1903,7 +1903,7 @@ const page = String.raw`<!doctype html>
         <div class="toolbar">
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
-          <button id="refresh" type="button" title="Reload the Brain Monitor's last doctor report">Reload</button>
+          <button id="refresh" type="button" title="Re-run diagnostics now, bypassing the cached Brain Monitor report. Clears a transient failure without waiting for the next cycle.">Reload</button>
         </div>
       </header>
 
@@ -4174,7 +4174,10 @@ const page = String.raw`<!doctype html>
         setupSubtabGroup("latency");
       }
 
-      document.getElementById("refresh").addEventListener("click", refresh);
+      // Pass an explicit options object: a bare listener receives the click Event,
+      // whose .fresh is undefined, which silently downgraded Reload to the cached
+      // report. The periodic poll below deliberately stays cached.
+      document.getElementById("refresh").addEventListener("click", () => refresh({ fresh: true }));
       setupTabs();
       setupActivityViews();
       setupFixes();
