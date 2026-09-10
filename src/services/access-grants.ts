@@ -580,4 +580,3 @@ export async function assertSteadyStateOwnerRoster(
   const count = await grants.countActiveOwners(brainId, "entra", tenantId);
   if (count < MIN_ACTIVE_OWNERS) throw new Error(`Access administration requires ${MIN_ACTIVE_OWNERS} active Owners; found ${count}`);
 }
-
