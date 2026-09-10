@@ -978,6 +978,9 @@ export class PostgresRevisionStore implements RevisionStore {
         [input.brainId, conflict.filename]
       );
       const current = currentResult.rows[0] || null;
+      if (!input.expectedRevisionId || input.expectedRevisionId !== current?.id) {
+        throw new Error("Stale or missing reviewed revision: re-read the hosted file before resolving the conflict.");
+      }
       const nextHash = contentHash(input.content);
 
       if (!current) {

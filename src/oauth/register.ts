@@ -1,3 +1,4 @@
+import { registrationLimits } from "./admission.js";
 import { isAllowedRedirectUri, type OauthConfig } from "./config.js";
 import {
   generateClientId,
@@ -71,7 +72,9 @@ export async function handleRegister(
     client_id_issued_at: Math.floor(Date.now() / 1000),
   };
 
-  await state.put("clients", clientId, record);
+  if (!state.registerClient) return { status: 503, body: { error: "temporarily_unavailable", error_description: "Registration admission is unavailable" } };
+  const admitted = await state.registerClient(clientId, record, registrationLimits());
+  if (!admitted) return { status: 429, body: { error: "temporarily_unavailable", error_description: "Registration limit reached; retry later or contact the operator. Existing clients remain valid." } };
   const response: any = { ...record };
   if (!isConfidential) delete response.client_secret;
   return { status: 201, body: response };

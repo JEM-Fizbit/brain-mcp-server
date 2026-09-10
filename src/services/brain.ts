@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { contentHash } from "../sync/hash.js";
+import { mutateLocalFile } from "../sync/recoverable-file.js";
 import {
   isDefaultKnowledgeSearchPath,
   rankSearchCandidates,
@@ -123,43 +125,32 @@ export async function updateFile(
   content: string,
   mode: "replace" | "append" | "patch",
   old_content?: string,
-  brainId?: string
+  brainId?: string,
+  expectedRevisionId?: string | null
 ): Promise<string> {
   const { brainDir } = await getBrainPaths(brainId);
   const filePath = resolveFilePath(brainDir, filename);
 
-  if (mode === "patch") {
-    if (!old_content) {
-      throw new Error("patch mode requires old_content parameter");
-    }
-    const existing = await fs.readFile(filePath, "utf-8");
-    const occurrences = existing.split(old_content).length - 1;
-    if (occurrences === 0) {
-      throw new Error(
-        `old_content not found in ${filename}. Ensure the text matches exactly (including whitespace and newlines).`
-      );
-    }
-    if (occurrences > 1) {
-      throw new Error(
-        `old_content found ${occurrences} times in ${filename}. It must be unique. Provide more surrounding context to disambiguate.`
-      );
-    }
-    // Function replacer: a plain-string replacement would interpret
-    // $-patterns ($$, $&, $`, $') and silently corrupt the file.
-    const updated = existing.replace(old_content, () => content);
-    await fs.writeFile(filePath, updated, "utf-8");
-  } else if (mode === "append") {
-    const existing = await fs.readFile(filePath, "utf-8").catch(() => "");
-    const separator =
-      existing.endsWith("\n") || existing.length === 0 ? "" : "\n";
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, existing + separator + content, "utf-8");
-  } else {
-    // Ensure the parent directory exists so a new file can be created in a
-    // subdirectory (e.g. archive/tasks-done.md) that does not yet exist.
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, content, "utf-8");
+  let existing: string | null;
+  try { existing = await fs.readFile(filePath, "utf8"); }
+  catch (error: any) { if (error.code !== "ENOENT") throw error; existing = null; }
+  const currentHash = existing === null ? null : contentHash(existing);
+  if (expectedRevisionId !== undefined && expectedRevisionId !== currentHash) {
+    throw new Error("Stale reviewed revision: read and review the current file before retrying.");
   }
+  let next = content;
+  if (mode === "patch") {
+    if (!old_content) throw new Error("patch mode requires old_content parameter");
+    const occurrences = (existing ?? "").split(old_content).length - 1;
+    if (!occurrences) throw new Error(`old_content not found in ${filename}. Ensure the text matches exactly.`);
+    if (occurrences > 1) throw new Error(`old_content found ${occurrences} times in ${filename}. It must be unique.`);
+    next = existing!.replace(old_content, () => content);
+  } else if (mode === "append") {
+    const text = existing ?? "";
+    next = text + (text.endsWith("\n") || !text.length ? "" : "\n") + content;
+  }
+  const mutation = await mutateLocalFile(brainDir, filename, next, currentHash);
+  if (!mutation.ok) throw new Error(`Concurrent local edit preserved at ${mutation.recoveryPath}; review before retrying.`);
 
   const [stat, fullContent] = await Promise.all([
     fs.stat(filePath),

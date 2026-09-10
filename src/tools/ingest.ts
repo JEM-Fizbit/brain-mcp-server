@@ -1,3 +1,5 @@
+import { assertOperationSupported, describeCapabilities, capabilityFailure } from "../services/capabilities.js";
+import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   IngestSchema,
@@ -37,7 +39,8 @@ export function registerIngestTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         const analysis = await analyzeForIngest(source_label, ctx.brain);
-        const filesystem = ctx.brain.storage_backend === "filesystem";
+        const capabilities = describeCapabilities(ctx.brain, ctx.role, activeBrainStore().capabilities);
+        const filesystem = capabilities.operations.brain_ingest.supported;
         const categories = sourceCategoriesForBrain(ctx.brain);
         const capability = [
           `# Ingestion preflight: ${source_label}`,
@@ -58,12 +61,9 @@ export function registerIngestTools(server: McpServer): void {
           "",
           analysis.instructions,
         ].join("\n");
-        return { content: [{ type: "text", text: capability }] };
+        return { content: [{ type: "text", text: capability }], structuredContent: { capabilities, source_categories: categories } };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );
@@ -96,12 +96,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
           const contentSection =
             source_content || source_path
               ? await (async () => {
-                  if (source_path && ctx.brain.storage_backend !== "filesystem") {
-                    throw new Error(
-                      `Brain ${ctx.brainId} uses Postgres; Fly cannot read source_path. ` +
-                        "This preflight made no writes. Use brain_prepare_ingest and the operator source workflow."
-                    );
-                  }
+                  if (source_path) assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_ingest", "source_path");
                   const content = await resolveSourceContent(
                     source_content,
                     source_path
@@ -125,12 +120,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
         }
 
         // dry_run=false: save the source .md file
-        if (ctx.brain.storage_backend !== "filesystem") {
-          throw new Error(
-            `Brain ${ctx.brainId} uses Postgres; brain_ingest source saving is unavailable on Fly. ` +
-              "No writes occurred. Call brain_prepare_ingest and complete source/inbox custody in the selected Brain's operator workflow before any Brain-content write."
-          );
-        }
+        assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_ingest");
         const content = await resolveSourceContent(source_content, source_path);
         const savedPath = await saveSource(
           content,
@@ -158,10 +148,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
 
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );
@@ -175,12 +162,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
         const ctx = await resolveToolBrain(brain_id, extra);
         assertToolRole(ctx, "brain_ingest_complete");
         assertConfiguredSourceCategory(category, ctx.brain);
-        if (ctx.brain.storage_backend !== "filesystem") {
-          throw new Error(
-            `Brain ${ctx.brainId} uses Postgres; brain_ingest_complete cannot see its operator-side source tree or inbox. ` +
-              "No writes occurred. Use brain_prepare_ingest and finish provenance plus inbox verification in the selected Brain's operator workflow; use brain_log only for the hosted Brain revision receipt."
-          );
-        }
+        assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_ingest_complete");
         const result = await recordIngest(
           source_label,
           category,
@@ -203,10 +185,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
 
         return { content: [{ type: "text", text: result + inboxResult + sync }] };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );

@@ -28,6 +28,11 @@ async function writeFile(rel, content) {
   await fs.writeFile(full, content, "utf-8");
 }
 
+test("semantic search never creates a missing derived index", async () => {
+  await assert.rejects(semantic.semanticSearch("ai-brain-jem", "retrieval"), /semantic_index_missing/);
+  assert.equal(await fs.stat(path.join(tmpDir, ".brain-platform")).then(() => true, () => false), false);
+});
+
 test("indexes markdown sources and returns semantic matches", async () => {
   await writeFile("brain/00_loader.md", "# Loader\n");
   await writeFile("brain/NOW.md", "# Now\n");

@@ -186,6 +186,7 @@ function validateSourceFilename(filename: string): string {
 }
 
 export class RevisionBrainStore implements BrainStore {
+  readonly capabilities = { revisions: true };
   constructor(
     private readonly revisionStore: RevisionStore,
     private readonly sourceStore?: SourceMetadataStore
@@ -194,6 +195,12 @@ export class RevisionBrainStore implements BrainStore {
   async brainExists(brainId: string): Promise<boolean> {
     const files = await this.revisionStore.listFiles(brainId);
     return files.length > 0;
+  }
+
+  async readFileSnapshot(brainId: string, filename: string) {
+    validateFilename(filename);
+    const revision = await this.revisionStore.readFile(brainId, filename);
+    return { content: revision.content, revisionId: revision.revisionId, contentHash: revision.contentHash };
   }
 
   async readFile(
@@ -321,11 +328,18 @@ export class RevisionBrainStore implements BrainStore {
     mode: WriteMode,
     oldContent?: string,
     actor?: RevisionActor,
-    role?: BrainRole
+    role?: BrainRole,
+    expectedRevisionId?: string | null
   ): Promise<string> {
     validateFilename(filename);
     assertStructuralWriteAllowed(filename, role);
     const current = await this.revisionStore.getHead(brainId, filename);
+    if (mode === "replace" && current && expectedRevisionId === undefined) {
+      throw new Error("expected_revision is required for replacement; read the file and submit its reviewed revision.");
+    }
+    if (expectedRevisionId !== undefined && (current?.revisionId ?? null) !== expectedRevisionId) {
+      throw new Error("Stale reviewed revision: read and review the current file before retrying.");
+    }
     let nextContent = content;
 
     if (mode === "patch") {
@@ -549,7 +563,8 @@ export class RevisionBrainStore implements BrainStore {
     conflictId: string,
     content: string,
     actor?: RevisionActor,
-    role?: BrainRole
+    role?: BrainRole,
+    expectedRevisionId?: string
   ): Promise<ConflictResolutionResult> {
     const conflict = (await this.revisionStore.listConflicts(brainId)).find(
       (candidate) => candidate.conflictId === conflictId
@@ -561,6 +576,7 @@ export class RevisionBrainStore implements BrainStore {
       conflictId,
       content,
       actor,
+      expectedRevisionId,
     });
   }
 }

@@ -1,3 +1,5 @@
+import { assertOperationSupported, capabilityFailure } from "../services/capabilities.js";
+import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   SemanticIndexSchema,
@@ -10,21 +12,19 @@ import { assertToolRole } from "../services/tool-authority.js";
 export function registerSemanticTools(server: McpServer): void {
   server.tool(
     "brain_semantic_index",
-    "Build or refresh the read-only semantic index over sources/ for one Brain.",
+    "Build or refresh the derived semantic index over sources/ for one Brain.",
     SemanticIndexSchema.shape,
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertToolRole(ctx, "brain_semantic_index");
+        assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_semantic_index");
         const result = await indexSources(ctx.brainId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );
@@ -33,9 +33,11 @@ export function registerSemanticTools(server: McpServer): void {
     "brain_semantic_search",
     "Search semantically across indexed sources/ chunks. This is read-only and does not modify Brain Markdown.",
     SemanticSearchSchema.shape,
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     async ({ brain_id, query, top_k }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_semantic_search");
         const results = await semanticSearch(ctx.brainId, query, top_k);
         if (results.length === 0) {
           return {
@@ -62,10 +64,7 @@ export function registerSemanticTools(server: McpServer): void {
 
         return { content: [{ type: "text", text }] };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );

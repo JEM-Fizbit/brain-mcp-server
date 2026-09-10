@@ -274,7 +274,7 @@ async function readBrainFile(brainDir, filename) {
   return fs.readFile(path.join(brainDir, filename), "utf-8");
 }
 
-async function callTool(harness, name, args = {}) {
+async function callRawTool(harness, name, args = {}) {
   const body = JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
@@ -309,7 +309,18 @@ async function callTool(harness, name, args = {}) {
   if (message.error) {
     throw new Error(message.error.message);
   }
-  return message.result.content.map((part) => part.text).join("\n");
+  return message.result;
+}
+
+// Model a client that reads before replacing. Tests of missing/stale preconditions
+// call callRawTool directly so this convenience cannot hide contract failures.
+async function callTool(harness, name, args = {}) {
+  if (name === "brain_update_file" && args.mode === "replace" && args.expected_revision === undefined) {
+    const read = await callRawTool(harness, "brain_read_file", { brain_id: args.brain_id, filename: args.filename });
+    args = { ...args, expected_revision: read.structuredContent?.revision_id ?? "new" };
+  }
+  const result = await callRawTool(harness, name, args);
+  return result.structuredContent?.content ?? result.content.map(part => part.text).join("\n");
 }
 
 async function listTools(harness) {
@@ -563,11 +574,10 @@ test("HTTP MCP hosted inbox scan does not require a server brain_dir", async () 
   });
 
   const result = await callTool(harness, "brain_scan_inbox");
-  assert.match(result, /Server-side inbox state/);
-  assert.match(result, /backend capability result/);
-  assert.match(result, /local Monitor\/operator workspace/);
-  assert.doesNotMatch(result, /local stdio server|local sync mirror/);
-  assert.match(result, /Postgres-backed Brain/);
+  assert.match(result, /operator_surface_required/);
+  assert.match(result, /"observation":"unobserved"/);
+  assert.match(result, /operator_workspace/);
+  assert.doesNotMatch(result, /Inbox is empty/);
 });
 
 test("HTTP MCP hosted ingestion preflight is read-only and backend-aware", async () => {
@@ -735,6 +745,7 @@ test("HTTP MCP exposes hosted sync status and conflict listing", async () => {
   assert.ok(conflictId);
   const resolution = await callTool(harness, "brain_resolve_conflict", {
     conflict_id: conflictId,
+    expected_revision: (await store.getHead("ai-brain-jem", "NOW.md")).revisionId,
     content: "Reviewed merged resolution\n",
   });
   assert.match(resolution, new RegExp(`Resolved conflict ${conflictId}`));
@@ -871,4 +882,35 @@ test("HTTP MCP refuses to delete or rename a protected structural file", async (
     to: "loader-renamed.md",
   });
   assert.match(rename, /protected structural file 00_loader\.md/);
+});
+
+
+test("HTTP replacement requires reviewed revision and refuses a stale reader", async () => {
+  const harness = await setupHarness("reviewed-revision");
+  const read = await callRawTool(harness, "brain_read_file", { filename: "NOW.md" });
+  const revision = read.structuredContent.revision_id;
+  assert.ok(revision);
+  const missing = await callRawTool(harness, "brain_update_file", { filename: "NOW.md", mode: "replace", content: "missing" });
+  assert.equal(missing.isError, true);
+  const accepted = await callRawTool(harness, "brain_update_file", { filename: "NOW.md", mode: "replace", content: "first", expected_revision: revision });
+  assert.ok(!accepted.isError);
+  const stale = await callRawTool(harness, "brain_update_file", { filename: "NOW.md", mode: "replace", content: "stale", expected_revision: revision });
+  assert.equal(stale.isError, true);
+  assert.equal(await callTool(harness, "brain_read_file", { filename: "NOW.md" }), "first");
+});
+
+test("capability discovery agrees with unsupported semantic and inbox execution", async () => {
+  const harness = await setupHarness("capability-contract", { storage_backend: "postgres", storage_config: {} });
+  const described = await callRawTool(harness, "brain_describe", { brain_id: "ai-brain-jem" });
+  const capabilities = described.structuredContent.capabilities;
+  assert.equal(capabilities.version, 1);
+  for (const operation of ["brain_scan_inbox", "brain_semantic_search", "brain_semantic_index"]) {
+    assert.equal(capabilities.operations[operation].supported, false);
+    const refused = await callRawTool(harness, operation, operation === "brain_semantic_search" ? { query: "example" } : {});
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /operator_surface_required/);
+  }
+  const context = await callRawTool(harness, "brain_load_context");
+  assert.equal(context.structuredContent.observations.inbox.state, "unobserved");
+  assert.doesNotMatch(context.content[0].text, /inbox unavailable|Inbox is empty/i);
 });

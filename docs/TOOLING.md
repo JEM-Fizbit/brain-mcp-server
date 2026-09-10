@@ -71,7 +71,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - Supabase Postgres owns hosted revisions, OAuth state, conflicts, cursors, source metadata, and telemetry.
 - Supabase Storage owns private source/artifact bytes.
 - Git is emergency export/history only; routine Brain work should not depend on manual commit/push/merge.
-- The cockpit and menu-bar app are local-only, read-only operator surfaces. They must not expose Brain writes, conflict resolution, hosted admin mutations, or public network binding.
+- The cockpit and menu-bar app remain loopback-only. Routine refresh is read-only; approved Maintenance actions may run lint, reviewed mechanical fixes and configured local restart controls as specified in `docs/hosted-cockpit.md`. They do not provide general Brain editing or conflict resolution. ERS access administration is a separate authenticated hosted Owner surface; the local cockpit links to it. Do not add public network binding or bypass either surface's authorization.
 
 ## Verification Guidance
 
@@ -80,3 +80,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - Logic, schema, sync, hosted doctor, or cockpit changes: `npm test`.
 - Cockpit UI/layout changes: `npm run test:cockpit:e2e` after `npx playwright install chromium` has been run for the machine.
 - Hosted-state or deploy work: include `npm run hosted:doctor` or `npm run hosted:test-drive -- --read-only` before mutating commands, then run the relevant post-change smoke from the runbook.
+
+## Capability and write preconditions
+
+Use `brain_describe` for endpoint support before selecting an operation or requesting approval. Manual inbox custody and filesystem access are independent of MCP roles. Follow `docs/backend-capabilities.md` for support, effects, authorization and observations. Replacements must carry the `revision_id` from the read used for review as `expected_revision` (`new` only for creation); conflict resolution also requires the reviewed hosted revision. A stale refusal requires a fresh review, never an automatic retry with the new head. Local sync retains displaced bytes under `.brain-sync-recovery/`; do not silently delete those records.

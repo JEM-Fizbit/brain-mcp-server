@@ -110,6 +110,7 @@ test("PostgresRevisionStore compare-and-swap flow", async (t) => {
       brainId,
       conflictId: conflicts[0].conflictId,
       content: "postgres resolved\n",
+      expectedRevisionId: current.revisionId,
       actor: { provider: "test", id: "resolver" },
     });
     assert.equal(resolved.conflict.status, "resolved");

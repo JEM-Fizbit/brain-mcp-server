@@ -268,7 +268,7 @@ Expected first authenticated tool checks:
 - `brain_list_conflicts` should show open sync conflicts or report none.
 - `brain_search` should search hosted Markdown revisions from Postgres.
 - `brain_list_sources` should show source manifests from Postgres.
-- `brain_read_file` with `scope="sources"` should return a metadata manifest, not private artifact bytes.
+- `brain_read_file` with `scope="sources"` returns exact retained Markdown companion text when available, otherwise a metadata manifest; it does not stream private binary artifact bytes.
 - A small hosted write should create a Postgres revision without invoking git.
 
 From a shell with hosted Supabase secrets set, the direct HTTP-handler smoke script exercises those same authenticated MCP paths without printing secrets:
@@ -324,3 +324,13 @@ After any deployment that changes schema, RLS, functions, Storage, or user-data 
 - Brain dates use `BRAIN_DATE_TIME_ZONE`; the Fly app currently sets this to `Asia/Ho_Chi_Minh` so journal/log entries match John's working date rather than UTC.
 - Store Supabase database URLs and service keys only in deployment secrets or a password manager. They must not appear in docs, commits, logs, screenshots, or client-side environment variables.
 - `BRAIN_HTTP_TIMING_LOGS=1` enables coarse MCP request timing logs with method, path, status, and duration only; request bodies and authorization headers are not logged.
+
+## Structural stabilization runtime contract
+
+Steady-state ERS administration startup uses the same two-active-Owner floor as transactional grant mutations. The legacy `ENTRA_REQUIRED_INITIAL_OWNER_COUNT` provisioning setting does not raise the restart floor; existing grants remain unchanged. Provisioning and current role assignment are separate operator decisions.
+
+Public OAuth registration is admitted atomically with defaults of 10,000 retained clients and 300 registrations per hour (`BRAIN_OAUTH_MAX_CLIENTS`, `BRAIN_OAUTH_REGISTRATIONS_PER_HOUR`). Invalid limits fail closed. Exhaustion returns 429 with Retry-After; existing clients and tokens remain valid. A bounded background sweep deletes expired codes, refresh tokens and upstream OAuth states, never client registrations or unexpired credentials. No identity migration is required.
+
+Client write checks must use reviewed revision preconditions; see [capability contract](backend-capabilities.md). The OAuth smoke checks now read that evidence explicitly and verify local convergence after resolution. Source reads return retained exact Markdown companion text when present, otherwise the metadata manifest; a manifest-only assertion is incorrect.
+
+Release the shared annotated tag first, then consume it through the ERS protected-overlay gate. Verify both owner-isolated deployments and restart the existing local Monitor children onto the matching built runtime. This does not authorize company-wide expansion; spec 020 records rollout acceptance separately.

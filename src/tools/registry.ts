@@ -1,3 +1,5 @@
+import { describeCapabilities } from "../services/capabilities.js";
+import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { DescribeBrainSchema, ListBrainsSchema } from "../schemas/tools.js";
 import {
@@ -27,14 +29,14 @@ export function registerRegistryTools(server: McpServer): void {
 
   server.tool(
     "brain_describe",
-    "Describe one accessible Brain's registry metadata.",
+    "Describe one accessible Brain and its versioned operation capabilities, role requirements, effects, custody and preconditions before invoking tools. This read-only discovery does not change content or grant authority.",
     DescribeBrainSchema.shape,
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async ({ brain_id }, extra) => {
       try {
         const brain = await describeBrainForExtra(brain_id, extra);
-        return {
-          content: [{ type: "text", text: JSON.stringify(brain, null, 2) }],
-        };
+        const result = { ...brain, capabilities: describeCapabilities(brain, brain.role, activeBrainStore().capabilities) };
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],

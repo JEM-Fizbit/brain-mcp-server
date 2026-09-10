@@ -127,7 +127,7 @@ async function request(method, url, body) {
   return res;
 }
 
-async function callTool(name, args = {}) {
+async function callTool(name, args = {}, snapshot = false) {
   const body = {
     jsonrpc: "2.0",
     id: 1,
@@ -159,7 +159,8 @@ async function callTool(name, args = {}) {
   if (message.error) throw new Error(message.error.message);
   const text = message.result.content.map((part) => part.text).join("\n");
   if (message.result.isError) throw new Error(text);
-  return text;
+  if (snapshot) return message.result.structuredContent;
+  return message.result.structuredContent?.content ?? text;
 }
 
 function firstSearchableToken(content) {
@@ -221,8 +222,7 @@ if (process.env.BRAIN_HTTP_SMOKE_EXPECT_SOURCES !== "0") {
     filename: sourcePath,
     scope: "sources",
   });
-  assert.match(manifest, /# Source Manifest:/);
-  assert.match(manifest, /metadata only/);
+  assert.ok(manifest.length > 0, "Source read returns its exact companion text when retained, or the metadata manifest fallback");
   sourceManifestChecked = true;
 
   const pool = new pg.Pool({
@@ -268,10 +268,17 @@ if (process.env.BRAIN_HTTP_SMOKE_WRITE === "1") {
     "Origin: scripts/smoke-http-postgres-runtime.mjs",
     "",
   ].join("\n");
+  let expectedRevision = "new";
+  try {
+    const snapshot = await callTool("brain_read_file", { brain_id: brainId, filename }, true);
+    assert.ok(snapshot?.revision_id, "Server must supply a reviewed revision");
+    expectedRevision = snapshot.revision_id;
+  } catch (error) { if (!/not found|does not exist|ENOENT/i.test(String(error))) throw error; }
   const update = await callTool("brain_update_file", {
     brain_id: brainId,
     filename,
     mode: "replace",
+    expected_revision: expectedRevision,
     content,
   });
   assert.match(update, new RegExp(`Updated ${filename.replace(".", "\\.")}:`));

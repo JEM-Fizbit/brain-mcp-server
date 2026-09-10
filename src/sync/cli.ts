@@ -460,7 +460,7 @@ async function runWithConfig(
             const summary = summarizeReport(report);
             await writeSyncHealth(config, {
               command,
-              status: "ok",
+              status: report.guardTripped ? "warn" : "ok",
               cycle,
               checkedAt: new Date().toISOString(),
               report: summary,

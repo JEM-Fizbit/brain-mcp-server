@@ -25,6 +25,7 @@ function makeState() {
   };
 
   return {
+    async registerClient(key, value) { mapFor("clients").set(key, value); return true; },
     async get(store, key) {
       return mapFor(store).get(key) || null;
     },

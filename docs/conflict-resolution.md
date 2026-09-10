@@ -1,7 +1,7 @@
 # Brain Sync Conflict Resolution
 
 **Status:** active operator guide
-**Last updated:** 2026-06-16
+**Last updated:** 2026-09-10
 
 This guide explains how hosted Brain sync conflicts should be detected, surfaced, reviewed, resolved, and verified.
 
@@ -28,7 +28,7 @@ Both cases are success states for safety. The system chose not to guess.
 These checks should be automated or proactively surfaced by clients:
 
 - `npm run hosted:doctor` reports hosted health, sync health, hosted/local counts, and open conflicts.
-- `brain_load_context` should continue surfacing lint, capture-queue, inbox, and maintenance nudges when the Brain context is loaded. This is enforced by `test/load-context-nudges.test.mjs`: the nudge block regressed to silence once already, when the tool was rewired onto the store abstraction and the nudge-bearing function was left with no callers.
+- `brain_load_context` surfaces lint, capture-queue and maintenance nudges, plus inbox nudges only when the selected endpoint can actually observe the inbox. Hosted MCP cannot scan the local operator inbox; the existing Monitor covers it. Structured observations distinguish unsupported/unobserved, failed and measured empty states. This is enforced by `test/load-context-nudges.test.mjs`: the nudge block regressed to silence once already, when the tool was rewired onto the store abstraction and the nudge-bearing function was left with no callers.
 - `brain_sync_status` reports hosted sync provider state and open conflict count.
 - `brain_list_conflicts` lists open conflicts without database access.
 - Future client integrations should alert the user when conflicts or stale sync health appear, instead of relying on manual polling.
@@ -90,11 +90,12 @@ Resolve by writing the reviewed final Markdown content through:
 brain_resolve_conflict({
   "brain_id": "ai-brain-jem",
   "conflict_id": "<conflict id>",
-  "content": "<reviewed final markdown>"
+  "content": "<reviewed final markdown>",
+  "expected_revision": "<revision_id from the hosted read used for review>"
 })
 ```
 
-The tool writes the reviewed content as the new hosted head and marks that conflict `resolved` with the resolution revision id.
+The tool compares the supplied reviewed revision with the locked current head. A stale review is refused without closing the conflict. A matching review writes the content as the new hosted head and records the resolution revision. Re-read and reconsider after a refusal; do not automatically retry the old merge with a fresh token.
 
 ## Verify
 
@@ -184,3 +185,13 @@ Next step: run brain_lint or process inbox items.
 ```
 
 The product goal is that users see these prompts before they notice drift themselves.
+
+## Local replacement recovery
+
+Sync first records durable intent and moves the actual destination inode into `.brain-sync-recovery/operation-*/original.md`. It installs or restores with an atomic no-replace link, preserving a newly saved pathname. A preflight checks that the filesystem supports the required primitive before any displacement. Interrupted operations restore retained bytes only if no replacement pathname exists. Writes through an editor's already-open descriptor remain in the retained inode and are detected on later sync cycles.
+
+A `local_recovery` guard identifies the retained path for content review. Doctor and Monitor surface it even when a cycle completed. Do not delete or prune this folder automatically: it can contain the only copy of an unsynced edit. Ordinary reviewed conflicts reconcile automatically when local bytes still match the reviewed conflict hash and the resolution is the current hosted head. A later local edit stays protected.
+
+Retention is capped before displacement at 256 MiB or 10,000 operation directories (`BRAIN_SYNC_RECOVERY_MAX_BYTES` can set a deliberate byte budget). Capacity refusal leaves the destination untouched. Reviewed archival of retained records is an exceptional recovery/storage operation; routine safe sync does not require coordinating edits. Recovery resides under the same Brain root and requires its normal private backup/custody treatment.
+
+An incomplete directory scan resets deletion confirmation and creates no inferred hosted deletion. Pulled bytes always come from the exact listed revision, not an independently fetched newer head. Hosted inventory counts exclude tombstones while revision history remains retained.

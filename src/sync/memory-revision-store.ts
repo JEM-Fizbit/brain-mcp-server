@@ -518,6 +518,9 @@ export class MemoryRevisionStore implements RevisionStore {
     }
 
     const current = await this.getHead(input.brainId, conflict.filename);
+    if (!input.expectedRevisionId || input.expectedRevisionId !== current?.revisionId) {
+      throw new Error("Stale or missing reviewed revision: re-read the hosted file before resolving the conflict.");
+    }
     const resolution = await this.proposeRevision({
       brainId: input.brainId,
       filename: conflict.filename,

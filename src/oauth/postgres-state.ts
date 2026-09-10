@@ -1,3 +1,4 @@
+import type { RegistrationLimits } from "./admission.js";
 import pg from "pg";
 import type { OauthStore, StateProvider } from "./state.js";
 import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
@@ -33,6 +34,39 @@ export class PostgresStateProvider implements StateProvider {
             "oauth_state"
           )
         : poolOrConnectionString;
+  }
+
+  async registerClient(key: string, value: any, limits: RegistrationLimits): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select pg_advisory_xact_lock(hashtext('brain.oauth.registration'))");
+      const counts = await client.query(`select count(*)::int as total,
+        count(*) filter (where created_at > now() - interval '1 hour')::int as recent
+        from brain.oauth_state where store = 'clients'`);
+      if (Number(counts.rows[0].total) >= limits.maximumClients || Number(counts.rows[0].recent) >= limits.perHour) {
+        await client.query("rollback");
+        return false;
+      }
+      await client.query(`insert into brain.oauth_state (store, state_key, value, expires_at, updated_at)
+        values ('clients', $1, $2::jsonb, null, now())`, [key, JSON.stringify(value)]);
+      await client.query("commit");
+      return true;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
+  async cleanupExpired(limit = 500): Promise<number> {
+    const bounded = Math.max(1, Math.min(5000, Math.floor(limit)));
+    const result = await this.pool.query(`delete from brain.oauth_state where ctid in (
+      select ctid from brain.oauth_state
+      where store in ('auth_codes', 'refresh_tokens', 'oauth_states')
+        and expires_at is not null and expires_at <= now()
+      order by expires_at limit $1 for update skip locked
+    )`, [bounded]);
+    return Number(result.rowCount || 0);
   }
 
   async close(): Promise<void> {

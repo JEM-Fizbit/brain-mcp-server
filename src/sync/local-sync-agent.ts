@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { assertBrainVaultPath } from "../services/brain-path.js";
 import { contentHash } from "./hash.js";
+import { mutateLocalFile, inspectLocalRecovery } from "./recoverable-file.js";
 import type {
   ConflictRecord,
   LocalSyncReport,
@@ -140,28 +141,6 @@ async function readFileHash(filePath: string): Promise<string | null> {
   }
 }
 
-type GuardedWriteResult = { ok: true } | { ok: false; currentHash: string | null };
-
-// Write via temp file + rename (atomic, no torn files on crash), re-checking
-// the target hash immediately before the rename so a local edit that landed
-// after the caller's clean-hash decision is never silently overwritten.
-async function writeLocalFileGuarded(
-  fullPath: string,
-  content: string,
-  expectedHash: string | null
-): Promise<GuardedWriteResult> {
-  await fs.mkdir(path.dirname(fullPath), { recursive: true });
-  const tmpPath = `${fullPath}.brain-sync-tmp-${process.pid}-${Date.now().toString(36)}`;
-  await fs.writeFile(tmpPath, content, "utf-8");
-  const currentHash = await readFileHash(fullPath);
-  if (currentHash !== expectedHash) {
-    await fs.rm(tmpPath, { force: true });
-    return { ok: false, currentHash };
-  }
-  await fs.rename(tmpPath, fullPath);
-  return { ok: true };
-}
-
 async function scanPolicy(root: string): Promise<{ skipNestedBrainDir: string | null }> {
   const rootLoaderPath = path.join(root, BRAIN_LOADER_FILENAME);
   const nestedBrainDir = path.join(root, NESTED_BRAIN_DIRNAME);
@@ -186,7 +165,7 @@ async function scanMarkdownFiles(root: string): Promise<string[]> {
   const policy = await scanPolicy(root);
 
   async function walk(dir: string): Promise<void> {
-    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
       const fullPath = path.join(dir, entry.name);
@@ -338,13 +317,60 @@ export class LocalSyncAgent {
     };
   }
 
+  private async unresolvedRecoveries() {
+    const observations = await inspectLocalRecovery(this.options.brainDir);
+    if (!observations.length) return observations;
+    const resolved = await this.options.store.listConflicts(this.options.brainId, "resolved");
+    return observations.filter(item => !resolved.some(conflict =>
+      conflict.filename === item.filename && conflict.localOrigin === "local_agent" &&
+      conflict.localContentHash === item.contentHash));
+  }
+
+  private async reconcileResolvedConflicts(report: LocalSyncReport): Promise<void> {
+    const state = await this.loadState();
+    const resolutions = await this.options.store.listConflicts(this.options.brainId, "resolved");
+    let changed = false;
+    for (const conflict of resolutions) {
+      const tracked = state.files[conflict.filename];
+      if (conflict.localOrigin !== "local_agent" || !conflict.resolutionRevisionId ||
+          !tracked || tracked.revisionId !== conflict.localBaseRevisionId) continue;
+      const head = await this.options.store.getHead(this.options.brainId, conflict.filename);
+      if (!head || head.deleted || head.revisionId !== conflict.resolutionRevisionId) continue;
+      const localHash = await readFileHash(safeMarkdownPath(this.options.brainDir, conflict.filename));
+      if (localHash !== conflict.localContentHash) continue;
+      const revision = await this.options.store.readRevision(this.options.brainId, head.revisionId);
+      if (!revision || revision.deleted) continue;
+      const applied = await mutateLocalFile(this.options.brainDir, conflict.filename, revision.content, localHash);
+      if (!applied.ok) {
+        report.guardTripped = `local_recovery: preserved edit at ${applied.recoveryPath}`;
+        continue;
+      }
+      state.files[conflict.filename] = { revisionId: revision.revisionId,
+        contentHash: revision.contentHash, localHash: revision.contentHash };
+      report.pulled.push(conflict.filename);
+      changed = true;
+    }
+    if (changed) await this.saveState(state);
+  }
+
   async pushLocalChanges(): Promise<LocalSyncReport> {
     const report = emptyReport();
     const totalStartedAt = performance.now();
+    const recovery = await this.unresolvedRecoveries();
+    await this.reconcileResolvedConflicts(report);
+    if (recovery.length) report.guardTripped = `local_recovery: preserved edit(s): ${recovery.map(r => r.recoveryPath).join(", ")}`;
     const state = await timed(report, "push", "state_read", () => this.loadState());
-    const filenames = await timed(report, "push", "local_scan", () =>
-      includedMarkdownFiles(this.options)
-    );
+    let filenames: string[];
+    try {
+      filenames = await timed(report, "push", "local_scan", () => includedMarkdownFiles(this.options));
+    } catch (error) {
+      state.pendingDeletions = [];
+      await this.saveState(state);
+      if (!(error && typeof error === "object" && "code" in error)) throw error;
+      report.guardTripped = `incomplete_scan: ${String(error)}; no deletions inferred`;
+      report.deletionsSkipped.push(...Object.keys(state.files));
+      return report;
+    }
 
     for (const filename of filenames) {
       const fullPath = safeMarkdownPath(this.options.brainDir, filename);
@@ -481,7 +507,15 @@ export class LocalSyncAgent {
   async pullHostedChanges(): Promise<LocalSyncReport> {
     const report = emptyReport();
     const totalStartedAt = performance.now();
+    const recovery = await this.unresolvedRecoveries();
     const state = await timed(report, "pull", "state_read", () => this.loadState());
+    for (const item of recovery) {
+      const head = await this.options.store.getHead(this.options.brainId, item.filename);
+      report.conflicts.push(await this.recordPullConflict(item.filename,
+        state.files[item.filename]?.revisionId ?? null, head?.revisionId ?? null,
+        item.contentHash, head?.contentHash ?? null));
+      report.guardTripped = `local_recovery: preserved concurrent edit at ${item.recoveryPath}`;
+    }
     const heads = await timed(report, "pull", "revision_store_list", async () =>
       filterIncludedHeads(
         this.options,
@@ -524,9 +558,15 @@ export class LocalSyncAgent {
           report.conflicts.push(conflict);
           continue;
         }
-        await timed(report, "pull", "local_write", () =>
-          fs.rm(fullPath, { force: true })
+        const removed = await timed(report, "pull", "local_write", () =>
+          mutateLocalFile(this.options.brainDir, filename, null, localHash)
         );
+        if (!removed.ok) {
+          report.guardTripped = `local_recovery: preserved concurrent edit at ${removed.recoveryPath}`;
+          report.conflicts.push(await this.recordPullConflict(filename, tracked?.revisionId ?? null,
+            head.revisionId, removed.currentHash, head.contentHash));
+          continue;
+        }
         delete state.files[filename];
         report.deleted.push(filename);
         continue;
@@ -577,12 +617,16 @@ export class LocalSyncAgent {
       }
 
       const remote = await timed(report, "pull", "revision_store_read", () =>
-        this.options.store.readFile(this.options.brainId, filename)
+        this.options.store.readRevision(this.options.brainId, head.revisionId)
       );
+      if (!remote || remote.deleted || remote.filename !== filename || remote.contentHash !== head.contentHash) {
+        throw new Error(`Inconsistent hosted revision for ${filename}`);
+      }
       const guarded = await timed(report, "pull", "local_write", () =>
-        writeLocalFileGuarded(fullPath, remote.content, localHash)
+        mutateLocalFile(this.options.brainDir, filename, remote.content, localHash)
       );
       if (!guarded.ok) {
+        report.guardTripped = `local_recovery: preserved concurrent edit at ${guarded.recoveryPath}`;
         const conflict = await this.recordPullConflict(
           filename,
           tracked?.revisionId ?? null,
@@ -614,7 +658,7 @@ export class LocalSyncAgent {
     const pulled = await this.pullHostedChanges();
     const report: LocalSyncReport = {
       pushed: pushed.pushed,
-      pulled: pulled.pulled,
+      pulled: [...pushed.pulled, ...pulled.pulled],
       unchanged: [...pushed.unchanged, ...pulled.unchanged],
       conflicts: [...pushed.conflicts, ...pulled.conflicts],
       timings: [...pushed.timings, ...pulled.timings],
@@ -640,9 +684,9 @@ export class LocalSyncAgent {
   private async recordPullConflict(
     filename: string,
     localBaseRevisionId: string | null,
-    remoteHeadRevisionId: string,
+    remoteHeadRevisionId: string | null,
     localHash: string | null,
-    remoteContentHash: string
+    remoteContentHash: string | null
   ): Promise<ConflictRecord> {
     return this.options.store.recordConflict({
       brainId: this.options.brainId,

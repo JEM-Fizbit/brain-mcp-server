@@ -695,3 +695,7 @@ Routine refresh remains read-only. Lint runs and fix application happen only on 
 
 - Add an explicitly reviewed inbox-ingestion workflow only when its classification and source-record contract is specified; the current Maintenance scan remains visibility-only.
 - Rehearse recovery/reseed from local Markdown and a restored Supabase project using `docs/hosted-brain-recovery-and-git-export.md`.
+
+## Structural sync protection (spec 020)
+
+A completed sync cycle can carry a guard warning. Doctor and Monitor report the guard and its recovery location instead of treating recent completion as healthy. Local displaced bytes are retained under `.brain-sync-recovery/`; see [recovery and conflict handling](conflict-resolution.md#local-replacement-recovery). Hosted file inventory counts live heads only, excluding tombstones. Inbox scanning remains the existing local Monitor operation; hosted MCP capability discovery cannot observe a user's local inbox.
