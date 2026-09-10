@@ -4,6 +4,10 @@
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
+## Verified maintenance release — 10 September 2026
+
+JEM v1.9.0 deployed through `deploy:guarded` from annotated tag v1.9.0 (`8aa762261e616ec0c19f3945da396d04ee7fd7d7`) at 22:32:58 UTC. Image: `registry.fly.io/jem-brain-mcp:deployment-01M26Q5PEJKVD5WDQES87N9K9N`. The independent ERS guarded release also serves v1.9.0; its operational provenance remains in the private overlay. No schema, credential, grant or DNS change was required. Health confirms Postgres revisions/OAuth and disabled Git hot path. Current client metadata acceptance remains open under spec 020.
+
 ## Shape
 
 - App name: `jem-brain-mcp`

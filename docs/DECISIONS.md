@@ -8,6 +8,14 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-10 — Deployed safety requires current client contracts
+
+**Decision:** v1.9.0 deploys the spec 020 protections to both owner-isolated services and propagates the operator-custody/capability guidance. Preserve existing grants and the company rollout hold. Deployment health and fixture success do not establish client acceptance.
+
+**Reason:** the installed OpenAI client retained an older schema after deployment. It omitted the reviewed revision parameter, and the server rejected replacement before writing. Verify schema discovery, read revision metadata, reviewed replacement and read-only preflight in fresh supported clients before declaring the capability deliverable closed.
+
+**Rejected:** making the revision precondition optional for old clients, retrying with an unreviewed current token, treating a healthy server as proof of refreshed client metadata, and deleting/re-enrolling working connectors merely to refresh schemas without a justified recovery decision. Retain nondestructive metadata refresh as the first recovery step when available.
+
 ## 2026-09-10 — Structural production safety before expansion
 
 **Decision:** retain current access and permissions while holding company-wide rollout for structural protections (spec 020). Require caller-reviewed revision preconditions for whole-file replacement and conflict resolution; retain displaced local bytes with recoverable no-replace installation; reject incomplete deletion inventories; use one steady-state Owner invariant for mutation and restart. Bound OAuth enrollment and sweep only expired transient state.

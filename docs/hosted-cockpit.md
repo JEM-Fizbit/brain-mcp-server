@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-10
 
 Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
@@ -10,7 +10,7 @@ it? Its narrow shipped Maintenance actions are documented below; it is not a
 general Brain editor. The tenant-neutral Spec 018 build adds one ERS-only
 hosted permissions surface. The ERS migration, one-time Entra setup, Fly secret
 loading, three-Owner bootstrap and first Reader grant are complete. The
-dual-provider canary is active; Entra-only cutover remains acceptance-gated.
+ERS service is now Entra-only. Company-wide expansion remains held pending stabilization acceptance.
 
 Spec 018 promotes Cockpit as the normal shared control-plane entry for the ERS
 production rollout. The implemented navigation is profile-scoped: JEM keeps GitHub
@@ -19,6 +19,10 @@ prominent **Identity & Access** module and matching navigation link. Both open t
 hosted, Entra-authenticated **Access & Roles** surface. This is a unified user
 journey, not a shared trust boundary or a plan to publish the current loopback
 server.
+
+## v1.9.0 operator verification — 10 September 2026
+
+The existing Monitor was restarted after building the matching local runtime. Both installed owner-bound doctor profiles pass and both sync profiles report healthy operation with zero conflicts. Continue using explicit installed profiles and disabled ambient repo environment loading; a stale bare environment was correctly refused by the deployment binding guard. Local recovery retains displaced files under `.brain-sync-recovery/`; do not prune these bytes as routine cleanup. Inbox custody remains manual and Monitor continues its existing local scans. This release adds no permissions or distributed operator credentials.
 
 ## Current Recommendation
 

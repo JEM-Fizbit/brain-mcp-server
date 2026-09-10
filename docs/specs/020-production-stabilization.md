@@ -1,6 +1,6 @@
 # 020 — Structural production stabilization
 
-**Status:** in-progress
+**Status:** deployed v1.9.0; client acceptance remains open
 **Date:** 2026-09-10
 **Source:** production design review F1–F9; accepted backend capability requirement.
 **Authority:** John authorized implementation after reviewing the audit. Existing access and permissions stay unchanged. Company-wide rollout remains held until structural fixes pass verification; behavioral coordination is not an acceptance substitute.
@@ -41,7 +41,8 @@ No permission/roster changes, new service, protocol migration, new paid dependen
 - Disposable loopback PostgreSQL 17 with all migrations: six real database tests passed, including simultaneous Owner reductions, stale replacement/resolution, bounded registration and expiry retention. No production identities were changed.
 - Chromium: all eight local browser fixtures passed (cockpit, access administration and Brain Library).
 - Recovery fixtures cover a late save before displacement, a new pathname after displacement, an open descriptor saved after completion, interruption recovery, unsupported link primitives and capacity refusal before displacement.
-- Protocol propagation and deployment/client acceptance remain in progress. Build/test evidence does not reopen company rollout.
+- JEM and ERS guarded releases deployed v1.9.0 on 10 September 2026. Both postdeployment doctor profiles pass; local sync is healthy with zero conflicts. Seven hosted guidance patches were applied and exact readback/local hashes matched. Both loader budgets and internal-link checks pass; JEM retains five unrelated maintenance findings, ERS none.
+- Existing OpenAI client metadata still omits `expected_revision` and `brain_prepare_ingest`. A replacement probe failed closed with the required-token error; it did not validate stale-token rejection through that client. The inspected installed-plugin controls offered no metadata Refresh action. Keep client-schema refresh and fresh client/role acceptance open; do not weaken the server precondition or infer acceptance from runtime tests. Company rollout remains held, with current grants unchanged.
 
 ### Reviewed operation inventory
 
