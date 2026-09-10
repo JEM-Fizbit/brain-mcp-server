@@ -5,6 +5,18 @@
 **Requested disposition:** deep design review. A watcher, an alert, or a per-session warning is **not** an acceptable answer to this report; see § Non-answers.
 **Related:** `BACKLOG.md` (cloud-run Brain health/inbox operations service; approval-gate capability probe) · [`specs/017-hosted-ingestion-preflight.md`](specs/017-hosted-ingestion-preflight.md) · [`specs/002-local-first-hosted-sync-contract.md`](specs/002-local-first-hosted-sync-contract.md)
 
+> **Review disposition — 2026-09-10:** John accepted a shared capability contract,
+> to be implemented after the broad production design audit. The original report
+> below is retained as historical evidence, with these corrections: spec 017
+> already settles operator-side inbox custody; the installed Monitor already
+> schedules local inbox scans every 60 seconds, so the unwatched-folder/data-loss
+> premise is not established; and ingestion preflight already partially addresses
+> the approval case. Users' manual filesystem/SharePoint access is independent of
+> MCP permissions. The cross-cutting declaration and guidance-propagation gaps
+> remain. See the [accepted decision and closure criteria](DECISIONS.md#2026-09-10--declare-operational-capabilities-consistently-implement-after-the-production-design-audit).
+> No implementation has been completed by this review; exact spec scope follows
+> the audit. §§ 1, 3.3–3.4 and questions 4–5 below must be read with this correction.
+
 ---
 
 ## 1. One-paragraph statement
