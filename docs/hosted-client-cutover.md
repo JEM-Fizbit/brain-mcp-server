@@ -58,6 +58,12 @@ The promotion gate passed:
 
 For remote-only Claude/Codex usage, prefer hosted `brain-hosted`. For local filesystem-heavy work on this Mac, local stdio `brain` remains acceptable and faster, especially for recovery, source-file handling, and direct Markdown work.
 
+## Schema refresh after v1.9.0
+
+Authenticated Brain calls still work; the observed defect is stale tool metadata rather than invalid OAuth. Use an existing connection's metadata Refresh control when available, verify `expected_revision` and `brain_prepare_ingest`, then exercise a fresh conversation. The [official OpenAI guide](https://developers.openai.com/plugins/deploy/connect-chatgpt) describes Refresh for development connections and scan/review/publish for published metadata (checked 10 September 2026). The installed development-plugin controls inspected during this release exposed Reconnect/Disconnect but no Refresh, leaving that acceptance step unresolved.
+
+Preserve current connections and permissions while resolving the missing control. Do not delete/re-enroll a working connector, relax reviewed-write preconditions or treat an existing task's catalog as refreshed without evidence. This release-specific diagnosis qualifies the older mirrored recovery protocol: its OAuth-invalidating incident procedure does not establish authorization for connector deletion after a schema-only release.
+
 ## OpenAI Client Cutover
 
 Provider-level ChatGPT/Codex connector recovery is canonicalized in `~/Projects/ai-knowledge/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md`. Use that protocol after hosted MCP OAuth-state, Dynamic Client Registration, callback, or tool-surface changes; this page keeps the Brain-specific connector URL, account notes, and verification commands.
