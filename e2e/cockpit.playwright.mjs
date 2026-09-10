@@ -117,6 +117,8 @@ async function writeDoctorStub(testInfo) {
         status: "pass",
         details: {
           latencyMs: 88,
+          serverVersion: "9.8.7",
+          versionObservedAt: "2026-06-25T21:31:49.000Z",
         },
       },
       {
@@ -253,6 +255,8 @@ async function stopCockpit(child) {
 
 async function expectCockpitReady(page) {
   await expect(page.locator("#active-brain-title")).toHaveText("JEM (ai-brain-jem)");
+  await expect(page.locator("#deployed-version")).toHaveText("Deployed v9.8.7");
+  await expect(page.locator("#version-observed")).toContainText("Observed");
   await expect(page.locator("#action-summary-heading")).toHaveText("Needs Action");
   await expect(page.locator("#action-summary-count")).toHaveText("None");
   await expect(page.locator("#profile-switcher")).toBeVisible();
@@ -600,6 +604,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(url);
     await expectCockpitReady(page);
+    await page.screenshot({ path: testInfo.outputPath("version-desktop.png") });
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: true });
     await expectCockpitNavigationHierarchy(page, { desktop: true });
@@ -610,6 +615,8 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await expectCockpitReady(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: testInfo.outputPath("version-mobile.png") });
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: false });
     await expectCockpitNavigationHierarchy(page, { desktop: false });
@@ -633,6 +640,42 @@ test("ERS Cockpit is the clear entry point for Identity & Access", async ({ page
     );
     await expect(page.locator("#identity-access-action")).toContainText("Open Access & Roles");
     await expect(page.locator("#access-roles-link")).toContainText("Identity & Access");
+  } finally {
+    await stopCockpit(child);
+  }
+});
+
+
+test("deployed version follows the selected endpoint and clears missing observations", async ({ page }, testInfo) => {
+  const { child, url } = await startCockpit(testInfo);
+  let mode = "ers";
+  await page.route("**/api/doctor*", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.profile.brainId = "ers-brain";
+    payload.profile.profileLabel = "ERS (ers-brain)";
+    const health = payload.checks.find((check) => check.name === "hosted_health");
+    if (mode === "ers") health.details.serverVersion = "2.3.4";
+    else if (mode === "missing") delete health.details.serverVersion;
+    else {
+      health.status = "fail";
+      health.details = { connectivity: "unreachable" };
+    }
+    await route.fulfill({ response, json: payload });
+  });
+  try {
+    await page.goto(url);
+    await expect(page.locator("#active-brain-title")).toHaveText("ERS (ers-brain)");
+    await expect(page.locator("#deployed-version")).toHaveText("Deployed v2.3.4");
+    for (const state of ["missing", "failed"]) {
+      mode = state;
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes("/api/doctor?fresh=1")),
+        page.getByRole("button", { name: "Reload", exact: true }).click(),
+      ]);
+      await expect(page.locator("#deployed-version")).toHaveText("Deployed version: unknown");
+      await expect(page.locator("#version-observed")).toBeEmpty();
+    }
   } finally {
     await stopCockpit(child);
   }

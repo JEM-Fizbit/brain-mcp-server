@@ -526,7 +526,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /profileStatusForProfile/);
   assert.match(source, /Overall status: %@/);
   assert.match(source, /Sync status: %@/);
-  assert.match(source, /profileTitle = \[NSString stringWithFormat:@"%@: %@", displayName, overallStatus\]/);
+  assert.match(source, /profileTitle = \[NSString stringWithFormat:@"%@: %@ · %@", displayName, overallStatus/);
+  assert.match(source, /Deployed version: %@/);
+  assert.match(source, /Version observed: %@/);
+  assert.match(source, /details\[@"serverVersion"\]/);
   assert.match(source, /Brain Action/);
   assert.match(source, /sawChecking && !sawAction && !sawWarn && !sawKnown/);
   assert.doesNotMatch(source, /sawChecking && !sawAction && !sawWarn\)/);

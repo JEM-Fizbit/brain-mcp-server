@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
@@ -23,6 +23,14 @@ server.
 ## v1.9.0 operator verification — 10 September 2026
 
 The existing Monitor was restarted after building the matching local runtime. Both installed owner-bound doctor profiles pass and both sync profiles report healthy operation with zero conflicts. Continue using explicit installed profiles and disabled ambient repo environment loading; a stale bare environment was correctly refused by the deployment binding guard. Local recovery retains displaced files under `.brain-sync-recovery/`; do not prune these bytes as routine cleanup. Inbox custody remains manual and Monitor continues its existing local scans. This release adds no permissions or distributed operator credentials.
+
+## Deployed version visibility
+
+Cockpit's active-Brain header and each Brain Monitor profile menu show the version reported by that profile's hosted `/health` response (`mcp.server.version`). The doctor carries it as `hosted_health.details.serverVersion`, with `versionObservedAt`; the displayed observation time makes a cached report distinguishable from a new deployment check. This is the hosted server version, not the local app/package version or an inferred Git tag.
+
+Missing, malformed or unreachable version observations display **unknown**; a prior successful value is not carried into a failed health result. Reload/Refresh Doctor obtains another observation through the existing profile-scoped health check. No extra polling service or permissions are needed. Regenerate the installed native Monitor app after changing its menu code; restarting an old binary alone cannot expose the new menu rows.
+
+Verification on 11 September 2026: the full Node22 suite passed (531 passes, eight fixture-dependent skips); three Cockpit browser tests passed, including distinct endpoint versions and missing/failed observations. Live JEM and ERS each show v1.9.0 with observation times on desktop and 390px layouts, without horizontal overflow. Both light/dark browser preferences were checked; Cockpit currently retains its existing single visual theme. Native AppKit menu construction verified both profile labels, timestamps, unknown state and a distinct-version fixture. The updated native executable was installed and restarted with an unchanged configuration; both doctor/sync profiles remain healthy. This is a local operator UI update and requires no hosted redeployment.
 
 ## Current Recommendation
 
