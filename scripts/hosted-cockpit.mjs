@@ -673,6 +673,15 @@ const page = String.raw`<!doctype html>
         overflow-wrap: anywhere;
       }
 
+      .deployed-version {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        align-items: baseline;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
       .status-band {
         display: grid;
         grid-template-columns: minmax(360px, 1.05fr) minmax(340px, 0.95fr);
@@ -1898,6 +1907,10 @@ const page = String.raw`<!doctype html>
             <span class="active-brain-label">Active Brain</span>
             <span class="active-brain-title" id="active-brain-title">-</span>
             <span class="active-brain-subtitle" id="active-brain-subtitle">Checking profile.</span>
+            <div class="deployed-version">
+              <strong id="deployed-version">Deployed version: unknown</strong>
+              <span class="muted" id="version-observed"></span>
+            </div>
           </div>
         </div>
         <div class="toolbar">
@@ -3479,6 +3492,15 @@ const page = String.raw`<!doctype html>
         const usage24h = usageWindow(userOps, "24h");
         const usage7d = usageWindow(userOps, "7d");
         const profile = profileFromPayload(payload);
+
+        const hostedHealth = byName(payload, "hosted_health")?.details || {};
+        const deployedVersion = typeof hostedHealth.serverVersion === "string" && hostedHealth.serverVersion
+          ? hostedHealth.serverVersion : null;
+        document.getElementById("deployed-version").textContent = deployedVersion
+          ? "Deployed v" + deployedVersion : "Deployed version: unknown";
+        document.getElementById("version-observed").textContent = deployedVersion && hostedHealth.versionObservedAt
+          ? "Observed " + displayTimestamp(hostedHealth.versionObservedAt) : "";
+        document.getElementById("deployed-version").title = "Version reported by this Brain's hosted health endpoint; independent of the local app version.";
 
         document.getElementById("active-brain-title").textContent = profile.profileLabel || profile.brainId || "-";
         document.getElementById("active-brain-subtitle").textContent =

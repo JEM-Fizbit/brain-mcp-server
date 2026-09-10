@@ -496,6 +496,10 @@ async function checkHostedHealth() {
     });
     const body = await response.json();
     const runtime = body.runtime || {};
+    const reportedVersion = body?.mcp?.server?.version;
+    const serverVersion = typeof reportedVersion === "string" &&
+      /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.+-]+)?$/.test(reportedVersion) &&
+      reportedVersion.length <= 64 ? reportedVersion : null;
     const ok =
       response.ok &&
       body.ok === true &&
@@ -508,6 +512,8 @@ async function checkHostedHealth() {
       baseUrl,
       httpStatus: response.status,
       transport: body.transport,
+      serverVersion,
+      versionObservedAt: serverVersion ? new Date().toISOString() : null,
       revisionStore: runtime.revisionStore,
       artifactStore: runtime.artifactStore,
       oauthStateStore: runtime.oauthStateStore,

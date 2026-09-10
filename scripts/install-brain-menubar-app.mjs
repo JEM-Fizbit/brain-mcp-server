@@ -796,6 +796,15 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   return nil;
 }
 
+- (NSString *)deployedVersionForDoctorReport:(NSDictionary *)doctorReport {
+  NSDictionary *hostedHealth = [self doctorCheckNamed:@"hosted_health" report:doctorReport];
+  id details = hostedHealth[@"details"];
+  if (![details isKindOfClass:[NSDictionary class]]) return @"unknown";
+  id version = details[@"serverVersion"];
+  if (![version isKindOfClass:[NSString class]] || [version length] == 0) return @"unknown";
+  return [@"v" stringByAppendingString:version];
+}
+
 - (NSString *)connectivityStateForDoctorReport:(NSDictionary *)doctorReport {
   NSDictionary *hostedHealth = [self doctorCheckNamed:@"hosted_health" report:doctorReport];
   id detailsValue = hostedHealth[@"details"];
@@ -1451,13 +1460,22 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *connectivityState = [self connectivityStateForDoctorReport:doctorReport];
   NSString *overallStatus = [self profileStatusForProfile:profile];
 
-  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@", displayName, overallStatus];
+  NSString *deployedVersion = [self deployedVersionForDoctorReport:doctorReport];
+  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@ · %@", displayName, overallStatus,
+    [deployedVersion isEqualToString:@"unknown"] ? @"version unknown" : deployedVersion];
   NSMenuItem *profileItem = [[NSMenuItem alloc] initWithTitle:profileTitle action:nil keyEquivalent:@""];
   NSMenu *profileMenu = [[NSMenu alloc] initWithTitle:displayName];
   [profileItem setSubmenu:profileMenu];
   [menu addItem:profileItem];
 
   [self addDisabledItem:profileMenu title:@"Overview"];
+  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Deployed version: %@", deployedVersion]];
+  NSDictionary *hostedVersionCheck = [self doctorCheckNamed:@"hosted_health" report:doctorReport];
+  id hostedVersionDetails = hostedVersionCheck[@"details"];
+  if ([hostedVersionDetails isKindOfClass:[NSDictionary class]] && ![deployedVersion isEqualToString:@"unknown"]) {
+    NSString *observedAt = [self stringFromValue:hostedVersionDetails[@"versionObservedAt"] fallback:@"not reported"];
+    [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Version observed: %@", [self displayTimestamp:observedAt]]];
+  }
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Overall status: %@", overallStatus]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Sync status: %@", syncStatus]];
   [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAtDisplay]];
