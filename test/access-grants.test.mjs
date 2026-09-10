@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const { PostgresAccessGrantStore } = await import(path.join(__dirname, "..", "dist", "services", "access-grants.js"));
+const { PostgresAccessGrantStore, assertSteadyStateOwnerRoster } = await import(path.join(__dirname, "..", "dist", "services", "access-grants.js"));
 
 const tenant = "11111111-1111-4111-8111-111111111111";
 const objectId = "22222222-2222-4222-8222-222222222222";
@@ -51,4 +51,27 @@ test("grant store refuses to reduce the active Owner roster below two", async ()
   assert.ok(queries.includes("rollback"));
   assert.ok(queries.some((query) => query.includes("p.provider = $2") && query.includes("p.provider_tenant_id = $3")));
   assert.ok(!queries.some((query) => query.startsWith("insert into brain.brain_roles")));
+});
+
+
+test("a permitted three-to-two Owner reduction remains restartable", async () => {
+  let owners = 3;
+  const client = { async query(sql) {
+    const q = String(sql).replace(/\s+/g, " ").trim();
+    if (q.startsWith("select id from brain.brains")) return { rows: [{ id: "ers-brain" }] };
+    if (q.startsWith("insert into brain.principals")) return { rows: [{ id: "principal-id" }] };
+    if (q.startsWith("select role, status, version")) return { rows: [{ role: "owner", status: "active", version: 1 }] };
+    if (q.startsWith("select count(*)::int as count")) return { rows: [{ count: owners }] };
+    if (q.startsWith("insert into brain.brain_roles")) { owners--; return { rows: [{ version: 2 }] }; }
+    return { rows: [] };
+  }, release() {} };
+  const store = new PostgresAccessGrantStore({ async connect() { return client; }, async end() {} });
+  await store.applyMutation({ brainId: "ers-brain", target: principal, role: "reader", status: "active", roleSource: "entra_group", actor: principal });
+  assert.equal(owners, 2);
+  const startupStore = { async countActiveOwners(brainId, provider, tenantId) {
+    assert.equal(brainId, "ers-brain"); assert.equal(provider, "entra"); assert.equal(tenantId, tenant); return owners;
+  } };
+  await assert.doesNotReject(assertSteadyStateOwnerRoster(startupStore, "ers-brain", tenant));
+  owners = 1;
+  await assert.rejects(assertSteadyStateOwnerRoster(startupStore, "ers-brain", tenant), /requires 2/);
 });

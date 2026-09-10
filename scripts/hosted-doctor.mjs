@@ -586,7 +586,7 @@ async function runPostgresSummaryQuery(pool, retriedAfterFailures) {
   const result = await pool.query(
     `
       select
-        (select count(*)::int from brain.brain_files where brain_id = $1) as hosted_files,
+        (select count(*)::int from brain.brain_files f join brain.brain_file_revisions r on r.id = f.current_revision_id where f.brain_id = $1 and r.deleted = false) as hosted_files,
         (select count(*)::int from brain.sync_conflicts where brain_id = $1 and status = 'open') as open_conflicts,
         (select max(updated_at) from brain.brain_files where brain_id = $1) as latest_hosted_update
     `,
@@ -786,6 +786,7 @@ async function checkSyncHealth() {
       unchanged: health.report?.unchanged ?? null,
       conflicts: health.report?.conflicts ?? null,
       conflictFiles: health.report?.conflictFiles ?? [],
+      guardTripped: health.report?.guardTripped ?? null,
       totalMs: health.report?.totalMs ?? null,
       error: health.error || null,
     });
@@ -1616,7 +1617,10 @@ function buildOperatorActions(status) {
     });
   }
 
-  if (sync?.status === "fail") {
+  if (sync?.details?.guardTripped) {
+    actions.push({ level: "warn", reason: "sync_guard", title: "Review protected local sync state.",
+      detail: String(sync.details.guardTripped) });
+  } else if (sync?.status === "fail") {
     actions.push({
       level: "fail",
       reason: "sync_health_failed",

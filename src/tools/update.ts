@@ -29,12 +29,15 @@ import {
 export function registerUpdateTools(server: McpServer): void {
   server.tool(
     "brain_update_file",
-    "Update a Brain-vault file. External sources/, inbox/, and .brain-sync/ paths are reserved for their dedicated workflows. Hosted deployments may auto-commit and push after successful writes; otherwise call brain_commit separately after edits.",
+    "Update a Brain-vault file. For replace, pass expected_revision from brain_read_file (or 'new' for creation); stale or missing reviewed revisions are refused. External sources/, inbox/, and .brain-sync/ paths are reserved for their dedicated workflows. Hosted revisions do not require Git. Filesystem fallback uses its configured operator workflow.",
     UpdateFileSchema.shape,
-    async ({ brain_id, filename, content, mode, old_content }, extra) => {
+    async ({ brain_id, filename, content, mode, old_content, expected_revision }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertToolRole(ctx, "brain_update_file");
+        if (mode === "replace" && !expected_revision) {
+          throw new Error("expected_revision is required for replace; use the revision_id from brain_read_file, or 'new' for creation.");
+        }
         const result = await activeBrainStore().writeFile(
           ctx.brainId,
           filename,
@@ -42,7 +45,8 @@ export function registerUpdateTools(server: McpServer): void {
           mode,
           old_content,
           revisionActor(ctx),
-          ctx.role
+          ctx.role,
+          expected_revision === "new" ? null : expected_revision
         );
         const sync = revisionStoreModeEnabled()
           ? ""

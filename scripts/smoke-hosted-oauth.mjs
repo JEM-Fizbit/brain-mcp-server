@@ -291,7 +291,7 @@ async function getToken() {
   return (await refreshFromTokenCache()) || authorizeWithBrowser();
 }
 
-async function callTool(accessToken, name, args = {}) {
+async function callTool(accessToken, name, args = {}, snapshot = false) {
   const response = await fetch(resource, {
     method: "POST",
     headers: {
@@ -315,7 +315,19 @@ async function callTool(accessToken, name, args = {}) {
   if (message.error) throw new Error(`MCP ${name} error: ${message.error.message}`);
   const resultText = message.result?.content?.map((part) => part.text).join("\n") || "";
   if (message.result?.isError) throw new Error(`MCP ${name} tool error: ${resultText}`);
-  return resultText;
+  if (snapshot) return message.result.structuredContent;
+  return message.result.structuredContent?.content ?? resultText;
+}
+
+async function reviewedRevision(accessToken, filename) {
+  try {
+    const snapshot = await callTool(accessToken, "brain_read_file", { brain_id: brainId, filename }, true);
+    assert.ok(snapshot?.revision_id, "Server must supply a reviewed revision");
+    return snapshot.revision_id;
+  } catch (error) {
+    if (/not found|does not exist|ENOENT/i.test(String(error))) return "new";
+    throw error;
+  }
 }
 
 function classifyTool(name) {
@@ -562,6 +574,7 @@ async function runHostedConflictSmoke(accessToken, tool = timedTool) {
       filename: smokeFilename,
       content: baselineContent,
       mode: "replace",
+      expected_revision: await reviewedRevision(accessToken, smokeFilename),
     });
     assert.match(baselineUpdate, new RegExp(`Updated ${smokeFilename}`));
 
@@ -586,6 +599,7 @@ async function runHostedConflictSmoke(accessToken, tool = timedTool) {
       filename: smokeFilename,
       content: hostedConflictContent,
       mode: "replace",
+      expected_revision: await reviewedRevision(accessToken, smokeFilename),
     });
     assert.match(hostedUpdate, new RegExp(`Updated ${smokeFilename}`));
 
@@ -615,6 +629,7 @@ async function runHostedConflictSmoke(accessToken, tool = timedTool) {
     const resolution = await tool(accessToken, "brain_resolve_conflict", {
       brain_id: brainId,
       conflict_id: conflictId,
+      expected_revision: await reviewedRevision(accessToken, smokeFilename),
       content: resolvedContent,
     });
     assert.match(resolution, new RegExp(`Resolved conflict ${conflictId}`));
@@ -636,6 +651,8 @@ async function runHostedConflictSmoke(accessToken, tool = timedTool) {
       resolvedContent
     );
 
+    await runLocalSync("once", syncEnv);
+    await waitForLocalFile(resolvedContent, tempBrainDir);
     console.log(`[hosted-oauth] Conflict lifecycle verified: ${conflictId}`);
   } finally {
     await fs.rm(root, { recursive: true, force: true }).catch(() => undefined);
@@ -681,6 +698,7 @@ async function main() {
         filename: smokeFilename,
         content: expectedContent,
         mode: "replace",
+      expected_revision: await reviewedRevision(token.access_token, smokeFilename),
       });
       assert.match(update, new RegExp(`Updated ${smokeFilename}`));
       const hosted = await timedTool(token.access_token, "brain_read_file", {

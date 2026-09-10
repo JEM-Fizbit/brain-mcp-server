@@ -91,7 +91,7 @@ test("RevisionBrainStore.renameFile moves content and clears the old name", asyn
 test("RevisionBrainStore.restoreFile brings back the last content after a delete", async () => {
   const store = hostedStore();
   await store.writeFile(B, "note.md", "v1\n", "replace");
-  await store.writeFile(B, "note.md", "v2 final\n", "replace");
+  await store.writeFile(B, "note.md", "v2 final\n", "replace", undefined, undefined, undefined, (await store.readFileSnapshot(B, "note.md")).revisionId);
   await store.deleteFile(B, "note.md");
   await store.restoreFile(B, "note.md");
   assert.equal(await store.readFile(B, "note.md"), "v2 final\n");

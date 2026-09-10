@@ -8,6 +8,14 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-10 — Structural production safety before expansion
+
+**Decision:** retain current access and permissions while holding company-wide rollout for structural protections (spec 020). Require caller-reviewed revision preconditions for whole-file replacement and conflict resolution; retain displaced local bytes with recoverable no-replace installation; reject incomplete deletion inventories; use one steady-state Owner invariant for mutation and restart. Bound OAuth enrollment and sweep only expired transient state.
+
+**Reason:** low utilization reduces expected collisions but cannot establish correctness. Manual filesystem access is independent of MCP roles and must remain safe without asking users to coordinate routine edits. Recoverable custody is required where filesystem APIs cannot provide compare-and-swap against arbitrary editors.
+
+**Rejected:** timing assumptions, another hash check as an atomic guarantee, routine edit coordination, permission changes as a substitute for correctness, and automatic retry of stale reviewed content. Company rollout does not reopen automatically when a build passes.
+
 ## 2026-09-10 — Declare operational capabilities consistently; implement after the production design audit
 
 **Decision:** John accepted a shared, machine-readable capability contract for

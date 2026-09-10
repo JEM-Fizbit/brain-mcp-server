@@ -1,4 +1,6 @@
 import pg from "pg";
+import { operationCapability } from "./capabilities.js";
+import { loadRegistry, type BrainDefinition } from "./registry.js";
 import { LOADER_FILE, LOG_FILE, NOW_FILE } from "../constants.js";
 import { buildContextNudges } from "./context-nudges.js";
 import { getOpenMaintenanceIssues, type OpenIssue } from "./issues.js";
@@ -90,7 +92,19 @@ export async function warmActiveBrainStore(
 }
 
 export async function loadContextFromActiveStore(brainId: string): Promise<string> {
+  return (await loadContextWithObservations(brainId)).text;
+}
+
+export async function loadContextWithObservations(brainId: string, selectedBrain?: BrainDefinition) {
   const store = activeBrainStore();
+  const brain = selectedBrain ?? (await loadRegistry()).brains.find(brain => brain.id === brainId);
+  if (!brain) throw new Error("Unknown selected Brain");
+  const inboxSupport = operationCapability(brain, "reader", store.capabilities, "brain_scan_inbox");
+  let inboxObservation: { state: string; count?: number; observed_at?: string; reason_code?: string } = {
+    state: "unobserved", reason_code: inboxSupport.reason_code,
+  };
+
+  let issuesObservation = { state: "unobserved" };
 
   // Core files plus the nudge inputs, in one round trip. Every nudge source is
   // independently fault-tolerant: a Brain whose backend cannot answer one of
@@ -101,13 +115,14 @@ export async function loadContextFromActiveStore(brainId: string): Promise<strin
       store.readFile(brainId, NOW_FILE).catch(() => null),
       store.readFile(brainId, LOG_FILE).catch(() => null),
       store.readFile(brainId, TASKS_FILE).catch(() => null),
-      getOpenMaintenanceIssues().catch((): OpenIssue[] => []),
+      getOpenMaintenanceIssues().then(issues => { issuesObservation = { state: "observed" }; return issues; }).catch((): OpenIssue[] => { issuesObservation = { state: "failed" }; return []; }),
       // null distinguishes "no host inbox on this backend" (the S1-guard throws
       // for Postgres-backed Brains) from "inbox exists and is empty". Only a
       // real count can produce a nudge.
-      scanInbox(brainId)
-        .then((files) => files.length)
-        .catch((): null => null),
+      inboxSupport.supported ? scanInbox(brainId)
+        .then((files) => { inboxObservation = { state: "observed", count: files.length, observed_at: new Date().toISOString() }; return files.length; })
+        .catch((): null => { inboxObservation = { state: "failed", reason_code: "inbox_scan_failed", observed_at: new Date().toISOString() }; return null; })
+        : Promise.resolve(null),
     ]);
 
   if (!loader || !now) {
@@ -135,7 +150,11 @@ export async function loadContextFromActiveStore(brainId: string): Promise<strin
     })
   );
 
-  return parts.join("\n");
+  return { text: parts.join("\n"), observations: {
+    inbox: inboxObservation,
+    maintenance_issues: issuesObservation,
+    lint: { state: logContent === null ? "unobserved" : "observed" },
+  }, capability_discovery: { tool: "brain_describe", version: 1 } };
 }
 
 export function asFileMetadata(files: FileMetadata[] | string[]): FileMetadata[] {

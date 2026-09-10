@@ -43,6 +43,7 @@ export interface ApplyLintFixesOptions {
 }
 
 interface BrainState {
+  revisions: Record<string, string | null>;
   tasks: string | null;
   archive: string;
 }
@@ -54,19 +55,23 @@ interface ComputedFixes {
   appliedIds: string[];
 }
 
-async function readOrNull(brainId: string, filename: string): Promise<string | null> {
-  try {
-    return await activeBrainStore().readFile(brainId, filename);
-  } catch {
-    return null;
-  }
-}
-
 async function readState(brainId: string): Promise<BrainState> {
-  return {
-    tasks: await readOrNull(brainId, TASKS_FILE),
-    archive: (await readOrNull(brainId, TASKS_ARCHIVE_FILE)) ?? "",
-  };
+  const store = activeBrainStore();
+  const revisions: Record<string, string | null> = {};
+  async function read(filename: string): Promise<string | null> {
+    try {
+      const snapshot = await store.readFileSnapshot(brainId, filename);
+      revisions[filename] = snapshot.revisionId;
+      return snapshot.content;
+    } catch (error) {
+      if (!/not found|ENOENT|deleted/i.test(String(error))) throw error;
+      revisions[filename] = null;
+      return null;
+    }
+  }
+  const tasks = await read(TASKS_FILE);
+  const archive = (await read(TASKS_ARCHIVE_FILE)) ?? "";
+  return { tasks, archive, revisions };
 }
 
 function computeFixes(
@@ -174,7 +179,8 @@ export async function applyLintFixes(
       "replace",
       oldContent,
       actor,
-      role
+      role,
+      state.revisions[filename]
     );
     summary.filesWritten.push(filename);
   }
@@ -236,7 +242,8 @@ export async function applyLintFixSelection(
       "replace",
       oldContent,
       actor,
-      role
+      role,
+      state.revisions[filename]
     );
     result.filesWritten.push(filename);
   }

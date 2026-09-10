@@ -396,7 +396,7 @@ export class PostgresAccessGrantStore {
           `,
           [input.brainId, input.target.provider, normalizedTenant(input.target)]
         );
-        if (Number(countResult.rows[0]?.count || 0) <= 2) {
+        if (Number(countResult.rows[0]?.count || 0) <= MIN_ACTIVE_OWNERS) {
           throw new Error("Cannot reduce the active Owner roster below two");
         }
       }
@@ -571,3 +571,13 @@ export async function currentRolesForPrincipal(
 export async function hasCurrentAccess(principal: BrainPrincipal): Promise<boolean> {
   return Object.keys(await currentRolesForPrincipal(principal)).length > 0;
 }
+
+export const MIN_ACTIVE_OWNERS = 2;
+
+export async function assertSteadyStateOwnerRoster(
+  grants: Pick<PostgresAccessGrantStore, "countActiveOwners">, brainId: string, tenantId: string
+): Promise<void> {
+  const count = await grants.countActiveOwners(brainId, "entra", tenantId);
+  if (count < MIN_ACTIVE_OWNERS) throw new Error(`Access administration requires ${MIN_ACTIVE_OWNERS} active Owners; found ${count}`);
+}
+

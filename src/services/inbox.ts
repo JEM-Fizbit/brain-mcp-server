@@ -24,15 +24,12 @@ async function getInboxPath(brainId?: string): Promise<string> {
 
 /**
  * Scan the Brain inbox for pending files.
- * Creates the inbox directory if it doesn't exist.
+ * Read-only: an absent or unreadable directory is an observation failure.
  * Filters out hidden files, standard documentation placeholders, and directories.
  * Returns files sorted by modified date (newest first).
  */
 export async function scanInbox(brainId?: string): Promise<InboxFile[]> {
   const inboxPath = await getInboxPath(brainId);
-
-  // Create inbox dir if missing (no-op if exists)
-  await fs.mkdir(inboxPath, { recursive: true });
 
   const entries = await fs.readdir(inboxPath, { withFileTypes: true });
 

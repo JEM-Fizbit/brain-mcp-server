@@ -4,6 +4,7 @@ import type {
   ConflictResolutionResult,
   RevisionActor,
 } from "../sync/types.js";
+import { contentHash } from "../sync/hash.js";
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
@@ -72,7 +73,11 @@ export function assertNotProtected(filename: string, action: string): void {
   }
 }
 
+export interface FileSnapshot { content: string; revisionId: string; contentHash: string }
+
 export interface BrainStore {
+  readonly capabilities: { revisions: boolean };
+  readFileSnapshot(brainId: string, filename: string): Promise<FileSnapshot>;
   brainExists(brainId: string): Promise<boolean>;
   readFile(brainId: string, filename: string, scope?: ReadScope): Promise<string>;
   listFiles(brainId: string, scope?: "brain" | "sources"): Promise<FileMetadata[] | string[]>;
@@ -89,7 +94,8 @@ export interface BrainStore {
     mode: WriteMode,
     oldContent?: string,
     actor?: RevisionActor,
-    role?: BrainRole
+    role?: BrainRole,
+    expectedRevisionId?: string | null
   ): Promise<string>;
   deleteFile(
     brainId: string,
@@ -133,11 +139,17 @@ export interface BrainStore {
     conflictId: string,
     content: string,
     actor?: RevisionActor,
-    role?: BrainRole
+    role?: BrainRole,
+    expectedRevisionId?: string
   ): Promise<ConflictResolutionResult>;
 }
 
 export class FilesystemBrainStore implements BrainStore {
+  readonly capabilities = { revisions: false };
+  async readFileSnapshot(brainId: string, filename: string): Promise<FileSnapshot> {
+    const content = await this.readFile(brainId, filename);
+    return { content, revisionId: contentHash(content), contentHash: contentHash(content) };
+  }
   async brainExists(brainId: string): Promise<boolean> {
     try {
       await brain.listFileNames(brainId);
@@ -178,9 +190,10 @@ export class FilesystemBrainStore implements BrainStore {
     mode: WriteMode,
     oldContent?: string,
     _actor?: RevisionActor,
-    _role?: BrainRole
+    _role?: BrainRole,
+    expectedRevisionId?: string | null
   ): Promise<string> {
-    return brain.updateFile(filename, content, mode, oldContent, brainId);
+    return brain.updateFile(filename, content, mode, oldContent, brainId, expectedRevisionId);
   }
 
   deleteFile(

@@ -56,6 +56,7 @@ export const ReadFileSchema = BrainIdSchema.extend({
 });
 
 export const UpdateFileSchema = BrainIdSchema.extend({
+  expected_revision: z.string().min(1).optional().describe("Required for replace: revision_id returned by brain_read_file, or 'new' to create a file that must not exist. Stale replacements are refused."),
   filename: z
     .string()
     .describe("The Brain-vault filename to update. Must end in .md. External namespaces sources/, inbox/, and .brain-sync/ are reserved for their dedicated workflows. Hosted writes to 00_loader.md or NOW.md require owner/admin role."),
@@ -161,6 +162,7 @@ export const ListConflictsSchema = BrainIdSchema.extend({
 });
 
 export const ResolveConflictSchema = BrainIdSchema.extend({
+  expected_revision: z.string().min(1).describe("The current hosted revision_id you read and reviewed with brain_read_file; stale resolutions are refused."),
   conflict_id: z
     .string()
     .min(1)

@@ -7,7 +7,7 @@
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
-> **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md) — who owns what (JEM Brain + connector = personal; hosted MCP = personal-owned, ERS beta-shared) and the Phase 0 (personal beta) → Phase 1 (fork a dedicated ERS MCP) plan that this roadmap's cutover work realizes.
+> **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md). The reusable public server remains personal-owned; JEM and ERS operate permanently isolated hosted deployments. The historical fork phase is complete.
 
 The core product direction is local-first hosted Brain:
 
@@ -356,3 +356,7 @@ Recommended order:
 - Do not expose Brain tables through Supabase browser/client roles.
 - Do not move ERS production data into John's private Supabase org as a final state.
 - Do not build full multi-tenant product machinery before the single-user and multi-Brain contracts are proven.
+
+## Production stabilization — 10 September 2026
+
+Company-wide expansion remains held while [spec 020](specs/020-production-stabilization.md) verifies structural concurrency, reviewed-write, Owner restart, capability and OAuth protections. Existing access remains unchanged. Routine human edit coordination is not an acceptance substitute.

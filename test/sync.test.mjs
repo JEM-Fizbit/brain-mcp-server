@@ -320,6 +320,7 @@ test("file revision store persists heads and conflicts across instances", async 
     brainId: "ai-brain-jem",
     conflictId: conflicts[0].conflictId,
     content: "Persistent resolution\n",
+    expectedRevisionId: hosted.revisionId,
     actor: { provider: "test", id: "resolver" },
   });
   assert.equal(resolution.conflict.status, "resolved");

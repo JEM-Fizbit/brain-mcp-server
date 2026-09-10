@@ -3,7 +3,7 @@
  * Source ingestion, inbox processing, and sync state have their own bounded
  * workflows and must never be created through ordinary Brain file operations.
  */
-const RESERVED_EXTERNAL_ROOTS = new Set(["sources", "inbox", ".brain-sync"]);
+const RESERVED_EXTERNAL_ROOTS = new Set(["sources", "inbox", ".brain-sync", ".brain-sync-recovery"]);
 
 export function assertBrainVaultPath(filename: string): void {
   const portable = filename.replaceAll("\\", "/").replace(/^(\.\/)+/, "");

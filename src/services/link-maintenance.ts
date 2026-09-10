@@ -50,6 +50,10 @@ export async function rewriteLinksAfterRename(
       protectedSkipped.push(update.name);
       continue;
     }
+    const snapshot = await store.readFileSnapshot(brainId, update.name);
+    if (snapshot.content !== files.find(file => file.name === update.name)?.content) {
+      throw new Error(`Concurrent edit during link maintenance: ${update.name}`);
+    }
     await store.writeFile(
       brainId,
       update.name,
@@ -57,7 +61,8 @@ export async function rewriteLinksAfterRename(
       "replace",
       undefined,
       actor,
-      role
+      role,
+      snapshot.revisionId
     );
   }
   return {

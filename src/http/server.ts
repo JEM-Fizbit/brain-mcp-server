@@ -27,7 +27,7 @@ import {
 import { AdminSessionStore } from "../admin/session.js";
 import { AccessAdministrationService } from "../admin/access-service.js";
 import { handleAdminRequest, type AdminRouteContext } from "../admin/routes.js";
-import { postgresAccessGrantStore } from "../services/access-grants.js";
+import { assertSteadyStateOwnerRoster, postgresAccessGrantStore } from "../services/access-grants.js";
 import { runtimeBrainId } from "../services/runtime-env.js";
 import { loadRegistry } from "../services/registry.js";
 
@@ -277,7 +277,7 @@ export async function handleHttpRequest(
     if (req.method === "POST" && pathname === "/register") {
       const rawBody = await readRawBody(req, MAX_OAUTH_BODY_BYTES);
       const result = await handleRegister(rawBody, ctx.config, ctx.state);
-      sendJson(res, result.status, result.body);
+      sendJson(res, result.status, result.body, result.status === 429 ? { "Retry-After": "3600" } : undefined);
       return;
     }
 
@@ -395,20 +395,9 @@ export async function startHttpServer(): Promise<void> {
     config.entra?.adminGraphEnabled
   ) {
     const grants = postgresAccessGrantStore();
-    const requiredOwners = Number(process.env.ENTRA_REQUIRED_INITIAL_OWNER_COUNT || 3);
-    if (!Number.isInteger(requiredOwners) || requiredOwners < 2 || requiredOwners > 10) {
-      throw new Error("ENTRA_REQUIRED_INITIAL_OWNER_COUNT must be an integer between 2 and 10");
-    }
-    const activeOwners = await grants.countActiveOwners(
-      "ers-brain",
-      "entra",
-      config.entra.tenantId
-    );
-    if (activeOwners < requiredOwners) {
-      throw new Error(
-        `ERS access administration requires ${requiredOwners} active Owners; found ${activeOwners}`
-      );
-    }
+    // Initial provisioning may require a larger roster. Restarts must use the
+    // same steady-state floor as the transactional administration policy.
+    await assertSteadyStateOwnerRoster(grants, "ers-brain", config.entra.tenantId);
     ctx.admin = {
       config,
       state,
@@ -433,5 +422,19 @@ export async function startHttpServer(): Promise<void> {
   await new Promise<void>((resolve) => {
     server.listen(port, host, resolve);
   });
+  let cleaning = false;
+  const cleanup = async () => {
+    if (cleaning || !state.cleanupExpired) return;
+    cleaning = true;
+    try {
+      const deleted = await state.cleanupExpired();
+      if (deleted) log("INFO", "expired OAuth state removed", { deleted });
+    } catch { log("ERROR", "OAuth expiry cleanup failed"); }
+    finally { cleaning = false; }
+  };
+  const cleanupTimer = setInterval(() => void cleanup(), 60_000);
+  cleanupTimer.unref();
+  server.once("close", () => clearInterval(cleanupTimer));
+  void cleanup();
   log("INFO", `brain-mcp-server listening on http://${host}:${port}`);
 }

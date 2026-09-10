@@ -407,7 +407,7 @@ test("RevisionBrainStore protects always-loaded files at the store boundary", as
     );
   }
 
-  await assert.doesNotReject(() =>
+  await assert.doesNotReject(async () =>
     store.writeFile(
       "ai-brain-jem",
       "00_loader.md",
@@ -415,10 +415,11 @@ test("RevisionBrainStore protects always-loaded files at the store boundary", as
       "replace",
       undefined,
       undefined,
-      "admin"
+      "admin",
+      (await store.readFileSnapshot("ai-brain-jem", "00_loader.md")).revisionId
     )
   );
-  await assert.doesNotReject(() =>
+  await assert.doesNotReject(async () =>
     store.writeFile(
       "ai-brain-jem",
       "NOW.md",
@@ -426,7 +427,8 @@ test("RevisionBrainStore protects always-loaded files at the store boundary", as
       "replace",
       undefined,
       undefined,
-      "owner"
+      "owner",
+      (await store.readFileSnapshot("ai-brain-jem", "NOW.md")).revisionId
     )
   );
   await assert.doesNotReject(() =>
@@ -484,7 +486,8 @@ test("RevisionBrainStore protects structural conflict resolution at the store bo
       conflict.conflictId,
       "# admin resolution\n",
       undefined,
-      "admin"
+      "admin",
+      seeded.head.revisionId
     )
   );
 });

@@ -172,8 +172,7 @@ export async function semanticSearch(
   const filePath = await indexPath(brainId);
   let index = await readIndex(filePath);
   if (!index) {
-    await indexSources(brainId);
-    index = await readIndex(filePath);
+    throw new Error("semantic_index_missing: run brain_semantic_index explicitly before searching. No index was written.");
   }
   if (!index) return [];
 

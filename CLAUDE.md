@@ -16,7 +16,7 @@ brain-mcp-server is a generic, open-source MCP server (TypeScript) that serves M
 **Local:** stdio only (`node dist/index.js`, `BRAIN_DIR` env) — fast path for local filesystem work and recovery.
 **Status:** Production
 
-> **Active major initiative — Brain Platform (cloud, multi-tenant).** This server is evolving from single-user stdio into a multi-tenant "Brain Platform that serves any Brain" (one `mcp__brain__*` namespace + `brain_id` param + per-Brain substrate). It is an **evolution of this codebase, not a rewrite or new project.** Cloud transport + OAuth 2.1 + per-user attribution are already proven in a separate reference repo (`~/Projects/slack-mcp-server/` v0.3.0) — lift, don't re-derive. Next build window = JEM Phase 1+2 (HTTP transport + `BrainStore`/`BrainSemanticSearch` abstractions + `brain_id` + OAuth/GitHub-IdP + Tier 1 vector). **Kickoff plan:** `~/Projects/claude-ops/plans/brain-platform/2026-06-13.md`. **Canonical roadmap:** `docs/ROADMAP.md` (the `ai-brain-jem` `PLAN_brain_roadmap.md` is superseded/historical). **Ownership & lifecycle:** `docs/OWNERSHIP_AND_LIFECYCLE.md` — the hosted MCP is personal-owned and ERS beta-shared (John sole user); a dedicated ERS MCP is forked at multi-tenant cutover. **Target architecture:** `~/Projects/ai-brain-jem/docs/SPEC_brain_platform.md`. The implementation SPEC for this window goes at `docs/specs/001-brain-platform-phase-1-2.md` — draft and get sign-off before writing code.
+> **Current topology:** the shared public server is personal-owned and reusable. JEM and ERS have permanently separate hosted deployments, identities, databases and artifacts. HTTP, revision-backed storage and owner administration are implemented; the historical Phase 1/2 kickoff is not a pending implementation instruction. See `docs/OWNERSHIP_AND_LIFECYCLE.md` and `docs/ROADMAP.md`. Company-wide expansion is held pending the structural stabilization and acceptance in `docs/specs/020-production-stabilization.md`.
 
 ---
 
@@ -75,7 +75,7 @@ Conversationally captured items may be held temporarily in a Brain `TASKS.md` `#
 
 ## Hosted Cockpit And Telemetry
 
-The hosted cockpit is a local-only, read-only operator surface at `http://127.0.0.1:8787/`. It must not expose Brain writes, conflict resolution, admin mutations, or public network binding.
+The cockpit and menu-bar app remain loopback-only. Routine refresh is read-only; approved Maintenance actions may run lint, reviewed mechanical fixes and configured local restart controls as specified in `docs/hosted-cockpit.md`. They do not provide general Brain editing or conflict resolution. ERS access administration is a separate authenticated hosted Owner surface; the local cockpit links to it. Do not add public network binding or bypass either surface's authorization.
 
 Use Supabase Postgres for hosted operational telemetry:
 
@@ -237,3 +237,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 1. **Path traversal**: All filename inputs are validated — no `..`, no absolute paths, must end in `.md`
 2. **Git operations**: Server uses existing SSH config (`github-personal` alias) for push. No credentials stored.
 3. **stdio transport**: All logging goes to stderr (MCP convention). Never write to stdout except MCP protocol messages.
+
+## Capability and write preconditions
+
+Use `brain_describe` for endpoint support before selecting an operation or requesting approval. Manual inbox custody and filesystem access are independent of MCP roles. Follow `docs/backend-capabilities.md` for support, effects, authorization and observations. Replacements must carry the `revision_id` from the read used for review as `expected_revision` (`new` only for creation); conflict resolution also requires the reviewed hosted revision. A stale refusal requires a fresh review, never an automatic retry with the new head. Local sync retains displaced bytes under `.brain-sync-recovery/`; do not silently delete those records.

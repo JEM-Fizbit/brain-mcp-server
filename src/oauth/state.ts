@@ -1,3 +1,4 @@
+import type { RegistrationLimits } from "./admission.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -9,6 +10,8 @@ export type OauthStore =
   | "oauth_states";
 
 export interface StateProvider {
+  registerClient?(key: string, value: any, limits: RegistrationLimits): Promise<boolean>;
+  cleanupExpired?(limit?: number): Promise<number>;
   get(store: OauthStore, key: string): Promise<any | null>;
   put(store: OauthStore, key: string, value: any): Promise<any>;
   del(store: OauthStore, key: string): Promise<boolean>;
@@ -80,6 +83,23 @@ export function makeFileStateProvider(root = defaultRoot()): StateProvider {
   }
 
   return {
+    async registerClient(key, value, limits) {
+      return locks.with("clients", async () => {
+        const entries = await load("clients");
+        const clients = Object.values(entries);
+        const recent = clients.filter(client => Number(client.client_id_issued_at) > Date.now() / 1000 - 3600).length;
+        if (clients.length >= limits.maximumClients || recent >= limits.perHour) return false;
+        entries[key] = value;
+        await save("clients", entries);
+        return true;
+      });
+    },
+    async cleanupExpired() {
+      for (const name of ["auth_codes", "refresh_tokens", "oauth_states"] as OauthStore[]) {
+        await locks.with(name, async () => save(name, await load(name)));
+      }
+      return 0; // file provider does not expose deleted-count telemetry
+    },
     async get(store, key) {
       const entries = await load(store);
       return entries[key] || null;

@@ -114,6 +114,8 @@ export interface RevisionConflict {
 export type RevisionProposalResult = RevisionAccepted | RevisionConflict;
 
 export interface ConflictResolutionInput {
+  /** Caller-reviewed hosted head; required at runtime, including legacy callers. */
+  expectedRevisionId?: string;
   brainId: string;
   conflictId: string;
   content: string;

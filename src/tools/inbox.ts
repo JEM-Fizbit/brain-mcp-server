@@ -1,3 +1,5 @@
+import { assertOperationSupported, describeCapabilities, capabilityFailure } from "../services/capabilities.js";
+import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ScanInboxSchema } from "../schemas/tools.js";
 import { scanInbox } from "../services/inbox.js";
@@ -14,32 +16,18 @@ export function registerInboxTools(server: McpServer): void {
     "brain_scan_inbox",
     "List files pending in a filesystem-backed Brain inbox. Hosted Postgres deployments use their documented operator ingestion workflow. Returns filenames, sizes, and dates when an inbox is available.",
     ScanInboxSchema.shape,
+    { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        if (
-          ctx.brain.storage_backend !== "filesystem" ||
-          !ctx.brain.storage_config.brain_dir
-        ) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: [
-                  `Server-side inbox state is not observable for Postgres-backed Brain ${ctx.brainId}.`,
-                  "The hosted MCP server has no Fly-local inbox directory for this Brain.",
-                  "This is a backend capability result, not evidence that the real inbox is empty or still pending.",
-                  "Use brain_prepare_ingest, then inspect and verify the selected Brain's real inbox through its local Monitor/operator workspace so source metadata and artifacts land in the authoritative stores.",
-                ].join("\n"),
-              },
-            ],
-          };
-        }
+        assertOperationSupported(ctx.brain, ctx.role, activeBrainStore().capabilities, "brain_scan_inbox");
 
         const files = await scanInbox(ctx.brainId);
+        const observation = { state: "observed", count: files.length, observed_at: new Date().toISOString() };
 
         if (files.length === 0) {
           return {
+            structuredContent: { observation, files: [] },
             content: [
               {
                 type: "text",
@@ -72,12 +60,9 @@ export function registerInboxTools(server: McpServer): void {
           "7. Run `brain_lint` after the coordinated update",
         ].join("\n");
 
-        return { content: [{ type: "text", text: result }] };
+        return { content: [{ type: "text", text: result }], structuredContent: { observation, files } };
       } catch (error) {
-        return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
-        };
+        return capabilityFailure(error);
       }
     }
   );

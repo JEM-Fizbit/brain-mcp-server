@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LoadContextSchema, ReadFileSchema } from "../schemas/tools.js";
 import {
   activeBrainStore,
-  loadContextFromActiveStore,
+  loadContextWithObservations,
 } from "../services/active-brain-store.js";
 import { resolveToolBrain } from "../services/request-context.js";
 
@@ -14,8 +14,10 @@ export function registerContextTools(server: McpServer): void {
     async ({ brain_id }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
-        const content = await loadContextFromActiveStore(ctx.brainId);
-        return { content: [{ type: "text", text: content }] };
+        const result = await loadContextWithObservations(ctx.brainId, ctx.brain);
+        return { content: [{ type: "text", text: result.text }], structuredContent: {
+          observations: result.observations, capability_discovery: result.capability_discovery,
+        } };
       } catch (error) {
         return {
           content: [{ type: "text", text: String(error) }],
@@ -32,6 +34,11 @@ export function registerContextTools(server: McpServer): void {
     async ({ brain_id, filename, scope }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        if (scope === "brain") {
+          const snapshot = await activeBrainStore().readFileSnapshot(ctx.brainId, filename);
+          return { content: [{ type: "text", text: `revision_id: ${snapshot.revisionId}\ncontent_sha256: ${snapshot.contentHash}\n\n${snapshot.content}` }],
+            structuredContent: { filename, revision_id: snapshot.revisionId, content_sha256: snapshot.contentHash, content: snapshot.content } };
+        }
         const content = await activeBrainStore().readFile(
           ctx.brainId,
           filename,

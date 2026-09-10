@@ -85,7 +85,7 @@ export function registerSyncTools(server: McpServer): void {
     "brain_resolve_conflict",
     "Resolve an open sync conflict by writing reviewed replacement Markdown content as the new hosted head, then marking the conflict resolved. Use brain_list_conflicts first and do not use this to hide unreviewed divergence.",
     ResolveConflictSchema.shape,
-    async ({ brain_id, conflict_id, content }, extra) => {
+    async ({ brain_id, conflict_id, content, expected_revision }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertToolRole(ctx, "brain_resolve_conflict");
@@ -94,7 +94,8 @@ export function registerSyncTools(server: McpServer): void {
           conflict_id,
           content,
           revisionActor(ctx),
-          ctx.role
+          ctx.role,
+          expected_revision
         );
         const text = [
           `Resolved conflict ${result.conflict.conflictId} for ${result.conflict.filename}.`,

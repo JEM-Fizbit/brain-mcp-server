@@ -27,9 +27,9 @@ function storeThatEditsLocallyDuringRead(store, localPath, localEdit) {
     recordConflict: (...args) => store.recordConflict(...args),
     listConflicts: (...args) => store.listConflicts(...args),
     listChanges: (...args) => store.listChanges(...args),
-    readFile: async (...args) => {
+    readRevision: async (...args) => {
       await fs.writeFile(localPath, localEdit, "utf-8");
-      return store.readFile(...args);
+      return store.readRevision(...args);
     },
   };
 }

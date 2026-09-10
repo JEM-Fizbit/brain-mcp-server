@@ -32,8 +32,11 @@ async function captureItem(
     const ctx = await resolveToolBrain(brain_id, extra);
     assertToolRole(ctx, "brain_capture_item");
     let existing = "";
+    let expectedRevision: string | null = null;
     try {
-      existing = await activeBrainStore().readFile(ctx.brainId, TASKS_FILE);
+      const snapshot = await activeBrainStore().readFileSnapshot(ctx.brainId, TASKS_FILE);
+      existing = snapshot.content;
+      expectedRevision = snapshot.revisionId;
     } catch (error) {
       if (!String(error).includes("not found")) throw error;
       existing = "# TASKS\n";
@@ -55,7 +58,8 @@ async function captureItem(
       "replace",
       undefined,
       revisionActor(ctx),
-      ctx.role
+      ctx.role,
+      expectedRevision
     );
     const sync = revisionStoreModeEnabled()
       ? ""
