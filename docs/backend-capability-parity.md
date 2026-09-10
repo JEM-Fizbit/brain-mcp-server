@@ -14,8 +14,13 @@
 > the approval case. Users' manual filesystem/SharePoint access is independent of
 > MCP permissions. The cross-cutting declaration and guidance-propagation gaps
 > remain. See the [accepted decision and closure criteria](DECISIONS.md#2026-09-10--declare-operational-capabilities-consistently-implement-after-the-production-design-audit).
-> No implementation has been completed by this review; exact spec scope follows
-> the audit. §§ 1, 3.3–3.4 and questions 4–5 below must be read with this correction.
+> **Deployment disposition:** the subsequent audit produced spec 020, implemented
+> and deployed as v1.9.0 on both isolated services. The shared capability resolver
+> and loader/operations/primer propagation are complete. Fresh client acceptance
+> remains open: installed OpenAI tool metadata still lacks the new revision field
+> and ingest preflight. The server fails closed; client metadata must be updated
+> and verified before closure. No new inbox architecture was required.
+> §§ 1, 3.3–3.4 and questions 4–5 below retain the original report's dated claims.
 
 ---
 

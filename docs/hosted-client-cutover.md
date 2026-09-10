@@ -1,13 +1,15 @@
 # Hosted Client Cutover Runbook
 
 **Status:** active operator guide
-**Last updated:** 2026-07-18
+**Last updated:** 2026-09-10
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 
 Cutover does not replace the local Markdown Brain. Local stdio `brain` remains the fast local and recovery path. Hosted `brain-hosted` is the normal path for clients or sessions that need remote HTTPS access.
 
 ## Current Gate
+
+**10 September 2026:** v1.9.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation are live. Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
 
 The live JEM hosted test drive passed on 2026-06-16 at 16:38 Asia/Ho_Chi_Minh:
 
