@@ -8,6 +8,79 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-10 — Declare operational capabilities consistently; implement after the production design audit
+
+**Decision:** John accepted a shared, machine-readable capability contract for
+Brain operations. Carry it into the broad production design audit as an accepted
+requirement, then implement it with related findings in the sequenced post-audit
+remediation. The exact schema and integration remain subject to that audit;
+extending `brain_describe` is the preferred starting point, not a locked API.
+Do not create a full implementation spec before the audit establishes its scope.
+This entry records design acceptance, not shipped behaviour.
+
+**Principle:** Every Brain operation must declare its support, execution surface
+and custody boundary before invocation. Capability, caller authorization and
+observed state are distinct: unsupported, unobserved or failed checks must never
+imply empty or healthy state. Discovery, preflight and execution use one
+capability contract; execution revalidates before side effects. Permanent
+limitations are discoverable without recurring warnings. Client approval neither
+establishes capability nor replaces server authorization.
+
+**Scope and boundaries:** Resolve support for an operation on the selected Brain
+in its deployment, using backend abilities and configured adapters. Keep caller
+permissions and temporary operational health separate. Apply the contract to all
+three reported cases: inbox scan/context nudges, `brain_semantic_*`, and capability
+discovery before approval-gated operations. Preserve one shared tool catalog and
+implementation; derive declarations, availability and refusals from the common
+contract. Storage abilities belong at the store boundary; user roles, client
+approvals and operator custody do not become responsibilities of `BrainStore`.
+The server can declare support in advance and refuse before writes, but cannot
+guarantee that a third-party host suppresses an approval prompt.
+
+Spec 017 and the 24 August source-custody decision already retain operator-side
+inboxes. Users independently drop, read, edit and remove files through filesystem
+or SharePoint permissions; MCP roles and approvals do not govern those actions.
+Monitor observes the local inboxes and surfaces work; it does not control manual
+access. Hosted incapability describes this endpoint's reach, not the user's reach.
+Preserve owner-isolated deployments and their different source-access topologies;
+introduce no shared credential or second hosted inbox authority.
+
+**Why:** The focused review corrected the report's unwatched-folder premise.
+The installed Monitor schedules doctor runs every 60 seconds;
+`scripts/hosted-doctor.mjs` scans each configured local inbox and raises pending
+work. Existing reports on 10 September showed successful scans for both profiles.
+This establishes detection, not a processing SLA or coverage while the operator
+Mac is asleep/offline. Spec 017 already provides ingestion preflight and
+fail-before-write refusals, but broader discovery remains inconsistent and the
+loader/primer/operations guidance has not fully propagated the custody contract.
+There is no demonstrated urgent inbox-loss issue requiring a patch ahead of the
+audit. Reviewing the shared boundaries first avoids conflicting remediation.
+
+**Closure evidence:** A caller can discover support for the selected Brain and
+operation without trial calls; all three cases follow the same declaration and
+refusal rules; unsupported/unobserved state is never reported as an empty result;
+supported operations retain their behaviour and authorization checks; relevant
+loaders, operations guides and primer agree with the contract; and the supported
+client matrix verifies discovery, preflight and approval behaviour, explicitly
+recording host limitations. Permanent incapability produces no recurring warning.
+Keep this as a named remediation deliverable until that evidence is recorded.
+
+**Alternatives rejected:** A new inbox watcher; a per-session unavailable warning;
+a cloud routine assumed to reach local disk; documentation-only remediation;
+bringing manual file access under MCP permissions; implementing deferred vector
+retrieval to hide unsupported tools; and implementing the shared contract before
+the broad audit. No new inbox architecture spec is warranted.
+
+**Related:** [problem report](backend-capability-parity.md);
+[open remediation](../BACKLOG.md);
+[spec 017](specs/017-hosted-ingestion-preflight.md);
+[spec 002](specs/002-local-first-hosted-sync-contract.md).
+This extends the 24 August ingestion-preflight and session-nudge decisions:
+silent routine nudges remain valid, while capability discovery must make clear
+which observations are unavailable.
+
+---
+
 ## 2026-09-08 — Hosted latency findings are windowed, spans are annotated, and connection warmth comes from the idle timeout
 
 **Decision:** Three locks from spec 019. (1) The `db_max_span` SLO is scored as
