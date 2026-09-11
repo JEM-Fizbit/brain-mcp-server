@@ -1,7 +1,7 @@
 # Hosted Client Cutover Runbook
 
 **Status:** active operator guide
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 
@@ -61,6 +61,8 @@ For remote-only Claude/Codex usage, prefer hosted `brain-hosted`. For local file
 ## Schema refresh after v1.9.0
 
 Authenticated Brain calls still work; the observed defect is stale tool metadata rather than invalid OAuth. Use an existing connection's metadata Refresh control when available, verify `expected_revision` and `brain_prepare_ingest`, then exercise a fresh conversation. The [official OpenAI guide](https://developers.openai.com/plugins/deploy/connect-chatgpt) describes Refresh for development connections and scan/review/publish for published metadata (checked 10 September 2026). The installed development-plugin controls inspected during this release exposed Reconnect/Disconnect but no Refresh, leaving that acceptance step unresolved.
+
+Fresh-task check supplied by John on 11 September 2026: both JEM and ERS expose `brain_update_file`, but neither exposes `brain_prepare_ingest` or `expected_revision`. Only `brain_id`, `content`, `filename`, `mode` and optional `old_content` appear in the update schema. No Brain tools were invoked in that check. This rules out a stale individual task as the sole explanation; do not keep asking for new tasks until the installed metadata changes. The signed-in ERS plugin settings also show the old schema, with no Refresh action. Request a supported metadata-only refresh/rescan of the existing app definitions.
 
 Preserve current connections and permissions while resolving the missing control. Do not delete/re-enroll a working connector, relax reviewed-write preconditions or treat an existing task's catalog as refreshed without evidence. This release-specific diagnosis qualifies the older mirrored recovery protocol: its OAuth-invalidating incident procedure does not establish authorization for connector deletion after a schema-only release.
 
