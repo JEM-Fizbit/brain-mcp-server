@@ -12,7 +12,7 @@
 
 ---
 
-- **Backend capability contract — deployed; client/role acceptance open.** The supported [metadata refresh](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md#metadata-only-refresh--verified-11-september-2026) restored `brain_prepare_ingest` and `expected_revision` in fresh ChatGPT, Codex CLI and Codex desktop schemas on 11 September. Fresh Codex desktop Owner write/refusal/cleanup journeys pass for both Brains. Complete remaining actual client/role journeys and resolve host safety refusals; schema discovery alone is not acceptance. Preserve current access, reviewed-revision enforcement and the rollout hold. [Decision and closure criteria](docs/DECISIONS.md#2026-09-10--deployed-safety-requires-current-client-contracts).
+- **Backend capability contract — deployed; client/role acceptance open.** The supported [metadata refresh](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md#metadata-only-refresh--verified-11-september-2026) restored `brain_prepare_ingest` and `expected_revision` in fresh ChatGPT, Codex CLI and Codex desktop schemas on 11 September. Tested Owner write/refusal/cleanup journeys now pass across fresh Codex desktop/CLI, ChatGPT web and the approved Claude account/surface pairings. Complete existing ERS Reader/member client checks and the Reader monitoring view; Owner success does not prove lower-role enforcement. Preserve current access, reviewed-revision enforcement and the rollout hold. [Decision and closure criteria](docs/DECISIONS.md#2026-09-10--deployed-safety-requires-current-client-contracts).
 
 <!-- backlog items below; newest first -->
 
