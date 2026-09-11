@@ -42,6 +42,7 @@ db/migrations/2026-07-17_001_brain_revision_fts.sql
 db/migrations/2026-08-19_001_bounded_sync_observability.sql
 db/migrations/2026-08-22_001_source_reference_identity.sql
 db/migrations/2026-08-25_001_entra_access_grants.sql
+db/migrations/20260911113912_resumable_local_ingestion.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql
 docs/security/hosted-brain-supabase-security-gate.md
@@ -344,3 +345,7 @@ Release the shared annotated tag first, then consume it through the ERS protecte
 `/monitor` is enabled when the hosted Postgres runtime is configured; `BRAIN_MONITORING_ENABLED=0` disables it. It uses existing OAuth state and requires no migration, provider permission expansion or additional upstream callback. Budget two extra bounded database connections per process. Verify the shell, unauthenticated API refusal and the existing-provider login flow after guarded deployment. See [monitoring runbook](hosted-monitoring.md).
 
 Private overlay documentation includes `BACKLOG.md` and the exact `docs/reviews/production-acceptance-evidence.json` path. Arbitrary JSON and all protected runtime changes remain refused.
+
+## Local ingestion delivery
+
+The v1.11.0 operator CLI uses the additive `ingestion_jobs` migration listed above; apply it under each deployment owner and rerun the Supabase security gate. Runtime hosting stays metadata-only and receives no Storage service key. The migration is unused by hosted MCP/monitoring until an explicit operator job is created. [Local ingestion runbook](local-source-ingestion.md).

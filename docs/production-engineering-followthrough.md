@@ -107,3 +107,7 @@ Acceptance fixtures must cover duplicates, rename with stable provider identity,
 ## Decisions for the next review
 
 Confirm the monitoring detail split (Reader summary, Admin/Owner diagnostics), the initial workload target and whether the local ingestion stage should precede provisioning an ERS-owned Graph runner. The current single-operator arrangement stays supported until those replacements are built and verified. No access change, new service purchase or automatic rollout follows from these proposals.
+
+## Approved delivery — 11 September 2026
+
+John approved the two-stage implementation. Authenticated monitoring (spec 021) is deployed as v1.10.0 on both services, with native Monitor/Cockpit hosted-status links. Resumable local ingestion (spec 022) is implemented with private durable jobs, immutable original verification, exact review bundles and atomic multi-file/metadata receipts. [Monitoring runbook](hosted-monitoring.md), [ingestion runbook](local-source-ingestion.md). Final deployment and live acceptance are recorded separately; no company rollout gate is lifted.

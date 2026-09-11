@@ -368,3 +368,7 @@ Company-wide expansion remains held while [spec 020](specs/020-production-stabil
 ### Authenticated monitoring and local ingestion — 11 September 2026
 
 [Spec 021](specs/021-authenticated-monitoring.md) implements browser monitoring under current Brain roles. [Spec 022](specs/022-resumable-local-ingestion.md) is the approved next operator-side ingestion step. Existing permissions and the company client-acceptance hold remain unchanged.
+
+### Local ingestion delivery
+
+[Spec 022](specs/022-resumable-local-ingestion.md) now implements the approved explicit-source local worker. Graph automation remains future work requiring a separate permission and runner decision. Verification uses isolated sources and databases; the first production source requires explicit selection and its own retained review/receipt.

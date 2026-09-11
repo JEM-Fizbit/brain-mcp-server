@@ -19,6 +19,11 @@ export class MonitoringRoutes {
     const send = (status:number,body:string,type='application/json',extra:Record<string,string|string[]>={}) => {res.writeHead(status,{...headers,'Content-Type':type,...extra});res.end(body);};
     const redirect = (location:string,cookies:string[])=>send(303,'','text/plain',{'Location':location,'Set-Cookie':cookies});
     try {
+      // Fly's alternate hostname must not start a login whose cookie would be
+      // stranded when the upstream callback returns to the canonical issuer.
+      if(req.method==='GET' && req.headers['x-forwarded-proto']==='https' && req.headers.host!==new URL(this.config.issuer).host){
+        redirect(new URL(url.pathname+url.search,this.config.issuer).href,[]);return;
+      }
       if (req.headers.origin && req.headers.origin !== new URL(this.config.issuer).origin) {send(403,'{"error":"origin_refused"}');return;}
       if (req.method==='POST' && url.pathname==='/monitor/logout') {
         if (req.headers.origin !== new URL(this.config.issuer).origin) {send(403,'{"error":"origin_required"}');return;}
