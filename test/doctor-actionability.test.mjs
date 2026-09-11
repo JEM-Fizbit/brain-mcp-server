@@ -10,6 +10,8 @@ import {
   consecutiveFailureStreak,
   postgresFailureDetail,
   postgresFailureStatus,
+  evaluateSyncHealth,
+  syncHealthAction,
   OPERATOR_ALARM_CHECKS,
   TRANSIENT_FAILURE_ESCALATION_CYCLES,
 } from "../scripts/lib/doctor-actionability.mjs";
@@ -235,4 +237,67 @@ test("a failed Postgres check explains class, age and persistence", () => {
   });
   assert.match(persistent, /4 consecutive cycles/);
   assert.doesNotMatch(persistent, /first cycle/);
+});
+
+const syncTime = Date.parse('2026-09-11T12:00:00Z');
+function syncSample(seconds, previous, extra = {}, now = syncTime + seconds * 1000) {
+  return evaluateSyncHealth({ command: 'watch', cycle: 1, status: 'error',
+    checkedAt: new Date(syncTime + seconds * 1000).toISOString(),
+    error: 'Connection terminated due to connection timeout', ...extra }, previous,
+    { now, maxAgeMs: 60_000 });
+}
+
+test('sync escalates distinct failed attempts, including cycle-one supervisor restarts, but never polls', () => {
+  let result = syncSample(0);
+  assert.equal(result.status, 'warn');
+  for (let i = 0; i < 50; i++) result = syncSample(0, result.observation);
+  assert.equal(result.details.failedObservations, 1);
+  result = syncSample(5, result.observation);
+  assert.equal(result.status, 'warn');
+  result = syncSample(10, result.observation);
+  assert.equal(result.status, 'fail');
+  assert.equal(result.details.failedObservations, 3);
+  const action = syncHealthAction(result);
+  assert.equal(action.level, 'fail');
+  assert.match(action.detail, /3 distinct failed/);
+  assert.match(action.detail, /2026-09-11T12:00:10/);
+});
+
+test('sync observed success, missed in-process recovery, old history and clock rollback reset recurrence', () => {
+  const failed = syncSample(5, syncSample(0).observation);
+  const recovered = syncSample(10, failed.observation, {status: 'ok'});
+  assert.equal(recovered.status, 'pass');
+  for (const result of [syncSample(15, recovered.observation),
+    syncSample(15, failed.observation, {cycle: 2}),
+    syncSample(100, failed.observation), syncSample(0, failed.observation),
+    syncSample(15, undefined)]) {
+    assert.equal(result.status, 'warn');
+    assert.equal(result.details.failedObservations, 1);
+  }
+});
+
+test('stale transient observations report unknown current health, not a fresh recurring failure', () => {
+  const prior = syncSample(5, syncSample(0).observation);
+  const failed = syncSample(10, prior.observation);
+  const stale = syncSample(10, failed.observation, {}, syncTime + 100_000);
+  assert.equal(stale.status, 'warn');
+  assert.equal(stale.details.state, 'stale');
+  assert.match(syncHealthAction(stale).detail, /current sync health is unknown/);
+  for (const checkedAt of [null, 'invalid', new Date(syncTime + 200_000).toISOString()]) {
+    assert.equal(syncSample(0, undefined, {checkedAt}).details.state, 'stale');
+  }
+});
+
+test('durable sync errors and guards retain actionability, missing health is not healthy', () => {
+  for (const error of ['permission denied for table files', 'password authentication failed',
+    'relation brain.files does not exist', 'unexpected local filesystem failure']) {
+    const result = syncSample(0, undefined, {error});
+    assert.equal(result.status, 'fail');
+    assert.equal(result.details.transient, false);
+  }
+  const guard = syncSample(0, undefined, {status: 'ok', report: {guardTripped: 'incomplete_scan'}});
+  assert.equal(guard.status, 'warn');
+  assert.equal(syncHealthAction({...guard, details: {...guard.details, guardTripped: 'incomplete_scan'}}).reason, 'sync_guard');
+  assert.equal(evaluateSyncHealth({}, null, {now: syncTime, maxAgeMs: 60_000}).status, 'warn');
+  assert.equal(syncHealthAction(syncSample(0, undefined, {status: 'ok'})), null);
 });

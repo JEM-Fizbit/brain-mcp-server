@@ -680,3 +680,40 @@ test("deployed version follows the selected endpoint and clears missing observat
     await stopCockpit(child);
   }
 });
+
+test("sync warnings, recurring failures and recovery render with source provenance", async ({ page }, testInfo) => {
+  const { evaluateSyncHealth, syncHealthAction } = await import('../scripts/lib/doctor-actionability.mjs');
+  const { child, url } = await startCockpit(testInfo);
+  let sample;
+  await page.route('**/api/doctor*', async route => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    payload.status = sample.status;
+    payload.checks = payload.checks.filter(check => check.name !== 'sync_health');
+    payload.checks.push({name: 'sync_health', ...sample});
+    const action = syncHealthAction(sample);
+    payload.actions = action ? [action] : [{level: 'pass', reason: 'none', title: 'No operator action required.'}];
+    await route.fulfill({response, json: payload});
+  });
+  try {
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({width, height: 844});
+      let previous;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const now = Date.parse('2026-09-11T12:00:00Z') + attempt * 1000;
+        sample = evaluateSyncHealth({status: 'error', checkedAt: new Date(now).toISOString(), error: 'Connection terminated due to connection timeout'}, previous, {now, maxAgeMs: 60_000});
+        previous = sample.observation;
+        await page.goto(url);
+        await expect(page.locator('#actions')).toContainText(attempt < 3 ? 'Watch local sync recovery.' : 'Restore local sync.');
+        await expect(page.locator('#actions')).toContainText(`${attempt} distinct failed attempt(s)`);
+        await expect(page.locator('#actions')).toContainText('Observed 2026-09-11');
+      }
+      await expect(page.locator("body")).toHaveJSProperty("scrollWidth", width);
+      await page.screenshot({path: testInfo.outputPath(`sync-recurring-${width}.png`), fullPage: true});
+      sample = evaluateSyncHealth({status: 'ok', checkedAt: new Date().toISOString()}, previous, {maxAgeMs: 60_000});
+      await page.goto(url);
+      await expect(page.locator('#actions')).toContainText('No operator action required.');
+      await expect(page.locator('#actions')).not.toContainText('Restore local sync.');
+    }
+  } finally { await stopCockpit(child); }
+});

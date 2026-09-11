@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "observedAt": "2026-09-11T11:06:03.846Z",
+  "environment": "synthetic loopback PostgreSQL; no production data or provider backup",
+  "stages": [
+    {
+      "concurrency": 1,
+      "durationMs": 1897.2,
+      "operations": {
+        "read": {
+          "count": 70,
+          "p50Ms": 2.98,
+          "p95Ms": 4.82,
+          "maxMs": 11.5
+        },
+        "reviewed_write": {
+          "count": 20,
+          "p50Ms": 3.79,
+          "p95Ms": 5.31,
+          "maxMs": 5.69
+        },
+        "sync": {
+          "count": 10,
+          "p50Ms": 152.48,
+          "p95Ms": 265.13,
+          "maxMs": 265.13
+        }
+      },
+      "errors": 0
+    },
+    {
+      "concurrency": 4,
+      "durationMs": 1738.33,
+      "operations": {
+        "read": {
+          "count": 70,
+          "p50Ms": 2.31,
+          "p95Ms": 5.34,
+          "maxMs": 40.62
+        },
+        "reviewed_write": {
+          "count": 20,
+          "p50Ms": 2.99,
+          "p95Ms": 16.43,
+          "maxMs": 18.81
+        },
+        "sync": {
+          "count": 10,
+          "p50Ms": 628.24,
+          "p95Ms": 921.42,
+          "maxMs": 921.42
+        }
+      },
+      "errors": 0
+    },
+    {
+      "concurrency": 8,
+      "durationMs": 1724.93,
+      "operations": {
+        "read": {
+          "count": 70,
+          "p50Ms": 3.77,
+          "p95Ms": 7.45,
+          "maxMs": 9.96
+        },
+        "reviewed_write": {
+          "count": 20,
+          "p50Ms": 4.06,
+          "p95Ms": 10.67,
+          "maxMs": 16.43
+        },
+        "sync": {
+          "count": 10,
+          "p50Ms": 1278.61,
+          "p95Ms": 1510.73,
+          "maxMs": 1510.73
+        }
+      },
+      "errors": 0
+    },
+    {
+      "concurrency": 16,
+      "durationMs": 2189.29,
+      "operations": {
+        "read": {
+          "count": 70,
+          "p50Ms": 8.76,
+          "p95Ms": 15.17,
+          "maxMs": 17.03
+        },
+        "reviewed_write": {
+          "count": 20,
+          "p50Ms": 14.27,
+          "p95Ms": 20.04,
+          "maxMs": 21.38
+        },
+        "sync": {
+          "count": 10,
+          "p50Ms": 1630.46,
+          "p95Ms": 2109.62,
+          "maxMs": 2109.62
+        }
+      },
+      "errors": 0
+    }
+  ],
+  "reviewedRace": {
+    "contenders": 16,
+    "accepted": 1,
+    "staleOrConflictRefusals": 15,
+    "recordedConflicts": 15
+  },
+  "recovery": {
+    "heads": 222,
+    "conflictRecords": 15,
+    "exactRevisionIds": true,
+    "exactMarkdownBytes": true,
+    "artifactCompanion": true,
+    "separateOriginalByteRestore": true,
+    "missingAndCorruptOriginalDetected": true,
+    "rlsFlagsPreserved": true,
+    "freshMirrorVerified": true,
+    "emptyBrainReseedVerified": true
+  },
+  "cleanup": "fixture databases and synthetic files removed"
+}

@@ -37,6 +37,8 @@ import {
   consecutiveFailureStreak,
   postgresFailureDetail,
   postgresFailureStatus,
+  evaluateSyncHealth,
+  syncHealthAction,
   OPERATOR_ALARM_CHECKS,
 } from "./lib/doctor-actionability.mjs";
 import {
@@ -767,25 +769,18 @@ async function checkSyncLock() {
   }
 }
 
+let syncHealthObservation = null;
 async function checkSyncHealth() {
   try {
     const health = await readJson(healthFile);
-    const checkedAt = health.checkedAt ? Date.parse(health.checkedAt) : NaN;
-    const ageMs = Number.isNaN(checkedAt) ? null : Date.now() - checkedAt;
-    const stale = ageMs === null || ageMs > maxSyncHealthAgeMs;
-    const status =
-      health.status === "ok" && !stale
-        ? "pass"
-        : health.status === "error"
-          ? "fail"
-          : "warn";
-
-    addCheck("sync_health", status, {
-      healthFile,
-      state: stale ? "stale" : health.status || "unknown",
-      checkedAt: health.checkedAt || null,
-      ageMs,
+    const evaluated = evaluateSyncHealth(health, doctorHistory.at(-1)?.syncHealth, {
       maxAgeMs: maxSyncHealthAgeMs,
+    });
+    syncHealthObservation = evaluated.observation;
+    addCheck("sync_health", evaluated.status, {
+      healthFile,
+      ...evaluated.details,
+      checkedAt: health.checkedAt || null,
       cycle: health.cycle ?? null,
       pushed: health.report?.pushed ?? null,
       pulled: health.report?.pulled ?? null,
@@ -1623,24 +1618,8 @@ function buildOperatorActions(status) {
     });
   }
 
-  if (sync?.details?.guardTripped) {
-    actions.push({ level: "warn", reason: "sync_guard", title: "Review protected local sync state.",
-      detail: String(sync.details.guardTripped) });
-  } else if (sync?.status === "fail") {
-    actions.push({
-      level: "fail",
-      reason: "sync_health_failed",
-      title: "Fix failing local sync health.",
-      detail: "Run npm run sync -- summary, inspect the reported error, then rerun hosted:doctor.",
-    });
-  } else if (sync?.status === "warn") {
-    actions.push({
-      level: "warn",
-      reason: "sync_health_stale",
-      title: "Refresh stale or incomplete sync health.",
-      detail: "Check the local launchd loop and recent sync logs before relying on hosted state.",
-    });
-  }
+  const syncAction = syncHealthAction(sync);
+  if (syncAction) actions.push(syncAction);
 
   if (launchd?.status === "warn") {
     const supervisorKind = launchd.details?.supervisor || supervisor;
@@ -1957,6 +1936,7 @@ await appendDoctorHistory({
   checkedAt: summary.checkedAt,
   status,
   checks: Object.fromEntries(checks.map((check) => [check.name, check.status])),
+  syncHealth: syncHealthObservation,
 });
 
 console.log(JSON.stringify(summary, null, 2));
