@@ -9,7 +9,7 @@ This roadmap records the intended path from the current JEM hosted Brain pilot t
 
 > **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md). The reusable public server remains personal-owned; JEM and ERS operate permanently isolated hosted deployments. The historical fork phase is complete.
 
-**11 September delivery:** both isolated services run v1.11.0. Authenticated monitoring and the explicit-source resumable ingestion workflow are implemented; both private job-table migrations and security gates pass. No production source was selected. Installed-client acceptance and the company rollout hold remain open. [Delivery and remaining boundaries](production-engineering-followthrough.md#final-verification-and-activation-boundary).
+**11 September delivery:** both isolated services run v1.11.0. Authenticated monitoring and the explicit-source resumable ingestion workflow are implemented; both private job-table migrations and security gates pass. No production source was selected. Both existing OpenAI Brain definitions have since passed the supported metadata refresh, with current schemas and actual read-only preflight verified in fresh ChatGPT and Codex CLI sessions. Remaining actual client/role acceptance and the company rollout hold remain open. [Delivery and remaining boundaries](production-engineering-followthrough.md#final-verification-and-activation-boundary).
 
 The core product direction is local-first hosted Brain:
 
@@ -24,7 +24,7 @@ The core product direction is local-first hosted Brain:
 
 **11 September 2026 engineering follow-through:** local sync alarms now distinguish isolated transient errors from observed recurrence. Isolated recovery and mixed-load verification passed; colleague monitoring and resumable ingestion designs are prepared in [the follow-through record](production-engineering-followthrough.md). These extend engineering evidence without lifting the rollout hold or claiming provider recovery/production write capacity.
 
-**10 September 2026:** v1.9.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation are live. Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
+**Historical 10 September 2026 snapshot (superseded by the 11 September delivery/metadata result above):** v1.9.0 was deployed on both isolated services; spec 020 structural protections and guidance propagation are live. Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
 
 The hosted Brain rebuild has passed the first critical sync gates:
 
