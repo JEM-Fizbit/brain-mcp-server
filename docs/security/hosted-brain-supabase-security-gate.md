@@ -1,7 +1,7 @@
 # Hosted Brain Supabase Security Gate
 
 **Status:** passed for the live JEM and ERS hosted runtimes
-**Full gate checked:** JEM 2026-08-26; ERS 2026-08-28. Bounded read-only recheck: 2026-09-11 (below).
+**Full database/Storage access gate checked:** both owners 2026-09-11, after the approved ingestion-job migration (below).
 **Projects:** `jem-brain-personal`; `brain-platform-pilot`
 **Supabase project refs:** `gfipcidoyrtgngauzijy`; `omnwbcdtmtvxasgdmvwr`
 **Organizations:** John E. Milad personal; `ERS Genomics`
@@ -9,7 +9,29 @@
 
 ## Gate Decision
 
-### Bounded recheck — 11 September 2026
+### Ingestion-job migration gate — 11 September 2026
+
+Following John's explicit production approval, `20260911113912_resumable_local_ingestion.sql` was applied separately to JEM and ERS. ERS used its scoped Supabase migration connector; JEM used the existing authenticated Supabase CLI administration path with a transaction containing the exact migration. Neither used a runtime login for DDL or changed workforce grants. Both tables were absent immediately before application and contain zero rows afterward.
+
+| Control | JEM | ERS |
+| --- | --- | --- |
+| Brain tables with RLS | 18/18 | 19/19 |
+| Effective client schema/table access; public ACL entries | 0 | 0 |
+| Policies outside `brain_runtime`; elevated Brain runtime roles | 0 | 0 |
+| Invalid/not-ready Brain indexes | 0 | 0 |
+| Ingestion table | 20 columns, 8 constraints, empty | 20 columns, 8 constraints, empty |
+| Ingestion access | Existing runtime role: SELECT/INSERT/UPDATE/DELETE; one runtime-only ALL policy | Same |
+| Artifact bucket | Private | Private |
+| Storage object policies; client/public helper execution | 0 | 0 |
+| Security Advisor findings | 0 | 0 |
+| Performance Advisor | 6 INFO, no WARN/ERROR | 8 INFO, no WARN/ERROR |
+| Existing owner-bound runtime read and doctor | Pass | Pass |
+
+Performance notices include [an uncovered foreign key](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) on `ingestion_jobs.brain_id` in both databases, [unused indexes](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index), and the existing [Auth connection allocation](https://supabase.com/docs/guides/deployment/going-into-prod). ERS also reports the access-audit foreign key and retained telemetry table allocation. The new table is empty; the source index supports the operator's source history queries. An additional Brain-key index can be considered with observed job volume or Brain deletion workload. No index removal, locking vacuum, connection-setting change or wider migration was performed just to clear informational notices.
+
+The successful current CLI checks close the earlier JEM advisor and bucket-privacy visibility gaps. This access-security gate does not attest original-byte recovery, live artifact-object coverage, provider backup restoration or fresh workforce/client role journeys. No source bytes were uploaded and the company rollout hold remains in force.
+
+### Earlier bounded recheck — 11 September 2026
 
 Owner-bound read-only runtime queries confirm RLS on every Brain table (JEM 17/17; ERS 18/18), no effective Brain schema/table access for `anon` or `authenticated`, and all Brain policies restricted to `brain_runtime`. Inspected runtime logins have no superuser, role/database creation, replication or RLS-bypass privileges. Brain indexes are valid/ready. ERS Security Advisor returned no findings and its artifact bucket is private, with zero Storage object policies.
 

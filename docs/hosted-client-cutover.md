@@ -9,7 +9,7 @@ Cutover does not replace the local Markdown Brain. Local stdio `brain` remains t
 
 ## Current Gate
 
-**10 September 2026:** v1.9.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation are live. Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
+**11 September 2026:** v1.11.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation remain live. Authenticated monitoring and the empty private ingestion-job schema are deployed and security-verified; see [delivery record](production-engineering-followthrough.md#final-verification-and-activation-boundary). Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
 
 The live JEM hosted test drive passed on 2026-06-16 at 16:38 Asia/Ho_Chi_Minh:
 

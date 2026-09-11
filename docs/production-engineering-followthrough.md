@@ -1,6 +1,6 @@
 # Production engineering follow-through
 
-**Status:** approved implementation in progress; company rollout remains held
+**Status:** approved engineering delivery deployed and verified; company rollout remains held
 **Updated:** 2026-09-11
 **Scope:** remaining Brain-owned engineering after spec 020; existing permissions and connections stay in place
 
@@ -110,18 +110,18 @@ Confirm the monitoring detail split (Reader summary, Admin/Owner diagnostics), t
 
 ## Approved delivery — 11 September 2026
 
-John approved the two-stage implementation. Authenticated monitoring (spec 021) is deployed as v1.10.0 on both services, with native Monitor/Cockpit hosted-status links. Resumable local ingestion (spec 022) is implemented with private durable jobs, immutable original verification, exact review bundles and atomic multi-file/metadata receipts. [Monitoring runbook](hosted-monitoring.md), [ingestion runbook](local-source-ingestion.md). Final deployment and live acceptance are recorded separately; no company rollout gate is lifted.
+John approved the two-stage implementation. Authenticated monitoring (spec 021) is deployed as v1.11.0 on both services, with native Monitor/Cockpit hosted-status links. Resumable local ingestion (spec 022) is implemented with private durable jobs, immutable original verification, exact review bundles and atomic multi-file/metadata receipts. [Monitoring runbook](hosted-monitoring.md), [ingestion runbook](local-source-ingestion.md). Final deployment and live acceptance are recorded separately; no company rollout gate is lifted.
 
 ### Final verification and activation boundary
 
-The personal service is deployed at v1.11.0 (`42867b9`); the company service remains at v1.10.0. Both live browser monitoring journeys passed with the existing owner accounts, through GitHub and Entra respectively. Both owner-bound doctor profiles pass. The installed native Monitor preserves its exact configuration and supervises the expected two sync and two Cockpit processes. No workforce permission changed.
+Both services are deployed at v1.11.0 (public source `42867b9`); the company overlay passed the guarded deployment on 11 September 2026. Both live browser monitoring journeys passed with the existing owner accounts, through GitHub and Entra respectively. Both owner-bound doctor profiles pass. The installed native Monitor preserves its exact configuration and supervises the expected two sync and two Cockpit processes. No workforce permission changed.
 
 Final verification: 553 tests, 542 passes, 11 explicit skips and zero failures; 38 real-Postgres integration checks passed with zero skips; 11 browser tests passed. Twelve focused ingestion checks included actual PDF extraction, changed-file refusal, immutable upload recovery, extraction checkpoint recovery, lease fencing, atomic rollback, stale approval and receipt replay. Synthetic originals and test database objects were isolated from production.
 
-The v1.11.0 ingestion implementation is committed and available locally. Production ingestion is inactive: neither owner database has the new job table, and no real source was selected or uploaded. Automatic approval review rejected the company application upgrade and production schema mutation as needing more explicit authority. The prepared remaining actions are:
+John explicitly approved the company v1.11.0 deployment and the empty private job-table migration on both databases. Those actions are complete. Migration `20260911113912_resumable_local_ingestion.sql` was applied separately through each owner's authenticated administration path. Both tables contain zero jobs. Their columns, constraints, runtime-only policy and indexes were verified; existing runtime logins can read them. No workforce grants, credentials or source content changed.
 
-1. Deploy the clean company v1.11.0 overlay through the guarded release path. This does not run migrations or enroll users.
-2. Apply `db/migrations/20260911113912_resumable_local_ingestion.sql` separately to the personal and company databases. It creates one empty private job table, one source index and a policy for the existing `brain_runtime` role; public/client roles retain no access.
-3. Verify table access/RLS, run the applicable security advisors and recheck both services. The first real ingestion then requires an explicitly selected source and the existing operator byte credential.
+The post-migration [Supabase security gate](security/hosted-brain-supabase-security-gate.md) passes: JEM 18/18 and ERS 19/19 Brain tables have RLS, client/public Brain access is absent, artifact buckets are private, and both Security Advisors return no findings. Performance Advisors report informational findings only, including the new table's uncovered Brain foreign key and unused source index; these do not block the explicit-source workflow. Live health reports v1.11.0 on both endpoints, unauthenticated monitoring APIs return 401, and the ERS alternate hostname redirects to its canonical monitoring URL. Both owner-bound doctors pass. Existing browser Owner sign-in was verified before the final ERS upgrade; those tabs were subsequently closed, so session continuity across that upgrade is not claimed.
+
+Production schema prerequisites are ready. The first real ingestion still requires an explicitly selected source and the existing operator byte credential; no production source was selected or uploaded during this delivery.
 
 Company-wide rollout remains held for the previously recorded installed-client acceptance and owner assurance items. These implementation deliveries do not close those separate gates. Provider physical-backup/Storage recovery remains non-blocking resilience work.
