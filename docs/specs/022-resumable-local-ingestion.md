@@ -1,6 +1,6 @@
 # 022 — Resumable operator-side source ingestion
 
-**Status:** implemented and tested; production job-table migration awaits explicit approval — John approved 2026-09-11
+**Status:** implemented, deployed and security-verified on both owner databases — explicit production approval and completion 2026-09-11
 **Source:** staged ingestion design in `docs/production-engineering-followthrough.md`
 **Decisions impact:** retries preserve original bytes and require exact review before Brain replacement
 
@@ -22,4 +22,4 @@ Graph permissions/adapter, scheduled hosted worker, new identity, paid extractio
 
 ## Delivered workflow
 
-The explicit local CLI, private job table and atomic reviewed-write receipt are implemented. Original bytes are uploaded without replacement and read back before extraction and before apply. Source/artifact metadata, all approved Brain revisions and the completion receipt commit in one Postgres transaction using the shared revision-store CAS. The exact review bundle includes previous and proposed bytes. [Runbook and limits](../local-source-ingestion.md).
+The explicit local CLI, private job table and atomic reviewed-write receipt are implemented. Both owner databases have the empty job table and passed the post-migration security gate on 11 September 2026. No production source has been selected or ingested. Original bytes are uploaded without replacement and read back before extraction and before apply. Source/artifact metadata, all approved Brain revisions and the completion receipt commit in one Postgres transaction using the shared revision-store CAS. The exact review bundle includes previous and proposed bytes. [Runbook and limits](../local-source-ingestion.md).

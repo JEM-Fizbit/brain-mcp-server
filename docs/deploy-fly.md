@@ -348,4 +348,4 @@ Private overlay documentation includes `BACKLOG.md` and the exact `docs/reviews/
 
 ## Local ingestion delivery
 
-The v1.11.0 operator CLI uses the additive `ingestion_jobs` migration listed above; apply it under each deployment owner and rerun the Supabase security gate. Runtime hosting stays metadata-only and receives no Storage service key. The migration is unused by hosted MCP/monitoring until an explicit operator job is created. [Local ingestion runbook](local-source-ingestion.md).
+The v1.11.0 operator CLI uses the additive `ingestion_jobs` migration listed above; apply it under each deployment owner and rerun the Supabase security gate. Both existing owner deployments completed this migration and passed the gate on 11 September 2026; their job tables remained empty. Runtime hosting stays metadata-only and receives no Storage service key. The migration is unused by hosted MCP/monitoring until an explicit operator job is created. [Local ingestion runbook](local-source-ingestion.md).

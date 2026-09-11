@@ -1,13 +1,15 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-09-10
+**Last updated:** 2026-09-11
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
 This roadmap records the intended path from the current JEM hosted Brain pilot to ERS-owned, multi-brain, multi-tenant Brain infrastructure.
 
 > **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md). The reusable public server remains personal-owned; JEM and ERS operate permanently isolated hosted deployments. The historical fork phase is complete.
+
+**11 September delivery:** both isolated services run v1.11.0. Authenticated monitoring and the explicit-source resumable ingestion workflow are implemented; both private job-table migrations and security gates pass. No production source was selected. Installed-client acceptance and the company rollout hold remain open. [Delivery and remaining boundaries](production-engineering-followthrough.md#final-verification-and-activation-boundary).
 
 The core product direction is local-first hosted Brain:
 
