@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
@@ -61,7 +61,8 @@
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "test": "npm run build && node --test",
     "test:cockpit:e2e": "env -u NO_COLOR playwright test --config=playwright.config.mjs",
-    "test:brain-library:e2e": "npm run build && env -u NO_COLOR playwright test --config=playwright.brain-library.config.mjs"
+    "test:brain-library:e2e": "npm run build && env -u NO_COLOR playwright test --config=playwright.brain-library.config.mjs",
+    "sources:ingest:local": "npm run build && node scripts/ingest-local-source.mjs"
   },
   "keywords": [
     "mcp",

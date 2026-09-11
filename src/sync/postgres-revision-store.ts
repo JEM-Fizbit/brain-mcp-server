@@ -522,7 +522,11 @@ export class PostgresRevisionStore implements RevisionStore {
   }
 
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
-    return transaction(this.pool, async (client) => {
+    return transaction(this.pool, client => this.proposeRevisionInTransaction(client, input));
+  }
+
+  /** Caller owns the transaction; shared CAS also serves atomic ingestion receipts. */
+  async proposeRevisionInTransaction(client: PoolClient, input: RevisionProposal): Promise<RevisionProposalResult> {
       // Serialize writers per (brain, filename). The head-row lock below
       // cannot lock a row that does not exist yet, so two concurrent first
       // creations would otherwise both be accepted and one head silently
@@ -646,7 +650,7 @@ export class PostgresRevisionStore implements RevisionStore {
         head: headFromRow(revision),
         revision: revisionFromRow(revision),
       };
-    });
+
   }
 
   async proposeDeletion(

@@ -1,6 +1,6 @@
 # 022 — Resumable operator-side source ingestion
 
-**Status:** approved, queued after monitoring — John approved 2026-09-11
+**Status:** implemented; deployment verification in progress — John approved 2026-09-11
 **Source:** staged ingestion design in `docs/production-engineering-followthrough.md`
 **Decisions impact:** retries preserve original bytes and require exact review before Brain replacement
 
@@ -19,3 +19,7 @@ Use isolated Postgres and artifact adapters for duplicates, changed bytes, renam
 ## Exclusions
 
 Graph permissions/adapter, scheduled hosted worker, new identity, paid extraction or infrastructure, automatic claim synthesis and deletion/retention changes remain later work.
+
+## Delivered workflow
+
+The explicit local CLI, private job table and atomic reviewed-write receipt are implemented. Original bytes are uploaded without replacement and read back before extraction and before apply. Source/artifact metadata, all approved Brain revisions and the completion receipt commit in one Postgres transaction using the shared revision-store CAS. The exact review bundle includes previous and proposed bytes. [Runbook and limits](../local-source-ingestion.md).

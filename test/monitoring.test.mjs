@@ -58,6 +58,8 @@ test('monitoring checks current roles on every HTTP request, redacts readers and
  const server=http.createServer((req,res)=>void routes.handle(req,res,new URL(req.url,config.issuer)));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
  const base='http://127.0.0.1:'+server.address().port;
+ const canonical=await fetch(base+'/monitor/login',{headers:{'x-forwarded-proto':'https'},redirect:'manual'});
+ assert.equal(canonical.status,303);assert.equal(canonical.headers.get('location'),new URL('/monitor/login',config.issuer).href);assert.equal(canonical.headers.get('set-cookie'),null);
  const {cookie}=await signIn(routes.sessions,state);const request=(suffix='',extra={})=>fetch(base+'/monitor/api/status?brain_id=test-monitor'+suffix,{headers:{cookie,...extra}});
  let response=await request();assert.equal(response.status,200);assert.equal((await response.json()).diagnostics.operations,2);assert.equal(response.headers.get('cache-control'),'no-store');
  role='reader';response=await request();const reader=await response.json();assert.equal(reader.diagnostics,undefined);assert.equal(reader.local_inbox.state,'unobserved');
