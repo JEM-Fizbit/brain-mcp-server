@@ -1,6 +1,6 @@
 # 022 — Resumable operator-side source ingestion
 
-**Status:** implemented; deployment verification in progress — John approved 2026-09-11
+**Status:** implemented and tested; production job-table migration awaits explicit approval — John approved 2026-09-11
 **Source:** staged ingestion design in `docs/production-engineering-followthrough.md`
 **Decisions impact:** retries preserve original bytes and require exact review before Brain replacement
 
