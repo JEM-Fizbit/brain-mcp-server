@@ -1251,6 +1251,16 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self writeStackStatus];
 }
 
+- (void)openHostedStatus:(id)sender {
+  NSDictionary *profile = [self profileForSender:sender];
+  NSString *base = profile[@"env"][@"BRAIN_HOSTED_BASE_URL"];
+  if (![base isKindOfClass:[NSString class]] || base.length == 0) return;
+  NSURL *origin = [NSURL URLWithString:base];
+  if (![@[@"https", @"http"] containsObject:origin.scheme]) return;
+  NSURL *url = [NSURL URLWithString:@"/monitor" relativeToURL:origin];
+  [[NSWorkspace sharedWorkspace] openURL:url.absoluteURL];
+}
+
 - (void)restartLocalStack:(id)sender {
   NSDictionary *profile = [self profileForSender:sender];
   [self stopManagedProcessesForProfile:profile];
@@ -1522,6 +1532,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [profileMenu addItem:[NSMenuItem separatorItem]];
   [self addDisabledItem:profileMenu title:@"Controls"];
   [self addActionItem:profileMenu title:@"Open Cockpit" action:@selector(openCockpit:) profile:profile];
+  [self addActionItem:profileMenu title:@"Open Hosted Status" action:@selector(openHostedStatus:) profile:profile];
   [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
   [self addActionItem:profileMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
   [self addActionItem:profileMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];

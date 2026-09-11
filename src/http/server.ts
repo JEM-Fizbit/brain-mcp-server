@@ -31,6 +31,9 @@ import { assertSteadyStateOwnerRoster, postgresAccessGrantStore } from "../servi
 import { runtimeBrainId } from "../services/runtime-env.js";
 import { loadRegistry } from "../services/registry.js";
 
+import { MonitoringRoutes } from "../monitor/routes.js";
+import { createMonitoringStatus } from "../monitor/status.js";
+
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_OAUTH_BODY_BYTES = 16 * 1024;
 
@@ -40,6 +43,7 @@ interface HttpContext {
   config: OauthConfig;
   state: StateProvider;
   admin?: AdminRouteContext;
+  monitor?: MonitoringRoutes;
 }
 
 function log(level: string, message: string, extra?: unknown): void {
@@ -207,6 +211,11 @@ export async function handleHttpRequest(
   const pathname = url.pathname;
 
   try {
+    if (pathname === "/monitor" || pathname.startsWith("/monitor/")) {
+      if (!ctx.monitor) { sendJson(res, 404, {error: "not found"}); return; }
+      await ctx.monitor.handle(req, res, url);
+      return;
+    }
     if (pathname.startsWith("/admin")) {
       if (!ctx.admin) {
         sendJson(res, 404, { error: "not found" });
@@ -390,6 +399,10 @@ export async function startHttpServer(): Promise<void> {
   const config = buildOauthConfig();
   const state = makeHttpStateProvider();
   const ctx: HttpContext = { config, state };
+  if (process.env.BRAIN_MONITORING_ENABLED !== "0" && process.env.BRAIN_REVISION_STORE === "postgres" && process.env.BRAIN_REVISION_DATABASE_URL) {
+    const status = createMonitoringStatus(process.env.BRAIN_REVISION_DATABASE_URL);
+    ctx.monitor = new MonitoringRoutes(config, state, (brainId, role) => status.read(brainId, role));
+  }
   if (
     runtimeBrainId() === "ers-brain" &&
     config.entra?.adminGraphEnabled

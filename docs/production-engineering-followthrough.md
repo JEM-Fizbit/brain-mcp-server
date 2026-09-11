@@ -1,6 +1,6 @@
 # Production engineering follow-through
 
-**Status:** verification and design review; company rollout remains held
+**Status:** approved implementation in progress; company rollout remains held
 **Updated:** 2026-09-11
 **Scope:** remaining Brain-owned engineering after spec 020; existing permissions and connections stay in place
 
@@ -75,7 +75,7 @@ Run bounded metadata queries server-side with the existing private runtime crede
 
 Acceptance must cover missing/expired sessions, wrong tenant/Brain, Reader versus Admin detail, same-session revocation, sanitized errors, stale/unavailable upstream checks, cache separation, and a clean-machine viewer with no database, Fly or local Brain installation. Verify desktop/narrow layouts and both themes. Signed/notarized packaging, update verification, profile discovery and uninstall come after this credential model; packaging alone does not solve authorization.
 
-**Next implementation brief warranted:** yes, after agreement on the above response tiers. It is a new authenticated product surface and session policy, not a cosmetic app change. No new credential or session implementation is made in this pass.
+**Approved and implemented:** [spec 021](specs/021-authenticated-monitoring.md), with the [monitoring runbook](hosted-monitoring.md). Release verification is recorded separately.
 
 ## Design proposal: automated source ingestion with operator-side custody
 

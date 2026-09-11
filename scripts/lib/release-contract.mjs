@@ -14,6 +14,8 @@ function assertOverlayChanges(changes) {
       );
     }
     const allowed =
+      change.path === "BACKLOG.md" ||
+      change.path === "docs/reviews/production-acceptance-evidence.json" ||
       change.path === "fly.toml" ||
       change.path === "test/deploy-expectations.json" ||
       OVERLAY_CONFIG_PATH.test(change.path) ||
