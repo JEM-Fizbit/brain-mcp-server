@@ -2,19 +2,29 @@
 
 > Operator runbook for recovering ChatGPT and Codex custom MCP connectors after hosted MCP server updates, OAuth-state migrations, tool-surface changes, or redeploys. Captures the June 2026 hosted Brain recovery so the next pass starts from known failure modes instead of rediscovering them.
 
-**Last Updated:** 2026-06-25
-**Version:** 1.0
+**Last Updated:** 2026-09-11
+**Version:** 1.1
 **Scope:** OpenAI ecosystem surfaces: ChatGPT personal, ChatGPT Business / workspace Apps, Codex desktop/app sessions, and Codex terminal / CLI.
 
 ---
 
-## Hard-earned rule
+## Separate metadata refresh from authorization recovery
 
-OpenAI's MCP connector state is split across surfaces and is not reliably reset by "disconnect / reconnect".
+Missing tools or parameters with working authenticated reads call for a metadata refresh. They do not establish an OAuth failure or justify deleting a working connection. The older deletion/recreation instructions below apply to confirmed authorization-state failures and remain subject to the user's approved scope.
 
-When a hosted MCP update invalidates dynamic client registrations, refresh tokens, callback metadata, or tool snapshots, assume stale connector state until proven otherwise. Full app deletion and recreation is often the fastest correct path.
+## Metadata-only refresh — verified 11 September 2026
 
-This is especially true when the server logs show `unknown_client_id`, `invalid_client`, `invalid_grant`, or a tool-surface mismatch after the user has already approved OAuth.
+For existing custom apps in the tested ChatGPT Business workspace:
+
+1. Open **Workspace settings → Apps**, then select the existing app.
+2. In **App details**, under **Actions**, select **See details**.
+3. In **Action details**, select **Refresh** and inspect the resulting schemas.
+4. Repeat independently for each deployment's existing app definition.
+5. Verify declarations and real calls in fresh intended clients. Existing Codex tasks can retain earlier declarations.
+
+The separate **Plugins → Manage for workspace → Configure** panel exposed configuration but did not contain this refresh control. Do not mistake it for the Apps Action details panel. A temporarily loading Apps page is not evidence that Refresh is absent.
+
+Both existing Brain definitions gained `brain_prepare_ingest` and `brain_update_file.expected_revision` through this path, without deletion, recreation, reconnection, workforce grant changes or manual approval-policy edits. Fresh ChatGPT and Codex CLI sessions exposed both markers and passed describe/status/preflight on both deployments. Schema/read-only success does not prove write enforcement, stale refusal, cleanup or lower-role behavior. Treat host safety refusals as separate acceptance gaps; do not weaken server controls or route around a refusal. This is dated evidence for the tested workspace, not a guarantee for every account or future UI.
 
 ---
 
@@ -30,7 +40,7 @@ Use this protocol when any OpenAI surface shows:
 - `codex exec` reporting `user cancelled MCP tool call` for a read-only tool;
 - server-side auth telemetry showing `unknown_client_id`, `invalid_client`, `invalid_grant`, or stale refresh-token failures.
 
-Do not spend more than one short diagnostic loop on reconnect-only fixes if the server has recently changed OAuth state, DCR storage, redirect handling, or the tool list. Move to full delete/recreate.
+For a tool-list change, use metadata-only refresh first. For confirmed OAuth-state failure, limit reconnect-only diagnostic loops and assess the recovery below against the approved scope. Do not delete/recreate merely because Refresh is not visible in the first panel inspected.
 
 ---
 
@@ -167,7 +177,7 @@ For multi-brain or multi-tenant MCPs, verify every intended logical target expli
 | `Authorization failed` after approving OAuth | OpenAI broker still holds a stale DCR `client_id` | Delete/remove the app, recreate it, then re-OAuth. |
 | `unknown_client_id` at `/token` | Client ID not present in durable `clients` store | Full connector/app removal and reinstall. |
 | `invalid_grant` on refresh | Expired, rotated, or reset refresh token | Reauth; if repeated, delete/recreate. |
-| Tools missing after redeploy | OpenAI app snapshot/session cached old tool list | Fresh chat/session; if still stale, delete/recreate app. |
+| Tools missing after redeploy with working reads | Cached installed tool metadata | Apps → app details → Actions / See details → Refresh; verify in fresh intended clients. |
 | ChatGPT desktop has no management UI | Desktop app does not expose workspace app management cleanly | Use browser workspace settings. |
 | Business account reconnect still fails | Individual reconnect did not recreate the workspace app's DCR client | Disable + delete at Workspace settings -> Apps, then create a new app. |
 | Codex fresh chat works but `codex exec` fails | CLI lacks persisted tool approval | Run one interactive CLI session and choose Always allow for the smoke tool. |
@@ -193,7 +203,7 @@ For architecture-level lessons about OAuth/DCR/state durability, update `REMOTE_
 
 ## Related protocols and references
 
-- [`REMOTE_MCP_SERVICE_PATTERN.md`](REMOTE_MCP_SERVICE_PATTERN.md) — architecture-level OAuth 2.1, DCR, durable state, and auth telemetry pattern.
+- [`REMOTE_MCP_SERVICE_PATTERN.md`](https://github.com/JEM-Fizbit/ai-knowledge/blob/main/protocols/REMOTE_MCP_SERVICE_PATTERN.md) — architecture-level OAuth 2.1, DCR, durable state, and auth telemetry pattern.
 - `~/Projects/brain-mcp-server/docs/hosted-client-cutover.md` — Brain-specific ChatGPT/Codex recovery commands and current verification matrix.
 - `~/Projects/openai-ops/` — local OpenAI-side operational workspace for account-level settings, prompts, and snapshots.
 - OpenAI Apps SDK auth docs: <https://developers.openai.com/apps-sdk/build/auth>
@@ -207,4 +217,5 @@ For architecture-level lessons about OAuth/DCR/state durability, update `REMOTE_
 
 | Version | Date | Changes |
 | --- | --- | --- |
+| 1.1 | 2026-09-11 | Verified metadata-only refresh through workspace Apps Action details; separate schema lag from OAuth failure and retain per-client acceptance boundaries. |
 | 1.0 | 2026-06-25 | Initial protocol, extracted from hosted Brain recovery across ChatGPT personal, ChatGPT Business workspace, Codex app/chat, and Codex CLI. Captures delete/recreate over reconnect, ChatGPT-first/Codex-last ordering, workspace-app browser path, and Codex CLI approval-state requirements. |
