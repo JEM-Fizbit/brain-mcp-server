@@ -1,6 +1,6 @@
 # 021 — Authenticated colleague monitoring
 
-**Status:** implemented; release verification in progress — John approved 2026-09-11
+**Status:** implemented; live GitHub and Entra Owner sign-in verified — John approved 2026-09-11
 **Source:** monitoring design in `docs/production-engineering-followthrough.md`
 **Decisions impact:** monitoring uses current Brain identity/roles without distributing database credentials
 
