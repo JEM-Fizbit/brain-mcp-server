@@ -12,7 +12,7 @@
 
 ---
 
-- **Backend capability contract — deployed v1.9.0; client acceptance open.** Shared discovery/preflight/refusal and operator-custody guidance are deployed on both services under [spec 020](docs/specs/020-production-stabilization.md). Refresh installed OpenAI tool metadata (current catalog omits `expected_revision` and `brain_prepare_ingest`; inspected controls expose no Refresh), then verify reviewed replacement, semantic/inbox unsupported state and preapproval discovery in fresh supported clients. Direct live HTTP/MCP acceptance passes on both endpoints, and isolated same-token role/revocation fixtures pass. John supplied a fresh-task schema inspection on 11 September: both connectors still lack preflight and the revision parameter, so opening another task alone does not resolve the installed metadata. Preserve current access and the rollout hold; no optional revision token, new watcher or recurring incapability warning. [Decision and closure criteria](docs/DECISIONS.md#2026-09-10--deployed-safety-requires-current-client-contracts).
+- **Backend capability contract — deployed; client/role acceptance open.** The supported [metadata refresh](docs/protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md#metadata-only-refresh--verified-11-september-2026) restored `brain_prepare_ingest` and `expected_revision` in fresh ChatGPT and Codex CLI schemas on 11 September. Complete remaining actual client/role journeys and resolve host safety refusals, including synthetic cleanup; schema discovery alone is not acceptance. Preserve current access, reviewed-revision enforcement and the rollout hold. [Decision and closure criteria](docs/DECISIONS.md#2026-09-10--deployed-safety-requires-current-client-contracts).
 
 <!-- backlog items below; newest first -->
 
