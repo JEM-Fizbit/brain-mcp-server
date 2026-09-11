@@ -20,6 +20,8 @@ The core product direction is local-first hosted Brain:
 
 ## Current Position
 
+**11 September 2026 engineering follow-through:** local sync alarms now distinguish isolated transient errors from observed recurrence. Isolated recovery and mixed-load verification passed; colleague monitoring and resumable ingestion designs are prepared in [the follow-through record](production-engineering-followthrough.md). These extend engineering evidence without lifting the rollout hold or claiming provider recovery/production write capacity.
+
 **10 September 2026:** v1.9.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation are live. Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. Installed OpenAI metadata still lacks the new revision input and ingest preflight; fresh client schema/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
 
 The hosted Brain rebuild has passed the first critical sync gates:

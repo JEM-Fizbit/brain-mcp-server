@@ -8,6 +8,16 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-09-11 — Sync alarms count source observations, not dashboard polls
+
+**Decision:** apply existing transient/durable failure classes to local sync health. First and second fresh transient failed attempts warn; three distinct observed failed attempts fail. Keep durable or unrecognised errors immediately actionable. Report stale observations as stale, with heartbeat and supervisor checks providing their own liveness evidence.
+
+**Principle:** An observation's severity must reflect its cause, freshness and independently observed recurrence. Repeatedly reading the same failed attempt is not evidence of repeated failure. Preserve operator-side custody and existing retry supervision; a diagnostic refresh must not initiate a sync write.
+
+**Reason:** the watcher exits at its first error and the supervisor can restart it at cycle one. Timestamped source observations, an explicit recovery reset and bounded history distinguish a short connection interruption from a recurring fault without hiding durable errors.
+
+**Rejected:** immediate critical failure for every network interruption, escalation on poll count, claiming that stale samples describe current state, and adding a second watcher or an unreviewed retry loop. See [implementation and follow-on designs](production-engineering-followthrough.md).
+
 ## 2026-09-10 — Deployed safety requires current client contracts
 
 **Decision:** v1.9.0 deploys the spec 020 protections to both owner-isolated services and propagates the operator-custody/capability guidance. Preserve existing grants and the company rollout hold. Deployment health and fixture success do not establish client acceptance.

@@ -15,6 +15,8 @@ The former June 2026 shared-pilot observations are historical and do not establi
 
 Checks on 2026-09-11 confirmed both hosted revision services and local sync healthy, with zero open conflicts. The installed native `pg_dump` is now PostgreSQL 17.11; the old missing-binary limitation is resolved. No production export or restore was performed by that check. A completed backup listing, matching stored-text hash, or Storage metadata row is useful evidence, but none proves that original bytes can be restored.
 
+A later synthetic local rehearsal on 2026-09-11 verified logical dump/restore, 222 exact Markdown heads, 15 conflict records, companion text, separately exported original bytes, fresh mirror hydration and empty-Brain reseeding. Missing and corrupted original bytes were detected. This is application-path evidence only: it does not prove a production physical-backup or Supabase Storage restore, and does not close the gate below. See [results and limits](production-engineering-followthrough.md#resilience-and-workload-verification).
+
 Keep PITR status explicitly owner-specific and observed; do not infer it for one deployment from the other. No new backup purchase or recovery-time commitment is implied by this runbook. The isolated restore rehearsal remains deferred, non-blocking resilience work under the 2026-08-25 decision; it remains required before retiring the existing Git recovery lane.
 
 Supabase's backup model matters for Brain recovery:

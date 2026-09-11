@@ -58,6 +58,70 @@ export function enforceOperatorAlarmContract(checks) {
   return checks;
 }
 
+// Watcher restarts reset cycle numbers. Count distinct timestamped source
+// observations, never doctor polls. Keep the count when history rolls over.
+export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeMs } = {}) {
+  const observedMs = Date.parse(health.checkedAt);
+  const ageMs = Number.isFinite(observedMs) ? now - observedMs : null;
+  const stale = ageMs === null || ageMs < 0 || ageMs > maxAgeMs;
+  const error = health.status === "error";
+  const previousMs = Date.parse(previous?.checkedAt);
+  const previousCount = Number.isSafeInteger(previous?.failedObservations)
+    ? Math.max(0, previous.failedObservations) : 0;
+  const same = error && previous?.status === "error" &&
+    Number.isFinite(observedMs) && observedMs === previousMs;
+  const adjacent = error && previous?.status === "error" &&
+    observedMs > previousMs && observedMs - previousMs <= maxAgeMs &&
+    // A watch process exits at its first error; cycle > 1 proves a recovery
+    // happened in that process even if the doctor missed the successful file.
+    !(health.command === "watch" && health.cycle > 1);
+  const failedObservations = error ? (same ? Math.max(1, previousCount)
+    : adjacent ? previousCount + 1 : 1) : 0;
+  const classification = error ? classifyPostgresError({
+    message: health.error, code: health.errorCode,
+  }) : null;
+  const status = error
+    ? classification.durable ? "fail"
+      : !stale && failedObservations >= TRANSIENT_FAILURE_ESCALATION_CYCLES ? "fail" : "warn"
+    : health.status === "ok" && !stale && !health.report?.guardTripped ? "pass" : "warn";
+  return {
+    status,
+    details: {
+      state: stale ? "stale" : health.status || "unknown",
+      observedAt: health.checkedAt || null, ageMs, maxAgeMs,
+      ...(classification ? {
+        errorClass: classification.class, transient: !classification.durable,
+        failedObservations,
+      } : {}),
+    },
+    observation: { checkedAt: health.checkedAt || null, status: health.status || "unknown", failedObservations },
+  };
+}
+
+export function syncHealthAction(sync) {
+  if (!sync || (sync.status !== "warn" && sync.status !== "fail")) return null;
+  const details = sync.details || {};
+  if (details.guardTripped) return { level: "warn", reason: "sync_guard",
+    title: "Review protected local sync state.", detail: String(details.guardTripped) };
+  if (details.errorClass) return {
+    level: sync.status,
+    reason: sync.status === "fail" ? "sync_health_failed" : "sync_health_degraded",
+    title: sync.status === "fail" ? "Restore local sync." : "Watch local sync recovery.",
+    detail: [
+      `Last sync error: ${details.errorClass}.`,
+      details.observedAt ? `Observed ${details.observedAt}.` : "Observation time unavailable.",
+      `${details.failedObservations || 1} distinct failed attempt(s) observed since the last observed recovery or gap.`,
+      details.state === "stale" ? "This observation is stale; current sync health is unknown." : "",
+      details.transient && sync.status === "warn"
+        ? "Monitor supervises retry; check connectivity and the profile sync log if recovery does not follow."
+        : "Inspect this profile's sync log and resolve the reported error, then restart its local stack in Brain Monitor.",
+    ].filter(Boolean).join(" "),
+  };
+  return { level: sync.status, reason: "sync_health_stale",
+    title: "Refresh stale or incomplete sync health.",
+    detail: "Check the local supervisor and recent sync logs before relying on hosted state." };
+}
+
 function boundedText(value, maxLength = 240) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }

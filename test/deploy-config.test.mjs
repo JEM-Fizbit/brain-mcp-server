@@ -334,7 +334,7 @@ test("hosted doctor emits normalized user-action indicators", async () => {
   assert.match(doctor, /next_action:/);
   assert.match(doctor, /urgency:/);
   assert.match(doctor, /reason: "open_conflicts"/);
-  assert.match(doctor, /reason: "sync_health_failed"/);
+  assert.match(doctor, /syncHealthAction\(sync\)/);
   assert.match(doctor, /reason: "pending_inbox"/);
   assert.match(doctor, /pending Brain inbox file\(s\) in an interactive Claude session/);
   assert.match(doctor, /refreshing the scan is detection-only/);
@@ -726,8 +726,8 @@ test("Brain recovery runbook keeps Git out of routine operations", async () => {
 
   assert.match(runbook, /Git is not a routine Brain operation/);
   assert.match(runbook, /no manual commit\/push\/merge/);
-  assert.match(runbook, /Supabase physical backups are visible/);
-  assert.match(runbook, /PITR is not currently enabled/);
+  assert.match(runbook, /Check each owner.s database backup inventory/);
+  assert.match(runbook, /PITR status explicitly owner-specific/);
   assert.match(runbook, /Supabase Storage objects are not included in database backups/);
   assert.match(runbook, /Async Git export cadence/);
   assert.match(runbook, /Restore rehearsal gate/);
