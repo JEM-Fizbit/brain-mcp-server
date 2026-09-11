@@ -1,13 +1,21 @@
 # Hosted Brain Supabase Security Gate
 
 **Status:** passed for the live JEM and ERS hosted runtimes
-**Checked:** JEM 2026-08-26; ERS 2026-08-28
+**Full gate checked:** JEM 2026-08-26; ERS 2026-08-28. Bounded read-only recheck: 2026-09-11 (below).
 **Projects:** `jem-brain-personal`; `brain-platform-pilot`
 **Supabase project refs:** `gfipcidoyrtgngauzijy`; `omnwbcdtmtvxasgdmvwr`
 **Organizations:** John E. Milad personal; `ERS Genomics`
 **Scope:** owner-isolated hosted Brain databases, dedicated runtime roles, private artifact buckets, and bounded operational-observability schemas.
 
 ## Gate Decision
+
+### Bounded recheck — 11 September 2026
+
+Owner-bound read-only runtime queries confirm RLS on every Brain table (JEM 17/17; ERS 18/18), no effective Brain schema/table access for `anon` or `authenticated`, and all Brain policies restricted to `brain_runtime`. Inspected runtime logins have no superuser, role/database creation, replication or RLS-bypass privileges. Brain indexes are valid/ready. ERS Security Advisor returned no findings and its artifact bucket is private, with zero Storage object policies.
+
+The JEM connector management scope was unavailable; bounded CLI advisor attempts timed out. Runtime credentials correctly cannot query Storage bucket/object metadata, so this pass does not freshly attest JEM bucket privacy, JEM object coverage, or JEM advisor results. The dated full-gate evidence below remains historical for those controls. No migration, grant or security setting changed. This bounded recheck is not a replacement full gate and does not lift the rollout hold.
+
+### Original gate decision
 
 The ERS-owned hosted Brain database may proceed through M1 deployment, provided credentials remain in a password manager or deployment secret store and the `brain` schema remains private until the hosted access model is explicitly designed.
 

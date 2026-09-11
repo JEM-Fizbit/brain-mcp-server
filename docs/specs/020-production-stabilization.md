@@ -44,6 +44,14 @@ No permission/roster changes, new service, protocol migration, new paid dependen
 - JEM and ERS guarded releases deployed v1.9.0 on 10 September 2026. Both postdeployment doctor profiles pass; local sync is healthy with zero conflicts. Seven hosted guidance patches were applied and exact readback/local hashes matched. Both loader budgets and internal-link checks pass; JEM retains five unrelated maintenance findings, ERS none.
 - Existing OpenAI client metadata still omits `expected_revision` and `brain_prepare_ingest`. A replacement probe failed closed with the required-token error; it did not validate stale-token rejection through that client. The inspected installed-plugin controls offered no metadata Refresh action. Keep client-schema refresh and fresh client/role acceptance open; do not weaken the server precondition or infer acceptance from runtime tests. Company rollout remains held, with current grants unchanged.
 
+### Additional acceptance evidence — 11 September 2026
+
+Both live HTTP endpoints publish the preflight and reviewed-revision schema. Direct authenticated MCP calls using existing grants pass discovery, read-only preflight, revision/hash reads, explicit operator-custody refusals and stale-token rejection with unchanged heads. The installed OpenAI metadata snapshot remains stale; direct endpoint acceptance does not close that client gap.
+
+`test/http-role-postgres.test.mjs` adds a real HTTP/MCP fixture backed by disposable PostgreSQL: Reader/member/Admin/Owner reads and mutation boundaries, protected-file writes, reviewed replacement, same-bearer downgrade/suspension/revocation, wrong-tenant denial and cross-Brain denial. No production grants are modified. Run the database fixture files with `node --test --test-concurrency=1`: the older revision-store fixture reapplies schema DDL, so parallel files can deadlock on schema locks. Concurrency inside the Owner/admission/CAS fixtures remains enabled.
+
+The private owner release record contains image-label attestation, bounded database/security and artifact inventory checks, and the remaining client/provider/governance limitations. These are assurance improvements, not a new hosted release or permission change.
+
 ### Reviewed operation inventory
 
 Whole-file replace and conflict resolution require the caller's reviewed revision. Append and exact-text patch keep their operation-specific checks and transaction CAS. Explicit delete/rename/restore keep their existing guarded revision-history contract and protected-file/role rules; this release does not claim they express a whole-document content review. Internal lint, task-intake and link updates now pass the snapshot used to compute their replacement. A stale internal result fails rather than replaying unreviewed content.
