@@ -464,3 +464,7 @@ Hosted `brain` is the promoted default for `ai-brain-jem` across **all** Claude 
 - Any open conflict or stale sync health should pause hosted writes until reviewed.
 
 To keep hosted the default in practice: in Claude Code, allow-list only `mcp__brain__*` (hosted) — leave `mcp__brain-local__*` un-allowed so local use prompts. In Claude Desktop, set the hosted `brain` connector tools to Allow and leave `brain-local` at Needs-approval.
+
+### Authenticated monitoring
+
+Colleague status is available through the endpoint’s `/monitor` browser surface under existing Brain sign-in. Reader/Curator status and Admin/Owner diagnostics are distinct; local inbox custody remains outside the hosted observation boundary. This delivery does not close installed-client acceptance or lift the rollout hold. [Runbook](hosted-monitoring.md).

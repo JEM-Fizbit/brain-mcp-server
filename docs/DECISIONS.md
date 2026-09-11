@@ -1180,3 +1180,9 @@ trigger).
 
 ---
 -->
+
+## 2026-09-11 — Monitoring follows current Brain roles
+
+Approved colleague monitoring uses existing sign-in and a separate browser session with current grants checked for every response. Readers/Curators receive basic status; Admins/Owners receive sanitized aggregates. Local inbox and manual filesystem authority remain independent and unobserved by the hosted page. No database credentials are distributed to viewers. [Contract and limits](hosted-monitoring.md).
+
+The private release overlay may retain its root backlog and the exact `docs/reviews/production-acceptance-evidence.json` report as documentation, in addition to existing allowed docs/config paths. This preserves deployment-specific acceptance evidence without permitting changes to shared source, scripts, database schema, dependencies or arbitrary JSON. The guarded release tests enforce that boundary.

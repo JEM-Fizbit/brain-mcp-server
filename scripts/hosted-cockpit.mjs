@@ -38,6 +38,7 @@ const accessAdminUrl =
     ? process.env.BRAIN_COCKPIT_ACCESS_ADMIN_URL ||
       `${(process.env.BRAIN_HOSTED_BASE_URL || "https://brain.ersgenomics.online").replace(/\/+$/, "")}/admin/access`
     : "";
+const monitoringUrl = `${(process.env.BRAIN_HOSTED_BASE_URL || (cockpitBrainId === "ers-brain" ? "https://brain.ersgenomics.online" : "https://jem-brain-mcp.fly.dev")).replace(/\/+$/, "")}/monitor`;
 const localBrainDir = process.env.BRAIN_DIR ? path.resolve(process.env.BRAIN_DIR) : null;
 const localBrainRoot = localBrainDir ? path.resolve(localBrainDir, "..") : null;
 // Per-process CSRF nonce: embedded in the served page and required on the write
@@ -1916,6 +1917,7 @@ const page = String.raw`<!doctype html>
         <div class="toolbar">
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
+          <a class="access-nav-link" id="hosted-monitor-link" href="${escapeAttribute(monitoringUrl)}" target="_blank" rel="noopener noreferrer">Hosted status ↗</a>
           <button id="refresh" type="button" title="Re-run diagnostics now, bypassing the cached Brain Monitor report. Clears a transient failure without waiting for the next cycle.">Reload</button>
         </div>
       </header>

@@ -364,3 +364,7 @@ Recommended order:
 ## Production stabilization — 10 September 2026
 
 Company-wide expansion remains held while [spec 020](specs/020-production-stabilization.md) verifies structural concurrency, reviewed-write, Owner restart, capability and OAuth protections. Existing access remains unchanged. Routine human edit coordination is not an acceptance substitute.
+
+### Authenticated monitoring and local ingestion — 11 September 2026
+
+[Spec 021](specs/021-authenticated-monitoring.md) implements browser monitoring under current Brain roles. [Spec 022](specs/022-resumable-local-ingestion.md) is the approved next operator-side ingestion step. Existing permissions and the company client-acceptance hold remain unchanged.

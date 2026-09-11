@@ -338,3 +338,9 @@ Public OAuth registration is admitted atomically with defaults of 10,000 retaine
 Client write checks must use reviewed revision preconditions; see [capability contract](backend-capabilities.md). The OAuth smoke checks now read that evidence explicitly and verify local convergence after resolution. Source reads return retained exact Markdown companion text when present, otherwise the metadata manifest; a manifest-only assertion is incorrect.
 
 Release the shared annotated tag first, then consume it through the ERS protected-overlay gate. Verify both owner-isolated deployments and restart the existing local Monitor children onto the matching built runtime. This does not authorize company-wide expansion; spec 020 records rollout acceptance separately.
+
+## Authenticated monitoring release
+
+`/monitor` is enabled when the hosted Postgres runtime is configured; `BRAIN_MONITORING_ENABLED=0` disables it. It uses existing OAuth state and requires no migration, provider permission expansion or additional upstream callback. Budget two extra bounded database connections per process. Verify the shell, unauthenticated API refusal and the existing-provider login flow after guarded deployment. See [monitoring runbook](hosted-monitoring.md).
+
+Private overlay documentation includes `BACKLOG.md` and the exact `docs/reviews/production-acceptance-evidence.json` path. Arbitrary JSON and all protected runtime changes remain refused.

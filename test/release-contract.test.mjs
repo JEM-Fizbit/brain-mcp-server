@@ -48,6 +48,8 @@ test("release state accepts a clean overlay on an annotated version-matching ups
       { status: "M", path: "fly.toml" },
       { status: "M", path: "test/deploy-expectations.json" },
       { status: "A", path: "docs/example-deploy.md" },
+      { status: "M", path: "BACKLOG.md" },
+      { status: "A", path: "docs/reviews/production-acceptance-evidence.json" },
     ],
   };
 
@@ -61,6 +63,13 @@ test("release state accepts a clean overlay on an annotated version-matching ups
     }),
     "v1.2.0"
   );
+
+  for (const file of ["docs/runtime.json", "package.json", "scripts/deploy-guarded.mjs", "db/migrations/private.sql"]) {
+    assert.throws(() => assertReleaseState({
+      porcelain: "", packageVersion: "1.2.0",
+      overlay: { ...overlay, changes: [...overlay.changes, { status: "M", path: file }] },
+    }), /overlay path/i);
+  }
 
   assert.throws(
     () =>
