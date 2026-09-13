@@ -9,6 +9,8 @@ Cutover does not replace the local Markdown Brain. Local stdio `brain` remains t
 
 ## Current Gate
 
+**13 September 2026:** the agreed Owner, Curator and Reader acceptance cases are complete on the recorded client surfaces, including the final colleague responses and synthetic cleanup. Both existing services now run guarded v1.11.1, with authenticated preflight JSON/text parity and unchanged sync state verified. Existing connector sessions work. This supersedes the outstanding-case descriptions in the dated 11 September history below; it does not certify untested combinations or lift the company governance hold. [Release verification](preflight-maintenance-release.md).
+
 **11 September 2026:** v1.11.0 is deployed on both isolated services; spec 020 structural protections and guidance propagation remain live. Authenticated monitoring and the empty private ingestion-job schema are deployed and security-verified; see [delivery record](production-engineering-followthrough.md#final-verification-and-activation-boundary). Both doctor/sync profiles pass with zero conflicts. Existing grants are unchanged and company rollout remains held. The supported metadata refresh restored the new revision input and ingest preflight in fresh ChatGPT and Codex CLI sessions on 11 September; remaining actual client/role acceptance is outstanding. See [spec 020](specs/020-production-stabilization.md). Earlier observations below are dated history, not the current release baseline.
 
 The live JEM hosted test drive passed on 2026-06-16 at 16:38 Asia/Ho_Chi_Minh:

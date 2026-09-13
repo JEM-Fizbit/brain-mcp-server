@@ -1,7 +1,7 @@
 # Hosted Brain Cockpit
 
 **Status:** active operator guide
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-13
 
 Brain Cockpit is the local, read-mostly operator surface for the
 hosted JEM and ERS Brain pilot. It is meant to answer one question quickly: can
@@ -25,6 +25,8 @@ server.
 The existing Monitor was restarted after building the matching local runtime. Both installed owner-bound doctor profiles pass and both sync profiles report healthy operation with zero conflicts. Continue using explicit installed profiles and disabled ambient repo environment loading; a stale bare environment was correctly refused by the deployment binding guard. Local recovery retains displaced files under `.brain-sync-recovery/`; do not prune these bytes as routine cleanup. Inbox custody remains manual and Monitor continues its existing local scans. This release adds no permissions or distributed operator credentials.
 
 ## Deployed version visibility
+
+On 13 September, both existing local cockpit `/api/doctor?fresh=1` routes passed and observed hosted v1.11.1 with a fresh observation timestamp after the guarded releases. The installed version-display code consumes this hosted observation; no app reinstall, credential change or operator restart was required. This check verifies the live data path, not a new visual-layout test.
 
 Cockpit's active-Brain header and each Brain Monitor profile menu show the version reported by that profile's hosted `/health` response (`mcp.server.version`). The doctor carries it as `hosted_health.details.serverVersion`, with `versionObservedAt`; the displayed observation time makes a cached report distinguishable from a new deployment check. This is the hosted server version, not the local app/package version or an inferred Git tag.
 

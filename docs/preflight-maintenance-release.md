@@ -1,6 +1,6 @@
 # Preflight maintenance release
 
-**Prepared:** 13 September 2026. **Version:** v1.11.1. **State:** verified release candidate; not yet deployed.
+**Released:** 13 September 2026. **Version:** v1.11.1. **State:** deployed and verified on both existing owner-isolated services.
 
 ## Scope
 
@@ -19,6 +19,6 @@ The release guard accepts PNG/PDF/DOCX review artifacts only under `docs/reviews
 
 The agreed production client/role test set is complete on its recorded surfaces; private records retain the participant evidence. This does not certify untested combinations.
 
-Publish annotated v1.11.1 and intake that exact tag into the ERS overlay. Verify protected paths equal upstream and run the overlay gate. After required maintenance approval, use `deploy:guarded` separately for each existing service; verify deployed versions, hosted preflight JSON/text fields, sync counts/conflicts and owner-bound doctors. Do not repeat synthetic write tests for this read-only addition unless evidence indicates a regression.
+Annotated v1.11.1 (`24ddb85794fbe1095f762ea937a8e8925b8b687e`) was deployed through `deploy:guarded` to both existing services on 13 September. Each deployment reran 554 tests: 543 passed, 11 existing skips, zero failures. Live health reports v1.11.1; both existing authenticated connectors return all six structured preflight fields with matching text, workflow, instructions and file inventory. File counts and revision cursors are unchanged with zero conflicts. Both installed owner-bound cockpit doctor routes pass and observe v1.11.1. Unauthenticated MCP POST and monitoring APIs return 401; monitoring shells remain available. Credentials, permissions and enrolment were unchanged. No synthetic writes or new migration were needed. Private deployment provenance and owner decisions remain in the ERS overlay.
 
 Company-wide enrolment and provider/governance clearance remain separate. Unrelated protocol migration, editor attribution and provider restore rehearsals retain their existing backlog priority. Deployment approval and owner-specific maintenance are recorded privately.
