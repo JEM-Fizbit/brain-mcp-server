@@ -1,6 +1,7 @@
 const OVERLAY_CONFIG_PATH = /^config\/[a-z0-9][a-z0-9._-]*\.json$/;
 const OVERLAY_PUBLIC_CA_PATH = /^config\/[a-z0-9][a-z0-9._-]*\.crt$/;
 const OVERLAY_DOC_PATH = /^docs\/.+\.md$/;
+const OVERLAY_REVIEW_ARTIFACT_PATH = /^docs\/reviews\/(?:[^/.][^/]*\/)*[^/.][^/]*\.(?:png|pdf|docx)$/;
 
 function assertOverlayChanges(changes) {
   if (!Array.isArray(changes) || changes.length === 0) {
@@ -20,7 +21,8 @@ function assertOverlayChanges(changes) {
       change.path === "test/deploy-expectations.json" ||
       OVERLAY_CONFIG_PATH.test(change.path) ||
       OVERLAY_PUBLIC_CA_PATH.test(change.path) ||
-      OVERLAY_DOC_PATH.test(change.path);
+      OVERLAY_DOC_PATH.test(change.path) ||
+      OVERLAY_REVIEW_ARTIFACT_PATH.test(change.path);
     if (!allowed) {
       throw new Error(`Guarded deploy refused: overlay path is not allowed: ${change.path}`);
     }

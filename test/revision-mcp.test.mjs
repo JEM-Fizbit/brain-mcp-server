@@ -594,9 +594,21 @@ test("HTTP MCP hosted ingestion preflight is read-only and backend-aware", async
   assert.equal(prepareTool.annotations?.destructiveHint, false);
   assert.equal(prepareTool.annotations?.idempotentHint, true);
 
-  const preflight = await callTool(harness, "brain_prepare_ingest", {
+  const before = await fs.readFile(harness.storeFile, "utf8");
+  const result = await callRawTool(harness, "brain_prepare_ingest", {
     source_label: "Research note",
   });
+  const preflight = result.content.map(part => part.text).join("\n");
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(result.structuredContent.files, ["00_loader.md", "NOW.md"]);
+  assert.equal(result.structuredContent.file_count, 2);
+  assert.deepEqual(result.structuredContent.source_categories, ["personal", "research"]);
+  assert.equal(result.structuredContent.capabilities.backend, "postgres");
+  assert.ok(preflight.includes(result.structuredContent.authoritative_workflow));
+  assert.ok(preflight.includes(result.structuredContent.instructions));
+  assert.match(result.structuredContent.authoritative_workflow, /operator workspace/);
+  assert.match(result.structuredContent.instructions, /Verify source custody and inbox cleanup/);
+  assert.equal(await fs.readFile(harness.storeFile, "utf8"), before);
   assert.match(preflight, /Backend: `postgres`/);
   assert.match(preflight, /`personal`, `research`/);
   assert.match(preflight, /Server source-path read\/write: not supported/);
@@ -632,6 +644,26 @@ test("HTTP MCP hosted ingestion preflight is read-only and backend-aware", async
   });
   assert.match(unsupportedComplete, /No writes occurred/);
   assert.match(unsupportedComplete, /operator workflow/);
+});
+
+test("HTTP MCP filesystem preflight exposes the same inventory and completion advice in JSON and text", async () => {
+  const harness = await setupHarness("filesystem-ingest-preflight", { source_categories: ["research"], role: "reader" });
+  delete process.env.BRAIN_EXPERIMENTAL_REVISION_STORE_FILE;
+  await writeBrainFile(harness.brainDir, "NOW.md", "Local now\n");
+  const result = await callRawTool(harness, "brain_prepare_ingest", { source_label: "Local source" });
+  assert.equal(result.isError, undefined);
+  const json = result.structuredContent;
+  const text = result.content.map(part => part.text).join("\n");
+  assert.deepEqual(json.files, ["NOW.md"]);
+  assert.equal(json.file_count, 1);
+  assert.deepEqual(json.source_categories, ["research"]);
+  assert.equal(json.capabilities.operations.brain_prepare_ingest.authorization.role_allowed, true);
+  assert.match(json.authoritative_workflow, /this server can save source Markdown/);
+  assert.match(json.instructions, /Call `brain_ingest_complete`/);
+  assert.ok(text.includes(json.authoritative_workflow));
+  assert.ok(text.includes(json.instructions));
+  assert.equal(await readBrainFile(harness.brainDir, "NOW.md"), "Local now\n");
+  assert.deepEqual(await fs.readdir(harness.brainDir), ["NOW.md"]);
 });
 
 test("HTTP MCP ingestion rejects a category outside the selected Brain registry", async () => {

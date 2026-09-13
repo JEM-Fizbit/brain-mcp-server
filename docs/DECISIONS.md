@@ -1,5 +1,9 @@
 # Working Decisions Log
 
+## 2026-09-13 — Preflight information must survive either response representation
+
+Structured output and text must both carry the promised inventory and authoritative workflow, generated from one analysis. v1.11.1 adds fields without changing existing inputs, machine role identifiers or write preconditions. The shared schema retains optional `expected_revision` because append/patch are also supported; replace still requires it at execution. Do not globally require that field or rename `member` to fix a presentation issue. [Implementation and verification](preflight-maintenance-release.md).
+
 > Locked design decisions for this project, with rationale. Append-only — when a decision is reversed, add a new entry referencing the prior one. Do not delete history.
 
 Each entry captures: **what was decided**, **why** (the constraint or insight), **when**, and **what alternatives were rejected**. This is the durable answer to "why did we do it this way?" months from now.
