@@ -1,7 +1,7 @@
 # Hosted Brain Roadmap
 
 **Status:** active reference
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-13
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -22,7 +22,7 @@ The core product direction is local-first hosted Brain:
 
 ## Current Position
 
-**13 September:** the agreed client/role test set is complete on the recorded surfaces. The additive [v1.11.1 preflight patch](preflight-maintenance-release.md) is verified and prepared, not deployed. Test completion and maintenance preparation do not activate company enrolment.
+**13 September:** the agreed client/role test set is complete on the recorded surfaces. The additive [v1.11.1 preflight patch](preflight-maintenance-release.md) is deployed and verified on both existing services. Live structured/text parity, unchanged revision cursors, zero conflicts and both owner-bound cockpit doctors pass. Technical acceptance does not activate company enrolment; the existing vendor-review gate remains separate.
 
 **11 September 2026 engineering follow-through:** local sync alarms now distinguish isolated transient errors from observed recurrence. Isolated recovery and mixed-load verification passed; colleague monitoring and resumable ingestion designs are prepared in [the follow-through record](production-engineering-followthrough.md). These extend engineering evidence without lifting the rollout hold or claiming provider recovery/production write capacity.
 

@@ -10,7 +10,7 @@ JEM v1.9.0 deployed through `deploy:guarded` from annotated tag v1.9.0 (`8aa7622
 
 ## Shape
 
-**Prepared 13 September:** [v1.11.1 preflight maintenance](preflight-maintenance-release.md) is verified, not yet deployed. Existing services remain on v1.11.0 pending their guarded maintenance releases. The overlay guard permits PNG/PDF/DOCX only under `docs/reviews/`; runtime/executable overlay changes remain prohibited.
+**Released 13 September:** [v1.11.1 preflight maintenance](preflight-maintenance-release.md) is deployed and verified on both existing services. Both guarded full test runs and live preflight/health checks pass. The overlay guard permits PNG/PDF/DOCX only under `docs/reviews/`; runtime/executable overlay changes remain prohibited.
 
 - App name: `jem-brain-mcp`
 - Public base: `https://jem-brain-mcp.fly.dev`
