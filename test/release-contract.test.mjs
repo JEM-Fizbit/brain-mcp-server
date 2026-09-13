@@ -50,6 +50,9 @@ test("release state accepts a clean overlay on an annotated version-matching ups
       { status: "A", path: "docs/example-deploy.md" },
       { status: "M", path: "BACKLOG.md" },
       { status: "A", path: "docs/reviews/production-acceptance-evidence.json" },
+      { status: "A", path: "docs/reviews/client-instructions.docx" },
+      { status: "A", path: "docs/reviews/evidence/Monitoring Page.png" },
+      { status: "A", path: "docs/reviews/evidence/acceptance.pdf" },
     ],
   };
 
@@ -64,7 +67,9 @@ test("release state accepts a clean overlay on an annotated version-matching ups
     "v1.2.0"
   );
 
-  for (const file of ["docs/runtime.json", "package.json", "scripts/deploy-guarded.mjs", "db/migrations/private.sql"]) {
+  for (const file of ["docs/runtime.json", "package.json", "scripts/deploy-guarded.mjs", "db/migrations/private.sql",
+    "docs/reviews/runtime.mjs", "docs/reviews/evidence/test.png.js", "docs/reviews/test.docm",
+    "docs/reviews/../runtime.png", "docs/outside.png", "src/reviews/test.png"]) {
     assert.throws(() => assertReleaseState({
       porcelain: "", packageVersion: "1.2.0",
       overlay: { ...overlay, changes: [...overlay.changes, { status: "M", path: file }] },

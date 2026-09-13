@@ -42,6 +42,9 @@ export function registerIngestTools(server: McpServer): void {
         const capabilities = describeCapabilities(ctx.brain, ctx.role, activeBrainStore().capabilities);
         const filesystem = capabilities.operations.brain_ingest.supported;
         const categories = sourceCategoriesForBrain(ctx.brain);
+        const authoritativeWorkflow = filesystem
+          ? "Authoritative workflow: this server can save source Markdown, record SOURCES.md provenance, append the Brain log, and clean its own inbox after reviewed Brain updates."
+          : "Authoritative workflow: use the selected Brain's local Monitor/operator workspace to preserve the source, update Postgres/Storage source metadata, and verify/clear the real inbox before Brain-content writes. Fly has no copy of that inbox or source tree. Return to hosted MCP only for reviewed Brain revision writes and revision-store logging; do not call the filesystem ingest mutation tools.";
         const capability = [
           `# Ingestion preflight: ${source_label}`,
           "",
@@ -53,15 +56,23 @@ export function registerIngestTools(server: McpServer): void {
           `- Server inbox scan/cleanup: ${filesystem ? "supported" : "not supported"}`,
           `- \`brain_ingest_complete\`: ${filesystem ? "supported" : "not supported"}`,
           "",
-          filesystem
-            ? "Authoritative workflow: this server can save source Markdown, record SOURCES.md provenance, append the Brain log, and clean its own inbox after reviewed Brain updates."
-            : "Authoritative workflow: use the selected Brain's local Monitor/operator workspace to preserve the source, update Postgres/Storage source metadata, and verify/clear the real inbox before Brain-content writes. Fly has no copy of that inbox or source tree. Return to hosted MCP only for reviewed Brain revision writes and revision-store logging; do not call the filesystem ingest mutation tools.",
+          authoritativeWorkflow,
           "",
           "This preflight made no writes and requires no content approval.",
           "",
           analysis.instructions,
         ].join("\n");
-        return { content: [{ type: "text", text: capability }], structuredContent: { capabilities, source_categories: categories } };
+        return {
+          content: [{ type: "text", text: capability }],
+          structuredContent: {
+            capabilities,
+            source_categories: categories,
+            files: analysis.files,
+            file_count: analysis.fileCount,
+            authoritative_workflow: authoritativeWorkflow,
+            instructions: analysis.instructions,
+          },
+        };
       } catch (error) {
         return capabilityFailure(error);
       }

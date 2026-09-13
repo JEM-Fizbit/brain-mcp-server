@@ -21,6 +21,10 @@ Support does not grant permission. Role authorization does not prove support. Ap
 
 Semantic search never silently builds an index. A missing index returns `semantic_index_missing`; an explicit `brain_semantic_index` is a derived-index write.
 
+## Preflight response parity (v1.11.1)
+
+`brain_prepare_ingest.structuredContent` retains `capabilities` and `source_categories` and adds `files` (sorted Brain filenames), `file_count`, `authoritative_workflow` and `instructions`. The workflow and instructions are the same strings included in the text response, generated from the same read-only inventory. Both response consumers receive the completion/verification guidance; filenames are not source bodies or a local-inbox observation. Hosted source custody still belongs to the operator workspace. The input schema and role/revision requirements are unchanged.
+
 ## Preserve the review boundary
 
 A Brain-scope `brain_read_file` response now supplies `revision_id`, `content_sha256` and `content` in `structuredContent`, with the revision/hash also visible in the text response. Source-scope reads retain their source-content format.
