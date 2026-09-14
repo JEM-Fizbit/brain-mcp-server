@@ -32,7 +32,7 @@ The committed `fly.toml`, `Dockerfile`, and Fly entrypoint intentionally enforce
 
 ## Builder region and build-input boundary
 
-The build machine's region is separate from `primary_region` (runtime) and from image-registry storage. On 14 September 2026 the ERS Fly **Organization → Settings → App Builders → Configure** UI offered explicit region selection including London. The proposed ERS change from IAD to LHR awaits approval; do not assume it has happened. See [the builder review](fly-builder-region-handoff.md#engineering-follow-up--14-september-2026).
+The build machine's region is separate from `primary_region` (runtime) and from image-registry storage. On 14 September 2026 the ERS Fly **Organization → Settings → App Builders → Configure** UI offered explicit region selection including London. John approved the ERS change; the dashboard confirmed LHR at unchanged 4 CPU / 4 GB on 14 September at approximately 21:09 UTC. No runtime deployment was performed. The next guarded build must still confirm actual execution region. See [the builder review](fly-builder-region-handoff.md#engineering-follow-up--14-september-2026).
 
 Use an explicit London builder configuration for the approved move, keeping hardware unchanged. Read back the setting and check the next guarded build's actual region. Do not rely on the operator's physical location or silently fall back to a different region. Configuration changes recreate the shared builder and lose cached layers; coordinate with every app using the organisation builder and obtain approval before resetting it. This setting does not establish residency for registry replicas, logs, control-plane or support processing.
 
