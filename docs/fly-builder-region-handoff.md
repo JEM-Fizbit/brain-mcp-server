@@ -1,6 +1,6 @@
 # Fly image-builder region — handoff report
 
-**Status:** investigated — build-context restriction prepared; explicit London builder configuration recommended, awaiting shared-infrastructure approval
+**Status:** ERS builder moved to London and setting verified; JEM review, ERS build-file intake and subsequent build evidence remain
 **Date:** 14 September 2026
 **Origin:** ERS AI governance review, 14 September 2026 (Brain Approval Review decision D3; Fly evidence action FLY-14-03)
 **Owner of the follow-up:** brain-mcp-server project (John), with the outcome reported back to the ERS governance record
@@ -8,7 +8,17 @@
 
 This document captures the complete state of knowledge about *where Fly builds this server's Docker image* and the options for moving that build out of the United States. It deliberately makes no design decision and proposes no spec. Pick it up, verify the facts against the live account, choose, do, and record.
 
+## ERS builder move completed — 14 September 2026
+
+John explicitly approved moving the shared ERS builder to London at unchanged hardware. At approximately **21:09 UTC / 22:09 BST**, the authenticated Fly Settings page returned “Builder configuration updated successfully” and showed **ers-genomics — LHR, London, United Kingdom — 4 CPU, 4 GB RAM**. The operation recreates the shared builder and discards cached layers; no Brain or BDR runtime deployment was invoked. An initial form submission retained IAD; the region was then explicitly selected and the final London result verified. No credentials, access permissions or subscription were changed.
+
+Both ERS and JEM public health endpoints returned HTTP 200 after the change. This confirms endpoint availability; it is not a fresh client/role acceptance run. The next guarded build has not run, so its observed execution region remains a follow-up. The build-input restriction is tested and committed upstream at `b9f6b74`; adoption into the ERS protected build files still requires normal annotated-release intake. No new image was pushed or deployed for this setting change.
+
+**FLY-14-03:** the current builder-location subtask is complete. The input analysis is filed; subsequent-build evidence and any outstanding registry/cache/log-retention or historical-copy evidence remain explicit follow-ups for Mike's disposition under **D3**. The move does not establish UK/EU-only registry, control-plane, support or subprocessor handling and does not clear the joint vendor-review gate. Personal JEM builder review is next and remains separate; no JEM infrastructure change is approved by this ERS move.
+
 ## Engineering follow-up — 14 September 2026
+
+*Pre-move investigation; the completed action above supersedes its pending-state statements.*
 
 This section supersedes the original handoff's assumptions below. No builder, deployment, credential or permission was changed during this investigation.
 
