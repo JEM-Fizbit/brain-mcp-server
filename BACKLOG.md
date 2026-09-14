@@ -15,6 +15,8 @@
 
 <!-- backlog items below; newest first -->
 
+- Decide where Fly builds the ERS Brain image and record the processing map: the ERS org's Depot builder sits in IAD (Virginia) while runtime and database are London; the ERS governance review (14 Sep 2026, Brain Approval Review D3 / Fly evidence FLY-14-03) needs either the builder re-placed in the UK/EU or a confirmed statement of what the build carries. Complete state of knowledge and the options, no decision taken: `docs/fly-builder-region-handoff.md`.
+
 
 - Distinguish approval timeout, explicit denial and tool failure in host UX. Claude web returned only "No approval received" after unattended approval prompts timed out (2026-08-01). This host-owned ambiguity remains product-feedback work; do not send feedback without authorization. The server capability-before-approval portion is deployed in v1.9.0 through read-only discovery/preflight; the agreed client/role test set passed on 13 September; private deployment evidence retains the scoped results. Do not reopen a separate server probe implementation.
 - During the next planned Brain credential-maintenance window, rotate the JEM sync and ERS runtime database credentials as routine hygiene; update each deployment's isolated Monitor/runtime configuration through the existing credential workflow; then verify database connectivity, local/hosted sync, doctor health, and connector reads without printing secret-bearing configuration. Do not schedule this as a standalone incident response.
