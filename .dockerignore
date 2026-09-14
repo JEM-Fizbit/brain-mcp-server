@@ -1,10 +1,14 @@
-.DS_Store
-.claude/
-.env
-.env.*
-.git/
-dist/
-node_modules/
-npm-debug.log*
-test/
-*.tsbuildinfo
+# Build input allow-list. Git ignore rules do not constrain Docker's context.
+# Keep operator files, Brain bytes, reports and credentials out by default.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/**/*.ts
+!config/brain-platform.*.json
+!config/prod-ca-2021.crt
+!README.md
+!LICENSE
+!scripts/fly-entrypoint.sh

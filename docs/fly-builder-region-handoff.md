@@ -1,12 +1,42 @@
 # Fly image-builder region — handoff report
 
-**Status:** open — handoff for a coding agent; no design decision taken here
+**Status:** investigated — build-context restriction prepared; explicit London builder configuration recommended, awaiting shared-infrastructure approval
 **Date:** 14 September 2026
 **Origin:** ERS AI governance review, 14 September 2026 (Brain Approval Review decision D3; Fly evidence action FLY-14-03)
 **Owner of the follow-up:** brain-mcp-server project (John), with the outcome reported back to the ERS governance record
 **Scope:** both owner-isolated deployments — the ERS Fly organisation `ers-genomics` (app `ers-brain-mcp`) is the one the governance question is about; check the personal org (`jem-brain-mcp`) at the same time
 
 This document captures the complete state of knowledge about *where Fly builds this server's Docker image* and the options for moving that build out of the United States. It deliberately makes no design decision and proposes no spec. Pick it up, verify the facts against the live account, choose, do, and record.
+
+## Engineering follow-up — 14 September 2026
+
+This section supersedes the original handoff's assumptions below. No builder, deployment, credential or permission was changed during this investigation.
+
+### Recommendation and live findings
+
+Use the existing **Configure → Region → London, United Kingdom** control on the ERS organisation's App Builders page, retaining **4 CPU / 4 GB RAM**. The authenticated administrator UI now supports an explicit region selection; the older public announcement and section 3's claim that no selector exists are outdated. The form warns that updating creates a new builder and loses cached layers. It was inspected without submitting. The current shared builder remains **IAD / Ashburn, Virginia**. No new CI service, local-build dependency for releases, or deprecated classic-builder workaround is needed. No new spec is warranted for this small build-boundary correction and operator configuration change.
+
+The builder is organisation-shared, so a reset can affect build cache for the BDR app too. Obtain approval for that shared infrastructure/cache change before submitting. Runtime machines are not selected by this form; the ERS dashboard currently reports **one** Brain machine in LHR and two BDR machines in FRA, correcting the original handoff's two-Brain-machine statement. No build or deploy should be running during the change.
+
+Personal CLI authentication was verified independently: `jem-brain-mcp` belongs to John E Milad's `personal` organisation. Its Depot region is **not verified**: the organisation CLI output does not expose it; Chrome is signed into the separate ERS account and the in-app browser requires personal sign-in. Do not infer a personal region from the ERS setting, runtime location, or the CLI's legacy remote-builder image field. No account switch or credential change was attempted.
+
+### What can reach the builder
+
+`Dockerfile` copies the package manifests, TypeScript configuration/source, deployment registries, public CA certificate, README, licence and entrypoint; npm and apt fetch dependencies. The build stage produces `dist/`; the final image carries the compiled server, production dependencies and configuration. `config/brain-platform.*.json` contains bootstrap identity/role identifiers and deployment metadata, so the image is **not a claim of zero personal or organisational data**. There is no Dockerfile source for external Brain inboxes, stored source bytes or hosted Brain documents. `buildFlyDeployArgs` supplies only `GIT_SHA` and `APP_VERSION`; neither Dockerfile nor either current Fly build configuration supplies a build-secret mount or runtime-secret build argument. Fly control-plane authentication and runtime secret injection remain distinct from Docker build inputs.
+
+The original `.dockerignore` was a deny-list: it excluded `.env*`, Git, dependencies and tests, but admitted `tmp/`, reports, deployment provenance and arbitrary new files. A file need not appear in a final-image `COPY` to be eligible for context transfer. Therefore the original handoff's unconditional “no Brain content or secrets” expectation was not justified for historical builds. Existing provenance records give app/tag/commit/time, not builder region or a context manifest; they cannot prove historical transfer or deletion. This investigation does not assert that protected material actually transferred.
+
+The prepared `.dockerignore` now denies everything except the exact build input classes above, including only TypeScript under `src`, named registry patterns and the public certificate under `config`, and the one entrypoint under `scripts`. No parent-directory include admits arbitrary children. This prevents unrelated operator files from silently joining future build contexts; reviewed source/config must still be kept free of secrets. The ERS checkout must receive this protected upstream file through a reviewed annotated release, not an ad hoc overlay exception.
+
+### Verification and remaining closure
+
+Docker's actual context exporter passed a synthetic test: all 10 required sample inputs included, all 15 forbidden samples excluded, including nested credentials, PDFs, inbox bytes, reports and future directories. Applying the candidate ignore file to the actual checkouts exported **121 files / 798,553 bytes for JEM** and **122 files / 800,666 bytes for ERS**, before this follow-up documentation was written. No excluded directory appeared. The Node 22 deployment/release checks passed **28 tests**, with one existing profile-specific skip. Both restricted contexts also built the unchanged hosted Dockerfile successfully for `linux/amd64` using Docker 29.6.1. [Machine-readable verification summary](fly-build-context-evidence.json). Local evidence is retained under `/tmp/brain-build-boundary-gtgbmvmi`; nothing was pushed to an image registry by these checks.
+
+After approval: set and read back ERS London at unchanged hardware, record cache recreation, verify a subsequent guarded build's actual region, and check the personal builder through its own authenticated account. Adopt explicit configured region as the operating rule in [deploy-fly.md](deploy-fly.md); operator geography is not a substitute. Do not silently reset or accept a different region if the configured choice is unavailable.
+
+Keep FLY-14-03 and D3 open until the actual outcome and residual map are recorded. Moving this builder only removes this identified US build location: registry storage/replication, build logs/cache retention and historical copies, control-plane/support processing and dependencies are not established as UK/EU-only here. Mike retains the decision on whether any remaining evidence gap is a launch condition or a dated follow-up. The older statement below that a builder move makes D3 “collapse to a note” must not be used as automatic legal clearance.
+
+## Original handoff — retained for provenance
 
 ## 1. What was observed
 
