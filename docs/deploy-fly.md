@@ -30,6 +30,14 @@ Fly should not provide the live Brain working copy. The previous deployment used
 
 The committed `fly.toml`, `Dockerfile`, and Fly entrypoint intentionally enforce this: no deploy key mount, no `BRAIN_AUTO_SYNC`, no `BRAIN_AUTO_PUSH`, and no SSH setup in the runtime image. Keep Supabase database URLs, OAuth secrets, and any service-role keys in Fly secrets, not in `fly.toml`.
 
+## Builder region and build-input boundary
+
+The build machine's region is separate from `primary_region` (runtime) and from image-registry storage. On 14 September 2026 the ERS Fly **Organization → Settings → App Builders → Configure** UI offered explicit region selection including London. The proposed ERS change from IAD to LHR awaits approval; do not assume it has happened. See [the builder review](fly-builder-region-handoff.md#engineering-follow-up--14-september-2026).
+
+Use an explicit London builder configuration for the approved move, keeping hardware unchanged. Read back the setting and check the next guarded build's actual region. Do not rely on the operator's physical location or silently fall back to a different region. Configuration changes recreate the shared builder and lose cached layers; coordinate with every app using the organisation builder and obtain approval before resetting it. This setting does not establish residency for registry replicas, logs, control-plane or support processing.
+
+The root `.dockerignore` is a build-input allow-list, independent of `.gitignore`: package manifests, TypeScript source/configuration, `config/brain-platform.*.json`, the public CA certificate, README, licence and the Fly entrypoint. Keep credentials and Brain/source bytes out of those reviewed paths. Docker receives the allowed context, which is a wider boundary than final-image `COPY` instructions alone. Any new build input requires an explicit ignore-rule review; do not restore broad directory includes for convenience. Guarded release build arguments remain only commit SHA and app version, with no runtime credentials forwarded as build secrets. ERS adopts protected build-file changes through its normal annotated-upstream release intake.
+
 ## One-Time Setup
 
 Apply the Supabase migrations and security gate before deploying the hosted MCP runtime:

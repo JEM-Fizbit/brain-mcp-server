@@ -1,5 +1,9 @@
 # Working Decisions Log
 
+## 2026-09-14 — Build context is an explicit data boundary
+
+Docker build inputs must be allow-listed independently of Git ignore rules and final-image `COPY` instructions. Operator working files, inbox/source bytes, reports and credentials must not join the context merely because they sit inside a checkout. Keep permitted source and deployment configuration reviewed; configuration contains identity/role metadata and is not categorically non-personal data. Runtime location, builder location and registry/control-plane processing are separate claims. An explicit builder-region setting is preferable to placement inferred from the deployer's location; a region move never grants governance clearance by itself. See [the builder review and validation](fly-builder-region-handoff.md#engineering-follow-up--14-september-2026). The proposed ERS London configuration still awaits shared-builder/cache approval.
+
 ## 2026-09-13 — Preflight information must survive either response representation
 
 Structured output and text must both carry the promised inventory and authoritative workflow, generated from one analysis. v1.11.1 adds fields without changing existing inputs, machine role identifiers or write preconditions. The shared schema retains optional `expected_revision` because append/patch are also supported; replace still requires it at execution. Do not globally require that field or rename `member` to fix a presentation issue. [Implementation and verification](preflight-maintenance-release.md).

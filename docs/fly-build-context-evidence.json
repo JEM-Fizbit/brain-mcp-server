@@ -1,0 +1,33 @@
+{
+  "date": "2026-09-14",
+  "scope": "Local build-input verification only; no registry push, deploy or builder change",
+  "docker": "29.6.1",
+  "platform": "linux/amd64",
+  "ignore_sha256": "3accfe9a985a3518f89897600ddf5222af72d1467909671395bd41226fab2850",
+  "fixture": {
+    "required_included": 10,
+    "forbidden_excluded": 15,
+    "status": "pass"
+  },
+  "node_22_checks": {
+    "passed": 28,
+    "skipped": 1,
+    "failed": 0
+  },
+  "contexts": {
+    "jem": {
+      "files": 121,
+      "bytes": 798553,
+      "manifest_sha256": "bd97a865d947150d7b365ddcd5d43aa69c23187ba6fc26b6f897514ba565de75",
+      "local_image_build": "pass",
+      "build_log_sha256": "430a35f5547b103844efb6be0836d5dafcb283db18979945c68e24e841e1e7e9"
+    },
+    "ers": {
+      "files": 122,
+      "bytes": 800666,
+      "manifest_sha256": "0b71958cb9066c8cc3f34f3598c264fa7da59425b5361dde28752ff9db40df9e",
+      "local_image_build": "pass",
+      "build_log_sha256": "c63246752efd50b946b509ac11bb0f0613c29e1878d5f8017528a3347e46514e"
+    }
+  }
+}
