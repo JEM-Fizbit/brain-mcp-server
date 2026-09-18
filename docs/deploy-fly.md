@@ -6,6 +6,8 @@ This is the hosted target for remote MCP clients that need a public HTTPS URL. F
 
 ## Verified maintenance release — 10 September 2026
 
+**Build-boundary maintenance release prepared 18 September:** v1.11.2 carries the tested Docker-context allow-list into the annotated-release path required by the ERS mirror. It changes build inputs and version metadata only; application source, database schema, runtime credentials, permissions and Brain content are unchanged. The ERS guarded deployment is the acceptance build for the configured London builder and must record the observed build region before this evidence item closes.
+
 JEM v1.9.0 deployed through `deploy:guarded` from annotated tag v1.9.0 (`8aa762261e616ec0c19f3945da396d04ee7fd7d7`) at 22:32:58 UTC. Image: `registry.fly.io/jem-brain-mcp:deployment-01M26Q5PEJKVD5WDQES87N9K9N`. The independent ERS guarded release also serves v1.9.0; its operational provenance remains in the private overlay. No schema, credential, grant or DNS change was required. Health confirms Postgres revisions/OAuth and disabled Git hot path. Current client metadata acceptance remains open under spec 020.
 
 ## Shape
