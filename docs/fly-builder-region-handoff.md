@@ -1,6 +1,6 @@
 # Fly image-builder region — handoff report
 
-**Status:** ERS builder moved to London and setting verified; JEM review, ERS build-file intake and subsequent build evidence remain
+**Status:** ERS build boundary and London acceptance build complete; residual vendor-processing questions and the separate JEM review remain
 **Date:** 14 September 2026
 **Origin:** ERS AI governance review, 14 September 2026 (Brain Approval Review decision D3; Fly evidence action FLY-14-03)
 **Owner of the follow-up:** brain-mcp-server project (John), with the outcome reported back to the ERS governance record
@@ -8,13 +8,23 @@
 
 This document captures the complete state of knowledge about *where Fly builds this server's Docker image* and the options for moving that build out of the United States. It deliberately makes no design decision and proposes no spec. Pick it up, verify the facts against the live account, choose, do, and record.
 
+## ERS acceptance build completed — 18 September 2026
+
+Annotated public release **v1.11.2** (tag object `05b79816bb8d12baf025dbf6d440646bb241411e`, source `20761feccb6ad50bb1791e870d58b6af445c27a2`) carried the tested `.dockerignore` allow-list through the protected ERS intake. The ERS overlay `dc79d818f5fc96fd1e909958b6d679b09a3cc3d3` has no protected-path divergence from that tag. Public, private-intake and guarded-release suites each passed 554 tests: 543 pass, 11 existing fixture/dependency skips and zero failures.
+
+The guarded release built with Depot and reported an **806.81 kB** context, then deployed Fly release **26** / image `registry.fly.io/ers-brain-mcp:deployment-01M2T4WQ8X3VFYY5PYYRJDKSG8` at `2026-09-18T11:38:24.938Z`. Immediately after that completed build, the authenticated ERS **Organization → Settings → App Builders** page showed the organisation's shared global builder as **LHR — London, United Kingdom — 4 CPU, 4 GB RAM**. The guarded command does not request an app-isolated builder, so the post-build shared-builder readback is the location evidence for this build. The deployed machine is also in LHR, runs the exact image above and returned healthy MCP version **1.11.2** with Postgres revisions/OAuth, Supabase artifacts and the Git hot path disabled.
+
+The first guarded attempt stopped before a build because the normal CLI session belonged to the separate personal Fly account. A temporary isolated Fly configuration was authenticated to the existing ERS account and used for the successful run; the normal personal session remained unchanged. No password, token, runtime secret, permission, database, Brain content or workforce enrolment was changed.
+
+The two engineering evidence items are closed: the build-input restriction is in the protected ERS release, and a subsequent real build is evidenced against the London builder. FLY-14-03 can treat the build-location/input subtask as complete. Registry replication, build-cache/log retention, control-plane/support processing, dependencies and historical copies remain matters for Mike's vendor-processing disposition; this engineering result does not grant governance clearance. JEM remains a separate owner/account review and was not changed.
+
 ## ERS builder move completed — 14 September 2026
 
 John explicitly approved moving the shared ERS builder to London at unchanged hardware. At approximately **21:09 UTC / 22:09 BST**, the authenticated Fly Settings page returned “Builder configuration updated successfully” and showed **ers-genomics — LHR, London, United Kingdom — 4 CPU, 4 GB RAM**. The operation recreates the shared builder and discards cached layers; no Brain or BDR runtime deployment was invoked. An initial form submission retained IAD; the region was then explicitly selected and the final London result verified. No credentials, access permissions or subscription were changed.
 
-Both ERS and JEM public health endpoints returned HTTP 200 after the change. This confirms endpoint availability; it is not a fresh client/role acceptance run. The next guarded build has not run, so its observed execution region remains a follow-up. The build-input restriction is tested and committed upstream at `b9f6b74`; adoption into the ERS protected build files still requires normal annotated-release intake. No new image was pushed or deployed for this setting change.
+Both ERS and JEM public health endpoints returned HTTP 200 after the change. This confirms endpoint availability; it is not a fresh client/role acceptance run. The later v1.11.2 intake and acceptance build are recorded above.
 
-**FLY-14-03:** the current builder-location subtask is complete. The input analysis is filed; subsequent-build evidence and any outstanding registry/cache/log-retention or historical-copy evidence remain explicit follow-ups for Mike's disposition under **D3**. The move does not establish UK/EU-only registry, control-plane, support or subprocessor handling and does not clear the joint vendor-review gate. Personal JEM builder review is next and remains separate; no JEM infrastructure change is approved by this ERS move.
+**FLY-14-03:** the builder-location and input-boundary engineering evidence is complete. Outstanding registry/cache/log-retention or historical-copy evidence remains for Mike's disposition under **D3**. The move does not establish UK/EU-only registry, control-plane, support or subprocessor handling and does not clear the joint vendor-review gate. Personal JEM builder review remains separate; no JEM infrastructure change is approved by this ERS move.
 
 ## Engineering follow-up — 14 September 2026
 
