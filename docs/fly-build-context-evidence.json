@@ -1,6 +1,6 @@
 {
   "date": "2026-09-14",
-  "scope": "Local build-input verification only; no registry push, deploy or builder change",
+  "scope": "Local build-input verification plus the 2026-09-18 ERS guarded acceptance build",
   "docker": "29.6.1",
   "platform": "linux/amd64",
   "ignore_sha256": "3accfe9a985a3518f89897600ddf5222af72d1467909671395bd41226fab2850",
@@ -29,5 +29,33 @@
       "local_image_build": "pass",
       "build_log_sha256": "c63246752efd50b946b509ac11bb0f0613c29e1878d5f8017528a3347e46514e"
     }
+  },
+  "ers_remote_acceptance": {
+    "date": "2026-09-18",
+    "tag": "v1.11.2",
+    "tag_object": "05b79816bb8d12baf025dbf6d440646bb241411e",
+    "upstream_sha": "20761feccb6ad50bb1791e870d58b6af445c27a2",
+    "overlay_sha": "dc79d818f5fc96fd1e909958b6d679b09a3cc3d3",
+    "guarded_tests": {
+      "passed": 543,
+      "skipped": 11,
+      "failed": 0
+    },
+    "builder": {
+      "provider": "Depot",
+      "scope": "organization_shared",
+      "region": "lhr",
+      "display_region": "London, United Kingdom",
+      "cpu": 4,
+      "memory_gb": 4,
+      "post_build_readback": "pass"
+    },
+    "reported_context": "806.81 kB",
+    "fly_release": 26,
+    "image": "registry.fly.io/ers-brain-mcp:deployment-01M2T4WQ8X3VFYY5PYYRJDKSG8",
+    "deployed_at": "2026-09-18T11:38:24.938Z",
+    "health_version": "1.11.2",
+    "runtime_region": "lhr",
+    "status": "pass"
   }
 }
