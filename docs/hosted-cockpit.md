@@ -46,6 +46,7 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - checks continue to come from `npm run hosted:doctor`;
 - checks use `pass`/`info`/`warn`/`fail`: informational diagnostic limitations stay visible in Checks but do not enter Operator Queue or change readiness, while every warning or failure carries a concrete next action;
 - local sync health, launchd state, local mirror state, lint freshness, inbox state, and local latency snapshots remain visible;
+- local recovery retention (`.brain-sync-recovery/` entries and bytes as a percent of the tighter budget) is carried in the watcher health file and `sync_health.details.recovery`; at 70% the doctor warns and the cockpit adds a `recovery_budget` action pointing at the reviewed `sync:recovery:prune` workflow;
 - the `pooler_config` check classifies `BRAIN_REVISION_DATABASE_URL` (transaction `:6543` vs session `:5432` vs direct) and warns on session mode — whose hard ~15-client cap, shared across the hosted runtime pool + telemetry + local sync daemon + operator scripts, exhausts under load (`EMAXCONNSESSION`); it also reports the active backend connection count and the per-pool `max` (`BRAIN_PG_POOL_MAX`) for visibility;
 - user-facing hosted MCP latency shows SLO status, performance findings, DB hotspots, latest, average, p50, p95, failures, and short trendlines for read, write, and sync-wait operations;
 - hosted MCP auth failures show current-window counts, prior-window trend, safe reason/target metadata, and recent metadata-only events in a dedicated Activity > Auth subpanel;

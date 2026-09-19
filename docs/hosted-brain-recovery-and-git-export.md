@@ -29,7 +29,7 @@ References: [Supabase Database Backups](https://supabase.com/docs/guides/platfor
 
 ## Normal Brain Operations
 
-The v1.9.0 sync agent retains displaced local files and durable recovery intent under `.brain-sync-recovery/` within its configured sync root. Preserve this directory during incident investigation: it can contain a manual save that never entered hosted revision history, including a late save through an already-open descriptor. It is private recovery data, not a Git export input. Do not silently prune it or treat its existence as proof of off-device backup. Before restoring any retained version, review the current hosted revision and local bytes; use the guarded conflict/revision workflow rather than overwriting a newer head.
+The v1.9.0 sync agent retains displaced local files and durable recovery intent under `.brain-sync-recovery/` within its configured sync root. Preserve this directory during incident investigation: it can contain a manual save that never entered hosted revision history, including a late save through an already-open descriptor. It is private recovery data, not a Git export input. Do not silently prune it or treat its existence as proof of off-device backup; the only sanctioned reduction is the reviewed `sync:recovery:prune` workflow in `conflict-resolution.md`, which deletes records only after hosted revision history is shown to hold their bytes. Before restoring any retained version, review the current hosted revision and local bytes; use the guarded conflict/revision workflow rather than overwriting a newer head.
 
 Do:
 

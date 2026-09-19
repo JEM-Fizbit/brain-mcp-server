@@ -43,12 +43,14 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - `npm run test:cockpit:e2e` - Playwright cockpit E2E using deterministic fixture data; requires installed chromium.
 - `npm run sources:inventory:postgres`, `npm run sources:verify-list:postgres` - read/report source metadata when configured.
 - `npm run bench:http:postgres` - read-only benchmark, but networked and telemetry-adjacent; run only when measuring hosted performance.
+- `npm run sync:recovery:prune` (no `--apply`) - read-only classification of `.brain-sync-recovery/` records against hosted revision history; runs beside a live watcher without taking the sync lock.
 
 ### Local-State Mutating
 
 - `npm run dev`, `npm run start`, `npm run sync -- watch`, `npm run sync -- once`, and `npm run sync -- pull` start processes or update local mirror/state files.
 - `npm run sync:launchd:plist`, `npm run hosted:cockpit:launchd:plist`, `npm run sync:helper:launchd:plist`, and `npm run sync:menubar:launchd:plist` generate local LaunchAgent plists under `tmp/` or configured paths.
 - `npm run sync:helper:install`, `npm run hosted:cockpit:launcher:install`, and `npm run sync:menubar:install` create local macOS app bundles.
+- `npm run sync:recovery:prune -- --apply` deletes recovery records the dry run classified as redundant (completed, older than `--older-than` days, and whose displaced bytes hosted revision history verifiably holds). It takes the sync lock, never touches a retained record, and is the only sanctioned way to shrink `.brain-sync-recovery/`.
 
 ### Hosted/Postgres Mutating
 
@@ -83,7 +85,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 
 ## Capability and write preconditions
 
-Use `brain_describe` for endpoint support before selecting an operation or requesting approval. Manual inbox custody and filesystem access are independent of MCP roles. Follow `docs/backend-capabilities.md` for support, effects, authorization and observations. Replacements must carry the `revision_id` from the read used for review as `expected_revision` (`new` only for creation); conflict resolution also requires the reviewed hosted revision. A stale refusal requires a fresh review, never an automatic retry with the new head. Local sync retains displaced bytes under `.brain-sync-recovery/`; do not silently delete those records.
+Use `brain_describe` for endpoint support before selecting an operation or requesting approval. Manual inbox custody and filesystem access are independent of MCP roles. Follow `docs/backend-capabilities.md` for support, effects, authorization and observations. Replacements must carry the `revision_id` from the read used for review as `expected_revision` (`new` only for creation); conflict resolution also requires the reviewed hosted revision. A stale refusal requires a fresh review, never an automatic retry with the new head. Local sync retains displaced bytes under `.brain-sync-recovery/`; do not silently delete those records. The only sanctioned reduction is a reviewed `sync:recovery:prune -- --apply`, which removes records whose bytes hosted revision history already holds.
 
 ## Isolated recovery and capacity fixture
 
