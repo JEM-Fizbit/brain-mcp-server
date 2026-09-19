@@ -358,7 +358,11 @@ npm run hosted:doctor
 
 The command loads only the selected profile's allowlisted runtime values and
 then verifies its database URL against `BRAIN_EXPECTED_SUPABASE_PROJECT_REF`
-before any network access. A missing profile, inconsistent Brain id, non-HTTPS
+before any network access. With more than one profile the Brain id must be
+explicit; a profile value replaces an ambient `.env.local` value but never an
+explicit shell value that disagrees with it (that is a refusal). The sync CLI
+and every operator script that loads ambient env apply the same rule from
+`src/sync/runtime-binding.ts`. A missing profile, inconsistent Brain id, non-HTTPS
 hosted endpoint, absent expected ref, or cross-project URL is a hard refusal.
 The generated config is owner-readable only (`0600`) because a database URL is
 a credential; never commit or print the profiles JSON:

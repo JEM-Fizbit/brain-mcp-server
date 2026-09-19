@@ -47,9 +47,14 @@ import {
 } from "./lib/hosted-runtime-binding.mjs";
 import { hostedHealthFailureDetails } from "./lib/hosted-health-failure.mjs";
 
-loadLocalEnv();
-await applyBrainMonitorProfileEnv(process.env);
-assertHostedRuntimeBinding(process.env, "Hosted doctor");
+try {
+  loadLocalEnv();
+  await applyBrainMonitorProfileEnv(process.env);
+  assertHostedRuntimeBinding(process.env, "Hosted doctor");
+} catch (error) {
+  process.stderr.write(`[hosted-doctor] ${error?.message || error}\n`);
+  process.exit(2);
+}
 
 const exec = promisify(execFile);
 const { Pool } = pg;

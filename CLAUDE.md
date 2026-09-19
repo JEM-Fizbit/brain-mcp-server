@@ -229,6 +229,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 | `BRAIN_SOURCES_DIR` | Path to the `sources/` archive (sibling of `brain/`) | `~/Projects/ai-brain-jem/sources` |
 | `BRAIN_SYNC_MAX_DELETES` | Guarded sync (spec 011): max confirmed local deletions auto-applied per cycle; a larger batch is skipped for operator review | `5` |
 | `BRAIN_SYNC_MAX_DELETE_PCT` | Guarded sync (spec 011): max % of tracked files auto-deleted per cycle before the mass-delete guard trips | `10` |
+| `BRAIN_MONITOR_CONFIG_FILE` | Owner-only Brain Monitor config that supplies per-Brain credentials to the sync CLI and operator scripts; with several profiles `BRAIN_ID` must be explicit, and a profile never overrides an explicit conflicting shell value | unset |
 
 ---
 

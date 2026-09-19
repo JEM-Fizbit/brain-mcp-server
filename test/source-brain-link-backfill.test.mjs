@@ -99,6 +99,7 @@ test("backfill CLI requires an expected project ref even in dry-run mode", () =>
         BRAIN_SOURCE_REFERENCE_DATABASE_URL:
           "postgresql://runtime.fakeprojectref@aws-0.example.invalid:6543/postgres",
         BRAIN_REVISION_DATABASE_URL: "",
+        BRAIN_MONITOR_CONFIG_FILE: "",
       },
     }
   );
@@ -125,6 +126,7 @@ test("backfill CLI rejects a mismatched project ref before connecting", () => {
         BRAIN_SOURCE_REFERENCE_DATABASE_URL:
           "postgresql://runtime.fakeprojectref@aws-0.example.invalid:6543/postgres",
         BRAIN_REVISION_DATABASE_URL: "",
+        BRAIN_MONITOR_CONFIG_FILE: "",
       },
     }
   );
