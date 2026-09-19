@@ -301,3 +301,12 @@ test('durable sync errors and guards retain actionability, missing health is not
   assert.equal(evaluateSyncHealth({}, null, {now: syncTime, maxAgeMs: 60_000}).status, 'warn');
   assert.equal(syncHealthAction(syncSample(0, undefined, {status: 'ok'})), null);
 });
+
+test("sync health warns when local recovery retention nears its budget", () => {
+  const base = { status: "ok", checkedAt: new Date().toISOString(), report: {} };
+  const fine = evaluateSyncHealth({ ...base, recovery: { entries: 10, bytes: 1, entryLimit: 10000, byteLimit: 100, percent: 1 } }, undefined, { maxAgeMs: 60_000 });
+  assert.equal(fine.status, "pass");
+  const near = evaluateSyncHealth({ ...base, recovery: { entries: 7000, bytes: 1, entryLimit: 10000, byteLimit: 100, percent: 70 } }, undefined, { maxAgeMs: 60_000 });
+  assert.equal(near.status, "warn");
+  assert.equal(near.details.recoveryPercent, 70);
+});

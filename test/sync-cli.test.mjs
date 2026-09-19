@@ -523,3 +523,62 @@ test("sync CLI replaces stale sync locks before running", async () => {
   assert.deepEqual(output.report.pushed, ["NOW.md"]);
   await assert.rejects(fs.readFile(config.lockFile, "utf-8"), /ENOENT/);
 });
+
+test("sync CLI summary reports recovery usage against the retention budget", async () => {
+  const config = dirs("summary-recovery");
+  await writeBrainFile(config.brainDir, "NOW.md", "v1\n");
+  await runCli("push", config);
+  const store = new FileRevisionStore(config.storeFile);
+  const head = await store.getHead("ai-brain-jem", "NOW.md");
+  await store.proposeRevision({ brainId: "ai-brain-jem", filename: "NOW.md", baseRevisionId: head.revisionId, content: "v2\n", origin: "hosted_mcp" });
+  await runCli("pull", config);
+
+  const output = await runCli("summary", config);
+  assert.equal(output.recovery.entries, 1);
+  assert.equal(output.recovery.entryLimit, 10000);
+  assert.ok(output.recovery.bytes > 0);
+  assert.equal(typeof output.recovery.percent, "number");
+});
+
+test("sync CLI recovery:prune is dry-run by default and deletes only hosted-verified redundant records on --apply", async () => {
+  const config = dirs("recovery-prune");
+  await writeBrainFile(config.brainDir, "NOW.md", "v1\n");
+  await runCli("push", config);
+  const store = new FileRevisionStore(config.storeFile);
+  const head = await store.getHead("ai-brain-jem", "NOW.md");
+  await store.proposeRevision({ brainId: "ai-brain-jem", filename: "NOW.md", baseRevisionId: head.revisionId, content: "v2\n", origin: "hosted_mcp" });
+  await runCli("pull", config);
+  const recoveryDir = path.join(config.brainDir, ".brain-sync-recovery");
+  const past = new Date(Date.now() - 30 * 86_400_000);
+  for (const entry of await fs.readdir(recoveryDir)) await fs.utimes(path.join(recoveryDir, entry, "intent.json"), past, past);
+
+  const tooRecent = await runCli("recovery:prune", config, ["--older-than=60"]);
+  assert.equal(tooRecent.applied, false);
+  assert.equal(tooRecent.records[0].reason, "too_recent");
+
+  const dryRun = await runCli("recovery:prune", config);
+  assert.equal(dryRun.applied, false);
+  assert.equal(dryRun.olderThanDays, 7);
+  assert.equal(dryRun.records.length, 1);
+  assert.equal(dryRun.records[0].verdict, "redundant");
+  assert.equal(dryRun.records[0].filename, "NOW.md");
+  assert.equal(dryRun.redundant, 1);
+  assert.equal((await fs.readdir(recoveryDir)).length, 1);
+
+  const applied = await runCli("recovery:prune", config, ["--apply"]);
+  assert.equal(applied.applied, true);
+  assert.deepEqual(applied.deleted, [dryRun.records[0].operation]);
+  assert.equal((await fs.readdir(recoveryDir)).length, 0);
+  assert.equal(applied.usage.entries, 0);
+});
+
+test("sync CLI recovery:prune dry run works beside a running watcher but --apply requires the lock", async () => {
+  const config = dirs("recovery-prune-lock");
+  await writeBrainFile(config.brainDir, "NOW.md", "v1\n");
+  await runCli("push", config);
+  await fs.writeFile(config.lockFile, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+
+  const dryRun = await runCli("recovery:prune", config);
+  assert.equal(dryRun.applied, false);
+  await assert.rejects(runCli("recovery:prune", config, ["--apply"]), /already running/);
+});

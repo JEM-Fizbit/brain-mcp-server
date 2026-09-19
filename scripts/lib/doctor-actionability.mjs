@@ -60,6 +60,9 @@ export function enforceOperatorAlarmContract(checks) {
 
 // Watcher restarts reset cycle numbers. Count distinct timestamped source
 // observations, never doctor polls. Keep the count when history rolls over.
+/** Local recovery retention usage (percent of the tighter budget) that warns. */
+export const RECOVERY_BUDGET_WARN_PERCENT = 70;
+
 export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeMs } = {}) {
   const observedMs = Date.parse(health.checkedAt);
   const ageMs = Number.isFinite(observedMs) ? now - observedMs : null;
@@ -80,15 +83,18 @@ export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeM
   const classification = error ? classifyPostgresError({
     message: health.error, code: health.errorCode,
   }) : null;
+  const recoveryPercent = Number.isFinite(health.recovery?.percent) ? health.recovery.percent : null;
+  const recoveryNearBudget = recoveryPercent !== null && recoveryPercent >= RECOVERY_BUDGET_WARN_PERCENT;
   const status = error
     ? classification.durable ? "fail"
       : !stale && failedObservations >= TRANSIENT_FAILURE_ESCALATION_CYCLES ? "fail" : "warn"
-    : health.status === "ok" && !stale && !health.report?.guardTripped ? "pass" : "warn";
+    : health.status === "ok" && !stale && !health.report?.guardTripped && !recoveryNearBudget ? "pass" : "warn";
   return {
     status,
     details: {
       state: stale ? "stale" : health.status || "unknown",
       observedAt: health.checkedAt || null, ageMs, maxAgeMs,
+      recoveryPercent, recoveryNearBudget, recovery: health.recovery ?? null,
       ...(classification ? {
         errorClass: classification.class, transient: !classification.durable,
         failedObservations,

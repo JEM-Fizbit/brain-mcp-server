@@ -1,5 +1,15 @@
 # Working Decisions Log
 
+## 2026-09-19 — Recovery records shrink only by verified redundancy, never by age
+
+**Decision:** `.brain-sync-recovery/` is reduced only through `sync:recovery:prune`: dry-run classification, then an explicit `--apply` that deletes records whose operation completed, are older than a threshold, and whose displaced bytes hosted revision history verifiably holds. Records whose `original.md` diverged from `expectedHash` are retained indefinitely until their conflict is resolved. Retention usage is a gauge in sync health, the doctor and the cockpit, warning at 70%.
+
+**Why:** Every record ends `complete: true`, including conflict outcomes, so an age-and-completion rule cannot separate a redundant copy from the only copy of an unsynced edit. Moving such records to an archive folder would also remove them from `inspectLocalRecovery`, silencing the `local_recovery` guard that reports stranded edits. Hosted verification turns "probably redundant" into "shown redundant", which is what makes deletion compatible with the never-silently-prune rule. The budget hard-stop also halts pulls, so the risk to manage is the surprise, which a gauge removes.
+
+**Alternatives rejected:** an `archive` command selecting on `complete && age` (unsafe selector, hides stranded edits); moving redundant records to a second local folder (same disk, same custody duty, no reviewer, only exempt from the budget by accident); auto-pruning redundant records inside the sync loop (reverses the documented rule without operator review).
+
+**Related:** `docs/conflict-resolution.md` § Local replacement recovery; `docs/TOOLING.md`; `src/sync/recoverable-file.ts`; `test/recovery-prune.test.mjs`.
+
 ## 2026-09-14 — Build context is an explicit data boundary
 
 Docker build inputs must be allow-listed independently of Git ignore rules and final-image `COPY` instructions. Operator working files, inbox/source bytes, reports and credentials must not join the context merely because they sit inside a checkout. Keep permitted source and deployment configuration reviewed; configuration contains identity/role metadata and is not categorically non-personal data. Runtime location, builder location and registry/control-plane processing are separate claims. An explicit builder-region setting is preferable to placement inferred from the deployer's location; a region move never grants governance clearance by itself. See [the builder review and validation](fly-builder-region-handoff.md#engineering-follow-up--14-september-2026). John explicitly approved the shared-builder/cache change and it was applied on 14 September; Fly reported LHR at unchanged 4 CPU / 4 GB. Annotated v1.11.2 then carried the allow-list through the protected ERS intake, and the 18 September guarded Depot build transferred an 806.81 kB restricted context before the authenticated post-build builder readback again showed LHR. Remaining registry, cache/log-retention, control-plane and support evidence stays separate from this completed build-location proof.

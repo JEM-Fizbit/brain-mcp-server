@@ -54,20 +54,52 @@ async function restoreIfAbsent(original: string, target: string): Promise<void> 
   catch (error: any) { if (error.code !== "EEXIST" && error.code !== "ENOENT") throw error; }
 }
 
-async function assertRecoveryBudget(root: string, extraBytes: number): Promise<void> {
+const RECOVERY_ENTRY_LIMIT = 10000;
+const RECOVERY_RECORD_FILES = ["original.md", "replacement.md", "intent.json"];
+
+function recoveryByteLimit(): number {
   const maximum = Number(process.env.BRAIN_SYNC_RECOVERY_MAX_BYTES ?? 268435456);
   if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error("Invalid BRAIN_SYNC_RECOVERY_MAX_BYTES");
-  let bytes = extraBytes;
-  const entries = await fs.readdir(root, { withFileTypes: true });
-  if (entries.length >= 10000) throw new Error("local_recovery_capacity: archive retained recovery records before further local replacement");
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    for (const name of ["original.md", "replacement.md", "intent.json"]) {
-      try { bytes += (await fs.stat(path.join(root, entry.name, name))).size; }
-      catch (error: any) { if (error.code !== "ENOENT") throw error; }
-    }
+  return maximum;
+}
+
+async function recordBytes(dir: string): Promise<number> {
+  let bytes = 0;
+  for (const name of RECOVERY_RECORD_FILES) {
+    try { bytes += (await fs.stat(path.join(dir, name))).size; }
+    catch (error: any) { if (error.code !== "ENOENT") throw error; }
   }
-  if (bytes > maximum) throw new Error("local_recovery_capacity: retained recovery bytes reached the safety budget; no file was displaced");
+  return bytes;
+}
+
+export interface RecoveryUsage {
+  entries: number;
+  bytes: number;
+  entryLimit: number;
+  byteLimit: number;
+  /** Percent of whichever budget (entries or bytes) is closer to exhaustion. */
+  percent: number;
+}
+
+/** Retention budget usage of `.brain-sync-recovery/` under a Brain root. */
+export async function recoveryUsage(root: string): Promise<RecoveryUsage> {
+  const recoveryRoot = path.join(root, ".brain-sync-recovery");
+  const byteLimit = recoveryByteLimit();
+  let entries: import("node:fs").Dirent[] = [];
+  try { entries = await fs.readdir(recoveryRoot, { withFileTypes: true }); }
+  catch (error: any) { if (error.code !== "ENOENT") throw error; }
+  let bytes = 0;
+  for (const entry of entries) {
+    if (entry.isDirectory()) bytes += await recordBytes(path.join(recoveryRoot, entry.name));
+  }
+  const percent = Math.ceil(Math.max(entries.length / RECOVERY_ENTRY_LIMIT, bytes / byteLimit) * 100);
+  return { entries: entries.length, bytes, entryLimit: RECOVERY_ENTRY_LIMIT, byteLimit, percent };
+}
+
+async function assertRecoveryBudget(root: string, extraBytes: number): Promise<void> {
+  const usage = await recoveryUsage(root);
+  if (usage.entries >= usage.entryLimit) throw new Error("local_recovery_capacity: prune verified-redundant recovery records (sync:recovery:prune) before further local replacement");
+  if (usage.bytes + extraBytes > usage.byteLimit) throw new Error("local_recovery_capacity: retained recovery bytes reached the safety budget; no file was displaced");
 }
 
 /**
@@ -86,7 +118,7 @@ export async function mutateLocalFile(
   let existingBytes = 0;
   try { existingBytes = (await fs.stat(target)).size; }
   catch (error: any) { if (error.code !== "ENOENT") throw error; }
-  await assertRecoveryBudget(recoveryRoot, existingBytes + Buffer.byteLength(content ?? "") + 1024);
+  await assertRecoveryBudget(root, existingBytes + Buffer.byteLength(content ?? "") + 1024);
   const dir = await fs.mkdtemp(path.join(recoveryRoot, "operation-"));
   const original = path.join(dir, "original.md");
   const replacement = path.join(dir, "replacement.md");
@@ -169,4 +201,82 @@ export async function inspectLocalRecovery(root: string): Promise<RecoveryObserv
     }
   }
   return observations;
+}
+
+export type RecoveryVerdict = "redundant" | "retain";
+export type RecoveryRetainReason =
+  | "too_recent" | "incomplete" | "divergent_original" | "not_in_hosted_history"
+  | "unreadable_intent" | "invalid_target";
+export type RecoveryRedundantReason = "nothing_displaced" | "original_in_hosted_history";
+
+export interface RecoveryPrunePlanEntry {
+  operation: string;
+  filename: string | null;
+  verdict: RecoveryVerdict;
+  reason: RecoveryRetainReason | RecoveryRedundantReason;
+  bytes: number;
+  ageMs: number | null;
+}
+
+export interface RecoveryPruneOptions {
+  /** Records completed more recently than this are always retained. */
+  olderThanMs: number;
+  /** True when hosted revision history holds `hash` as a revision of `filename`. */
+  hostedHas: (filename: string, hash: string) => boolean | Promise<boolean>;
+  now?: number;
+}
+
+/**
+ * Classify retained recovery records. A record is redundant only when its
+ * operation completed, it is older than the threshold, and either nothing was
+ * displaced or the displaced bytes still hash to `expectedHash` and hosted
+ * history verifiably holds that revision. Every other record is retained: it
+ * may be the only copy of an edit that never reached hosted.
+ */
+export async function planRecoveryPrune(root: string, options: RecoveryPruneOptions): Promise<RecoveryPrunePlanEntry[]> {
+  const recoveryRoot = path.join(root, ".brain-sync-recovery");
+  const now = options.now ?? Date.now();
+  let entries: import("node:fs").Dirent[];
+  try { entries = await fs.readdir(recoveryRoot, { withFileTypes: true }); }
+  catch (error: any) { if (error.code === "ENOENT") return []; throw error; }
+  const plan: RecoveryPrunePlanEntry[] = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (!entry.isDirectory() || !entry.name.startsWith("operation-")) continue;
+    const dir = path.join(recoveryRoot, entry.name);
+    const bytes = await recordBytes(dir);
+    const retain = (reason: RecoveryRetainReason, filename: string | null, ageMs: number | null) =>
+      plan.push({ operation: entry.name, filename, verdict: "retain", reason, bytes, ageMs });
+    let intent: Intent; let ageMs: number;
+    try {
+      const intentPath = path.join(dir, "intent.json");
+      intent = JSON.parse(await fs.readFile(intentPath, "utf8"));
+      ageMs = now - (await fs.stat(intentPath)).mtimeMs;
+      if (intent.version !== 1 || typeof intent.filename !== "string") throw new Error("bad intent");
+    } catch { retain("unreadable_intent", null, null); continue; }
+    try { targetPath(root, intent.filename); } catch { retain("invalid_target", intent.filename, ageMs); continue; }
+    if (!intent.complete) { retain("incomplete", intent.filename, ageMs); continue; }
+    if (ageMs < options.olderThanMs) { retain("too_recent", intent.filename, ageMs); continue; }
+    const originalHash = await hash(path.join(dir, "original.md"));
+    if (originalHash === null) {
+      plan.push({ operation: entry.name, filename: intent.filename, verdict: "redundant", reason: "nothing_displaced", bytes, ageMs });
+      continue;
+    }
+    if (originalHash !== intent.expectedHash) { retain("divergent_original", intent.filename, ageMs); continue; }
+    if (!(await options.hostedHas(intent.filename, originalHash))) { retain("not_in_hosted_history", intent.filename, ageMs); continue; }
+    plan.push({ operation: entry.name, filename: intent.filename, verdict: "redundant", reason: "original_in_hosted_history", bytes, ageMs });
+  }
+  return plan;
+}
+
+/** Remove the redundant records of a plan. Retained records are never touched. */
+export async function applyRecoveryPrune(root: string, plan: RecoveryPrunePlanEntry[]): Promise<string[]> {
+  const recoveryRoot = path.join(root, ".brain-sync-recovery");
+  const removed: string[] = [];
+  for (const entry of plan) {
+    if (entry.verdict !== "redundant" || !entry.operation.startsWith("operation-")) continue;
+    await fs.rm(path.join(recoveryRoot, entry.operation), { recursive: true, force: true });
+    removed.push(entry.operation);
+  }
+  if (removed.length) await syncDirectory(recoveryRoot);
+  return removed;
 }

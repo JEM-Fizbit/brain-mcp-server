@@ -2603,6 +2603,17 @@ const page = String.raw`<!doctype html>
           });
         }
 
+        if (syncHealth?.details?.recoveryNearBudget) {
+          items.push({
+            status: "warn",
+            brain_id: payload.profile?.brainId || "",
+            reason: "recovery_budget",
+            urgency: "soon",
+            title: "Local recovery retention is " + syncHealth.details.recoveryPercent + "% of its budget.",
+            next_action: "Run npm run sync:recovery:prune (dry run), review the verdicts, then re-run with -- --apply to delete only hosted-verified redundant records.",
+          });
+        }
+
         if (syncHealth?.status === "fail") {
           items.push({
             status: "fail",

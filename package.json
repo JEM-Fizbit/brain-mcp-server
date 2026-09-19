@@ -30,6 +30,7 @@
     "sync:menubar:launchd:plist": "node scripts/write-brain-menubar-launchd-plist.mjs",
     "sync:reconcile:duplicate-brain-paths": "node scripts/reconcile-duplicate-brain-paths-postgres.mjs",
     "sync:rebase-state": "npm run build && node dist/sync/cli.js rebase-state",
+    "sync:recovery:prune": "npm run build && node dist/sync/cli.js recovery:prune",
     "smoke:brain-store:postgres": "npm run build && node scripts/smoke-postgres-brain-store.mjs",
     "smoke:http:postgres": "npm run build && node scripts/smoke-http-postgres-runtime.mjs",
     "smoke:hosted:oauth": "node scripts/smoke-hosted-oauth.mjs",

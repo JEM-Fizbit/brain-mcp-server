@@ -12,6 +12,7 @@ import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import { summarizeReport } from "./report-summary.js";
 import type { RevisionStore } from "./types.js";
+import { applyRecoveryPrune, planRecoveryPrune, recoveryUsage } from "./recoverable-file.js";
 
 type SyncCommand =
   | "push"
@@ -20,7 +21,8 @@ type SyncCommand =
   | "status"
   | "summary"
   | "watch"
-  | "rebase-state";
+  | "rebase-state"
+  | "recovery:prune";
 type RevisionStoreProvider = "file" | "postgres";
 
 interface SyncCliConfig {
@@ -102,9 +104,10 @@ function projectRefFromDatabaseUrl(databaseUrl: string): string | null {
 
 function usage(): string {
   return [
-    "Usage: node dist/sync/cli.js <push|pull|once|status|summary|watch|rebase-state> [--apply]",
+    "Usage: node dist/sync/cli.js <push|pull|once|status|summary|watch|rebase-state|recovery:prune> [--apply] [--older-than=<days>]",
     "",
     "rebase-state is dry-run by default. --apply atomically backs up and rebuilds local sync metadata only after exact local/hosted parity and zero open conflicts are proven.",
+    "recovery:prune is dry-run by default. It classifies .brain-sync-recovery records and, with --apply, deletes only records older than --older-than days (default 7) whose displaced bytes hosted revision history verifiably holds. Records that may carry an unsynced edit are always retained.",
     "",
     "Environment:",
     "  BRAIN_ID                  Brain id (default: ai-brain-jem)",
@@ -383,15 +386,36 @@ async function withLock<T>(
   }
 }
 
-async function run(command: SyncCommand, apply = false): Promise<void> {
+const DEFAULT_PRUNE_OLDER_THAN_DAYS = 7;
+
+async function run(command: SyncCommand, apply = false, olderThanDays = DEFAULT_PRUNE_OLDER_THAN_DAYS): Promise<void> {
   const config = readConfig();
-  await withLock(config.lockFile, () => runWithConfig(command, config, apply));
+  // A dry-run prune only reads: it must be usable while the watcher holds the lock.
+  if (command === "recovery:prune" && !apply) {
+    await runWithConfig(command, config, apply, olderThanDays);
+    return;
+  }
+  await withLock(config.lockFile, () => runWithConfig(command, config, apply, olderThanDays));
+}
+
+/** Every (filename, contentHash) pair hosted revision history holds for the Brain. */
+async function hostedHistoryIndex(store: RevisionStore, brainId: string): Promise<Set<string>> {
+  const index = new Set<string>();
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await store.listChanges(brainId, cursor);
+    for (const change of page.changes) index.add(`${change.filename}\0${change.contentHash}`);
+    if (!page.nextCursor || page.nextCursor === cursor || !page.changes.length) break;
+    cursor = page.nextCursor;
+  }
+  return index;
 }
 
 async function runWithConfig(
   command: SyncCommand,
   config: SyncCliConfig,
-  apply = false
+  apply = false,
+  olderThanDays = DEFAULT_PRUNE_OLDER_THAN_DAYS
 ): Promise<void> {
   const storeHandle = createStore(config);
   const store = storeHandle.store;
@@ -413,6 +437,27 @@ async function runWithConfig(
         command,
         config: outputConfig(config),
         result: await agent.rebaseState(apply),
+      });
+      return;
+    }
+
+    if (command === "recovery:prune") {
+      const history = await hostedHistoryIndex(store, config.brainId);
+      const records = await planRecoveryPrune(config.brainDir, {
+        olderThanMs: olderThanDays * 86_400_000,
+        hostedHas: (filename, hash) => history.has(`${filename}\0${hash}`),
+      });
+      const deleted = apply ? await applyRecoveryPrune(config.brainDir, records) : [];
+      writeJson({
+        command,
+        config: outputConfig(config),
+        applied: apply,
+        olderThanDays,
+        redundant: records.filter((r) => r.verdict === "redundant").length,
+        retained: records.filter((r) => r.verdict === "retain").length,
+        deleted,
+        records,
+        usage: await recoveryUsage(config.brainDir),
       });
       return;
     }
@@ -458,12 +503,14 @@ async function runWithConfig(
           try {
             const report = await agent.syncOnce();
             const summary = summarizeReport(report);
+            const recovery = await recoveryUsage(config.brainDir);
             await writeSyncHealth(config, {
               command,
               status: report.guardTripped ? "warn" : "ok",
               cycle,
               checkedAt: new Date().toISOString(),
               report: summary,
+              recovery,
             });
             writeJsonLine({
               command,
@@ -491,10 +538,11 @@ async function runWithConfig(
       return;
     }
 
-    const [state, hostedFiles, openConflicts] = await Promise.all([
+    const [state, hostedFiles, openConflicts, recovery] = await Promise.all([
       agent.loadState(),
       store.listFiles(config.brainId),
       store.listConflicts(config.brainId, "open"),
+      recoveryUsage(config.brainDir),
     ]);
     if (command === "summary") {
       writeJson({
@@ -508,6 +556,7 @@ async function runWithConfig(
         },
         hostedFiles: hostedFiles.length,
         openConflicts: openConflicts.length,
+        recovery,
         latestHostedCursor:
           hostedFiles
             .map((file) => file.cursor)
@@ -523,6 +572,7 @@ async function runWithConfig(
       state,
       hostedFiles,
       openConflicts,
+      recovery,
     });
   } finally {
     await closeWithTimeout(config, storeHandle);
@@ -534,6 +584,11 @@ async function main(): Promise<void> {
   const command = process.argv[2] as SyncCommand | undefined;
   const extraArgs = process.argv.slice(3);
   const apply = extraArgs.includes("--apply");
+  const olderThanArg = extraArgs.find((arg) => arg.startsWith("--older-than="));
+  const olderThanDays = olderThanArg
+    ? Number(olderThanArg.slice("--older-than=".length))
+    : DEFAULT_PRUNE_OLDER_THAN_DAYS;
+  const applyCommands: SyncCommand[] = ["rebase-state", "recovery:prune"];
   if (
     !command ||
     ![
@@ -544,16 +599,18 @@ async function main(): Promise<void> {
       "summary",
       "watch",
       "rebase-state",
+      "recovery:prune",
     ].includes(command) ||
-    extraArgs.some((arg) => arg !== "--apply") ||
-    (apply && command !== "rebase-state")
+    extraArgs.some((arg) => arg !== "--apply" && !arg.startsWith("--older-than=")) ||
+    (apply && !applyCommands.includes(command)) ||
+    (olderThanArg && (command !== "recovery:prune" || !Number.isFinite(olderThanDays) || olderThanDays < 0))
   ) {
     process.stderr.write(`${usage()}\n`);
     process.exitCode = 2;
     return;
   }
 
-  await run(command, apply);
+  await run(command, apply, olderThanDays);
 }
 
 main().catch((error) => {
