@@ -123,10 +123,42 @@ test("owner-only Brain Monitor profile overrides an ambient cross-project databa
       `postgresql://brain_ers_sync_user.${ERS_REF}:secret@pooler.example:6543/postgres`,
   };
 
-  const result = await applyBrainMonitorProfileEnv(env);
+  const result = await applyBrainMonitorProfileEnv(env, {
+    ambientKeys: new Set(["BRAIN_HOSTED_BASE_URL", "BRAIN_REVISION_DATABASE_URL"]),
+  });
   assert.equal(result.source, "brain_monitor");
   assert.equal(env.BRAIN_EXPECTED_SUPABASE_PROJECT_REF, JEM_REF);
   assert.equal(assertHostedRuntimeBinding(env, "Test command").actualProjectRef, JEM_REF);
+});
+
+test("Brain Monitor profile refuses to override an explicit conflicting environment value", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hosted-runtime-binding-"));
+  const configFile = path.join(root, "brain-menubar-config.json");
+  await fs.writeFile(configFile, JSON.stringify({ brains: [{ brainId: "ai-brain-jem", env: boundEnv() }] }));
+  await fs.chmod(configFile, 0o600);
+  const env = {
+    BRAIN_ID: "ai-brain-jem",
+    BRAIN_MONITOR_CONFIG_FILE: configFile,
+    BRAIN_REVISION_DATABASE_URL: `postgresql://brain_ers_sync_user.${ERS_REF}:secret@pooler.example:6543/postgres`,
+  };
+  await assert.rejects(applyBrainMonitorProfileEnv(env, { ambientKeys: new Set() }), /conflicts with explicit BRAIN_REVISION_DATABASE_URL/);
+  assert.equal(env.BRAIN_REVISION_DATABASE_URL.includes(ERS_REF), true);
+});
+
+test("Brain Monitor selection requires an explicit Brain id when the config holds several profiles", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hosted-runtime-binding-"));
+  const configFile = path.join(root, "brain-menubar-config.json");
+  await fs.writeFile(configFile, JSON.stringify({ brains: [
+    { brainId: "ai-brain-jem", env: boundEnv() },
+    { brainId: "ers-brain", env: boundEnv({ BRAIN_ID: "ers-brain", BRAIN_HOSTED_BASE_URL: "https://brain.ersgenomics.online",
+      BRAIN_REVISION_DATABASE_URL: `postgresql://brain_ers_sync_user.${ERS_REF}:secret@pooler.example:6543/postgres`,
+      BRAIN_EXPECTED_SUPABASE_PROJECT_REF: ERS_REF }) },
+  ] }));
+  await fs.chmod(configFile, 0o600);
+  await assert.rejects(applyBrainMonitorProfileEnv({ BRAIN_MONITOR_CONFIG_FILE: configFile }), /BRAIN_ID/);
+  const single = { BRAIN_MONITOR_CONFIG_FILE: configFile, BRAIN_ID: "ers-brain" };
+  assert.equal((await applyBrainMonitorProfileEnv(single)).profile, "ers-brain");
+  assert.equal(single.BRAIN_EXPECTED_SUPABASE_PROJECT_REF, ERS_REF);
 });
 
 test("local environment example requires one explicit matching runtime tuple", async () => {

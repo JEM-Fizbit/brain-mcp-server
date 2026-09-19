@@ -1,5 +1,15 @@
 # Working Decisions Log
 
+## 2026-09-19 — Credentials are keyed by Brain, never by folder; the ambient repo credential is retired
+
+**Decision:** The repo's `.env.local` carries no database credential. Brain selection and credentials come from the owner-only Brain Monitor profile named by `BRAIN_MONITOR_CONFIG_FILE`, chosen by an explicit `BRAIN_ID` whenever more than one profile exists. A profile value may replace an ambient `.env.local` value but never an explicit environment value that disagrees with it; that is a refusal. The rule lives once in `src/sync/runtime-binding.ts` and is applied by the sync CLI and by the shared loader every operator script uses. Read-only sync commands (`summary`, `status`, prune dry run) do not take the sync lock.
+
+**Why:** This repo serves two Brains, so a credential keyed by the folder a command runs from is structurally wrong for one of them whatever check surrounds it. The August 2026 misrouting (481k JEM telemetry rows in the ERS database) was guarded three times but the ambient file was never retired, and a September hand-edit of one line reproduced the mismatch. The refusal-on-conflict rule also closes the test-suite hazard: a spawned process with its own `BRAIN_DIR` that inherits the machine profile is refused, not redirected to a live Brain. The same model is the one that scales to colleagues: one installer-generated profile per Brain per machine with a per-person login, and later an identity-based local sync with no database credential on the laptop.
+
+**Alternatives rejected:** repointing the ambient file at the personal project (keeps a folder-keyed credential); a TypeScript twin of the script-side binding (two homes for one rule); adding profile calls to each script (omissions); defaulting to the JEM profile when no Brain id is given (the identity-beside-credential failure again); storing the Storage admin key in any file (supplied per invocation instead).
+
+**Related:** 2026-08-26 entry; `docs/TOOLING.md` § Brain Selection From The Repo Folder; `test/runtime-binding.test.mjs`; `test/hosted-runtime-binding.test.mjs`; `BACKLOG.md` identity-based local sync.
+
 ## 2026-09-19 — Recovery records shrink only by verified redundancy, never by age
 
 **Decision:** `.brain-sync-recovery/` is reduced only through `sync:recovery:prune`: dry-run classification, then an explicit `--apply` that deletes records whose operation completed, are older than a threshold, and whose displaced bytes hosted revision history verifiably holds. Records whose `original.md` diverged from `expectedHash` are retained indefinitely until their conflict is resolved. Retention usage is a gauge in sync health, the doctor and the cockpit, warning at 70%.

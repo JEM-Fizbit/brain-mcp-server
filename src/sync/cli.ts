@@ -1,5 +1,4 @@
 import path from "node:path";
-import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import { BRAIN_DIR } from "../constants.js";
 import { FileRevisionStore } from "./file-revision-store.js";
@@ -12,6 +11,11 @@ import { LocalSyncAgent } from "./local-sync-agent.js";
 import { PostgresRevisionStore } from "./postgres-revision-store.js";
 import { summarizeReport } from "./report-summary.js";
 import type { RevisionStore } from "./types.js";
+import {
+  applyBrainMonitorProfileEnvSync,
+  loadLocalEnv as loadAmbientEnv,
+  projectRefFromDatabaseUrl,
+} from "./runtime-binding.js";
 import { applyRecoveryPrune, planRecoveryPrune, recoveryUsage } from "./recoverable-file.js";
 
 type SyncCommand =
@@ -51,55 +55,6 @@ interface StoreHandle {
 interface SyncLockPayload {
   pid: number;
   startedAt: string;
-}
-
-function parseEnvLine(line: string): [string, string] | null {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith("#")) return null;
-  const equals = trimmed.indexOf("=");
-  if (equals === -1) return null;
-  const key = trimmed.slice(0, equals).trim();
-  let value = trimmed.slice(equals + 1).trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return null;
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    value = value.slice(1, -1);
-  }
-  return [key, value];
-}
-
-function loadLocalEnv(rootDir = process.cwd()): void {
-  if (process.env.BRAIN_SYNC_LOAD_LOCAL_ENV === "0") return;
-  for (const filename of [".env.local", ".env"]) {
-    const envPath = path.join(rootDir, filename);
-    if (!fsSync.existsSync(envPath)) continue;
-    const raw = fsSync.readFileSync(envPath, "utf-8");
-    for (const line of raw.split(/\r?\n/)) {
-      const parsed = parseEnvLine(line);
-      if (!parsed) continue;
-      const [key, value] = parsed;
-      if (process.env[key] === undefined) process.env[key] = value;
-    }
-  }
-}
-
-function projectRefFromDatabaseUrl(databaseUrl: string): string | null {
-  try {
-    const url = new URL(databaseUrl);
-    const usernameSuffix = decodeURIComponent(url.username).split(".").at(-1);
-    if (
-      usernameSuffix &&
-      usernameSuffix !== "postgres" &&
-      /^[a-z0-9]{12,32}$/.test(usernameSuffix)
-    ) {
-      return usernameSuffix;
-    }
-    return url.hostname.match(/^db\.([a-z0-9]{12,32})\.supabase\.co$/)?.[1] || null;
-  } catch {
-    return null;
-  }
 }
 
 function usage(): string {
@@ -390,8 +345,9 @@ const DEFAULT_PRUNE_OLDER_THAN_DAYS = 7;
 
 async function run(command: SyncCommand, apply = false, olderThanDays = DEFAULT_PRUNE_OLDER_THAN_DAYS): Promise<void> {
   const config = readConfig();
-  // A dry-run prune only reads: it must be usable while the watcher holds the lock.
-  if (command === "recovery:prune" && !apply) {
+  // Read-only commands must be usable while the watcher holds the lock.
+  const readOnly = command === "summary" || command === "status" || (command === "recovery:prune" && !apply);
+  if (readOnly) {
     await runWithConfig(command, config, apply, olderThanDays);
     return;
   }
@@ -577,6 +533,13 @@ async function runWithConfig(
   } finally {
     await closeWithTimeout(config, storeHandle);
   }
+}
+
+function loadLocalEnv(): void {
+  // BRAIN_SYNC_LOAD_LOCAL_ENV=0 is the sync-specific switch for explicitly
+  // configured supervisors; the shared loader also honours BRAIN_LOAD_LOCAL_ENV.
+  const ambientKeys = process.env.BRAIN_SYNC_LOAD_LOCAL_ENV === "0" ? new Set<string>() : loadAmbientEnv();
+  applyBrainMonitorProfileEnvSync(process.env, { ambientKeys });
 }
 
 async function main(): Promise<void> {

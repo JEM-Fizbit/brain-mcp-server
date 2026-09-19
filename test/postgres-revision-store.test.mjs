@@ -9,6 +9,7 @@ const { loadLocalEnv } = await import(
   path.join(__dirname, "..", "scripts", "lib", "load-local-env.mjs")
 );
 
+process.env.BRAIN_MONITOR_CONFIG_FILE = ""; // hermetic: never select the machine's Brain profile from a test
 loadLocalEnv(path.join(__dirname, ".."));
 const testDatabaseUrl = process.env.BRAIN_POSTGRES_TEST_DATABASE_URL;
 const allowRuntimeDatabaseUrl =

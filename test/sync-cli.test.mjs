@@ -53,6 +53,8 @@ async function runCli(command, config, args = []) {
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+      BRAIN_MONITOR_CONFIG_FILE: "",
     },
   });
   return JSON.parse(stdout);
@@ -70,6 +72,7 @@ async function runCliWithEnv(command, config, env) {
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_MONITOR_CONFIG_FILE: "",
       ...env,
     },
   });
@@ -93,6 +96,7 @@ function envWithoutSyncConfig() {
   ]) {
     delete env[key];
   }
+  env.BRAIN_MONITOR_CONFIG_FILE = "";
   return env;
 }
 
@@ -343,6 +347,8 @@ test("sync CLI reports missing Postgres database URL when provider is postgres",
         BRAIN_SYNC_STORE_FILE: config.storeFile,
         BRAIN_REVISION_STORE: "postgres",
         BRAIN_REVISION_DATABASE_URL: "",
+        BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+        BRAIN_MONITOR_CONFIG_FILE: "",
       },
     }),
     /BRAIN_REVISION_DATABASE_URL is required/
@@ -406,6 +412,8 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+      BRAIN_MONITOR_CONFIG_FILE: "",
       BRAIN_SYNC_INTERVAL_MS: "250",
       BRAIN_SYNC_WATCH_CYCLES: "2",
     },
@@ -461,6 +469,8 @@ test("sync CLI watch can emit full reports for debugging", async () => {
       BRAIN_SYNC_STORE_FILE: config.storeFile,
       BRAIN_REVISION_STORE: "file",
       BRAIN_REVISION_DATABASE_URL: "",
+      BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+      BRAIN_MONITOR_CONFIG_FILE: "",
       BRAIN_SYNC_INTERVAL_MS: "250",
       BRAIN_SYNC_WATCH_CYCLES: "1",
       BRAIN_SYNC_WATCH_OUTPUT: "full",
@@ -501,6 +511,8 @@ test("sync CLI fails fast when another active sync lock exists", async () => {
         BRAIN_SYNC_STORE_FILE: config.storeFile,
         BRAIN_REVISION_STORE: "file",
         BRAIN_REVISION_DATABASE_URL: "",
+        BRAIN_SYNC_LOAD_LOCAL_ENV: "0",
+        BRAIN_MONITOR_CONFIG_FILE: "",
       },
     }),
     /Brain sync is already running/
@@ -581,4 +593,43 @@ test("sync CLI recovery:prune dry run works beside a running watcher but --apply
   const dryRun = await runCli("recovery:prune", config);
   assert.equal(dryRun.applied, false);
   await assert.rejects(runCli("recovery:prune", config, ["--apply"]), /already running/);
+});
+
+test("sync CLI selects a Brain Monitor profile named by the ambient env and refuses an explicit conflict", async () => {
+  const config = dirs("monitor-profile");
+  const cwd = path.dirname(config.brainDir);
+  await fs.mkdir(cwd, { recursive: true });
+  await writeBrainFile(config.brainDir, "NOW.md", "profile base\n");
+  const configFile = path.join(cwd, "brain-menubar-config.json");
+  await fs.writeFile(configFile, JSON.stringify({ brains: [
+    { brainId: "ai-brain-jem", env: { BRAIN_ID: "ai-brain-jem", BRAIN_DIR: config.brainDir, BRAIN_SYNC_STATE_FILE: config.stateFile,
+      BRAIN_SYNC_HEALTH_FILE: config.healthFile, BRAIN_REVISION_STORE: "file", BRAIN_SYNC_STORE_FILE: config.storeFile } },
+    { brainId: "ers-brain", env: { BRAIN_ID: "ers-brain", BRAIN_DIR: path.join(cwd, "ers"), BRAIN_REVISION_STORE: "file" } },
+  ] }));
+  await fs.chmod(configFile, 0o600);
+  await fs.writeFile(path.join(cwd, ".env.local"), `BRAIN_MONITOR_CONFIG_FILE=${configFile}\n`);
+  const base = envWithoutSyncConfig();
+  delete base.BRAIN_MONITOR_CONFIG_FILE; // this test's pointer comes from its own ambient file
+
+  await assert.rejects(exec(process.execPath, [cliPath, "summary"], { cwd, env: base }), /BRAIN_ID/);
+
+  const { stdout } = await exec(process.execPath, [cliPath, "push"], { cwd, env: { ...base, BRAIN_ID: "ai-brain-jem" } });
+  const pushed = JSON.parse(stdout);
+  assert.deepEqual(pushed.report.pushed, ["NOW.md"]);
+  assert.equal(pushed.config.brainDir, config.brainDir);
+
+  await assert.rejects(
+    exec(process.execPath, [cliPath, "summary"], { cwd, env: { ...base, BRAIN_ID: "ai-brain-jem", BRAIN_DIR: path.join(cwd, "elsewhere") } }),
+    /conflicts with explicit BRAIN_DIR/
+  );
+});
+
+test("sync CLI summary and status are read-only and work beside a running watcher", async () => {
+  const config = dirs("readonly-beside-lock");
+  await writeBrainFile(config.brainDir, "NOW.md", "v1\n");
+  await runCli("push", config);
+  await fs.writeFile(config.lockFile, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+  assert.equal((await runCli("summary", config)).hostedFiles, 1);
+  assert.equal((await runCli("status", config)).hostedFiles.length, 1);
+  await assert.rejects(runCli("push", config), /already running/);
 });

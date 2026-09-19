@@ -66,6 +66,10 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - Applying `db/migrations/*.sql` or `db/seeds/*.sql` changes Supabase state. Rerun `docs/security/hosted-brain-supabase-security-gate.md` after migrations touching schemas, RLS, functions, Storage, or user data.
 - Backup/restore/export rehearsals can affect Supabase projects, Storage, Docker state, or external CLI state. Use `docs/hosted-brain-recovery-and-git-export.md` as the runbook.
 
+## Brain Selection From The Repo Folder
+
+Credentials are keyed by Brain, never by folder. The owner-only Brain Monitor config holds one profile per Brain; the repo's `.env.local` names that config with `BRAIN_MONITOR_CONFIG_FILE` and carries no database credential. Every command run from this folder that touches a Brain therefore needs an explicit `BRAIN_ID` (`BRAIN_ID=ai-brain-jem npm run hosted:doctor`, `BRAIN_ID=ers-brain npm run sync -- summary`); with two profiles and no Brain id the command refuses. A profile value may replace a value that came from `.env.local`, but an explicit shell value that disagrees with the profile is a refusal, so a test or script with its own `BRAIN_DIR` can never be redirected to a live Brain. The rule has one home, `src/sync/runtime-binding.ts`; the script-side module re-exports it and the shared env loader applies it for every operator script. Explicitly configured supervisors set `BRAIN_LOAD_LOCAL_ENV=0` (scripts) or `BRAIN_SYNC_LOAD_LOCAL_ENV=0` (sync CLI) and pass the profile env directly.
+
 ## Hosted/Local State Boundaries
 
 - The personal hosted MCP is the normal remote path for `ai-brain-jem`; the dedicated ERS deployment serves `ers-brain`.
