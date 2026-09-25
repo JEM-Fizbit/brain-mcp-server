@@ -366,6 +366,11 @@ test("HTTP MCP reads and loads context from revision store harness", async () =>
   assert.match(context, /Loader table/);
   assert.match(context, /--- FILE: NOW\.md ---/);
   assert.match(context, /Hosted now/);
+
+  const raw = await callRawTool(harness, "brain_load_context");
+  assert.equal(raw.structuredContent.bootstrap, raw.content[0].text);
+  assert.match(raw.structuredContent.bootstrap, /Loader table/);
+  assert.match(raw.structuredContent.bootstrap, /Hosted now/);
 });
 
 test("HTTP MCP denies cross-tenant reads and writes for a Brain-scoped principal", async () => {
