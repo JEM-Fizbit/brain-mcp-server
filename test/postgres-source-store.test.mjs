@@ -87,7 +87,9 @@ test("PostgresSourceMetadataStore lists source paths relative to sources root", 
   });
 
   assert.deepEqual(await store.listSourcePaths("ai-brain-jem", "photos"), [
+    "photos/draft.md",
     "photos/headshot.jpg",
+    "photos/headshot.md",
     "working/draft.xlsx",
   ]);
   assert.deepEqual(queries[0].values, ["ai-brain-jem", "photos"]);
