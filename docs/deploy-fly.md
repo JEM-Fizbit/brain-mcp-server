@@ -187,6 +187,15 @@ hosted health. Preserve this image as the rollback target. The local sync
 heartbeat was stale; acceptance must use authenticated hosted source discovery
 and an exact reviewed-companion read, not the local mirror.
 
+Deployment completed 25 September 2026 at 17:52 UTC. Fly image
+`registry.fly.io/jem-brain-mcp:deployment-01M3CV2Q7JEJX3YQMYEC5A9G33`
+reports OCI revision `0082f8b12f2f83567e6fdac0e2881cde11bb2164`, version
+1.11.3, and passing health on the existing London machine. The release guard
+passed 545 tests (11 existing skips, zero failures). Authenticated source list
+and exact reviewed companion read passed; see [ingestion acceptance](local-source-ingestion.md#reviewed-companion-read-back).
+The release tag identifies the narrow deployed branch; subsequent main merges
+and documentation commits are not additional deployments.
+
 ## Runtime Smoke Tests
 
 ```bash
