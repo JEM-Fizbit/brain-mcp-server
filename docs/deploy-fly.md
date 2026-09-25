@@ -173,6 +173,20 @@ the overlay SHA, while the OCI revision label identifies the actual overlay
 commit used to build the image. Do not use overlay mode to deploy a source-code
 fork or to bypass a failing release gate.
 
+### Personal source-reader release (v1.11.3)
+
+This release takes the reviewed source-companion reader fix on the v1.11.2 build
+boundary. It deliberately excludes subsequent local sync/recovery/profile work
+on main. The approved target is `jem-brain-mcp` only; ERS is not deployed.
+No schema, data migration, credential, or permission changes are required.
+
+Preflight on 25 September found personal production at v1.11.1, image
+`registry.fly.io/jem-brain-mcp:deployment-01M2DPDKM9AAVJEVH7HTAY7RRC`
+(OCI revision `24ddb85794fbe1095f762ea937a8e8925b8b687e`), with passing
+hosted health. Preserve this image as the rollback target. The local sync
+heartbeat was stale; acceptance must use authenticated hosted source discovery
+and an exact reviewed-companion read, not the local mirror.
+
 ## Runtime Smoke Tests
 
 ```bash
