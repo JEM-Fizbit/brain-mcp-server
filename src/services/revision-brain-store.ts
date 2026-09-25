@@ -17,6 +17,7 @@ import {
   type WriteMode,
 } from "./brain-store.js";
 import { assertBrainVaultPath } from "./brain-path.js";
+import { isSafeRelativePath } from "../source-references/schema.js";
 import type { BrainRole } from "./registry.js";
 import {
   rankSearchCandidates,
@@ -215,10 +216,19 @@ export class RevisionBrainStore implements BrainStore {
       const requested = validateSourceFilename(filename);
       const manifests = await this.sourceStore.listSourceManifests(brainId);
       const manifest = manifests.find((candidate) =>
-        candidate.paths.includes(requested)
+        candidate.source.brainId === brainId && candidate.paths.includes(requested)
       );
       if (!manifest) {
         throw new Error(`Source manifest not found in hosted metadata: ${filename}`);
+      }
+      // Ingestion stores the reviewed companion in the revision store, separately
+      // from original-byte extraction. Resolve only the selected Brain's declared
+      // source path; arbitrary revision paths remain outside this read surface.
+      const companion = manifest.source.companionPath;
+      if (companion?.startsWith("sources/") && companion.endsWith(".md") &&
+          isSafeRelativePath(companion) && normalizeSourcePath(companion) === requested &&
+          await this.revisionStore.getHead(brainId, companion)) {
+        return (await this.revisionStore.readFile(brainId, companion)).content;
       }
       const artifact = manifest.artifacts.find(
         (candidate) => artifactSourcePath(candidate, manifest) === requested
