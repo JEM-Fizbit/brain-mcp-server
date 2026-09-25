@@ -15,7 +15,11 @@ export function registerContextTools(server: McpServer): void {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         const result = await loadContextWithObservations(ctx.brainId, ctx.brain);
+        // Clients that prefer structuredContent over the text block (Claude Code
+        // does) would otherwise receive no loader or NOW.md, so the bootstrap
+        // travels in both.
         return { content: [{ type: "text", text: result.text }], structuredContent: {
+          bootstrap: result.text,
           observations: result.observations, capability_discovery: result.capability_discovery,
         } };
       } catch (error) {
