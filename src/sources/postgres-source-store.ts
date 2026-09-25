@@ -6,6 +6,7 @@ import {
 import { contentHash } from "../sync/hash.js";
 import { postgresPoolOptions } from "../sync/postgres-revision-store.js";
 import { attachPoolErrorLogger } from "../services/pg-pool.js";
+import { isSafeRelativePath } from "../source-references/schema.js";
 import type {
   CreateSourceInput,
   RecordArtifactTextInput,
@@ -467,7 +468,9 @@ export class PostgresSourceMetadataStore implements SourceMetadataStore {
           }),
           artifacts: [],
           brainLinks: [],
-          paths: [],
+          paths: row.companion_path?.startsWith("sources/") &&
+            row.companion_path.endsWith(".md") && isSafeRelativePath(row.companion_path)
+            ? [normalizeSourcePath(row.companion_path)] : [],
         };
         manifests.set(row.id, manifest);
       }

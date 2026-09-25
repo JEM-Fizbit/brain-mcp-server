@@ -524,3 +524,43 @@ test("RevisionBrainStore protects structural rename targets at the store boundar
     )
   );
 });
+
+test('operator-ingested companions remain discoverable and readable with opaque provider IDs', async () => {
+  const {PostgresSourceMetadataStore} = await import('../dist/sources/postgres-source-store.js');
+  const now=new Date('2026-09-25T00:00:00Z');
+  const row={id:'source-note',brain_id:'ai-brain-jem',category:'analysis',label:'Reviewed decision',status:'processed',
+    source_date:null,provenance_note:'Reviewed source',companion_path:'sources/analysis/decision.md',metadata:{},
+    source_created_at:now,source_updated_at:now,artifact_id:'artifact-note',source_id_row:'source-note',
+    artifact_kind:'original',storage_bucket:'private-artifacts',storage_path:'immutable/hash',
+    external_id:'opaque-provider-id',external_provider:'capture',relative_path:'decision.md',
+    original_filename:'decision.md',mime_type:'text/markdown',byte_size:10,retention_status:'active',
+    artifact_metadata:{},artifact_created_at:now};
+  const metadata=new PostgresSourceMetadataStore({async query(sql,values){
+    if(sql.includes('from brain.source_brain_links'))return {rows:[]};
+    assert.equal(values[0],'ai-brain-jem');return {rows:[row]};
+  }});
+  const revisions=new MemoryRevisionStore();
+  await revisions.proposeRevision({brainId:'ai-brain-jem',filename:row.companion_path,baseRevisionId:null,
+    content:'# Reviewed decision\n\nIncludes the approved provenance and limitations.\n',
+    origin:'import',actor:{provider:'test',id:'reviewer'}});
+  const store=new RevisionBrainStore(revisions,metadata);
+  assert.ok((await store.listSources('ai-brain-jem','analysis')).includes('analysis/decision.md'));
+  assert.equal(await store.readFile('ai-brain-jem','analysis/decision.md','sources'),
+    '# Reviewed decision\n\nIncludes the approved provenance and limitations.\n');
+  assert.equal(await store.readFile('ai-brain-jem','sources/analysis/decision.md','sources'),
+    '# Reviewed decision\n\nIncludes the approved provenance and limitations.\n');
+  // A provider identifier still resolves to its manifest, not arbitrary original bytes.
+  assert.match(await store.readFile('ai-brain-jem','opaque-provider-id','sources'),/Source Manifest/);
+  await assert.rejects(()=>store.readFile('ai-brain-jem','analysis/unregistered.md','sources'),/not found/);
+  row.brain_id='other-brain';
+  await assert.rejects(()=>store.readFile('ai-brain-jem','analysis/decision.md','sources'),/not found/);
+});
+
+test('source companions without a hosted revision keep the metadata-only response', async () => {
+  const metadata=sourceStore({research:['research/paper.pdf']});
+  const list=metadata.listSourceManifests;
+  metadata.listSourceManifests=async()=>{const rows=await list();rows[0].paths.push('research/paper.pdf.md');return rows;};
+  const store=new RevisionBrainStore(new MemoryRevisionStore(),metadata);
+  assert.match(await store.readFile('ai-brain-jem','research/paper.pdf.md','sources'),/Source Manifest/);
+  await assert.rejects(()=>store.readFile('ai-brain-jem','research/../paper.pdf.md','sources'),/Path traversal/);
+});
