@@ -528,6 +528,13 @@ export class LocalSyncAgent {
 
     for (const head of heads) {
       const filename = head.filename;
+      // Reviewed source companions share the hosted revision store with vault
+      // files, but belong to the dedicated source workflow, never brain/sources.
+      // Do not interpret their tombstones as local deletions either.
+      if (filename.startsWith("sources/")) {
+        (report.excludedSourceFiles ??= []).push(filename);
+        continue;
+      }
       const fullPath = safeMarkdownPath(this.options.brainDir, filename);
       const tracked = state.files[filename];
       const localHash = await timed(report, "pull", "local_read", () =>
@@ -665,6 +672,7 @@ export class LocalSyncAgent {
       deleted: [...pushed.deleted, ...pulled.deleted],
       deletionsSkipped: [...pushed.deletionsSkipped, ...pulled.deletionsSkipped],
       guardTripped: pushed.guardTripped ?? pulled.guardTripped,
+      excludedSourceFiles: pulled.excludedSourceFiles,
     };
     addTiming(report, "sync", "total", startedAt);
     if (this.options.store.recordSyncHeartbeat) {

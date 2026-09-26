@@ -20,6 +20,9 @@ export function summarizeReport(report: LocalSyncReport) {
     deletionsSkipped: report.deletionsSkipped.length,
     deletionsSkippedFiles: report.deletionsSkipped,
     guardTripped: report.guardTripped,
+    ...(report.excludedSourceFiles?.length ? {
+      excludedSourceFiles: report.excludedSourceFiles,
+    } : {}),
     totalMs: totalTiming?.ms ?? null,
   };
 }

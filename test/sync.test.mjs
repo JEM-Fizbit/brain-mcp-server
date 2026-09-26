@@ -136,13 +136,45 @@ test("hosted MCP write pulls to clean local Markdown tree", async () => {
   assert.equal(await readBrainFile(brainDir, "NOW.md"), "Remote first\n");
 });
 
-test("local sync rejects hosted heads in external namespaces", async () => {
+test("vault sync excludes hosted source companions and tombstones without changing source custody", async () => {
+  const store = new MemoryRevisionStore();
+  const config = dirs("source-companions");
+  await writeBrainFile(config.brainDir, "00_loader.md", "Loader\n");
+  await writeBrainFile(config.brainDir, "NOW.md", "Local priority\n");
+  for (const filename of ["sources/analysis/live.md", "sources/analysis/deleted.md", "topic.md"]) {
+    const head = await accept(await store.proposeRevision({
+      brainId: "ai-brain-jem", filename, baseRevisionId: null,
+      content: "Hosted text\n", origin: "hosted_mcp",
+    }));
+    if (filename.endsWith("deleted.md")) {
+      await accept(await store.proposeDeletion({
+        brainId: "ai-brain-jem", filename, baseRevisionId: head.revisionId,
+        origin: "hosted_mcp",
+      }));
+    }
+  }
+  const sourcesDir = path.resolve(config.brainDir, "..", "sources");
+  await writeBrainFile(sourcesDir, "analysis/deleted.md", "Operator original\n");
+  const before = await store.listFiles("ai-brain-jem", { includeDeleted: true });
+  const report = await makeAgent(store, config).syncOnce();
+  assert.deepEqual(report.excludedSourceFiles, ["sources/analysis/deleted.md", "sources/analysis/live.md"]);
+  assert.deepEqual(report.pulled, ["topic.md"]);
+  assert.equal(report.conflicts.length, 0);
+  assert.equal(report.guardTripped, undefined);
+  assert.equal(await readBrainFile(config.brainDir, "topic.md"), "Hosted text\n");
+  await assert.rejects(fs.stat(path.join(config.brainDir, "sources")), /ENOENT/);
+  assert.equal(await readBrainFile(sourcesDir, "analysis/deleted.md"), "Operator original\n");
+  assert.deepEqual((await store.listFiles("ai-brain-jem", { includeDeleted: true }))
+    .filter(h => h.filename.startsWith("sources/")), before.filter(h => h.filename.startsWith("sources/")));
+});
+
+test("local sync rejects hosted heads in non-source external namespaces", async () => {
   const store = new MemoryRevisionStore();
   const { brainDir, stateFile } = dirs("reserved-hosted-head");
   await accept(
     await store.proposeRevision({
       brainId: "ai-brain-jem",
-      filename: "sources/brand/guidelines.md",
+      filename: "inbox/brand/guidelines.md",
       baseRevisionId: null,
       content: "Should remain outside the Brain vault\n",
       origin: "hosted_mcp",
@@ -154,7 +186,7 @@ test("local sync rejects hosted heads in external namespaces", async () => {
     /Reserved external Brain path/
   );
   await assert.rejects(
-    () => readBrainFile(brainDir, "sources/brand/guidelines.md"),
+    () => readBrainFile(brainDir, "inbox/brand/guidelines.md"),
     /ENOENT/
   );
   assert.equal((await store.listConflicts("ai-brain-jem", "open")).length, 0);

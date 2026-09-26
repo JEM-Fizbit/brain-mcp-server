@@ -27,6 +27,12 @@ test("summary surfaces deleted files and their count", () => {
   assert.deepEqual(summary.deletedFiles, ["a.md", "b.md"]);
 });
 
+test("summary identifies source companions excluded from vault sync", () => {
+  const summary = summarizeReport(baseReport({ excludedSourceFiles: ["sources/analysis/note.md"] }));
+  assert.deepEqual(summary.excludedSourceFiles, ["sources/analysis/note.md"]);
+  assert.equal(summary.guardTripped, undefined);
+});
+
 test("summary surfaces a tripped guard so a skipped mass-delete is never silent", () => {
   const summary = summarizeReport(
     baseReport({
