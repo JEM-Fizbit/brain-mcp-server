@@ -1,7 +1,8 @@
 # Hosted Brain Roadmap
 
+**26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
 **Status:** active reference
-**Last updated:** 2026-09-13
+**Last updated:** 2026-09-26
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 

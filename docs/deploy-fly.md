@@ -4,6 +4,10 @@
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
+## Verified sync reliability release — 26 September 2026
+
+Both isolated services now run annotated public v1.12.0 through guarded deployments. JEM source `14a06d3` deployed at 11:35:24 UTC; private overlay provenance remains in the owning repository. Both release test gates, live health/version, authenticated reads and local Monitor profiles pass. No live schema or permission change was required. [Verification and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
+
 ## Verified maintenance release — 10 September 2026
 
 **Build-boundary maintenance release completed 18 September:** annotated v1.11.2 carried the tested Docker-context allow-list through the protected ERS intake. The ERS guarded release passed 554 tests (543 pass, 11 existing skips, zero failures), transferred an 806.81 kB restricted context to Depot, deployed Fly release 26/image `deployment-01M2T4WQ8X3VFYY5PYYRJDKSG8`, and returned healthy v1.11.2 runtime state. The authenticated App Builders page readback immediately after the build showed the shared builder in LHR at 4 CPU / 4 GB. Application source, database schema, runtime credentials, permissions and Brain content were unchanged.

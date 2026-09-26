@@ -1,7 +1,8 @@
 # Hosted Client Cutover Runbook
 
+**26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
 **Status:** active operator guide
-**Last updated:** 2026-09-11
+**Last updated:** 2026-09-26
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 
