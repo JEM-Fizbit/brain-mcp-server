@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   assertReleaseState,
+  assertFlyAppBinding,
   buildFlyDeployArgs,
   buildProvenanceRecord,
   buildReleaseTestEnv,
@@ -192,6 +193,9 @@ test("guarded deploy isolates tests from local hosted-runtime configuration", ()
       GITHUB_ALLOWED_LOGINS: "example",
       GITHUB_OAUTH_CLIENT_ID: "client",
       SUPABASE_ACCESS_TOKEN: "token",
+      FLY_API_TOKEN: "must-not-reach-tests",
+      FLY_ACCESS_TOKEN: "also-must-not-reach-tests",
+      FLY_CONFIG_DIR: "/real/owner/login",
     }),
     {
       PATH: "/bin",
@@ -251,4 +255,10 @@ test("package and image expose the guarded release contract", () => {
   assert.match(dockerfile, /ARG APP_VERSION/);
   assert.match(dockerfile, /org\.opencontainers\.image\.revision/);
   assert.match(dockerfile, /org\.opencontainers\.image\.version/);
+});
+
+test("guarded deploy refuses a credential target from a different checkout",()=>{
+ assert.doesNotThrow(()=>assertFlyAppBinding('app = "one-brain"\n','one-brain'));
+ assert.throws(()=>assertFlyAppBinding('app = "one-brain"\n','other-brain'),/target app/);
+ assert.throws(()=>assertFlyAppBinding('app = "one-brain"\napp = "other-brain"','one-brain'),/target app/);
 });

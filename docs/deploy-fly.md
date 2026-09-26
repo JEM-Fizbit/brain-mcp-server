@@ -4,6 +4,33 @@
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
+## Managed Fly credentials
+
+Local guarded deployment uses a separate app-scoped token per Brain, stored in macOS Keychain. Monitor uses a read-only derivative of that app token; it never loads the deployment credential. Both paths use a separate automation config directory with no cached human login and override ambient Fly tokens. The deployment target must match the checkout's `fly.toml`; an explicitly supplied Brain id must also match the credential profile. Tokens are loaded only after release tests and final guards pass. All `FLY_` variables are removed from test subprocesses.
+
+The default lifetime is **180 days**, with a Monitor warning during the final **30 days**. Expired/missing credentials or unavailable Keychain access produce an automation-access warning; the independently checked hosted service and sync can remain healthy. There is no unattended creation of replacement credentials from an all-powerful account token. Fly may require a fresh owner sign-in when issuing replacements.
+
+Secrets travel between Fly, Node and the native Keychain helper through private pipes or the specific Fly child's environment. They are not stored in profiles, app bundles, metadata, command arguments or test environments. Never run the helper's `get` command or Fly token creation/debug commands directly into a visible terminal or tool result. The helper keeps a stable signing identity and source record; reinstalling an unchanged helper is a no-op. A changed helper requires an explicit Keychain-access migration review instead of silently breaking background access.
+
+Install once using `npm run fly:credentials:install`. Provision or replace with explicit owner bindings:
+
+```sh
+npm run fly:credentials -- provision --brain-id <brain-id> --app <app> \
+  --owner <owner-email> --fly-config-dir <absolute-owner-login-directory>
+npm run fly:credentials -- status
+npm run fly:credentials -- verify --brain-id <brain-id> --app <app>
+```
+
+Provisioning checks the owner login, stores and reads back new Keychain items, verifies both tokens against the exact app, then atomically switches metadata. A serialized lock prevents concurrent replacements; a metadata-only transaction records the candidate token name before creation for crash recovery. Failed validation leaves the active credential unchanged and attempts to revoke only the newly created candidate. An interrupted operation's lock/transaction requires review; never blindly retry or delete an active lock. The previous working credential is retained during replacement. After a successful guarded deployment records the replacement's non-secret credential reference, retire it with:
+
+```sh
+npm run fly:credentials -- retire-previous --brain-id <brain-id> --app <app>
+```
+
+Retirement rechecks both new credentials and requires matching successful deployment provenance before revoking the previous token. Another replacement is refused while retirement remains outstanding. Metadata and transaction receipts are owner-only under the local Brain MCP application-support directory; they contain references, owner/app bindings and expiry, never secrets. A local same-user process can invoke the trusted helper: Keychain prevents plaintext custody, not compromise of the signed-in user account.
+
+Other platforms/CI can deliberately select `BRAIN_FLY_AUTH_MODE=external` with an explicitly supplied scoped `FLY_API_TOKEN` or `FLY_ACCESS_TOKEN`; this is not a silent fallback from failed local Keychain access. A monitor profile still requires its local managed metadata. The existing isolated owner browser logins remain available for account administration and replacement issuance.
+
 ## Verified sync reliability release — 26 September 2026
 
 Both isolated services now run annotated public v1.12.0 through guarded deployments. JEM source `14a06d3` deployed at 11:35:24 UTC; private overlay provenance remains in the owning repository. Both release test gates, live health/version, authenticated reads and local Monitor profiles pass. No live schema or permission change was required. [Verification and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).

@@ -103,6 +103,7 @@ const TEST_ENV_PREFIXES = [
   "GITHUB_ALLOWED_",
   "GITHUB_OAUTH_",
   "SUPABASE_",
+  "FLY_",
 ];
 
 export function buildReleaseTestEnv(env = process.env) {
@@ -119,6 +120,7 @@ export function buildProvenanceRecord({
   sha,
   upstreamSha,
   overlaySha,
+  credentialAccount,
   deployedAt = new Date(),
 }) {
   const record = {
@@ -128,6 +130,12 @@ export function buildProvenanceRecord({
   };
   if (upstreamSha) record.upstream_sha = upstreamSha;
   if (overlaySha) record.overlay_sha = overlaySha;
+  if (credentialAccount) record.credential_account = credentialAccount;
   record.deployed_at = deployedAt.toISOString();
   return record;
+}
+
+export function assertFlyAppBinding(configText, app) {
+  const matches = [...configText.matchAll(/^app\s*=\s*["']([^"']+)["']\s*(?:#.*)?$/gm)];
+  if(matches.length !== 1 || matches[0][1] !== app) throw new Error("Guarded deploy refused: target app must match this checkout's fly.toml");
 }

@@ -13,6 +13,7 @@ export const OPERATOR_ALARM_CHECKS = new Set([
   "inbox",
   "launchd",
   "fly_status",
+  "fly_credentials",
   "hosted_mcp_auth_failures",
   "user_operation_latency",
   "pooler_config",

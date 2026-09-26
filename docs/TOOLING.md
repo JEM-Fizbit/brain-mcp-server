@@ -63,6 +63,8 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 
 ### Deploy-Affecting Or Secret-Affecting
 
+- `fly:credentials:install` installs the native Keychain helper. `fly:credentials -- provision` creates app-scoped credentials and switches verified Keychain references; `retire-previous` revokes only the prior managed token after replacement deployment proof. These are expressly authorized credential operations, never routine verification. `status` is metadata-only and `verify` uses non-mutating Fly app reads. See [managed credentials](deploy-fly.md#managed-fly-credentials).
+
 - `fly deploy --app jem-brain-mcp`, `fly secrets set ...`, and `fly apps create ...` affect hosted infrastructure.
 - Applying `db/migrations/*.sql` or `db/seeds/*.sql` changes Supabase state. Rerun `docs/security/hosted-brain-supabase-security-gate.md` after migrations touching schemas, RLS, functions, Storage, or user data.
 - Backup/restore/export rehearsals can affect Supabase projects, Storage, Docker state, or external CLI state. Use `docs/hosted-brain-recovery-and-git-export.md` as the runbook.
