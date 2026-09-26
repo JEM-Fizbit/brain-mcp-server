@@ -692,6 +692,10 @@ Tune with `BRAIN_SLO_DB_SPAN_WINDOW_MS` (default 24h), `BRAIN_SLO_DB_SPAN_PERCEN
 
 ### Doctor findings carry provenance and tolerate transients (spec 019)
 
+#### Fly automation credentials (v1.12.1)
+
+The `fly_credentials` check reports the selected app's managed credential expiry and warns 30 days before its 180-day lifetime ends. `fly_status` uses only the app's Keychain-held read-only token, so routine diagnostics do not depend on an interactive Fly login. No token appears in the report or app bundle. If access expires, Keychain is locked, or profile selection fails, Monitor reports the automation-access issue while continuing independent hosted/sync checks. Correct the owner-bound credential via the [managed credential workflow](deploy-fly.md#managed-fly-credentials); refreshing the Cockpit never rotates or revokes credentials.
+
 #### Independent sync recovery (v1.12.0)
 
 **26 September 2026 release verification:** annotated public tag `v1.12.0` (tag object `d814722c5e42903c2e327d9e9e2fad31218a38be`, source `14a06d3d305f220786982c1523d73e4ee468d939`) was deployed through the guarded path to both isolated services. JEM deployed at 11:35:24 UTC; the separately owned overlay deployed at 11:38:52 UTC and retains its private provenance. Each release gate passed 583 Node 22 tests: 572 passed, 11 optional skips, zero failures. A separate disposable PostgreSQL lifecycle run passed all 9 tests, including ingestion, manifest-verified companion reads, lint, sync, rollback and receipt replay.

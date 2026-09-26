@@ -1,3 +1,4 @@
+import {readRegistry, selectCredential, credentialStatus, managedFlyEnv} from "./lib/fly-credentials.mjs";
 import { evaluateSupervision } from "./lib/sync-supervision.mjs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -1474,15 +1475,29 @@ async function checkFlyStatus() {
     });
     return;
   }
+  let managed = false;
   try {
+    const registry = await readRegistry();
+    const {profile} = selectCredential(registry, {app:flyApp, brainId, purpose:"monitor"});
+    const credential = credentialStatus(profile);
+    addCheck("fly_credentials", credential.status, credential);
+    const env = await managedFlyEnv({app:flyApp, brainId, purpose:"monitor"});
+    managed = true;
     const { stdout } = await exec("flyctl", ["status", "--app", flyApp], {
+      env,
       timeout: 20000,
       maxBuffer: 1024 * 1024,
     });
     const result = classifyFlyStatusOutput(stdout, flyApp);
     addCheck("fly_status", result.status, result.details);
   } catch (error) {
-    const result = classifyFlyStatusError(error, flyApp);
+    if (!managed) {
+      if (!checks.some(c => c.name === "fly_credentials")) addCheck("fly_credentials", "warn", {state:"unavailable", message:"Managed Fly credential missing, mismatched or Keychain unavailable."});
+      addCheck("fly_status", "warn", {app:flyApp, state:"credential_unavailable", resolution:"Restore the managed Fly credential for this profile; hosted service and sync are checked separately."});
+      return;
+    }
+    // Do not retain subprocess stdout/stderr from an authenticated command.
+    const result = classifyFlyStatusError({message:"Managed Fly status request failed"}, flyApp);
     addCheck("fly_status", result.status, result.details);
   }
 }
@@ -1570,6 +1585,8 @@ function buildOperatorActions(status) {
   const syncLock = checkByName("sync_lock");
   const fly = checkByName("fly_status");
   const pooler = checkByName("pooler_config");
+  const credential = checkByName("fly_credentials");
+  if (credential?.status === "warn") actions.push({level:"warn", reason:"fly_credential_maintenance", title:"Renew or restore Fly automation access.", detail:credential.details?.message || "Check the app credential in Keychain. Running Brain services and sync are checked separately."});
 
   const openConflicts = postgres?.details?.openConflicts || 0;
   if (openConflicts > 0) {

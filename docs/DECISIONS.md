@@ -1,5 +1,11 @@
 # Working Decisions Log
 
+## 2026-09-26 — App-scoped Fly credentials replace browser sessions in routine automation
+
+**Decision:** each owner deployment uses its own 180-day Keychain-held app token; Monitor receives a read-only derivative. Warn at 30 days remaining. Guarded releases bind the selected app to the checkout, remove Fly credentials from tests, and retrieve secrets only for the final Fly operation. Owner sign-in is reserved for account administration and replacement issuance. No permanent account-wide automation token is stored. Rotation stages and validates before atomic activation; previous credentials remain until matching deployment proof allows explicit retirement.
+
+**Why:** interactive Fly login expiry interrupted approved releases. A token for one app limits the effect of wrong-owner selection, while stable Keychain custody eliminates copies in profiles and global environment settings. This changes local deployment/monitoring access only; runtime database, OAuth, Brain-content and X credentials are unchanged. [Workflow and limits](deploy-fly.md#managed-fly-credentials).
+
 ## 2026-09-26 — Independent, bounded sync recovery for both owner profiles
 
 **Decision:** v1.12.0 adds a separate supervisor process between Monitor and each sync worker. It enforces a 330-second completed-cycle deadline even when the worker event loop freezes, waits for process exit before replacement, and allows three replacements with 3/15/60-second backoff. The retry budget resets only after completed cycles demonstrate 60 seconds of sustained progress. Exhaustion survives Monitor restart and requires the operator's **Retry Sync Recovery** action. Sleep/wake grants 120 seconds for reconnection; it never refreshes old health timestamps.
