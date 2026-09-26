@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import fs from 'node:fs/promises';
 import pg from 'pg';
+import os from 'node:os';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {RevisionBrainStore} from '../dist/services/revision-brain-store.js';
+import {PostgresSourceMetadataStore} from '../dist/sources/postgres-source-store.js';
+import {LocalSyncAgent} from '../dist/sync/local-sync-agent.js';
 import {IngestionJobs} from '../dist/ingestion/jobs.js';
 import {sha256} from '../dist/ingestion/local.js';
 
@@ -57,6 +64,23 @@ test('durable ingestion: immutable originals, fencing, atomic approval writes, r
    job=await jobs.review(job.id,'Reviewed synthetic content');await assert.rejects(jobs.approve(job.id,'wrong'),/approval_required/);
    await jobs.approve(job.id,job.candidate.digest);job=await jobs.apply(job.id,adapter);assert.equal(job.stage,'complete');assert.equal(job.receipt.revisions.length,1);
    const receipt=job.receipt;job=await jobs.apply(job.id,adapter);assert.deepEqual(job.receipt,receipt);
+   // One actual accepted ingestion must survive every downstream surface.
+   const brainStore=new RevisionBrainStore(jobs.revisions,new PostgresSourceMetadataStore(pool));
+   assert.match(await brainStore.readFile(brain,job.manifest.companionPath,'sources'),/Reviewed synthetic content/);
+   assert.ok(!(await brainStore.listFiles(brain,'brain')).some(f=>f.name.startsWith('sources/')));
+   const root=await fs.mkdtemp(path.join(os.tmpdir(),'ingestion-lifecycle-'));
+   try {
+    await fs.writeFile(path.join(root,'00_loader.md'),'# Loader\n[Source](../'+job.manifest.companionPath+')\n');
+    await fs.writeFile(path.join(root,'NOW.md'),'# NOW\n');
+    const sync=new LocalSyncAgent({brainId:brain,brainDir:root,stateFile:path.join(root,'.sync','state.json'),store:jobs.revisions});
+    const report=await sync.syncOnce();assert.equal(report.conflicts.length,0);assert.ok(report.excludedSourceFiles.includes(job.manifest.companionPath));
+    await assert.rejects(fs.stat(path.join(root,'sources')),/ENOENT/);
+    const registry=path.join(root,'registry.json');await fs.writeFile(registry,JSON.stringify({version:1,brains:[{id:brain,type:'shared',template_used:'shared',integration_mode:'vertical',storage_backend:'postgres',storage_config:{brain_dir:root,repo_path:root}}]}));
+    await promisify(execFile)(process.execPath,['--input-type=module','-e',
+      'import {runLint} from '+JSON.stringify(new URL('../dist/services/lint.js',import.meta.url).href)+'; const r=await runLint('+JSON.stringify(brain)+'); if(!Array.isArray(r.bloat)||!Array.isArray(r.orphans))throw Error("missing lint report"); process.exit(0);'],
+      {timeout:15000,env:{...process.env,BRAIN_ID:brain,BRAIN_PLATFORM_CONFIG:registry,BRAIN_REVISION_STORE:'postgres',BRAIN_REVISION_DATABASE_URL:url,BRAIN_LOAD_LOCAL_ENV:'0',BRAIN_MONITOR_CONFIG_FILE:''}});
+   } finally {await fs.rm(root,{recursive:true,force:true});}
+
    const source=await pool.query('select retention_status,storage_path from brain.source_artifacts where id=$1',[job.artifact_id]);assert.equal(source.rows[0].retention_status,'active');assert.equal(source.rows[0].storage_path,job.original.key);
    assert.equal((await pool.query('select count(*)::int n from brain.brain_file_revisions where brain_id=$1 and filename=$2',[brain,job.manifest.companionPath])).rows[0].n,1);
   });

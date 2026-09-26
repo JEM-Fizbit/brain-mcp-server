@@ -15,7 +15,6 @@
 
 <!-- backlog items below; newest first -->
 
-- Fix hosted lint aborting on valid source-archive links: a normal brain_lint call on 26 September raised a reserved external sources/ path error instead of completing its report. Route source-link checks through the source reader or report unsupported verification without aborting vault checks; add a fixture with a valid Markdown companion link. Capture routing edits were independently read back, but lint is not clean. Bug capture only; no runtime change or deployment in the Capture task.
 
 - Deferred source-review sweep: compare source custody/index coverage, identify under-integrated material and consolidation candidates; consider a monthly operator review. Migrated from JEM TASKS Future (Karpathy gap 2); design context remains `sources/analysis/2026-04-14_brain-architecture-review-karpathy.md`. Inventory only, no scheduler or implementation authorized.
 - Deferred proactive lint: assess `--stale` and `--reconcile` first, then `--impute`, `--connections` and `--questions`; measure false positives before automatic changes. Migrated from JEM TASKS Future (Karpathy gap 3), with the same architecture-review source.

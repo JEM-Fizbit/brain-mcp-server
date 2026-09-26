@@ -1,3 +1,4 @@
+import { evaluateSupervision } from "./lib/sync-supervision.mjs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -1378,7 +1379,11 @@ async function checkMenuBarSupervisor() {
     const stale = ageMs === null || ageMs > monitorStackMaxAgeMs;
     const stackBrainId = stack.brainId || null;
     const brainIdMatches = !stackBrainId || stackBrainId === brainId;
+    let recoveryReport = null;
+    try { recoveryReport = await readJson(`${healthFile}.supervision.json`); } catch {}
+    const recovery = evaluateSupervision(recoveryReport, { brainId, supervisorPid: syncPid, expected: sync.supervisionExpected });
     const ok =
+      ["pass", "info"].includes(recovery.status) &&
       stack.supervisor === "menubar" &&
       brainIdMatches &&
       !stale &&
@@ -1387,8 +1392,9 @@ async function checkMenuBarSupervisor() {
       cockpit.state === "running" &&
       cockpitPidAlive;
 
-    addCheck("launchd", ok ? "pass" : "warn", {
+    addCheck("launchd", recovery.status === "fail" ? "fail" : ok ? "pass" : "warn", {
       supervisor: "menubar",
+      recovery,
       brainId,
       profileName,
       stackBrainId,
@@ -1626,6 +1632,11 @@ function buildOperatorActions(status) {
   const syncAction = syncHealthAction(sync);
   if (syncAction) actions.push(syncAction);
 
+  if (launchd?.status === "fail" && launchd.details?.recovery?.state === "needs_attention") {
+    actions.push({ level: "fail", reason: "sync_recovery_exhausted",
+      title: "Sync needs intervention: automatic recovery has stopped.",
+      detail: "Inspect the recovery history and current sync error, correct the cause, then choose Retry Sync Recovery in Brain Monitor. Local edits, conflicts and recovery copies are retained." });
+  }
   if (launchd?.status === "warn") {
     const supervisorKind = launchd.details?.supervisor || supervisor;
     actions.push({

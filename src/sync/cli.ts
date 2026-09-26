@@ -177,11 +177,13 @@ async function writeSyncHealth(
   health: Record<string, unknown>
 ): Promise<void> {
   await fs.mkdir(path.dirname(config.healthFile), { recursive: true });
+  const temporary = `${config.healthFile}.${process.pid}.tmp`;
   await fs.writeFile(
-    config.healthFile,
+    temporary,
     `${JSON.stringify(
       {
         version: 1,
+        pid: process.pid,
         brainId: config.brainId,
         brainDir: config.brainDir,
         stateFile: config.stateFile,
@@ -192,6 +194,7 @@ async function writeSyncHealth(
     )}\n`,
     "utf-8"
   );
+  await fs.rename(temporary, config.healthFile);
 }
 
 function createStore(config: SyncCliConfig): StoreHandle {
@@ -379,11 +382,13 @@ async function runWithConfig(
 ): Promise<void> {
   const storeHandle = createStore(config);
   const store = storeHandle.store;
+  let stage = "sync.starting";
   const agent = new LocalSyncAgent({
     brainId: config.brainId,
     brainDir: config.brainDir,
     stateFile: config.stateFile,
     store,
+    onProgress: (operation, phase) => { stage = `${operation}.${phase}`; },
     includeFiles: config.includeFiles,
     actor: revisionActorForLocalEdit(
       config.localEditSurface,
@@ -451,6 +456,21 @@ async function runWithConfig(
 
     if (command === "watch") {
       let stopped = false;
+      let activeCycle = 0;
+      let cycleStartedAt = new Date().toISOString();
+      let progressWriting = false;
+      const progressTimer = setInterval(() => {
+        if (progressWriting) return;
+        progressWriting = true;
+        const target = `${config.healthFile}.progress.json`;
+        const temporary = `${target}.${process.pid}.tmp`;
+        void fs.mkdir(path.dirname(target), { recursive: true })
+          .then(() => fs.writeFile(temporary, JSON.stringify({ version: 1, brainId: config.brainId,
+            pid: process.pid, cycle: activeCycle, cycleStartedAt, stage,
+            observedAt: new Date().toISOString() }) + "\n", { mode: 0o600 }))
+          .then(() => fs.rename(temporary, target)).catch(() => undefined)
+          .finally(() => { progressWriting = false; });
+      }, 1_000);
       const stop = () => {
         stopped = true;
       };
@@ -460,6 +480,9 @@ async function runWithConfig(
         let cycle = 0;
         while (!stopped) {
           cycle += 1;
+          activeCycle = cycle;
+          cycleStartedAt = new Date().toISOString();
+          stage = "sync.starting";
           let deadline: NodeJS.Timeout | undefined;
           let timedOut = false;
           try {
@@ -482,6 +505,7 @@ async function runWithConfig(
                 const report = await agent.syncOnce();
                 if (timedOut) return;
                 const summary = summarizeReport(report);
+                stage = "sync.recovery_usage";
                 const recovery = await recoveryUsage(config.brainDir);
                 if (timedOut) return;
                 await writeSyncHealth(config, {
@@ -525,9 +549,11 @@ async function runWithConfig(
             if (deadline) clearTimeout(deadline);
           }
           if (config.watchCycles && cycle >= config.watchCycles) break;
+          stage = "sync.waiting";
           await sleep(config.watchIntervalMs);
         }
       } finally {
+        clearInterval(progressTimer);
         process.off("SIGINT", stop);
         process.off("SIGTERM", stop);
       }

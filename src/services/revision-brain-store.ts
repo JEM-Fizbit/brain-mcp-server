@@ -250,7 +250,8 @@ export class RevisionBrainStore implements BrainStore {
     if (scope === "sources") return this.listSources(brainId);
     const heads = await this.revisionStore.listFiles(brainId);
     return Promise.all(
-      heads.map((head) => fileMetadataFromHead(this, brainId, head))
+      heads.filter((head) => !head.filename.startsWith("sources/"))
+        .map((head) => fileMetadataFromHead(this, brainId, head))
     );
   }
 

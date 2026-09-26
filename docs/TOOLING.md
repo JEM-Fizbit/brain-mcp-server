@@ -47,6 +47,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 
 ### Local-State Mutating
 
+- `dist/sync/supervisor.js` is Monitor-owned local process supervision, including bounded worker restarts; it is not a read-only check. `SIGUSR1` explicitly retries an exhausted recovery episode, and `SIGUSR2` grants wake grace.
 - `npm run dev`, `npm run start`, `npm run sync -- watch`, `npm run sync -- once`, and `npm run sync -- pull` start processes or update local mirror/state files.
 - `npm run sync:launchd:plist`, `npm run hosted:cockpit:launchd:plist`, `npm run sync:helper:launchd:plist`, and `npm run sync:menubar:launchd:plist` generate local LaunchAgent plists under `tmp/` or configured paths.
 - `npm run sync:helper:install`, `npm run hosted:cockpit:launcher:install`, and `npm run sync:menubar:install` create local macOS app bundles.

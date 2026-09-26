@@ -21,6 +21,7 @@ export interface LocalSyncAgentOptions {
   stateFile: string;
   store: RevisionStore;
   actor?: RevisionActor;
+  onProgress?: (operation: SyncOperation, phase: SyncTimingPhase) => void;
   includeFiles?: string[];
 }
 
@@ -203,6 +204,11 @@ function filterIncludedHeads<T extends { filename: string }>(
 }
 
 export class LocalSyncAgent {
+  private timed<T>(report: LocalSyncReport, operation: SyncOperation, phase: SyncTimingPhase, fn: () => Promise<T>): Promise<T> {
+    this.options.onProgress?.(operation, phase);
+    return timed(report, operation, phase, fn);
+  }
+
   constructor(private readonly options: LocalSyncAgentOptions) {}
 
   async loadState(): Promise<LocalSyncState> {
@@ -359,10 +365,10 @@ export class LocalSyncAgent {
     const recovery = await this.unresolvedRecoveries();
     await this.reconcileResolvedConflicts(report);
     if (recovery.length) report.guardTripped = `local_recovery: preserved edit(s): ${recovery.map(r => r.recoveryPath).join(", ")}`;
-    const state = await timed(report, "push", "state_read", () => this.loadState());
+    const state = await this.timed(report, "push", "state_read", () => this.loadState());
     let filenames: string[];
     try {
-      filenames = await timed(report, "push", "local_scan", () => includedMarkdownFiles(this.options));
+      filenames = await this.timed(report, "push", "local_scan", () => includedMarkdownFiles(this.options));
     } catch (error) {
       state.pendingDeletions = [];
       await this.saveState(state);
@@ -374,7 +380,7 @@ export class LocalSyncAgent {
 
     for (const filename of filenames) {
       const fullPath = safeMarkdownPath(this.options.brainDir, filename);
-      const content = await timed(report, "push", "local_read", () =>
+      const content = await this.timed(report, "push", "local_read", () =>
         fs.readFile(fullPath, "utf-8")
       );
       const localHash = contentHash(content);
@@ -385,7 +391,7 @@ export class LocalSyncAgent {
         continue;
       }
 
-      const result = await timed(report, "push", "revision_store_write", () =>
+      const result = await this.timed(report, "push", "revision_store_write", () =>
         this.options.store.proposeRevision({
           brainId: this.options.brainId,
           filename,
@@ -416,7 +422,7 @@ export class LocalSyncAgent {
 
     await this.inferGuardedDeletions(report, state, new Set(filenames));
 
-    await timed(report, "push", "state_write", () => this.saveState(state));
+    await this.timed(report, "push", "state_write", () => this.saveState(state));
     addTiming(report, "push", "total", totalStartedAt);
     return report;
   }
@@ -481,7 +487,7 @@ export class LocalSyncAgent {
     } else {
       for (const filename of confirmed) {
         const tracked = state.files[filename];
-        const result = await timed(report, "push", "revision_store_write", () =>
+        const result = await this.timed(report, "push", "revision_store_write", () =>
           this.options.store.proposeDeletion({
             brainId: this.options.brainId,
             filename,
@@ -508,7 +514,7 @@ export class LocalSyncAgent {
     const report = emptyReport();
     const totalStartedAt = performance.now();
     const recovery = await this.unresolvedRecoveries();
-    const state = await timed(report, "pull", "state_read", () => this.loadState());
+    const state = await this.timed(report, "pull", "state_read", () => this.loadState());
     for (const item of recovery) {
       const head = await this.options.store.getHead(this.options.brainId, item.filename);
       report.conflicts.push(await this.recordPullConflict(item.filename,
@@ -516,7 +522,7 @@ export class LocalSyncAgent {
         item.contentHash, head?.contentHash ?? null));
       report.guardTripped = `local_recovery: preserved concurrent edit at ${item.recoveryPath}`;
     }
-    const heads = await timed(report, "pull", "revision_store_list", async () =>
+    const heads = await this.timed(report, "pull", "revision_store_list", async () =>
       filterIncludedHeads(
         this.options,
         await this.options.store.listFiles(this.options.brainId, {
@@ -537,7 +543,7 @@ export class LocalSyncAgent {
       }
       const fullPath = safeMarkdownPath(this.options.brainDir, filename);
       const tracked = state.files[filename];
-      const localHash = await timed(report, "pull", "local_read", () =>
+      const localHash = await this.timed(report, "pull", "local_read", () =>
         readFileHash(fullPath)
       );
 
@@ -565,7 +571,7 @@ export class LocalSyncAgent {
           report.conflicts.push(conflict);
           continue;
         }
-        const removed = await timed(report, "pull", "local_write", () =>
+        const removed = await this.timed(report, "pull", "local_write", () =>
           mutateLocalFile(this.options.brainDir, filename, null, localHash)
         );
         if (!removed.ok) {
@@ -623,13 +629,13 @@ export class LocalSyncAgent {
         continue;
       }
 
-      const remote = await timed(report, "pull", "revision_store_read", () =>
+      const remote = await this.timed(report, "pull", "revision_store_read", () =>
         this.options.store.readRevision(this.options.brainId, head.revisionId)
       );
       if (!remote || remote.deleted || remote.filename !== filename || remote.contentHash !== head.contentHash) {
         throw new Error(`Inconsistent hosted revision for ${filename}`);
       }
-      const guarded = await timed(report, "pull", "local_write", () =>
+      const guarded = await this.timed(report, "pull", "local_write", () =>
         mutateLocalFile(this.options.brainDir, filename, remote.content, localHash)
       );
       if (!guarded.ok) {
@@ -654,7 +660,7 @@ export class LocalSyncAgent {
     }
 
     state.cursor = maxCursor > 0 ? String(maxCursor) : state.cursor;
-    await timed(report, "pull", "state_write", () => this.saveState(state));
+    await this.timed(report, "pull", "state_write", () => this.saveState(state));
     addTiming(report, "pull", "total", totalStartedAt);
     return report;
   }

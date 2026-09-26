@@ -471,7 +471,7 @@ for (const failure of ["cycle", "cycle-and-health", "error-health"]) {
         return new Promise(() => {});
       };
       ${hungHealthWrite ? `const write = fs.writeFile; fs.writeFile = (file, ...args) =>
-        file === ${JSON.stringify(config.healthFile)} ? new Promise(() => {}) : write(file, ...args);` : ""}
+        String(file).startsWith(${JSON.stringify(config.healthFile)}) ? new Promise(() => {}) : write(file, ...args);` : ""}
     `);
     await assert.rejects(exec(process.execPath, ["--import", preload, cliPath, "watch"], {
       timeout: 10_000,
