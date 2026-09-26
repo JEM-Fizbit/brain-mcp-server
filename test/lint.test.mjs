@@ -352,6 +352,9 @@ test("revision-store lint does not scan BRAIN_DIR", async () => {
       origin: "hosted_mcp",
     });
 
+    await store.proposeRevision({ brainId: "ai-brain-jem", filename: "sources/analysis/review.md",
+      baseRevisionId: null, content: "Reviewed source companion", origin: "hosted_mcp" });
+
     const report = await runLint("ai-brain-jem");
 
     assert.deepEqual(report.bloat, []);

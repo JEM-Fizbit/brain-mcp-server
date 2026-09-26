@@ -454,7 +454,8 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
     },
   ]);
   assert.equal(config.syncProcess.launchPath, nodePath);
-  assert.deepEqual(config.syncProcess.arguments, [syncCliPath, "watch"]);
+  assert.equal(path.basename(config.syncProcess.arguments[0]), "supervisor.js");
+  assert.deepEqual(config.syncProcess.arguments.slice(1), [syncCliPath, "watch"]);
   assert.equal(config.syncProcess.stdoutPath, path.join(logDir, "monitor-sync.out.log"));
   assert.equal(config.syncProcess.stderrPath, path.join(logDir, "monitor-sync.err.log"));
   assert.equal(config.syncProcess.env.BRAIN_ID, "ers-brain");

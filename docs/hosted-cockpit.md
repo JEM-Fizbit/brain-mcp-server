@@ -324,7 +324,7 @@ reinstall; do not edit the bundle. Each profile supports `id` or
 environment allow-list is `BRAIN_REVISION_STORE`,
 `BRAIN_REVISION_DATABASE_URL`, `BRAIN_HOSTED_BASE_URL`, `BRAIN_FLY_APP`,
 `BRAIN_EXPECTED_SUPABASE_PROJECT_REF`,
-`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_SYNC_LOCAL_EDIT_SURFACE`,
+`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`, `BRAIN_SYNC_CYCLE_TIMEOUT_MS`, `BRAIN_SYNC_LOCAL_EDIT_SURFACE`,
 `BRAIN_DOCTOR_OPERATION_REFRESH_MS`, `BRAIN_DOCTOR_DB_TIMEOUT_MS`, and
 `BRAIN_LINT_MODE_OVERRIDES`; `FLY_CONFIG_DIR`
 may also be supplied when different profiles use isolated Fly CLI identities.
@@ -691,6 +691,16 @@ Tune with `BRAIN_SLO_DB_SPAN_WINDOW_MS` (default 24h), `BRAIN_SLO_DB_SPAN_PERCEN
 **Caveat on what a DB span currently measures.** A span wraps `pool.query`, and node-postgres acquires a connection before running the SQL, so a span bills connection setup — TCP, TLS, SCRAM — to the query, and attributes it to a table and a SQL verb. Spans taken on a client acquired explicitly through `pool.connect()` exclude that cost, so spans are not yet mutually comparable. Spec 019 phase 2 separates acquisition into its own span; until then, read a slow span as "this operation waited on Postgres", not as "this SQL was slow".
 
 ### Doctor findings carry provenance and tolerate transients (spec 019)
+
+#### Independent sync recovery (v1.12.0)
+
+Monitor now launches a small per-profile supervisor around the sync CLI. The supervisor has its own event loop, observes PID-bound completed sync health, and terminates a worker that makes no progress for the configured cycle deadline plus 30 seconds (default 330 seconds). It asks the worker to stop, forces termination after ten seconds if necessary, and waits for the actual child exit before replacement. An unknown live lock owner is never killed or adopted automatically.
+
+Automatic recovery waits 3, 15 and 60 seconds before its three replacement attempts. A full minute of fresh successful cycles resets the budget. Exhaustion becomes **Sync needs intervention**, persists across Monitor restarts, and attempts one native macOS notification per incident (delivery depends on macOS notification settings). Correct the cause and select **Retry Sync Recovery** in that Brain's Monitor menu to reset the budget. Merely refreshing the Cockpit does not authorize or run recovery.
+
+Mac wake notifications and long scheduling gaps grant a two-minute grace period; they do not fabricate successful sync observations. Intentional application shutdown stops the worker before its supervisor exits. Each profile retains a bounded 30-event metadata history at `<healthFile>.supervision.json`, with restart reason, current stage and last success. The worker writes atomic health reports with its PID and a separate `<healthFile>.progress.json` containing only cycle/stage/timing metadata. Stage updates cannot keep a stuck cycle healthy. Doctor checks reject stale, mismatched-Brain or mismatched-supervisor reports and expose recovery details under the supervisor check.
+
+No source bytes, Brain content, credentials or query text are captured by these new diagnostics. Conflict decisions and recovery copies remain human-controlled. A sleeping/offline Mac cannot promise local convergence; hosted service health remains a separate observation.
 
 The local sync watch loop has a per-cycle deadline (`BRAIN_SYNC_CYCLE_TIMEOUT_MS`, default `300000`, five minutes), including recovery accounting and health output. If asynchronous work stalls, it records `sync_cycle_timeout` and exits nonzero for Monitor's existing supervisor to replace it. Health reporting has a one-second exit fallback. A timed-out worker keeps its lock until process exit; the replacement reclaims the dead PID's lock through the normal startup path. It never starts another cycle alongside unfinished writes. This timer handles stalled asynchronous work, not a synchronously blocked Node event loop. Large legitimate syncs may need a higher configured deadline.
 

@@ -1,5 +1,15 @@
 # Working Decisions Log
 
+## 2026-09-26 — Independent, bounded sync recovery for both owner profiles
+
+**Decision:** v1.12.0 adds a separate supervisor process between Monitor and each sync worker. It enforces a 330-second completed-cycle deadline even when the worker event loop freezes, waits for process exit before replacement, and allows three replacements with 3/15/60-second backoff. The retry budget resets only after completed cycles demonstrate 60 seconds of sustained progress. Exhaustion survives Monitor restart and requires the operator's **Retry Sync Recovery** action. Sleep/wake grants 120 seconds for reconnection; it never refreshes old health timestamps.
+
+**Observability:** atomic, owner-only metadata records expose the last stage, successful cycle, retry count and bounded incident history. Monitor and doctor show exhausted recovery as a failure; Monitor requests one macOS notification per incident (delivery depends on OS notification settings). This does not add a remote telemetry service or carry Brain content into diagnostics.
+
+**Source boundary:** vault file listings now omit hosted `sources/` companions, just as sync does. This closes the previously open hosted-lint abort without weakening source-path validation or modifying archived bytes, manifests, revisions or local recovery records.
+
+**Evidence:** Node 22 subprocess tests exercise blocked event loops, database interruption, retry exhaustion and restart persistence, explicit retry, one-cycle false recovery, wake grace and sync convergence without loss of local work. Disposable PostgreSQL acceptance covers ingestion through manifest-verified companion reading, vault listing, lint and sync, plus rollback and receipt replay. See [operator behavior](hosted-cockpit.md#independent-sync-recovery-v1120). These are controlled engineering tests; the original September 24 stall's underlying cause remains unproven.
+
 ## 2026-09-26 — Bound stalled sync cycles and keep hosted source companions outside vault sync
 
 **Decision:** supervised `watch` cycles have a configurable five-minute deadline. Expiry records an error and terminates the worker with its lock retained until process exit; Monitor replaces it and normal startup reclaims the dead-PID lock. Do not retry a timed-out operation in the same process, because a timeout does not cancel its pending writes. Health reporting cannot delay exit beyond one additional second. The timer covers asynchronous stalls, not a blocked JavaScript event loop.

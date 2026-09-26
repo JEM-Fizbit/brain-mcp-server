@@ -150,6 +150,7 @@ const profileEnvKeys = new Set([
   "BRAIN_HOSTED_BASE_URL",
   "BRAIN_FLY_APP",
   "BRAIN_SYNC_HEARTBEAT_INTERVAL_MS",
+  "BRAIN_SYNC_CYCLE_TIMEOUT_MS",
   "BRAIN_SYNC_LOCAL_EDIT_SURFACE",
   "BRAIN_DOCTOR_OPERATION_REFRESH_MS",
   "BRAIN_DOCTOR_DB_TIMEOUT_MS",
@@ -322,7 +323,7 @@ function normalizeProfile(rawProfile, index) {
           syncProcess: {
             name: "sync",
             launchPath: nodePath,
-            arguments: [syncCliPath, "watch"],
+            arguments: [path.join(repoRoot, "dist", "sync", "supervisor.js"), syncCliPath, "watch"],
             currentDirectoryPath: repoRoot,
             stdoutPath: syncStdout,
             stderrPath: syncStderr,
@@ -563,6 +564,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
   [self setStatusTitle:@"Brain"];
   [self installTerminationSignalHandlers];
+  [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self selector:@selector(syncDidWake:) name:NSWorkspaceDidWakeNotification object:nil];
   [self startManagedProcesses];
   [self scheduleStackHeartbeat];
   [self scheduleDoctorPolling];
@@ -856,6 +858,9 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (NSString *)profileStatusForProfile:(NSDictionary *)profile {
   NSDictionary *health = [self readJsonAtPath:[self stringFromValue:profile[@"healthFile"] fallback:@""]];
+  NSDictionary *recovery = [self readJsonAtPath:[[self stringFromValue:profile[@"healthFile"] fallback:@""] stringByAppendingString:@".supervision.json"]];
+  if ([recovery[@"state"] isEqual:@"needs_attention"]) return @"fail";
+  if ([@[@"starting", @"backoff", @"stopping"] containsObject:recovery[@"state"]]) return @"warn";
   NSDictionary *doctor = [self readDoctorReportForProfile:profile];
   NSArray *actions = [self actionItemsForDoctorReport:doctor];
   NSString *doctorStatus = [[self stringFromValue:doctor[@"status"] fallback:@""] lowercaseString];
@@ -955,6 +960,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
     @"state": running ? @"running" : @"stopped",
     @"pid": running ? @(task.processIdentifier) : [NSNull null]
   } mutableCopy];
+  if ([name hasPrefix:@"sync:"]) status[@"supervisionExpected"] = @YES;
   NSString *fingerprint = self.cockpitScriptFingerprints[name];
   if (fingerprint.length > 0) {
     status[@"scriptFingerprint"] = fingerprint;
@@ -1079,8 +1085,44 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   }
 }
 
+- (void)syncDidWake:(NSNotification *)notification {
+  (void)notification;
+  for (NSDictionary *profile in [self brainProfiles]) {
+    NSTask *task = self.managedTasks[[self syncTaskNameForProfile:profile]];
+    if (task.isRunning) kill(task.processIdentifier, SIGUSR2);
+  }
+}
+
+- (void)retrySyncRecovery:(id)sender {
+  NSDictionary *profile = [self profileForSender:sender];
+  NSTask *task = self.managedTasks[[self syncTaskNameForProfile:profile]];
+  if (task.isRunning) kill(task.processIdentifier, SIGUSR1);
+  [self recordLastAction:@"Sync recovery retry requested"];
+}
+
+- (void)checkSyncRecoveryNotifications {
+  for (NSDictionary *profile in [self brainProfiles]) {
+    NSString *healthPath = [self stringFromValue:profile[@"healthFile"] fallback:@""];
+    NSDictionary *recovery = [self readJsonAtPath:[healthPath stringByAppendingString:@".supervision.json"]];
+    if (![recovery[@"state"] isEqual:@"needs_attention"]) continue;
+    NSString *episode = [self stringFromValue:recovery[@"attentionId"] fallback:@""];
+    NSString *receiptPath = [healthPath stringByAppendingString:@".notification.json"];
+    NSDictionary *receipt = [self readJsonAtPath:receiptPath];
+    if (!episode.length || [receipt[@"attentionId"] isEqual:episode]) continue;
+    NSUserNotification *notice = [[NSUserNotification alloc] init];
+    notice.title = @"Brain sync needs attention";
+    notice.subtitle = [self displayNameForProfile:profile];
+    notice.informativeText = @"Automatic recovery stopped. Open Brain Monitor and choose Retry Sync Recovery.";
+    [[NSUserNotificationCenter defaultUserNotificationCenter] deliverNotification:notice];
+    NSData *data = [NSJSONSerialization dataWithJSONObject:@{@"attentionId": episode} options:0 error:nil];
+    [data writeToFile:receiptPath atomically:YES];
+    [self recordLastAction:[NSString stringWithFormat:@"%@ sync needs intervention", [self displayNameForProfile:profile]]];
+  }
+}
+
 - (void)heartbeatStackStatus:(NSTimer *)timer {
   (void)timer;
+  [self checkSyncRecoveryNotifications];
   [self ensureCockpitRuntimesFresh:NO];
   [self writeStackStatus];
 }
@@ -1535,6 +1577,7 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addActionItem:profileMenu title:@"Open Hosted Status" action:@selector(openHostedStatus:) profile:profile];
   [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
   [self addActionItem:profileMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
+  [self addActionItem:profileMenu title:@"Retry Sync Recovery" action:@selector(retrySyncRecovery:) profile:profile];
   [self addActionItem:profileMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];
   [self addActionItem:profileMenu title:@"Apply Lint Fixes..." action:@selector(applyLintFixes:) profile:profile];
 
