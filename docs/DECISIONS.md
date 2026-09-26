@@ -1,5 +1,15 @@
 # Working Decisions Log
 
+## 2026-09-26 — Bound stalled sync cycles and keep hosted source companions outside vault sync
+
+**Decision:** supervised `watch` cycles have a configurable five-minute deadline. Expiry records an error and terminates the worker with its lock retained until process exit; Monitor replaces it and normal startup reclaims the dead-PID lock. Do not retry a timed-out operation in the same process, because a timeout does not cancel its pending writes. Health reporting cannot delay exit beyond one additional second. The timer covers asynchronous stalls, not a blocked JavaScript event loop.
+
+**Custody:** hosted `sources/` companion heads and tombstones are excluded from vault pulls and named in `excludedSourceFiles`. Reviewed ingestion deliberately stores companions in the revision store, but they must not become `brain/sources/` files. Other path refusals stay in force. No source bytes, hosted revisions, recovery records or conflict decisions are changed by this exclusion.
+
+**Evidence:** the JEM worker remained alive with no completed cycle after 24 September 20:42 UTC. A forced restart on 26 September exposed a second blocker: a reviewed source companion in the shared revision inventory tripped the vault-path refusal. After the fix, JEM doctor and heartbeat passed with zero conflicts and subsequent cycles reported no outstanding vault changes. Node 22 full suite: 565 passed, 11 skipped, zero failed; subprocess fixtures cover stalled cycles, stalled health output and dead-lock reclamation. The precise cause of the original asynchronous stall remains unproven. The separately recorded hosted-lint source-link defect remains open.
+
+**Related:** [operator behavior](hosted-cockpit.md#doctor-findings-carry-provenance-and-tolerate-transients-spec-019); `src/sync/cli.ts`; `test/sync-cli.test.mjs`; `test/sync.test.mjs`.
+
 ## 2026-09-19 — Credentials are keyed by Brain, never by folder; the ambient repo credential is retired
 
 **Decision:** The repo's `.env.local` carries no database credential. Brain selection and credentials come from the owner-only Brain Monitor profile named by `BRAIN_MONITOR_CONFIG_FILE`, chosen by an explicit `BRAIN_ID` whenever more than one profile exists. A profile value may replace an ambient `.env.local` value but never an explicit environment value that disagrees with it; that is a refusal. The rule lives once in `src/sync/runtime-binding.ts` and is applied by the sync CLI and by the shared loader every operator script uses. Read-only sync commands (`summary`, `status`, prune dry run) do not take the sync lock.

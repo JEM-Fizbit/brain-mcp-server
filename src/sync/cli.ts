@@ -44,6 +44,7 @@ interface SyncCliConfig {
   watchIntervalMs: number;
   watchCycles?: number;
   watchOutput: "summary" | "full";
+  cycleTimeoutMs: number;
   closeTimeoutMs: number;
 }
 
@@ -75,6 +76,8 @@ function usage(): string {
     "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
     "  BRAIN_SYNC_WATCH_CYCLES   Optional finite watch cycles for tests/jobs",
     "  BRAIN_SYNC_WATCH_OUTPUT   Watch output mode: summary|full (default: summary)",
+    "  BRAIN_SYNC_CYCLE_TIMEOUT_MS",
+    "                            Watch cycle deadline; exits for supervisor recovery (default: 300000)",
     "  BRAIN_SYNC_CLOSE_TIMEOUT_MS",
     "                            Max milliseconds to wait for sync store shutdown (default: 5000)",
     "  BRAIN_REVISION_STORE      Revision store provider: file|postgres",
@@ -148,6 +151,7 @@ function readConfig(): SyncCliConfig {
     watchOutput:
       process.env.BRAIN_SYNC_WATCH_OUTPUT === "full" ? "full" : "summary",
     closeTimeoutMs: positiveNumberEnv("BRAIN_SYNC_CLOSE_TIMEOUT_MS", 5_000),
+    cycleTimeoutMs: Math.min(2_147_483_647, positiveNumberEnv("BRAIN_SYNC_CYCLE_TIMEOUT_MS", 300_000)),
   };
 }
 
@@ -456,25 +460,59 @@ async function runWithConfig(
         let cycle = 0;
         while (!stopped) {
           cycle += 1;
+          let deadline: NodeJS.Timeout | undefined;
+          let timedOut = false;
           try {
-            const report = await agent.syncOnce();
-            const summary = summarizeReport(report);
-            const recovery = await recoveryUsage(config.brainDir);
-            await writeSyncHealth(config, {
-              command,
-              status: report.guardTripped ? "warn" : "ok",
-              cycle,
-              checkedAt: new Date().toISOString(),
-              report: summary,
-              recovery,
-            });
-            writeJsonLine({
-              command,
-              cycle,
-              config: outputConfig(config),
-              report: config.watchOutput === "full" ? report : summary,
-            });
+            // A rejected deadline cannot cancel in-flight I/O. On expiry we
+            // must exit with the lock still held, never start another cycle or
+            // release the lock while the abandoned operation can still write.
+            await Promise.race([
+              new Promise<never>((_resolve, reject) => {
+                deadline = setTimeout(() => {
+                  timedOut = true;
+                  const error = new Error(`Sync cycle timed out after ${config.cycleTimeoutMs}ms; exiting for supervisor restart`);
+                  process.stderr.write(`[brain-sync] ${error.message}\n`);
+                  // Bound exit even if the ordinary error handler is already
+                  // stuck writing health when the deadline fires.
+                  setTimeout(() => process.exit(1), 1_000);
+                  reject(error);
+                }, config.cycleTimeoutMs);
+              }),
+              (async () => {
+                const report = await agent.syncOnce();
+                if (timedOut) return;
+                const summary = summarizeReport(report);
+                const recovery = await recoveryUsage(config.brainDir);
+                if (timedOut) return;
+                await writeSyncHealth(config, {
+                  command,
+                  status: report.guardTripped ? "warn" : "ok",
+                  cycle,
+                  checkedAt: new Date().toISOString(),
+                  report: summary,
+                  recovery,
+                });
+                if (timedOut) return;
+                writeJsonLine({
+                  command,
+                  cycle,
+                  config: outputConfig(config),
+                  report: config.watchOutput === "full" ? report : summary,
+                });
+              })(),
+            ]);
           } catch (error: any) {
+            if (timedOut) {
+              try {
+                await writeSyncHealth(config, {
+                  command, status: "error", cycle,
+                  checkedAt: new Date().toISOString(),
+                  error: error.message, reason: "sync_cycle_timeout",
+                });
+              } finally {
+                process.exit(1);
+              }
+            }
             await writeSyncHealth(config, {
               command,
               status: "error",
@@ -483,6 +521,8 @@ async function runWithConfig(
               error: error?.message || String(error),
             });
             throw error;
+          } finally {
+            if (deadline) clearTimeout(deadline);
           }
           if (config.watchCycles && cycle >= config.watchCycles) break;
           await sleep(config.watchIntervalMs);

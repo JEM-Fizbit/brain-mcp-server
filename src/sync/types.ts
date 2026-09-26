@@ -220,6 +220,8 @@ export interface SyncTiming {
 }
 
 export interface LocalSyncReport {
+  /** Hosted source companions intentionally outside vault sync custody. */
+  excludedSourceFiles?: string[];
   pushed: string[];
   pulled: string[];
   unchanged: string[];

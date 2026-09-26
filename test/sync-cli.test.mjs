@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -429,6 +429,7 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
   assert.equal(outputs[0].cycle, 1);
   assert.equal(outputs[0].config.databaseUrl, "missing");
   assert.equal(outputs[0].config.watchOutput, "summary");
+  assert.equal(outputs[0].config.cycleTimeoutMs, 300_000);
   assert.equal(outputs[0].report.pushed, 1);
   assert.equal(outputs[0].report.pulled, 0);
   assert.equal(outputs[0].report.conflicts, 0);
@@ -453,6 +454,57 @@ test("sync CLI watch runs finite sync cycles for automation harnesses", async ()
   assert.equal(typeof health.checkedAt, "string");
   assert.equal("files" in health, false);
 });
+
+for (const failure of ["cycle", "cycle-and-health", "error-health"]) {
+  const hungHealthWrite = failure !== "cycle";
+  test(`watch deadline exits stalled ${failure} and permits safe restart`, async () => {
+    const config = dirs(`watch-timeout-${failure}`);
+    await writeBrainFile(config.brainDir, "NOW.md", "Preserve local work\n");
+    const preload = path.join(path.dirname(config.brainDir), "stall.mjs");
+    const agentUrl = pathToFileURL(path.join(__dirname, "..", "dist", "sync", "local-sync-agent.js")).href;
+    await fs.writeFile(preload, `
+      import fs from 'node:fs/promises';
+      import { LocalSyncAgent } from ${JSON.stringify(agentUrl)};
+      LocalSyncAgent.prototype.syncOnce = async function () {
+        await fs.writeFile(${JSON.stringify(preload + ".started")}, 'started');
+        ${failure === "error-health" ? "throw new Error('Synthetic sync failure');" : ""}
+        return new Promise(() => {});
+      };
+      ${hungHealthWrite ? `const write = fs.writeFile; fs.writeFile = (file, ...args) =>
+        file === ${JSON.stringify(config.healthFile)} ? new Promise(() => {}) : write(file, ...args);` : ""}
+    `);
+    await assert.rejects(exec(process.execPath, ["--import", preload, cliPath, "watch"], {
+      timeout: 10_000,
+      env: {
+        ...process.env, BRAIN_ID: "ai-brain-jem", BRAIN_DIR: config.brainDir,
+        BRAIN_SYNC_STATE_FILE: config.stateFile, BRAIN_SYNC_LOCK_FILE: config.lockFile,
+        BRAIN_SYNC_HEALTH_FILE: config.healthFile, BRAIN_SYNC_STORE_FILE: config.storeFile,
+        BRAIN_REVISION_STORE: "file", BRAIN_REVISION_DATABASE_URL: "",
+        BRAIN_SYNC_LOAD_LOCAL_ENV: "0", BRAIN_MONITOR_CONFIG_FILE: "",
+        BRAIN_SYNC_CYCLE_TIMEOUT_MS: "100", BRAIN_SYNC_WATCH_CYCLES: "1",
+      },
+    }), error => {
+      assert.equal(error.code, 1);
+      assert.equal(error.killed, false);
+      assert.match(error.stderr, /Sync cycle timed out after 100ms/);
+      assert.equal(error.stdout, "");
+      return true;
+    });
+    assert.equal(await fs.readFile(preload + ".started", "utf8"), "started");
+    const lock = JSON.parse(await fs.readFile(config.lockFile, "utf8"));
+    assert.throws(() => process.kill(lock.pid, 0), { code: "ESRCH" });
+    if (!hungHealthWrite) {
+      const health = JSON.parse(await fs.readFile(config.healthFile, "utf8"));
+      assert.equal(health.status, "error");
+      assert.equal(health.reason, "sync_cycle_timeout");
+      assert.equal(health.cycle, 1);
+    }
+    const recovered = await runCli("once", config);
+    assert.deepEqual(recovered.report.pushed, ["NOW.md"]);
+    assert.equal(await readBrainFile(config.brainDir, "NOW.md"), "Preserve local work\n");
+    await assert.rejects(fs.stat(config.lockFile), /ENOENT/);
+  });
+}
 
 test("sync CLI watch can emit full reports for debugging", async () => {
   const config = dirs("watch-full");
