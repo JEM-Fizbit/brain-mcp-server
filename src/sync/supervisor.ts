@@ -14,7 +14,17 @@ export interface SupervisorOptions {
   wakeGraceMs?: number;
   stableMs?: number;
   retryDelays?: number[];
+  networkRetryDelays?: number[];
 }
+
+// Mirrors the doctor's transient resolution/connectivity/timeout classes
+// (scripts/lib/doctor-actionability.mjs). An unreachable network is not a
+// worker fault: a sleep/DarkWake gap must not exhaust the restart budget.
+const NETWORK_ERROR = new RegExp([
+  String.raw`\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ENETDOWN|ETIMEDOUT|EPIPE)\b`,
+  "getaddrinfo", "connection terminated", "connection refused", "socket hang up",
+  "timeout exceeded when trying to connect", "query read timeout",
+].join("|"), "i");
 
 // Exposed for deterministic sleep/wake tests. Large scheduling gaps grant one
 // grace window; old worker health is never promoted to a new observation.
@@ -30,6 +40,7 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
   const wakeGraceMs = o.wakeGraceMs ?? 120_000;
   const stableMs = o.stableMs ?? 60_000;
   const retryDelays = o.retryDelays ?? [3_000, 15_000, 60_000];
+  const networkRetryDelays = o.networkRetryDelays ?? [15_000, 30_000, 60_000, 120_000, 300_000];
   const output = `${o.healthFile}.supervision.json`;
   const read = async (file: string): Promise<any> => {
     try { return JSON.parse(await fs.readFile(file, "utf8")); } catch { return null; }
@@ -41,7 +52,7 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
   let reason = state === "needs_attention" ? prior.reason : "startup";
   let child: ChildProcess | null = null;
   let startedAt = 0, lastCompletion = 0, lastTick = Date.now(), graceUntil = 0, nextStart = Date.now();
-  let stableSince = 0, stopAt = 0, shuttingDown = false, ticking = false;
+  let stableSince = 0, stopAt = 0, shuttingDown = false, ticking = false, networkWaits = 0;
   let lastStage: string | null = null, lastSuccessAt: string | null = prior?.lastSuccessAt ?? null;
   const history: any[] = prior?.brainId === o.brainId && Array.isArray(prior.history) ? prior.history.slice(-29) : [];
   let writing = false;
@@ -76,6 +87,13 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
     nextStart = Date.now() + delay;
     state = "backoff"; reason = why; event("retry_scheduled"); void publish();
   };
+  // Paced indefinitely without consuming the fault budget; a persistent
+  // resolution failure still escalates through the doctor's sync_health check.
+  const networkWait = () => {
+    stableSince = 0;
+    nextStart = Date.now() + networkRetryDelays[Math.min(networkWaits++, networkRetryDelays.length - 1)];
+    state = "backoff"; reason = "network_unavailable"; event("network_wait"); void publish();
+  };
   const alive = (pid: number) => {
     try { process.kill(pid, 0); return true; } catch (e: any) { return e.code !== "ESRCH"; }
   };
@@ -97,7 +115,17 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
       child = null;
       event("worker_exited");
       if (shuttingDown) return;
-      failed(state === "stopping" ? reason : signal ? "worker_signal" : code === 0 ? "unexpected_exit" : "worker_error");
+      if (state === "stopping" || signal || code === 0) {
+        failed(state === "stopping" ? reason : signal ? "worker_signal" : "unexpected_exit"); return;
+      }
+      // Hold replacement until the worker's final health report is classified.
+      state = "backoff"; nextStart = Infinity;
+      void read(o.healthFile).then((health) => {
+        if (shuttingDown || child) return;
+        const network = health?.pid === worker.pid && health.status === "error" &&
+          health.reason !== "sync_cycle_timeout" && NETWORK_ERROR.test(String(health.error ?? ""));
+        if (network) networkWait(); else failed("worker_error");
+      });
     });
     void publish();
   };
@@ -145,7 +173,7 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
           if (!stableSince) { stableSince = completed; event("progress_restored"); }
           if (advanced && completed - stableSince >= stableMs && Date.now() - completed < Math.min(deadlineMs, 120_000)) {
             if (attempts) event("recovered");
-            attempts = 0;
+            attempts = 0; networkWaits = 0;
           }
           state = "running"; reason = "progress_current";
         } else stableSince = 0;

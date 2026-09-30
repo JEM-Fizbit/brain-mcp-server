@@ -28,6 +28,9 @@ async function fixture(t,mode) {
     if(${JSON.stringify(mode)}==='once') {
       const original=LocalSyncAgent.prototype.syncOnce; let calls=0;
       LocalSyncAgent.prototype.syncOnce=async function(){if(calls++)while(true){};return original.call(this);};
+    } else if(${JSON.stringify(mode)}==='network'&&a.length<=4){
+      const errors=['getaddrinfo ENOTFOUND db.invalid','Connection terminated due to connection timeout','Query read timeout','connect ECONNREFUSED 127.0.0.1:6543'];
+      LocalSyncAgent.prototype.syncOnce=async()=>{throw Error(errors[a.length-1]);};
     } else if(${JSON.stringify(mode)}==='exhaust'||(${JSON.stringify(mode)}!=='healthy'&&a.length===1)){
       if(${JSON.stringify(mode)}==='freeze') LocalSyncAgent.prototype.syncOnce=async()=>{while(true){}};
       else LocalSyncAgent.prototype.syncOnce=async()=>{throw Error('Synthetic database interruption');};
@@ -36,7 +39,7 @@ async function fixture(t,mode) {
   await fs.writeFile(harness,`import {runSupervisor} from ${JSON.stringify(url('supervisor'))};
     await runSupervisor(${JSON.stringify({brainId:'fixture',healthFile:health,lockFile:state+'.lock',
       worker:['--import',preload,new URL('../dist/sync/cli.js',import.meta.url).pathname,'watch'],
-      tickMs:25,deadlineMs:1500,stopGraceMs:100,wakeGraceMs:1500,stableMs:200,retryDelays:[60,120]})});`);
+      tickMs:25,deadlineMs:1500,stopGraceMs:100,wakeGraceMs:1500,stableMs:200,retryDelays:[60,120],networkRetryDelays:[50,100]})});`);
   const env={...process.env,BRAIN_ID:'fixture',BRAIN_DIR:brainDir,BRAIN_SYNC_STATE_FILE:state,
     BRAIN_SYNC_HEALTH_FILE:health,BRAIN_SYNC_STORE_FILE:storeFile,BRAIN_REVISION_STORE:'file',
     BRAIN_REVISION_DATABASE_URL:'',BRAIN_SYNC_LOAD_LOCAL_ENV:'0',BRAIN_MONITOR_CONFIG_FILE:'',
@@ -89,4 +92,13 @@ test('sleep/wake grace lets a suspended worker resume without a false restart',a
  process.kill(d.workerPid,'SIGCONT');
  await waitFor(async()=>Date.parse((await json(f.health))?.checkedAt)>Date.parse(d.lastSuccessAt));
  assert.equal((await json(f.marker)).length,1);
+});
+
+test('network outage longer than the fault budget waits without needing intervention',async t=>{
+ const f=await fixture(t,'network');
+ const d=await waitFor(async()=>{const d=await f.report();return d?.state==='running'&&d.lastSuccessAt&&d;});
+ assert.equal((await json(f.marker)).length,5);assert.equal(d.attempts,0);
+ assert.equal(d.history.filter(e=>e.kind==='network_wait').length,4);
+ assert.ok(!d.history.some(e=>e.kind==='needs_attention'||e.kind==='retry_scheduled'));
+ assert.equal(await fs.readFile(path.join(f.brainDir,'NOW.md'),'utf8'),'Local work survives\n');
 });
