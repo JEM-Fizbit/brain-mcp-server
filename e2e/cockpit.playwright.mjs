@@ -717,3 +717,38 @@ test("sync warnings, recurring failures and recovery render with source provenan
     }
   } finally { await stopCockpit(child); }
 });
+
+test("lint source, assessment time and observation state remain explicit on desktop and mobile", async ({ page }, testInfo) => {
+  const { child, url } = await startCockpit(testInfo);
+  let state = "fresh";
+  let hasReport = true;
+  await page.route("**/api/lint/report", async route => route.fulfill({ json: {
+    ok: true, lint: {
+      brainId: "ai-brain-jem", source: "doctor_hosted", checkedAt: hasReport ? "2026-10-02T21:00:00Z" : null,
+      observation: { state, observedAt: new Date().toISOString() },
+      ...(hasReport ? { report: {}, issueCount: 4, automaticFixCount: 0, operatorDecisionCount: 0,
+        maintainerFindingCount: 4, reviewFindings: [], technicalDiagnostics: [], warnings: [] } : {}),
+    },
+  } }));
+  try {
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(url);
+      await page.getByRole("tab", { name: "Maintenance", exact: true }).click();
+      for (const observed of ["fresh", "stale", "failed", "unobserved"]) {
+        state = observed; hasReport = true;
+        await page.locator("#fixes-reload").click();
+        await expect(page.locator("#lint-status")).toContainText("source: doctor_hosted");
+        await expect(page.locator("#lint-status")).toContainText("state: " + observed);
+        await expect(page.locator("#lint-status")).toContainText("verified:");
+        if (observed !== "fresh") await expect(page.locator("#lint-status")).toContainText("historical");
+      }
+      state = "failed"; hasReport = false;
+      await page.locator("#fixes-reload").click();
+      await expect(page.locator("#lint-status")).toContainText("No structured lint assessment observed · state: failed");
+      await expect(page.locator("#lint-summary")).not.toContainText("0 action(s)");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`lint-state-${width}.png`), fullPage: true });
+    }
+  } finally { await stopCockpit(child); }
+});

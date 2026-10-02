@@ -536,7 +536,7 @@ surface instead of forcing a switch to an MCP client or CLI:
   the active Brain. A successful explicit run writes one narrow `LINT` receipt
   through the configured Brain store and atomically refreshes the per-profile
   `hosted-lint-report.json` cache. The action is detection-only and does not
-  change Brain content. The doctor reads that cache first so `lint_nudge`
+  change Brain content. The Monitor-owned Doctor verifies that cache against the selected hosted vault revisions so `lint_nudge`
   represents freshness while the separate `lint_findings` check represents the
   current result. Safe mechanical fixes and explicitly labelled operator
   content decisions make `lint_findings` an actionable warning; maintainer-only
@@ -746,3 +746,30 @@ A completed sync cycle can carry a guard warning. Doctor and Monitor report the 
 ## Hosted status viewer (spec 021)
 
 The Cockpit toolbar and Brain Monitor menu offer **Hosted status** for the selected profile. It opens the endpoint’s `/monitor` page using existing Brain sign-in; viewers need no database credentials or local installation. This does not replace local sync supervision or manual inbox access. See [authentication, role tiers and observation limits](hosted-monitoring.md).
+
+### Structured lint freshness
+
+Doctor's existing 60-second cycle checks selected-Brain hosted revision metadata.
+It recomputes the canonical structured lint and mechanical-fix preview on revision
+changes, missing/legacy reports, configuration changes, or a one-day assessment
+age; unchanged content uses the validated report. Automatic assessment is read-only
+and writes only the local per-profile cache, without LINT receipts or Brain edits.
+Hosted LOG receipts (including enhanced routine success prose) are not structured
+lint evidence and never replace these findings. The assessment source is
+`doctor_hosted`, `cockpit_hosted`, or `cockpit_local`, with separate assessment and
+observation timestamps. Hosted assessment covers synced vault Markdown; local
+working binaries and the local source-link audit remain explicitly outside its scope.
+
+Doctor and explicit hosted Maintenance serialize cache updates using a recoverable
+PID lock. Revision changes during assessment reject the candidate. ERS and JEM
+fingerprints include the selected Brain, endpoint/project binding and lint config;
+source-companion revisions are excluded from vault lint. Freshness is `fresh`,
+`stale`, `failed`, or `unobserved`. Failed/unobserved checks preserve prior findings
+as historical with their original timestamp, never as an all-clear. No additional
+polling daemon, hosted telemetry/schema change, or routine configuration is needed.
+An explicit Maintenance receipt changes LOG after assessment; the following Doctor
+cycle reassesses that revised vault.
+
+Activation requires the patched checkout/build and replacement of the running
+Cockpit children. Monitor remains the only periodic Doctor owner. Do not restart
+Monitor or its sync supervisors merely to activate this fix without operator approval.

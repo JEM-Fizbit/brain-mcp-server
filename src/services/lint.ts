@@ -209,9 +209,10 @@ function extractFileReferencesFromContent(content: string): Set<string> {
  * discoverable from inside a Brain session.
  */
 async function findUnindexedWorkingBinaries(
-  brainId?: string
+  brainId?: string,
+  revisionBacked = revisionStoreModeEnabled()
 ): Promise<{ files: string[]; warning?: string }> {
-  if (revisionStoreModeEnabled()) {
+  if (revisionBacked) {
     return {
       files: [],
       warning:
@@ -303,10 +304,10 @@ function resolveProjectsFile(allFiles: string[]): string | undefined {
   return [...candidates].sort()[0];
 }
 
-export async function runLint(brainId?: string): Promise<LintReport> {
+export async function runLint(brainId?: string, assessmentStore?: BrainStore): Promise<LintReport> {
   const { brain: lintBrain } = await resolveBrain(brainId, stdioPrincipal());
   const resolvedBrainId = lintBrain.id;
-  const store = activeBrainStore();
+  const store = assessmentStore ?? activeBrainStore();
   const files = await listBrainMarkdownFiles(store, resolvedBrainId);
   const allFiles = files.map((file) => file.name);
   const fileContentMap = new Map(files.map((file) => [file.name, file.content]));
@@ -485,7 +486,7 @@ export async function runLint(brainId?: string): Promise<LintReport> {
   }
 
   // Unindexed working binaries
-  const workingBinaryCheck = await findUnindexedWorkingBinaries(resolvedBrainId);
+  const workingBinaryCheck = await findUnindexedWorkingBinaries(resolvedBrainId, store.capabilities.revisions);
   const unindexedWorkingBinaries = workingBinaryCheck.files;
   if (workingBinaryCheck.warning) warnings.push(workingBinaryCheck.warning);
 

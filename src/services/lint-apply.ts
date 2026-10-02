@@ -6,6 +6,7 @@
  */
 import { TASKS_ARCHIVE_FILE, TASKS_FILE } from "../constants.js";
 import type { RevisionActor } from "../sync/types.js";
+import type { BrainStore } from "./brain-store.js";
 import { activeBrainStore } from "./active-brain-store.js";
 import type { BrainRole } from "./registry.js";
 import {
@@ -55,8 +56,7 @@ interface ComputedFixes {
   appliedIds: string[];
 }
 
-async function readState(brainId: string): Promise<BrainState> {
-  const store = activeBrainStore();
+async function readState(brainId: string, store = activeBrainStore()): Promise<BrainState> {
   const revisions: Record<string, string | null> = {};
   async function read(filename: string): Promise<string | null> {
     try {
@@ -201,9 +201,10 @@ export async function applyLintFixes(
 export async function planLintFixes(
   brainId: string,
   today: string,
-  thresholdDays = 30
+  thresholdDays = 30,
+  assessmentStore?: BrainStore
 ): Promise<LintFixPlan> {
-  const state = await readState(brainId);
+  const state = await readState(brainId, assessmentStore);
   return {
     items: computeFixes(state, today, thresholdDays, new Set()).items,
   };

@@ -1,3 +1,4 @@
+import { hostedLintFingerprint, refreshLintCache, readLintCache, validLintAssessment } from "./lib/lint-cache.mjs";
 import {readRegistry, selectCredential, credentialStatus, managedFlyEnv} from "./lib/fly-credentials.mjs";
 import { evaluateSupervision } from "./lib/sync-supervision.mjs";
 import fs from "node:fs/promises";
@@ -414,24 +415,39 @@ async function readJson(filePath) {
 
 function readMaintenanceLintReport() {
   if (!maintenanceLintReportPromise) {
-    maintenanceLintReportPromise = readJson(lintReportFile)
-      .then((payload) => {
-        const checkedAtMs = Date.parse(payload?.checkedAt || "");
-        if (
-          payload?.version !== 2 ||
-          payload?.brainId !== brainId ||
-          !Number.isFinite(checkedAtMs)
-        ) {
-          maintenanceLintReportError = "invalid or mismatched lint report cache";
-          return null;
-        }
-        return payload;
-      })
-      .catch((error) => {
-        if (error?.code === "ENOENT") return null;
-        maintenanceLintReportError = String(error?.message || error).slice(0, 180);
-        return null;
+    maintenanceLintReportPromise = (async () => {
+      if (!doctorPool) {
+        const cached = await readLintCache(lintReportFile, brainId);
+        return { ...(cached || { version: 2, brainId, checkedAt: null }),
+          observation: { state: "unobserved", observedAt: new Date().toISOString(), reason: "hosted_store_unavailable" } };
+      }
+      const [{ PostgresRevisionStore }, { RevisionBrainStore }, { runLint },
+        { planLintFixes }, { brainDate }, { resolveBrain, stdioPrincipal },
+        { lintAssessment }] = await Promise.all([
+        import("../dist/sync/postgres-revision-store.js"),
+        import("../dist/services/revision-brain-store.js"),
+        import("../dist/services/lint.js"),
+        import("../dist/services/lint-apply.js"),
+        import("../dist/services/date.js"),
+        import("../dist/services/registry.js"),
+        import("./lib/lint-assessment.mjs"),
+      ]);
+      const { brain } = await resolveBrain(brainId, stdioPrincipal());
+      const store = new RevisionBrainStore(new PostgresRevisionStore(doctorPool));
+      return refreshLintCache({
+        file: lintReportFile, brainId, source: "doctor_hosted",
+        getFingerprint: () => hostedLintFingerprint(doctorPool, brainId,
+          [baseUrl, process.env.BRAIN_EXPECTED_SUPABASE_PROJECT_REF], brain.lint),
+        assess: async () => lintAssessment({ brainId,
+          report: await runLint(brainId, store),
+          plan: await planLintFixes(brainId, brainDate(), 30, store),
+          sourceLinkAudit: { state: "unavailable", reason: "Doctor assesses hosted vault Markdown; local source-link audit requires Maintenance refresh." },
+        }),
       });
+    })().catch(() => {
+      maintenanceLintReportError = "lint assessment unavailable";
+      return null;
+    });
   }
   return maintenanceLintReportPromise;
 }
@@ -1198,76 +1214,27 @@ function addUserOperationLatencyCheck({
 
 async function checkLintNudge() {
   const cachedReport = await readMaintenanceLintReport();
-  if (cachedReport) {
-    const checkedAtMs = Date.parse(cachedReport.checkedAt);
-    const ageDays = Math.floor((Date.now() - checkedAtMs) / 86400000);
-    addCheck("lint_nudge", ageDays > lintNudgeDays ? "warn" : "pass", {
-      lintReportFile,
-      source: "maintenance_cache",
-      state: ageDays > lintNudgeDays ? "stale" : "fresh",
-      lastLintAt: cachedReport.checkedAt,
-      ageDays,
-      maxAgeDays: lintNudgeDays,
-      issueCount: cachedReport.issueCount || 0,
-      primaryIssueCount:
-        cachedReport.primaryIssueCount ?? cachedReport.issueCount ?? 0,
-      diagnosticCount: cachedReport.diagnosticCount || 0,
-      externalReferenceCount: cachedReport.externalReferenceCount || 0,
-      automaticFixCount: cachedReport.automaticFixCount || 0,
-      operatorDecisionCount: cachedReport.operatorDecisionCount || 0,
-      maintainerFindingCount: cachedReport.maintainerFindingCount || 0,
-    });
-    return;
-  }
-
-  const logFile = path.join(brainDir, "LOG.md");
-  try {
-    const content = await fs.readFile(logFile, "utf-8");
-    const match = content.match(/^## \[(\d{4}-\d{2}-\d{2})\] LINT/m);
-    if (!match) {
-      addCheck("lint_nudge", "warn", {
-        logFile,
-        state: "never_run",
-        lastLintAt: null,
-        maxAgeDays: lintNudgeDays,
-        ...(maintenanceLintReportError
-          ? { lintReportFile, lintReportError: maintenanceLintReportError }
-          : {}),
-      });
-      return;
-    }
-
-    const lastLintAt = new Date(`${match[1]}T00:00:00.000Z`);
-    const ageDays = Math.floor((Date.now() - lastLintAt.getTime()) / 86400000);
-    addCheck("lint_nudge", ageDays > lintNudgeDays ? "warn" : "pass", {
-      logFile,
-      state: ageDays > lintNudgeDays ? "stale" : "fresh",
-      lastLintAt: match[1],
-      ageDays,
-      maxAgeDays: lintNudgeDays,
-      ...(maintenanceLintReportError
-        ? { lintReportFile, lintReportError: maintenanceLintReportError }
-        : {}),
-    });
-  } catch (error) {
-    addCheck("lint_nudge", "warn", {
-      logFile,
-      state: "unreadable",
-      error: error.message,
-      maxAgeDays: lintNudgeDays,
-      ...(maintenanceLintReportError
-        ? { lintReportFile, lintReportError: maintenanceLintReportError }
-        : {}),
-    });
-  }
+  const observed = cachedReport?.observation || { state: "failed", reason: maintenanceLintReportError };
+  const assessed = validLintAssessment(cachedReport, brainId);
+  const ageDays = assessed ? Math.floor((Date.now() - Date.parse(cachedReport.checkedAt)) / 86400000) : null;
+  const fresh = assessed && observed.state === "fresh" && ageDays >= 0 && ageDays <= lintNudgeDays;
+  addCheck("lint_nudge", fresh ? "pass" : "warn", {
+    lintReportFile, source: cachedReport?.source || "unobserved",
+    state: fresh ? "fresh" : observed.state === "fresh" ? "stale" : observed.state,
+    lastLintAt: assessed ? cachedReport.checkedAt : null,
+    ageDays, maxAgeDays: lintNudgeDays, observation: observed,
+    assessmentScope: cachedReport?.assessmentScope || null,
+    note: "Structured assessment of current hosted Markdown; LOG receipts alone do not prove lint findings.",
+  });
 }
 
 async function checkLintFindings() {
   const cachedReport = await readMaintenanceLintReport();
-  if (!cachedReport) {
-    addCheck("lint_findings", maintenanceLintReportError ? "info" : "pass", {
+  if (!validLintAssessment(cachedReport, brainId)) {
+    addCheck("lint_findings", "info", {
       lintReportFile,
-      state: maintenanceLintReportError ? "unreadable" : "unavailable",
+      state: cachedReport?.observation?.state || "failed",
+      observation: cachedReport?.observation || null,
       issueCount: null,
       note: "Run lint in Cockpit Maintenance to create a current structured report.",
       ...(maintenanceLintReportError
@@ -1299,9 +1266,13 @@ async function checkLintFindings() {
     operatorDecisionCount,
     diagnosticCount,
   });
-  addCheck("lint_findings", classification.status, {
+  const current = cachedReport.observation?.state === "fresh";
+  addCheck("lint_findings", current ? classification.status : "info", {
     lintReportFile,
-    state: classification.state,
+    state: current ? classification.state : "historical",
+    freshness: cachedReport.observation?.state || "unobserved",
+    observation: cachedReport.observation,
+    source: cachedReport.source || "maintenance_cache",
     checkedAt: cachedReport.checkedAt,
     issueCount,
     primaryIssueCount,
@@ -1695,7 +1666,7 @@ function buildOperatorActions(status) {
       level: "warn",
       reason: "stale_lint",
       title: "Run lint from Cockpit Maintenance before accuracy-sensitive Brain work.",
-      detail: "The last lint pass is missing, stale, or unreadable. Maintenance records the receipt and refreshes the structured findings.",
+      detail: "The current hosted lint assessment is stale, failed, or unobserved. Check hosted connectivity, then refresh Maintenance; historical findings retain their original timestamp.",
     });
   }
 
