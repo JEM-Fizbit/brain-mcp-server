@@ -4,6 +4,12 @@
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
 
+## Lint freshness release — 3 October 2026
+
+Annotated **v1.12.2** (public source `b5e4db71f23f4e2272c856cfa6b335bb9d588318`) is deployed and verified on both existing owner-isolated services. ERS completed its guarded deployment at 07:32:34 UTC; JEM completed at 07:33:29 UTC. Each release gate passed 607 tests: 596 passed, 11 optional skips, zero failures. Both London machines are started, public health reports 1.12.2, OCI revision/version labels match their intended release commits, and unauthenticated MCP requests remain 401. ERS overlay/image provenance stays in its private owning repository.
+
+The release integrates current hosted structured lint with the local Doctor/Cockpit, preserving separate assessment and observation timestamps and historical failed/unobserved results. The already-landed sync network-outage resilience change is included. No migration, credential, permission, routine, Brain content or mechanical-fix application was required. The existing Mac Monitor picked up Doctor/Cockpit source changes automatically; no manual Monitor or sync restart was needed. [Freshness contract](hosted-cockpit.md#structured-lint-freshness).
+
 ## Managed Fly credentials
 
 The reusable method is documented in the owner-maintained [Automation Credential Lifecycle protocol](https://github.com/JEM-Fizbit/ai-knowledge/blob/main/protocols/AUTOMATION_CREDENTIAL_LIFECYCLE.md) (private knowledge library). This runbook remains the authority for Brain-specific commands and settings.

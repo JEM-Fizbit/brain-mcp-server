@@ -770,6 +770,10 @@ polling daemon, hosted telemetry/schema change, or routine configuration is need
 An explicit Maintenance receipt changes LOG after assessment; the following Doctor
 cycle reassesses that revised vault.
 
-Activation requires the patched checkout/build and replacement of the running
-Cockpit children. Monitor remains the only periodic Doctor owner. Do not restart
-Monitor or its sync supervisors merely to activate this fix without operator approval.
+The existing Monitor reads the canonical Doctor script each cycle and checks
+Cockpit source freshness through its existing child-supervision mechanism. With
+the canonical checkout built, both surfaces picked up this fix automatically on
+the Mac; no manual Monitor or sync restart was needed. Monitor remains the only
+periodic Doctor owner. The v1.12.2 guarded release is deployed and verified on both
+existing owner-isolated services. Do not restart Monitor or its sync supervisors
+merely to refresh this display.
