@@ -55,3 +55,16 @@ The private owner release record contains image-label attestation, bounded datab
 ### Reviewed operation inventory
 
 Whole-file replace and conflict resolution require the caller's reviewed revision. Append and exact-text patch keep their operation-specific checks and transaction CAS. Explicit delete/rename/restore keep their existing guarded revision-history contract and protected-file/role rules; this release does not claim they express a whole-document content review. Internal lint, task-intake and link updates now pass the snapshot used to compute their replacement. A stale internal result fails rather than replaying unreviewed content.
+
+### Cloud publication follow-through — 3 October 2026
+
+Persistent hard links from retained `replacement.md` to a canonical Markdown
+file can collapse their OneDrive File Provider identity. Local publication and
+interrupted restoration now use a separate prepared inode outside the watched
+namespace, atomically install it without replacing competing pathnames, and
+remove its temporary alias. Retained original/replacement files remain
+independent; late displaced-descriptor writes and conflicts are still observed.
+Cross-device/unsupported temporary publication refuses before displacement.
+Regression coverage includes inode independence, external staging cleanup,
+no-clobber races, cross-device refusal, late saves and interruption restoration.
+Existing recovery files are not automatically migrated or pruned.

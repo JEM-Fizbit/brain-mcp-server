@@ -71,3 +71,34 @@ Before Git is removed even as emergency recovery/history, run and record a resto
 8. Rehearse local Markdown reseed from the trusted local Brain checkout as the fallback path.
 
 Until this gate passes, Git stays available as emergency history/export only. It still stays out of routine Brain operations.
+
+## Cloud mirror publication and recovery identities
+
+Local sync preserves displaced files under `.brain-sync-recovery/`. Publication
+and interrupted-operation restoration now install an independent, fully written
+inode, using an atomic no-replace link from the OS temporary directory outside
+the watched cloud namespace. The temporary alias is removed immediately; the
+canonical pathname never shares a retained recovery inode. Persistent recovery
+hard links previously let OneDrive publish correct bytes under `replacement.md`
+while the canonical document name remained absent in SharePoint.
+
+The temporary directory must be outside the synced namespace and on the same
+filesystem as the Brain. Cross-device or unsupported no-replace publication
+refuses before displacing existing bytes. Do not fall back to overwriting rename
+or a partial copy into the canonical pathname. Recovery retains the original
+inode so saves through an open editor descriptor remain recoverable and are
+reported as conflicts. No background recovery cleanup is introduced.
+
+A healthy Brain hash/state is insufficient proof of cloud publication. Verify
+the exact canonical cloud folder/name and bytes, and compare File Provider item
+identity where needed. `fileproviderctl evaluate <exact-path>` is read-only;
+never invoke an action, repair, or broad diagnostic dump as a routine check.
+OneDrive must be running; its normal login item is independent of Brain Monitor.
+
+Historical retained hard links are not migrated automatically. Any existing
+canonical/recovery alias needs a bounded, explicitly approved reconciliation:
+review the canonical hash and hosted revision, preserve all recovery bytes,
+quiesce the Monitor-owned watcher, republish the reviewed bytes using the fixed
+mutation primitive, restart the existing owner, and verify independent inodes,
+unchanged bytes and the canonical cloud path. Do not mass-reconcile or directly
+upload/move cloud files to hide the publication defect.

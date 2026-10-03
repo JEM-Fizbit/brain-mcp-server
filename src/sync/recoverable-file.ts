@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { contentHash } from "./hash.js";
 
@@ -49,9 +50,46 @@ function targetPath(root: string, filename: string): string {
   return target;
 }
 
-async function restoreIfAbsent(original: string, target: string): Promise<void> {
-  try { await fs.link(original, target); }
-  catch (error: any) { if (error.code !== "EEXIST" && error.code !== "ENOENT") throw error; }
+/** Prepare outside the watched Brain/cloud namespace. The retained recovery copy
+ * and the published file must never share a provider-visible inode. Linking an
+ * independent prepared inode keeps atomic no-replace semantics; its temporary
+ * alias is removed immediately and is never visible to the cloud provider.
+ * Refuse cross-device/unsupported publication before displacing user bytes. */
+async function preparePublication(root: string, target: string, content: string) {
+  const temporaryRoot = path.resolve(os.tmpdir());
+  const brainRoot = path.resolve(root);
+  if (temporaryRoot === brainRoot || temporaryRoot.startsWith(brainRoot + path.sep) ||
+      temporaryRoot.split(path.sep).includes("CloudStorage")) {
+    throw new Error("local_publication_temp: OS temporary directory must be outside the synced namespace");
+  }
+  const dir = await fs.mkdtemp(path.join(temporaryRoot, "brain-publication-"));
+  const source = path.join(dir, path.basename(target));
+  const probe = path.join(path.dirname(target), `.brain-link-probe-${randomUUID()}`);
+  const dispose = () => fs.rm(dir, { recursive: true, force: true });
+  try {
+    await durableWrite(source, content);
+    try { await fs.link(source, probe); }
+    finally { await fs.unlink(probe).catch(error => { if (error.code !== "ENOENT") throw error; }); }
+    await syncDirectory(path.dirname(target));
+    return {
+      async publish() {
+        await fs.link(source, target);
+        await fs.unlink(source);
+        await syncDirectory(path.dirname(target));
+      },
+      dispose,
+    };
+  } catch (error) { await dispose(); throw error; }
+}
+
+async function restoreIfAbsent(root: string, original: string, target: string): Promise<void> {
+  let content: string;
+  try { content = await fs.readFile(original, "utf8"); }
+  catch (error: any) { if (error.code === "ENOENT") return; throw error; }
+  const publication = await preparePublication(root, target, content);
+  try { await publication.publish(); }
+  catch (error: any) { if (error.code !== "EEXIST") throw error; }
+  finally { await publication.dispose(); }
 }
 
 const RECOVERY_ENTRY_LIMIT = 10000;
@@ -104,8 +142,8 @@ async function assertRecoveryBudget(root: string, extraBytes: number): Promise<v
 
 /**
  * Move the actual destination inode into retained custody, then install using
- * link's atomic no-replace semantics. An editor holding that inode can keep
- * writing it: its bytes remain in original.md, even after the destination moves.
+ * an independent inode with link's atomic no-replace semantics. An editor holding
+ * the displaced inode can keep writing it: its bytes remain in original.md, even after the destination moves.
  * Recovery copies are deliberately never silently pruned by the sync loop.
  */
 export async function mutateLocalFile(
@@ -127,44 +165,40 @@ export async function mutateLocalFile(
     replacementHash: content === null ? null : contentHash(content), complete: false,
   };
   if (content !== null) await durableWrite(replacement, content);
-  // Prove no-replace links work on this filesystem before displacing user bytes.
-  const probeSource = path.join(dir, "link-probe");
-  const probeTarget = path.join(path.dirname(target), `.brain-link-probe-${randomUUID()}`);
-  await durableWrite(probeSource, "");
-  try { await fs.link(probeSource, probeTarget); }
-  finally { await fs.unlink(probeTarget).catch(error => { if (error.code !== "ENOENT") throw error; }); await fs.unlink(probeSource); }
-  await syncDirectory(path.dirname(target));
-  await saveIntent(dir, intent);
-  await syncDirectory(recoveryRoot);
-  let displaced = false;
+  const publication = await preparePublication(root, target, content ?? "");
   try {
-    await fs.rename(target, original);
-    displaced = true;
-    await syncDirectory(path.dirname(target));
-    await syncDirectory(dir);
-  } catch (error: any) { if (error.code !== "ENOENT") throw error; }
-  const displacedHash = displaced ? await hash(original) : null;
-  if (displacedHash !== expectedHash) {
-    await restoreIfAbsent(original, target);
-    await saveIntent(dir, { ...intent, complete: true });
-    return { ok: false, currentHash: displacedHash, recoveryPath: original };
-  }
-  if (content !== null) {
-    try { await fs.link(replacement, target); }
-    catch (error: any) {
-      if (error.code !== "EEXIST") throw error;
+    await saveIntent(dir, intent);
+    await syncDirectory(recoveryRoot);
+    let displaced = false;
+    try {
+      await fs.rename(target, original);
+      displaced = true;
+      await syncDirectory(path.dirname(target));
+      await syncDirectory(dir);
+    } catch (error: any) { if (error.code !== "ENOENT") throw error; }
+    const displacedHash = displaced ? await hash(original) : null;
+    if (displacedHash !== expectedHash) {
+      await restoreIfAbsent(root, original, target);
       await saveIntent(dir, { ...intent, complete: true });
-      return { ok: false, currentHash: await hash(target), recoveryPath: original };
+      return { ok: false, currentHash: displacedHash, recoveryPath: original };
     }
-  }
-  await syncDirectory(path.dirname(target));
-  // A new pathname or a late write through a displaced descriptor is a conflict.
-  const lateOriginalHash = displaced ? await hash(original) : null;
-  const currentHash = await hash(target);
-  const ok = lateOriginalHash === expectedHash && currentHash === intent.replacementHash;
-  if (!ok && currentHash === null) await restoreIfAbsent(original, target);
-  await saveIntent(dir, { ...intent, complete: true });
-  return { ok, currentHash: lateOriginalHash !== expectedHash ? lateOriginalHash : currentHash, recoveryPath: original };
+    if (content !== null) {
+      try { await publication.publish(); }
+      catch (error: any) {
+        if (error.code !== "EEXIST") throw error;
+        await saveIntent(dir, { ...intent, complete: true });
+        return { ok: false, currentHash: await hash(target), recoveryPath: original };
+      }
+    }
+    await syncDirectory(path.dirname(target));
+    // A new pathname or a late write through a displaced descriptor is a conflict.
+    const lateOriginalHash = displaced ? await hash(original) : null;
+    const currentHash = await hash(target);
+    const ok = lateOriginalHash === expectedHash && currentHash === intent.replacementHash;
+    if (!ok && currentHash === null) await restoreIfAbsent(root, original, target);
+    await saveIntent(dir, { ...intent, complete: true });
+    return { ok, currentHash: lateOriginalHash !== expectedHash ? lateOriginalHash : currentHash, recoveryPath: original };
+  } finally { await publication.dispose(); }
 }
 
 export interface RecoveryObservation { filename: string; contentHash: string; recoveryPath: string }
@@ -192,7 +226,7 @@ export async function inspectLocalRecovery(root: string): Promise<RecoveryObserv
     const originalHash = await hash(original);
     if (!intent.complete) {
       await fs.mkdir(path.dirname(target), { recursive: true });
-      await restoreIfAbsent(original, target);
+      await restoreIfAbsent(root, original, target);
       await syncDirectory(path.dirname(target));
       await saveIntent(dir, { ...intent, complete: true });
     }
