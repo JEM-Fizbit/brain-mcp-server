@@ -1,5 +1,25 @@
 # Fly Deployment
 
+## Verified independent-publication release — 3 October 2026
+
+Annotated **v1.12.3** (`8c3448d5d2d4e4ea3b072da280e6fd682b398d8b`)
+is deployed and verified on both existing owner-isolated services. Each guarded
+gate passed 614 tests: 603 passed, 11 optional skips, zero failures. ERS completed
+at 12:32:23 UTC; JEM completed at 12:34:24 UTC. Both London machines are started,
+health reports 1.12.3 with the expected image revision/version labels, and
+unauthenticated MCP remains 401. JEM Fly release 99 uses image
+`deployment-01M40W25MGGNB5ZTEJY00VK9KZ`; private ERS provenance remains in its
+owning overlay runbook and `.brain-deploy/provenance.jsonl`.
+
+The existing Mac Monitor restarted onto the fixed local sync build; both profiles
+report current sync with zero conflicts and hosted version 1.12.3. The approved
+single-file cloud reconciliation preserved its bytes and retained recovery
+files, installed an independent canonical inode, and propagated normally through
+OneDrive. Native cloud readback confirmed the exact canonical filename and hash,
+rather than an internal recovery filename. No direct cloud upload/move, recovery
+cleanup, credential, access, schema, permission or daemon change was performed.
+See [publication and recovery identities](hosted-brain-recovery-and-git-export.md#cloud-mirror-publication-and-recovery-identities).
+
 > Current status: the old Fly volume + git working-copy pilot is retired. Keep this document as the hosted HTTP deployment runbook, but the runtime state now belongs in Supabase Postgres plus private Supabase Storage. The personal hosted MCP serves only `ai-brain-jem`; local stdio `brain-local` remains the local-filesystem fallback. The ERS Brain runs on a separately owned deployment.
 
 This is the hosted target for remote MCP clients that need a public HTTPS URL. Fly can host the Node MCP server and OAuth flow, but it must not be the operational Brain data store. Markdown revisions are read/written through the configured `RevisionStore`; original/source artifacts are retained in the configured artifact store.
