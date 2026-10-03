@@ -1,5 +1,32 @@
 # Fly Deployment
 
+## Verified task-history and readiness release — 3 October 2026
+
+Annotated **v1.12.4**, public source
+`186a0027fdc4d541b600d94f149f307171479e0d`, is deployed and verified on
+both existing owner-isolated services. Each guarded gate passed 620 tests:
+609 passed, 11 optional skips, zero failures. All 12 isolated browser checks
+passed, including desktop/mobile lint freshness and optional-housekeeping wording.
+The ERS service completed at 14:01:16 UTC and JEM at 14:03:13 UTC. JEM is Fly
+release 100; the separate owner's deployment provenance remains in its private
+overlay. At 14:04 UTC both runtime images had their expected source/version
+labels and passing health checks, with their existing identity/runtime contracts.
+
+Mechanical fixes now preserve indented record history and source bullets, ignore
+child bullets as independent stamping/archive candidates, and bind move/archive
+approval IDs to the complete record. Optional completed-record housekeeping
+remains visible in Maintenance without affecting operational readiness; explicit
+content decisions remain actionable. The assessment policy fingerprint upgrades
+old caches automatically even when hosted revisions are unchanged.
+
+Auth actions distinguish rejected tokenless requests from credential failures.
+Security telemetry, count thresholds, severity, stale-connector rules and alerts
+are unchanged. Final live Cockpits show v1.12.4, Safe to use hosted, no open
+operator actions and zero conflicts. The existing Monitor picked up local source
+changes; no sync-service restart, new daemon, schedule, credentials, access,
+schema or permissions change was required. Recurring lint stays detection-only;
+this release grants no standing archival or deletion authority.
+
 ## Verified independent-publication release — 3 October 2026
 
 Annotated **v1.12.3** (`8c3448d5d2d4e4ea3b072da280e6fd682b398d8b`)
