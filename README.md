@@ -103,15 +103,15 @@ This repo includes:
 - [`docs/hosted-client-cutover.md`](./docs/hosted-client-cutover.md) for the JEM hosted client shadow rehearsal and promotion gate
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the staged hosted-client and multi-tenant roadmap
 
-Hosted endpoint shape:
+Hosted endpoint shape (substitute your own Fly.io app name):
 
 ```text
-https://jem-brain-mcp.fly.dev/mcp
+https://<your-fly-app>.fly.dev/mcp
 ```
 
 For hosted client cutover, add the HTTP endpoint as a separate `brain-hosted` connector first and keep the local stdio `brain` connector available as fallback.
 
-After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint through Settings -> Connectors -> Create.
+After full Codex cutover, hosted may be the default `brain` connector and local stdio should be retained as `brain-local`. ChatGPT uses the same hosted endpoint as a custom MCP app: turn on Developer mode (Settings -> Security and login), then add the app from ChatGPT's plugins; in a Business or Enterprise workspace an admin creates it under Workspace settings -> Apps -> Create. See OpenAI's [developer-mode guide](https://developers.openai.com/api/docs/guides/developer-mode).
 
 Each hosted deployment should use a private registry. A deployment may serve one or more Brain IDs, but different owners should be isolated at the deployment and credential boundary. This public repo does not contain private deployment registries; clients using multiple deployments should install a connector for each and pass `brain_id` explicitly.
 
