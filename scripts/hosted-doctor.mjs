@@ -36,6 +36,7 @@ import {
   classifyFlyStatusError,
   classifyFlyStatusOutput,
   classifyLintFindings,
+  hostedAuthFailureGuidance,
   classifyPostgresError,
   consecutiveFailureStreak,
   postgresFailureDetail,
@@ -1785,12 +1786,13 @@ function buildOperatorActions(status) {
           `A single unregistered client${staleClientId ? ` (${staleClientId})` : ""} is retrying a refresh-token grant the server purged. This is expected post-migration noise, not an incident, and is downgraded to warn. Fix it at the client: fully REMOVE the connector (a re-auth reuses the dead client id) — likely a frozen/half-deleted connector on the provider side. It stops on its own when the provider tears down the connector or its cached refresh token expires.`,
       });
     } else {
+      const guidance = hostedAuthFailureGuidance(authFailures.details);
       actions.push({
         level: authFailures.status,
         reason: "hosted_auth_failures",
-        title: `Investigate ${count} hosted MCP auth failures in the last ${windowMinutes}m (${trend}).`,
+        title: `Review ${count} ${guidance.label} in the last ${windowMinutes}m (${trend}).`,
         detail:
-          `${activityState === "active" ? "Failures are still recent" : "Failures appear stale"} (${lastFailureLabel}). Check the cockpit Auth panel and brain.sync_events hosted_mcp_auth rows. A connector holding a stale OAuth client likely needs to reconnect/re-auth; expected after an OAuth state migration.`,
+          `${activityState === "active" ? "Rejections are still recent" : "Rejections appear stale"} (${lastFailureLabel}). ${guidance.detail}`,
       });
     }
   }

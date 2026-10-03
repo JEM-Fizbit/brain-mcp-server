@@ -27,12 +27,12 @@ export function classifyLintFindings({
 } = {}) {
   const findings = Math.max(0, Number(issueCount) || 0);
   const automaticFixes = Math.max(0, Number(automaticFixCount) || 0);
-  if (automaticFixes > 0) {
-    return { status: "warn", state: "actionable_fixes" };
-  }
   const operatorDecisions = Math.max(0, Number(operatorDecisionCount) || 0);
   if (operatorDecisions > 0) {
     return { status: "warn", state: "operator_decisions" };
+  }
+  if (automaticFixes > 0) {
+    return { status: "info", state: "housekeeping" };
   }
   const diagnostics = Math.max(0, Number(diagnosticCount) || 0);
   if (findings > 0 || diagnostics > 0) {
@@ -364,4 +364,21 @@ export function postgresFailureDetail(details = {}) {
   }
   if (details.resolution) parts.push(details.resolution);
   return parts.join(". ");
+}
+
+/** Describe observed reason codes without guessing which client sent a request. */
+export function hostedAuthFailureGuidance(details = {}) {
+  const reasons = (details.reasons || []).filter((entry) => Number(entry.count ?? entry.n) > 0);
+  const tokenlessOnly = reasons.length === 1 && reasons[0].reason === "missing_bearer" &&
+    Number(reasons[0].count ?? reasons[0].n) === Number(details.failureCount);
+  if (tokenlessOnly) {
+    return {
+      label: "requests without a bearer token rejected by hosted MCP",
+      detail: "The server enforced authentication. These events do not show rejected credentials. Identify whether they came from deliberate unauthenticated probes or unexpected anonymous traffic; check the Cockpit Auth panel and hosted_mcp_auth rows. Reconnect a client only if its authenticated calls also fail.",
+    };
+  }
+  return {
+    label: "hosted MCP authentication failures",
+    detail: "Inspect the recorded reason codes in the Cockpit Auth panel and hosted_mcp_auth rows. For expired or invalid tokens, retry authentication on the affected client. For unknown clients or other reasons, investigate the matching client and grant before changing credentials or reconnecting. Mixed or incomplete evidence does not identify a stale connector.",
+  };
 }

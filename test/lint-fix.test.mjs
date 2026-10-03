@@ -107,3 +107,43 @@ test("archiveOldDoneItems never enumerates an unstamped item", () => {
   const t = ["# T", "", "## Done", "- [x] no date", ""].join("\n");
   assert.equal(archiveOldDoneItems(t, "", "2026-07-01", 30).items.length, 0);
 });
+
+
+test("relocation preserves a complete filing receipt and never stamps its child evidence", () => {
+  const block = "- [x] Filed assessment (project remains open)\n  - Routed previously to BACKLOG\n\n  Source paragraph retained.\n  - [x] Nested evidence is not a separate completed record";
+  const input = "## Capture / Triage Queue\n" + block + "\n- [ ] Still open\n\n## Done\n";
+  const plan = relocateCompletedTasks(input, "2026-10-03", new Set());
+  assert.equal(plan.items.length, 1);
+  assert.equal(plan.content, input);
+  const moved = relocateCompletedTasks(input, "2026-10-03", new Set([plan.items[0].id]));
+  assert.match(moved.content, /## Done\n- \[x\] Filed assessment/);
+  assert.ok(moved.content.includes(block.replace("(project remains open)", "(project remains open) (done 2026-10-03)")));
+  assert.equal(stampDoneItems(moved.content, "2026-10-03", new Set()).items.length, 0);
+  assert.match(moved.content, /## Capture \/ Triage Queue\n- \[ \] Still open/);
+});
+
+test("archiving preserves indented history and dates without selecting child bullets", () => {
+  const block = "- [x] Closed receipt (done 2026-08-19)\n  - Source and project status preserved\n\n  More original history.\n  - Child context (done 2026-01-01)";
+  const input = "## Done\n" + block + "\n- [x] Recent (done 2026-09-25)\n";
+  const plan = archiveOldDoneItems(input, "# Archive\n", "2026-10-03", 30, new Set());
+  assert.equal(plan.items.length, 1);
+  assert.equal(plan.tasksContent, input);
+  const archived = archiveOldDoneItems(input, "# Archive\n", "2026-10-03", 30, new Set([plan.items[0].id]));
+  assert.ok(archived.archiveContent.includes(block));
+  assert.doesNotMatch(archived.tasksContent, /Source and project status|Child context|More original history/);
+  assert.match(archived.tasksContent, /Recent/);
+});
+
+
+test("changed child evidence invalidates a previously approved record id", () => {
+  const input = "## Active\n- [x] Filed receipt\n  - Original source\n## Done\n";
+  const plan = relocateCompletedTasks(input, "2026-10-03", new Set());
+  const changed = input.replace("Original source", "Different source");
+  const result = relocateCompletedTasks(changed, "2026-10-03", new Set([plan.items[0].id]));
+  assert.equal(result.content, changed);
+  assert.deepEqual(result.appliedIds, []);
+  const done = input.replace("## Active", "## Done").replace("Filed receipt", "Filed receipt (done 2026-08-19)");
+  const archivedPlan = archiveOldDoneItems(done, "", "2026-10-03", 30, new Set());
+  const changedDone = done.replace("Original source", "Different source");
+  assert.deepEqual(archiveOldDoneItems(changedDone, "", "2026-10-03", 30, new Set([archivedPlan.items[0].id])).appliedIds, []);
+});

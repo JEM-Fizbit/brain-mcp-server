@@ -6,6 +6,7 @@ import {
   classifyFlyStatusError,
   classifyFlyStatusOutput,
   classifyLintFindings,
+  hostedAuthFailureGuidance,
   classifyPostgresError,
   consecutiveFailureStreak,
   postgresFailureDetail,
@@ -27,7 +28,7 @@ test("lint alarms distinguish operator actions from maintainer-only findings", (
   );
   assert.deepEqual(
     classifyLintFindings({ issueCount: 685, automaticFixCount: 34 }),
-    { status: "warn", state: "actionable_fixes" }
+    { status: "info", state: "housekeeping" }
   );
   assert.deepEqual(
     classifyLintFindings({
@@ -309,4 +310,29 @@ test("sync health warns when local recovery retention nears its budget", () => {
   const near = evaluateSyncHealth({ ...base, recovery: { entries: 7000, bytes: 1, entryLimit: 10000, byteLimit: 100, percent: 70 } }, undefined, { maxAgeMs: 60_000 });
   assert.equal(near.status, "warn");
   assert.equal(near.details.recoveryPercent, 70);
+});
+
+
+test("housekeeping never masks a content decision or turns readiness amber", () => {
+  assert.deepEqual(classifyLintFindings({ automaticFixCount: 5 }),
+    { status: "info", state: "housekeeping" });
+  assert.deepEqual(classifyLintFindings({ automaticFixCount: 3, operatorDecisionCount: 1 }),
+    { status: "warn", state: "operator_decisions" });
+});
+
+test("tokenless rejection guidance does not invent invalid credentials", () => {
+  const guidance = hostedAuthFailureGuidance({ failureCount: 4,
+    reasons: [{reason: "missing_bearer", count: 4}] });
+  assert.match(guidance.label, /without a bearer token/);
+  assert.match(guidance.detail, /do not show rejected credentials/);
+  assert.match(guidance.detail, /unexpected anonymous traffic/);
+  assert.doesNotMatch(guidance.detail, /likely|expected after|stale OAuth/);
+  for (const details of [
+    {failureCount: 4, reasons: [{reason: "missing_bearer", n: 3}]},
+    {failureCount: 4, reasons: [{reason: "missing_bearer", count: 3}, {reason: "invalid_token", count: 1}]},
+    {failureCount: 4, reasons: [{reason: "invalid_token", count: 4}]},
+    {failureCount: 4},
+  ]) {
+    assert.match(hostedAuthFailureGuidance(details).label, /authentication failures/);
+  }
 });

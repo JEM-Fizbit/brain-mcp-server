@@ -30,11 +30,11 @@ export interface FixItem {
 
 const DONE_HEADING = /^##\s+Done\s*$/i;
 const H2 = /^##\s/;
-const LIST_ITEM = /^\s*[-*]\s+/;
+const LIST_ITEM = /^[-*]\s+/;
 /** Matches the Brain's existing completion convention: `(done YYYY-MM-DD ...)`. */
 const DONE_DATE = /\(done\s+(\d{4}-\d{2}-\d{2})/;
 /** A completed task checkbox line, e.g. `- [x] ...`. */
-const COMPLETED_TASK = /^\s*[-*]\s+\[x\]\s/i;
+const COMPLETED_TASK = /^[-*]\s+\[x\]\s/i;
 const FENCE = /^\s*(```|~~~)/;
 
 /** Deterministic short hash (djb2) for stable item ids across plan/re-plan. */
@@ -111,6 +111,32 @@ function annotateLines(content: string): {
   });
 }
 
+/** Keep indented history, source bullets and paragraphs attached to their record. */
+function annotateTaskBlocks(content: string) {
+  const annotated = annotateLines(content);
+  const blocks: Array<(typeof annotated)[number] & { tail: string[] }> = [];
+  for (let i = 0; i < annotated.length; i += 1) {
+    const entry = annotated[i];
+    const tail: string[] = [];
+    if (!entry.inFence && LIST_ITEM.test(entry.line)) {
+      while (i + 1 < annotated.length) {
+        const next = annotated[i + 1].line;
+        if (/^\s+\S/.test(next)) {
+          tail.push(next);
+          i += 1;
+        } else if (!next.trim()) {
+          let after = i + 2;
+          while (after < annotated.length && !annotated[after].line.trim()) after += 1;
+          if (after >= annotated.length || !/^\s+\S/.test(annotated[after].line)) break;
+          while (i + 1 < after) tail.push(annotated[++i].line);
+        } else break;
+      }
+    }
+    blocks.push({ ...entry, tail });
+  }
+  return blocks;
+}
+
 function isDoneSection(section: string | null): boolean {
   return section !== null && /^done$/i.test(section);
 }
@@ -156,15 +182,15 @@ export function relocateCompletedTasks(
   today: string,
   approved?: Set<string>
 ): TransformResult {
-  const annotated = annotateLines(tasksContent);
+  const annotated = annotateTaskBlocks(tasksContent);
   const items: FixItem[] = [];
   const appliedIds: string[] = [];
   const moved: string[] = [];
   const kept: string[] = [];
 
-  for (const { line, inFence, section } of annotated) {
+  for (const { line, inFence, section, tail } of annotated) {
     if (!inFence && COMPLETED_TASK.test(line) && !isDoneSection(section)) {
-      const id = makeId("task_relocate", line.trim());
+      const id = makeId("task_relocate", [line, ...tail].join("\n").trim());
       items.push({
         id,
         kind: "task_relocate",
@@ -173,12 +199,12 @@ export function relocateCompletedTasks(
         detail: `Move into Done: ${line.trim()}`,
       });
       if (isApproved(approved, id)) {
-        moved.push(parseDoneDate(line) ? line : `${line} (done ${today})`);
+        moved.push([parseDoneDate(line) ? line : `${line} (done ${today})`, ...tail].join("\n"));
         appliedIds.push(id);
         continue;
       }
     }
-    kept.push(line);
+    kept.push(line, ...tail);
   }
 
   if (moved.length === 0) return { content: tasksContent, items, appliedIds };
@@ -202,17 +228,17 @@ export function archiveOldDoneItems(
   thresholdDays = 30,
   approved?: Set<string>
 ): ArchiveResult {
-  const annotated = annotateLines(tasksContent);
+  const annotated = annotateTaskBlocks(tasksContent);
   const items: FixItem[] = [];
   const appliedIds: string[] = [];
   const archived: string[] = [];
   const kept: string[] = [];
 
-  for (const { line, inFence, section } of annotated) {
+  for (const { line, inFence, section, tail } of annotated) {
     if (!inFence && isDoneSection(section) && LIST_ITEM.test(line)) {
       const done = parseDoneDate(line);
       if (done && daysBetween(done, today) > thresholdDays) {
-        const id = makeId("done_archive", line.trim());
+        const id = makeId("done_archive", [line, ...tail].join("\n").trim());
         items.push({
           id,
           kind: "done_archive",
@@ -221,13 +247,13 @@ export function archiveOldDoneItems(
           detail: `Archive (done ${done}, >${thresholdDays}d): ${line.trim()}`,
         });
         if (isApproved(approved, id)) {
-          archived.push(line);
+          archived.push([line, ...tail].join("\n"));
           appliedIds.push(id);
           continue;
         }
       }
     }
-    kept.push(line);
+    kept.push(line, ...tail);
   }
 
   if (archived.length === 0) {

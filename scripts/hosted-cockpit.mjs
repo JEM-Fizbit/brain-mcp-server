@@ -3462,7 +3462,7 @@ const page = String.raw`<!doctype html>
           (lint.observation?.state !== "fresh" ? ". Findings below are historical; refresh or wait for Doctor." : ".");
         summary.innerHTML =
           "<div class='maintenance-summary'>" +
-          "<strong>" + escapeHtml(String(automaticFixCount)) + " action(s) you can approve</strong>" +
+          "<strong>" + escapeHtml(String(automaticFixCount)) + " optional housekeeping fix(es) you can approve</strong>" +
           "<strong>" + escapeHtml(String(operatorDecisionCount)) + " bounded content decision(s)</strong>" +
           "<span class='muted'>" + escapeHtml(String(maintainerFindingCount)) + " maintainer note(s)</span>" +
           (diagnosticCount > 0

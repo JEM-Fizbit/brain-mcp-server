@@ -504,8 +504,7 @@ recent-activity telemetry, and unavailable latency telemetry follow the same
 visibility-without-alarm rule.
 
 Warn means use judgement and always includes a concrete next action. Typical
-examples are stale sync health, stale or missing Brain lint, available safe
-mechanical lint fixes, stale or oversized `TASKS.md` Capture / Triage Queue,
+examples are stale sync health, stale or missing Brain lint, explicit content decisions, stale or oversized `TASKS.md` Capture / Triage Queue,
 pending inbox files, an authenticated Fly result with no passing
 Machine, or a latency SLO warning. Warnings are condition-derived rather than
 dismissible: perform the stated action and reload, and the next doctor result
@@ -538,7 +537,7 @@ surface instead of forcing a switch to an MCP client or CLI:
   `hosted-lint-report.json` cache. The action is detection-only and does not
   change Brain content. The Monitor-owned Doctor verifies that cache against the selected hosted vault revisions so `lint_nudge`
   represents freshness while the separate `lint_findings` check represents the
-  current result. Safe mechanical fixes and explicitly labelled operator
+  current result. Completed-record housekeeping (relocation, date stamping and archival) remains visible as optional `info` in Maintenance and does not change operational readiness. Explicitly labelled operator
   content decisions make `lint_findings` an actionable warning; maintainer-only
   findings and genuine broken internal links remain `info` without changing
   readiness. Graph telemetry does not inflate the maintenance finding count.
@@ -777,3 +776,26 @@ the Mac; no manual Monitor or sync restart was needed. Monitor remains the only
 periodic Doctor owner. The v1.12.2 guarded release is deployed and verified on both
 existing owner-isolated services. Do not restart Monitor or its sync supervisors
 merely to refresh this display.
+
+
+### Housekeeping and authentication evidence
+
+Mechanical task fixes preserve the complete record, including indented source
+bullets and history. Child bullets are not independent date-stamping or archive
+candidates. Applying a reviewed filing receipt closes the Brain capture, not the
+underlying project assessment. Existing revision/CAS safeguards and explicit
+selection remain required; detection does not grant recurring write authority.
+
+Authentication counts and thresholds remain unchanged. When every recorded
+rejection is `missing_bearer`, Doctor says that tokenless requests were rejected
+and asks the operator to identify intentional probes or unexpected anonymous
+traffic. It does not infer expired credentials, attribute a sender, or recommend
+reconnecting a working client. Mixed, incomplete and credential-failure evidence
+keeps its authentication investigation action. The conservative registered-client
+stale-connector rule and all retained security telemetry remain unchanged.
+
+Enhanced auto-lint should continue to detect and report these housekeeping
+candidates. Recurring application would require separately approved standing
+scope, deterministic block eligibility, reviewed current revisions, complete
+history preservation and receipts; this change adds no auto-archive, deletion,
+schedule or daemon authority. Review dates are not refreshed automatically.

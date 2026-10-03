@@ -31,7 +31,8 @@ export async function hostedLintFingerprint(pool, brainId, binding, lintConfig) 
     order by f.filename
   `, [brainId]);
   return crypto.createHash("sha256").update(JSON.stringify({
-    version: 1, brainId, binding, lintConfig, heads: result.rows,
+    // Bump when assessment/fix semantics change, even if hosted content does not.
+    version: 2, brainId, binding, lintConfig, heads: result.rows,
   })).digest("hex");
 }
 

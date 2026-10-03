@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { refreshLintCache, hostedLintFingerprint, readLintCache, writeLintCache } from "../scripts/lib/lint-cache.mjs";
@@ -137,4 +138,23 @@ test("older assessment can never replace a newer valid report", async t => {
   assert.equal(result.issueCount, 11);
   assert.equal(result.checkedAt, new Date(NOW).toISOString());
   assert.equal(result.observation.reason, "older_assessment_rejected");
+});
+
+
+test("new task-fix policy invalidates an unchanged hosted cache from the old policy", async t => {
+  const heads = [{filename: "TASKS.md", revision_id: "unchanged"}];
+  const pool = {query: async () => ({rows: heads})};
+  const oldFingerprint = crypto.createHash("sha256").update(JSON.stringify({
+    version: 1, brainId: "ers-brain", binding: "ers", lintConfig: "graph", heads,
+  })).digest("hex");
+  let runs = 0;
+  const f = await fixture(t, {
+    getFingerprint: () => hostedLintFingerprint(pool, "ers-brain", "ers", "graph"),
+    assess: async () => {runs++; return {...report(), automaticFixCount: 0};},
+  });
+  await writeLintCache(f.file, {...report(), fingerprint: oldFingerprint, automaticFixCount: 2});
+  const result = await refreshLintCache(f);
+  assert.equal(runs, 1);
+  assert.equal(result.automaticFixCount, 0);
+  assert.equal(result.observation.state, "fresh");
 });

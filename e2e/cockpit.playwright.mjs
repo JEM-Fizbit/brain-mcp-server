@@ -514,6 +514,9 @@ async function expectMaintenanceLayout(page, { desktop }) {
   const captureDetail = captureFinding.locator("..").locator("p.muted").first();
   await expect(captureDetail).toContainText("2 total open item(s) need a disposition");
   await expect(captureDetail).toContainText("1 is stale because it is at least 7 days old");
+  // The lint action refreshes both Doctor and Maintenance; let their pending
+  // responses settle before opening a disclosure rebuilt by Maintenance.
+  await page.waitForLoadState("networkidle");
   const triageHandoff = page.getByText("LLM-assisted triage (recommended)", { exact: true });
   await expect(triageHandoff).toBeVisible();
   await triageHandoff.click();
@@ -726,7 +729,7 @@ test("lint source, assessment time and observation state remain explicit on desk
     ok: true, lint: {
       brainId: "ai-brain-jem", source: "doctor_hosted", checkedAt: hasReport ? "2026-10-02T21:00:00Z" : null,
       observation: { state, observedAt: new Date().toISOString() },
-      ...(hasReport ? { report: {}, issueCount: 4, automaticFixCount: 0, operatorDecisionCount: 0,
+      ...(hasReport ? { report: {}, issueCount: 4, automaticFixCount: 3, operatorDecisionCount: 0,
         maintainerFindingCount: 4, reviewFindings: [], technicalDiagnostics: [], warnings: [] } : {}),
     },
   } }));
@@ -741,6 +744,8 @@ test("lint source, assessment time and observation state remain explicit on desk
         await expect(page.locator("#lint-status")).toContainText("source: doctor_hosted");
         await expect(page.locator("#lint-status")).toContainText("state: " + observed);
         await expect(page.locator("#lint-status")).toContainText("verified:");
+        await expect(page.locator("#lint-summary")).toContainText("3 optional housekeeping fix(es) you can approve");
+        await expect(page.locator("#state-text")).toContainText("Safe to use hosted");
         if (observed !== "fresh") await expect(page.locator("#lint-status")).toContainText("historical");
       }
       state = "failed"; hasReport = false;
