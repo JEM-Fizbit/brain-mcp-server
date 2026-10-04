@@ -1,5 +1,18 @@
 # Fly Deployment
 
+## Verified reason-aware authentication release — 4 October 2026
+
+Annotated **v1.12.5**, public source `d0c4afb0ccadff89fad614b77a47d1d7adf67452`, is deployed on both existing owner-isolated services. The final guarded suite, including the event-gap repetition refinement, passed **630 tests: 619 passed, 11 optional skips, zero failures**, independently in both release gates. All **12 isolated desktop/mobile browser checks** passed with ambient live-profile loading disabled.
+
+The separate owner deployment completed at 03:07:34 UTC. Personal JEM completed at **03:09:45.189 UTC**, Fly release **101**, image `deployment-01M42E50D9MR9J60FKT4Q6RKM6`, digest `sha256:3c04c80089584bbd8eb950686cd8d764188160ec101010777f01dd06e8e2ba6e`. Live OCI labels match the intended source/version, machines are started with passing health, and each identity/runtime contract is unchanged. The other owner's exact overlay/image receipt remains in its private operational repository.
+
+Anonymous requests are still rejected and retained as security telemetry. They cannot inflate credential-failure severity or create a failure DM; elevated anonymous activity warrants channel review. Slack names the runtime Brain and persists category/last-event state. Unchanged overlapping counts do not repeat after cooldown; new observed reasons, material count growth, proven quiet gaps and credential escalation retain appropriate notifications. Unknown/incomplete reason evidence stays conservative. See the [shared reporting contract](hosted-cockpit.md#reason-aware-authentication-readiness--v1125).
+
+At 03:10 UTC both normal Monitor-owned Doctors had picked up the shared change and reported pass, fresh clean lint, no conflicts and no operator actions. Two earlier tokenless rejections remained informational. At the 03:14 live desktop/mobile check, a naturally occurring new rejection on each runtime brought that count to three, still informational with zero credential rejections; both Cockpits displayed **Deployed v1.12.5** and **Safe to use hosted**, without overflow. No production anonymous probes, test messages, new watcher/notifier, credentials, access, schema or permission changes were used.
+
+Production dispatch inspection through 03:15 UTC found no alerts or credential rejections after activation; the existing anonymous history remains intact. This short observation demonstrates correct low-count live classification, **not** a production stress test of repeated high counts. The parent operator owns the final quiet observation at or after 03:41 UTC, beyond the old 30-minute cooldown. Dedup/escalation/retry/clearing behavior is established by fixtures and the owner-scoped live metadata query with fake notification handlers; no synthetic production event was inserted. Recheck current reports rather than assuming this dated receipt remains current. Rollback requires a reviewed revert, new patch/tag and the same guarded route; no rollback was executed.
+
+
 ## Verified task-history and readiness release — 3 October 2026
 
 Annotated **v1.12.4**, public source
