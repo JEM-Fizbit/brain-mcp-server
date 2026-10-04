@@ -1776,6 +1776,10 @@ function buildOperatorActions(status) {
             ? "Set BRAIN_REVISION_DATABASE_URL for this profile, restart its local stack, then reload Brain Monitor."
             : `The auth telemetry query failed: ${String(authFailures.details.error).slice(0, 160)}. Verify database reachability and permissions, then reload Brain Monitor.`,
       });
+    } else if (authFailures.details?.anonymousStatus === "warn" && !["warn", "fail"].includes(authFailures.details?.credentialStatus)) {
+      actions.push({ level: "warn", reason: "anonymous_activity",
+        title: `Review ${authFailures.details.anonymousCount} anonymous requests rejected in the last ${windowMinutes}m.`,
+        detail: "Authentication was enforced. Caller origin is unknown; inspect unusual anonymous activity in the Auth panel. This count does not show rejected credentials or prove the Brain is unusable. Reconnect only if authenticated calls also fail." });
     } else if (authFailures.details?.connectorState === "stale_connector") {
       const staleClientId = authFailures.details?.staleClientId;
       actions.push({

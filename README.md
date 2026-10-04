@@ -122,7 +122,7 @@ For rendered Brain and source-companion reading, use the separate JEM-only
 relative and HTTPS links, exposes exact source trace data, and leaves local
 artifact opening disabled by default. See [`docs/brain-library.md`](./docs/brain-library.md).
 
-Hosted deployments can also raise **real-time auth-failure alerts to Slack** (warn → channel, fail → operator DM), gated on `BRAIN_SLACK_BOT_TOKEN` (no-op without it). The cockpit doctor's `hosted_mcp_auth_failures` check surfaces the same condition in the Checks tab. See [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md) for thresholds, routing, and env vars.
+Hosted deployments can also raise **reason-aware authentication alerts to Slack** (anonymous-activity review → channel; credential warning → channel, credential failure → operator DM), gated on `BRAIN_SLACK_BOT_TOKEN` (no-op without it). The cockpit doctor's `hosted_mcp_auth_failures` check surfaces the same condition in the Checks tab. See [`docs/hosted-cockpit.md`](./docs/hosted-cockpit.md) for thresholds, routing, and env vars.
 
 ### Applying Brain lint fixes
 

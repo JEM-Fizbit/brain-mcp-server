@@ -242,8 +242,9 @@ test("buildAuthAlertMessage builds a warn line for #claude-ops", () => {
       httpStatus: "401",
       isoDate: "2026-06-23",
       cockpitUrl: "http://127.0.0.1:8787/",
+      brainId: "ai-brain-jem",
     }),
-    "[brain-auth-alert] 2026-06-23 — ⚠️ 4 hosted MCP auth failures in last 60m (invalid_client ×3, token_expired ×1; HTTP 401). Cockpit: http://127.0.0.1:8787/"
+    "[brain-auth-alert] [ai-brain-jem] 2026-06-23 — ⚠️ 4 credential/authentication rejections in last 60m (invalid_client ×3, token_expired ×1; HTTP 401). Inspect the recorded reasons and affected client; reconnect only when authenticated calls fail. Cockpit: http://127.0.0.1:8787/"
   );
 });
 
@@ -257,7 +258,7 @@ test("buildAuthAlertMessage adds the [Action needed] prefix for fail DMs", () =>
     isoDate: "2026-06-23",
     cockpitUrl: "http://127.0.0.1:8787/",
   });
-  assert.match(text, /^\[brain-auth-alert\] \[Action needed\] 2026-06-23 — 🚨 12 /);
+  assert.match(text, /^\[brain-auth-alert\] \[Action needed\] \[unobserved-brain\] 2026-06-23 — 🚨 12 /);
 });
 
 // --- maybeAlertOnAuthFailure (orchestrator, injected fakes) ---------------
@@ -317,7 +318,7 @@ test("maybeAlertOnAuthFailure posts a warn to the channel and records the dispat
   assert.equal(outcome.posted, true);
   assert.equal(posts.length, 1);
   assert.equal(posts[0].channel, "C-OPS");
-  assert.match(posts[0].text, /⚠️ 4 hosted MCP auth failures/);
+  assert.match(posts[0].text, /⚠️ 4 credential\/authentication rejections/);
   assert.equal(dispatches.length, 1);
   assert.equal(dispatches[0].severity, "warn");
   assert.equal(dispatches[0].channel, "C-OPS");
@@ -363,7 +364,7 @@ test("maybeAlertOnAuthFailure fires once for a concurrent burst (cooldown race)"
       // Reflects dispatches recorded so far, like the DB cooldown read.
       loadState: async () => ({
         failureCount: 5,
-        reasons: [{ reason: "missing_bearer", n: 5 }],
+        reasons: [{ reason: "invalid_client", n: 5 }],
         httpStatus: "401",
         lastWarnAt:
           dispatches.filter((d) => d.severity === "warn").map((d) => d.at).sort().at(-1) ||

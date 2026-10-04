@@ -3155,11 +3155,11 @@ const page = String.raw`<!doctype html>
             : "clear";
         const summaryCards = [
           renderAuthFailureSummaryCard("Status", statusPill(check.status), activityCopy, true),
-          renderAuthFailureSummaryCard("Failures", formatCount(details.failureCount || 0), "current " + formatCount(details.windowMinutes || 0) + "m window"),
+          renderAuthFailureSummaryCard("Rejections", formatCount(details.failureCount || 0), formatCount(details.anonymousCount || 0) + " anonymous · " + formatCount(details.credentialCount ?? details.failureCount ?? 0) + " credential/other"),
           renderAuthFailureSummaryCard("Trend", formatSignedCount(details.failureDelta || 0), "versus previous window"),
           renderAuthFailureSummaryCard("Last Failure", details.lastFailureAt ? ageLabel(details.lastFailureAt) : "-", details.lastFailureAt ? localDateTime(details.lastFailureAt) : "none in current window"),
           renderAuthFailureSummaryCard("Top Reason", topReason ? topReason.reason : "-", topReason ? "x" + formatCount(topReason.count || topReason.n) + " · " + formatPercent(topReason.share) : "none"),
-          renderAuthFailureSummaryCard("Failure Rate", formatPercent(details.failureRate), formatCount(details.totalAuthEvents || 0) + " auth events"),
+          renderAuthFailureSummaryCard("Rejection Share", formatPercent(details.failureRate), "auth events only; excludes successful tool calls"),
         ].join("");
 
         const staleBanner = details.connectorState === "stale_connector"
@@ -3170,6 +3170,7 @@ const page = String.raw`<!doctype html>
         document.getElementById("auth-failure-summary").innerHTML =
           "<div class=\"latency-summary-grid auth-summary-grid\">" + summaryCards + "</div>" +
           staleBanner +
+          (details.anonymousCount > 0 ? "<div class=\"event-meta\">Anonymous requests were rejected without a bearer token. Authentication was enforced; caller origin is unknown. These counts do not demonstrate a broken connector. Elevated anonymous activity remains visible for security review.</div>" : "") +
           (details.eventLimitReached ? "<div class=\"event-meta\">Auth event limit reached; counts may be clipped at " + escapeHtml(formatCount(details.eventLimit)) + " rows.</div>" : "");
         document.getElementById("auth-failure-trend").innerHTML = renderAuthFailureTrend(details);
         document.getElementById("auth-failure-breakdowns").innerHTML = renderAuthFailureBreakdowns(details);

@@ -169,6 +169,11 @@ async function writeDoctorStub(testInfo) {
       },
     ],
   };
+  payload.checks.push({ name: "hosted_mcp_auth_failures", status: "info", details: {
+    failureCount: 5, anonymousCount: 5, credentialCount: 0, windowMinutes: 60,
+    activityState: "active", anonymousStatus: "info", credentialStatus: "pass",
+    connectorState: "anonymous_rejections", reasons: [{reason: "missing_bearer", count: 5}], recentFailures: [], trend: []
+  }});
   await fs.writeFile(
     doctorScript,
     `console.log(${JSON.stringify(JSON.stringify(payload, null, 2))});\n`,
@@ -434,6 +439,9 @@ async function expectCockpitNavigationHierarchy(page, { desktop }) {
   await page.getByRole("tab", { name: "Auth" }).click();
   await expect(page.locator("#activity-subtab-auth")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#activity-view-auth")).toBeVisible();
+  await expect(page.locator("#auth-failure-summary")).toContainText("5 anonymous · 0 credential/other");
+  await expect(page.locator("#auth-failure-summary")).toContainText("caller origin is unknown");
+  await expect(page.locator("#auth-failure-summary")).toContainText("excludes successful tool calls");
 }
 
 async function expectOperationLogTablePolish(page) {

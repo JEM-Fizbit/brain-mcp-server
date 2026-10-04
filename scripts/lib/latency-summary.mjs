@@ -1,3 +1,5 @@
+import { classifyAuthReasons } from "../../dist/services/auth-reason-policy.js";
+
 const DEFAULT_HISTORY_LIMIT = 240;
 const DEFAULT_TREND_LIMIT = 24;
 export const HOSTED_MCP_LATENCY_EVENT_TYPE = "hosted_mcp_latency";
@@ -411,8 +413,11 @@ export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
   }
   // Consumers (doctor + Slack alerter) read effectiveStatus so their verdicts
   // agree: a pure stale-connector loop is capped at `warn` instead of `fail`.
-  const effectiveStatus =
-    connectorState === "stale_connector" && status === "fail" ? "warn" : status;
+  const classification = classifyAuthReasons({ failureCount,
+    reasons: countBy(currentFailures, "reason", "auth_failed"), warnThreshold, failThreshold,
+    staleConnector: connectorState === "stale_connector" });
+  const effectiveStatus = classification.effectiveStatus;
+  if (classification.credentialCount === 0 && classification.anonymousCount > 0) connectorState = "anonymous_rejections";
 
   return {
     windowMinutes,
@@ -437,6 +442,7 @@ export function authFailureSummaryFromSyncEventRows(rows, options = {}) {
     activityState: failureCount === 0 ? "clear" : active ? "active" : "stale",
     connectorState,
     effectiveStatus,
+    ...classification,
     staleClientId,
     staleGraceMinutes,
     registeredClientIdsKnown: registeredKnown,

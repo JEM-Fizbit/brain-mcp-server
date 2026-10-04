@@ -5,15 +5,16 @@
 // logic is pure and shared with the cockpit doctor's auth-failure check, so the
 // cockpit verdict and the Slack alert always agree.
 //
-// Severity: warn at >= warnThreshold failures in the window, fail at
-// >= failThreshold. Routing: warn -> #claude-ops, fail -> operator DM. A
-// per-severity cooldown throttles a persistent condition while letting a
-// worsening warn -> fail escalate immediately.
+// Anonymous rejections remain information until the existing higher count
+// threshold warrants channel security review. Credential counts independently
+// warn/page. Persisted category state suppresses unchanged reminders while
+// retaining new incidents, material growth and immediate credential escalation.
 //
 // Sanitization: alerts and dispatch rows carry only reason codes, HTTP status,
 // and counts — never tokens, headers, bodies, SQL, or payloads.
 
 import pg from "pg";
+import { classifyAuthReasons } from "./auth-reason-policy.js";
 import { postSlackMessage } from "./slack.js";
 import { runtimeBrainId } from "./runtime-env.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
@@ -150,6 +151,8 @@ export interface AuthAlertMessageInput {
   httpStatus: string | null;
   isoDate: string;
   cockpitUrl: string;
+  brainId?: string;
+  category?: "anonymous" | "credentials";
 }
 
 export function buildAuthAlertMessage(input: AuthAlertMessageInput): string {
@@ -162,7 +165,11 @@ export function buildAuthAlertMessage(input: AuthAlertMessageInput): string {
   if (input.reasonSummary) parts.push(input.reasonSummary);
   if (input.httpStatus) parts.push(`HTTP ${input.httpStatus}`);
   const paren = parts.length ? ` (${parts.join("; ")})` : "";
-  return `${prefix} ${input.isoDate} — ${icon} ${input.failureCount} hosted MCP auth failures in last ${input.windowMinutes}m${paren}. Cockpit: ${input.cockpitUrl}`;
+  const label = input.category === "anonymous" ? "anonymous requests rejected" : "credential/authentication rejections";
+  const guidance = input.category === "anonymous"
+    ? "Authentication was enforced; caller origin is unknown. Review unusual anonymous activity; this does not demonstrate a broken connector."
+    : "Inspect the recorded reasons and affected client; reconnect only when authenticated calls fail.";
+  return `${prefix} [${input.brainId || "unobserved-brain"}] ${input.isoDate} — ${icon} ${input.failureCount} ${label} in last ${input.windowMinutes}m${paren}. ${guidance} Cockpit: ${input.cockpitUrl}`;
 }
 
 export interface AuthFailureState {
@@ -172,6 +179,10 @@ export interface AuthFailureState {
   lastWarnAt: Date | null;
   lastFailAt: Date | null;
   staleConnector: boolean;
+  firstFailureAt?: Date | null;
+  lastFailureAt?: Date | null;
+  categoryTimes?: Record<"anonymous" | "credentials", { first: Date | null; last: Date | null; episodeStartedAt?: Date | null }>;
+  recentDispatches?: AuthAlertPreviousDispatch[];
 }
 
 export interface AuthAlertConfig {
@@ -206,6 +217,41 @@ export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthA
   };
 }
 
+export interface AuthAlertPreviousDispatch {
+  at: Date;
+  severity: AuthAlertSeverity;
+  count: number;
+  category: "anonymous" | "credentials";
+  lastFailureAt: Date | null;
+  reasonCodes?: string;
+}
+
+export function shouldRepeatAuthAlert(input: {
+  previous?: AuthAlertPreviousDispatch;
+  severity: AuthAlertSeverity;
+  count: number;
+  firstFailureAt: Date | null;
+  lastFailureAt: Date | null;
+  now: Date;
+  windowMinutes: number;
+  cooldownMinutes: number;
+  reasonCodes?: string;
+  episodeStartedAt?: Date | null;
+}): boolean {
+  const p = input.previous;
+  if (!p) return true;
+  const priorEvent = p.lastFailureAt || p.at;
+  const newEpisode = input.episodeStartedAt && input.episodeStartedAt.getTime() > priorEvent.getTime();
+  if (input.severity === "fail" && p.severity === "warn") return true;
+  if (!newEpisode && p.severity === "fail" && input.severity === "warn") return false;
+  const changedReasons = Boolean(input.reasonCodes && p.reasonCodes && input.reasonCodes !== p.reasonCodes);
+  const cooled = input.now.getTime() - p.at.getTime() >= input.cooldownMinutes * 60000;
+  const newEvent = input.lastFailureAt && input.lastFailureAt.getTime() > priorEvent.getTime();
+  // No unchanged rolling-window reminders. Continued activity must at least
+  // double the prior notified count and contain a newly observed event.
+  return Boolean(cooled && newEvent && (newEpisode || changedReasons || input.count >= Math.max(1, p.count) * 2));
+}
+
 export interface AuthAlertDispatchRow {
   severity: AuthAlertSeverity;
   count: number;
@@ -214,6 +260,8 @@ export interface AuthAlertDispatchRow {
   httpStatus: string | null;
   channel: string;
   ok: boolean;
+  category?: "anonymous" | "credentials";
+  lastFailureAt?: Date | null;
 }
 
 export interface AuthAlertDeps {
@@ -299,6 +347,18 @@ async function defaultLoadState(
           and metadata->>'ok' = 'true'
           and created_at >= now() - interval '1 day'
         group by 1
+      ), activity as (
+        select created_at, case when metadata->>'error' = 'missing_bearer' then 'anonymous' else 'credentials' end as category
+        from brain.sync_events where brain_id = $1 and event_type = 'hosted_mcp_auth'
+          and metadata->>'ok' = 'false' and created_at >= now() - make_interval(mins => ($2::int * 2))
+        union all
+        select max(created_at), case when metadata->>'error' = 'missing_bearer' then 'anonymous' else 'credentials' end
+        from brain.sync_events where brain_id = $1 and event_type = 'hosted_mcp_auth'
+          and metadata->>'ok' = 'false' and created_at < now() - make_interval(mins => ($2::int * 2))
+        group by 2
+      ), gaps as (
+        select category, created_at, lag(created_at) over (partition by category order by created_at) as previous_at
+        from activity where created_at is not null
       )
       select
         (select count(*) from failures)::int as failure_count,
@@ -318,10 +378,22 @@ async function defaultLoadState(
             from failures) as all_unknown_refresh,
         (select min(created_at) from failures) as first_failure_at,
         (select max(created_at) from failures) as last_failure_at,
+        (select min(created_at) from failures where reason = 'missing_bearer') as anonymous_first_at,
+        (select max(created_at) from failures where reason = 'missing_bearer') as anonymous_last_at,
+        (select min(created_at) from failures where reason is distinct from 'missing_bearer') as credentials_first_at,
+        (select max(created_at) from failures where reason is distinct from 'missing_bearer') as credentials_last_at,
+        (select max(created_at) from gaps where category = 'anonymous' and created_at - previous_at > make_interval(mins => $2::int)) as anonymous_episode_at,
+        (select max(created_at) from gaps where category = 'credentials' and created_at - previous_at > make_interval(mins => $2::int)) as credentials_episode_at,
         (select coalesce(jsonb_agg(state_key), '[]'::jsonb)
             from brain.oauth_state where store = 'clients') as registered_client_ids,
         (select last_at from alerts where severity = 'warn') as last_warn_at,
-        (select last_at from alerts where severity = 'fail') as last_fail_at
+        (select last_at from alerts where severity = 'fail') as last_fail_at,
+        (select coalesce(jsonb_agg(a order by created_at desc), '[]'::jsonb) from (
+          select created_at, metadata from brain.sync_events
+          where brain_id = $1 and event_type = 'hosted_mcp_auth_alert'
+            and metadata->>'ok' = 'true'
+          order by created_at desc limit 100
+        ) a) as recent_dispatches
     `,
     [config.brainId, windowMinutes]
   );
@@ -350,6 +422,21 @@ async function defaultLoadState(
     lastWarnAt: row.last_warn_at ? new Date(row.last_warn_at) : null,
     lastFailAt: row.last_fail_at ? new Date(row.last_fail_at) : null,
     staleConnector,
+    firstFailureAt: row.first_failure_at ? new Date(row.first_failure_at) : null,
+    lastFailureAt: row.last_failure_at ? new Date(row.last_failure_at) : null,
+    categoryTimes: {
+      anonymous: { episodeStartedAt: row.anonymous_episode_at ? new Date(row.anonymous_episode_at) : null, first: row.anonymous_first_at ? new Date(row.anonymous_first_at) : null, last: row.anonymous_last_at ? new Date(row.anonymous_last_at) : null },
+      credentials: { episodeStartedAt: row.credentials_episode_at ? new Date(row.credentials_episode_at) : null, first: row.credentials_first_at ? new Date(row.credentials_first_at) : null, last: row.credentials_last_at ? new Date(row.credentials_last_at) : null },
+    },
+    recentDispatches: (Array.isArray(row.recent_dispatches) ? row.recent_dispatches : []).map((a: { created_at: string; metadata: Record<string, unknown> }) => {
+      const m = a.metadata;
+      const count = Number(m.count || 0);
+      const reasons = Array.isArray(m.reasons) ? m.reasons : [];
+      const legacyAnonymous = reasons.length === 1 && reasons[0].reason === "missing_bearer" && Number(reasons[0].n) === count;
+      const category = m.category === "anonymous" || (!m.category && legacyAnonymous) ? "anonymous" : "credentials";
+      return { at: new Date(a.created_at), severity: category === "anonymous" ? "warn" : m.severity as AuthAlertSeverity,
+        count, category, reasonCodes: reasons.map(r => String(r.reason)).sort().join(","), lastFailureAt: m.lastFailureAt ? new Date(String(m.lastFailureAt)) : null };
+    }),
   };
 }
 
@@ -361,9 +448,11 @@ async function defaultRecordDispatch(
   if (!connectionString) return;
   const pool = alertPool(connectionString);
   const metadata = {
-    version: 1,
+    version: 2,
     source: "hosted_mcp_server",
     kind: "auth_alert",
+    category: row.category,
+    lastFailureAt: row.lastFailureAt?.toISOString() || null,
     severity: row.severity,
     count: row.count,
     window_minutes: row.windowMinutes,
@@ -434,29 +523,38 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
     return { fired: false, reason: "state_error" };
   }
 
-  const decision = decideAuthAlert({
-    failureCount: state.failureCount,
-    warnThreshold: resolved.config.thresholds.warnThreshold,
-    failThreshold: resolved.config.thresholds.failThreshold,
-    cooldownMinutes: resolved.config.thresholds.cooldownMinutes,
-    lastWarnAt: state.lastWarnAt,
-    lastFailAt: state.lastFailAt,
-    now: resolved.now(),
-    staleConnector: state.staleConnector,
-  });
-  if (!decision.fire) return { fired: false, reason: decision.reason };
-
-  const severity = decision.severity;
+  const classification = classifyAuthReasons({ ...resolved.config.thresholds,
+    failureCount: state.failureCount, reasons: state.reasons, staleConnector: state.staleConnector });
+  // Credential failures take precedence; anonymous traffic cannot raise their
+  // severity or consume their independent notification cooldown.
+  const category = classification.credentialStatus === "warn" || classification.credentialStatus === "fail"
+    ? "credentials" : "anonymous";
+  const status = category === "credentials" ? classification.credentialStatus : classification.anonymousStatus;
+  if (status !== "warn" && status !== "fail") return { fired: false, reason: "below_threshold" };
+  const severity: AuthAlertSeverity = status;
+  const count = category === "credentials" ? classification.credentialCount : classification.anonymousCount;
+  const reasons = state.reasons.filter(r => category === "anonymous" ? r.reason === "missing_bearer" : r.reason !== "missing_bearer");
+  const previous = state.recentDispatches?.find(d => d.category === category);
+  const times = state.categoryTimes?.[category] || { first: state.firstFailureAt || null, last: state.lastFailureAt || null };
+  const reasonCodes = reasons.map(r => r.reason).sort().join(",");
+  if (state.recentDispatches) {
+    if (!shouldRepeatAuthAlert({ previous, severity, count,
+      firstFailureAt: times.first, lastFailureAt: times.last, reasonCodes,
+      episodeStartedAt: state.categoryTimes?.[category].episodeStartedAt,
+      now: resolved.now(), ...resolved.config.thresholds })) return { fired: false, reason: "unchanged_incident" };
+  } else {
+    // Injected/legacy state fallback retains existing cooldown behavior.
+    const decision = decideAuthAlert({ failureCount: count, ...resolved.config.thresholds,
+      warnThreshold: category === "anonymous" ? resolved.config.thresholds.failThreshold : resolved.config.thresholds.warnThreshold,
+      failThreshold: category === "anonymous" ? Number.MAX_SAFE_INTEGER : resolved.config.thresholds.failThreshold,
+      lastWarnAt: state.lastWarnAt, lastFailAt: state.lastFailAt, now: resolved.now(), staleConnector: state.staleConnector });
+    if (!decision.fire) return { fired: false, reason: decision.reason };
+  }
   const channel = severity === "fail" ? resolved.config.dm : resolved.config.channel;
-  const text = buildAuthAlertMessage({
-    severity,
-    failureCount: state.failureCount,
-    windowMinutes: resolved.config.thresholds.windowMinutes,
-    reasonSummary: formatReasonSummary(state.reasons),
-    httpStatus: state.httpStatus,
-    isoDate: resolved.isoDate(),
-    cockpitUrl: resolved.config.cockpitUrl,
-  });
+  const text = buildAuthAlertMessage({ severity, category, brainId: resolved.config.brainId,
+    failureCount: count, windowMinutes: resolved.config.thresholds.windowMinutes,
+    reasonSummary: formatReasonSummary(reasons), httpStatus: state.httpStatus,
+    isoDate: resolved.isoDate(), cockpitUrl: resolved.config.cockpitUrl });
 
   let posted = false;
   try {
@@ -471,9 +569,11 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
   try {
     await resolved.recordDispatch({
       severity,
-      count: state.failureCount,
+      count,
+      category,
+      lastFailureAt: times.last,
       windowMinutes: resolved.config.thresholds.windowMinutes,
-      reasons: state.reasons,
+      reasons,
       httpStatus: state.httpStatus,
       channel,
       ok: posted,

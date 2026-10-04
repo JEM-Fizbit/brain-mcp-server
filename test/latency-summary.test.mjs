@@ -440,7 +440,7 @@ test("auth summary keeps full severity when the stale pattern is ambiguous", asy
   assert.equal(shortBurst.connectorState, "incident");
   assert.equal(shortBurst.effectiveStatus, "fail");
 
-  // (d) mixed reasons (missing_bearer) -> ambiguous -> full severity
+  // (d) mixed reasons: tokenless counts cannot inflate credential severity
   const multiReason = authFailureSummaryFromSyncEventRows(
     [
       base({ error: "unknown_client_id", clientId: "z", grantType: "refresh_token" }, "2026-06-24T08:20:00.000Z"),
@@ -450,7 +450,9 @@ test("auth summary keeps full severity when the stale pattern is ambiguous", asy
     { ...opts, registeredClientIds: [] }
   );
   assert.equal(multiReason.connectorState, "incident");
-  assert.equal(multiReason.effectiveStatus, "fail");
+  assert.equal(multiReason.status, "fail"); // original total retained
+  assert.equal(multiReason.credentialCount, 2);
+  assert.equal(multiReason.effectiveStatus, "info");
 });
 
 test("latency summaries separate timing layers, exact tools, slowest operations, and DB contribution", () => {
