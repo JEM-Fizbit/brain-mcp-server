@@ -33,8 +33,12 @@ primary_region = "lhr"
   BRAIN_PG_IDLE_TIMEOUT_MS = "120000"
   BRAIN_HTTP_TIMING_LOGS = "1"
   BRAIN_DATE_TIME_ZONE = "Asia/Ho_Chi_Minh"
-  BRAIN_SLACK_ALERT_CHANNEL = "C0B27NK40H4"
-  BRAIN_SLACK_ALERT_DM = "U06SWS92Y5V"
+  # Auth alerts post to JEM Private (#jem-brain-alerts, DM to John) as the
+  # "JEM Brain Alerts" Slack app (A0C6B35LAR5); bot token in Fly secret
+  # BRAIN_SLACK_BOT_TOKEN. Moved off ERS Slack 2026-10-05 under the Slack
+  # delivery convention (personal systems never post to ERS Slack).
+  BRAIN_SLACK_ALERT_CHANNEL = "C0C6B2VF3RV"
+  BRAIN_SLACK_ALERT_DM = "U0AGU0YM801"
 
 [http_service]
   internal_port = 8080
