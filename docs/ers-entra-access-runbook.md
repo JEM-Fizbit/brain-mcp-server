@@ -361,10 +361,13 @@ or Obsidian. Those rights follow the Systems & IT SharePoint policy.
   or deliberately revise the intended state. Confirmation reapplies the fixed
   Entra groups and local grant using the normal fail-closed order. The system
   never chooses a role automatically.
+- The managed **Effective grants** table can be sorted by user, role, status,
+  Entra check or update time. Legacy GitHub rows are separated into their own
+  sortable, read-only table so they cannot be mistaken for current Entra
+  access or an available authentication path.
 - A fixed-group read failure marks Entra drift unavailable as a unit and never
-  widens local access. GitHub rollback grants are not Graph-managed: they stay
-  visible during dual-provider validation as **not managed here** and expose no
-  Entra reconciliation button.
+  widens local access. GitHub rollback grants are not Graph-managed and expose
+  no Entra reconciliation action.
 - Admins can administer Brain content/recovery but cannot administer identity.
   Only Owners can use the access mutation APIs.
 - The active Owner roster cannot be reduced below two.

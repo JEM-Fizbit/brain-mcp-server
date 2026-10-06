@@ -215,7 +215,9 @@ operate without recurring IT/TDM intervention.
   role's authority inside the confirmation modal. Drift actions are labelled
   **Review & reconcile** and explain that opening the modal is read-only,
   confirmation reapplies a deliberately reviewed state, and the system never
-  chooses a role automatically. GitHub fallback rows offer no Entra action.
+  chooses a role automatically. The managed grant view is sortable by field;
+  GitHub fallback rows are isolated in a separate sortable, read-only table and
+  offer no Entra action.
 - The page and confirmation modal state that role changes govern MCP and
   connected AI clients only and do not add or remove SharePoint, OneDrive or
   Obsidian manual-edit permissions.

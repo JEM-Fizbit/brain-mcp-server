@@ -107,11 +107,14 @@ for (const colorScheme of ["light", "dark"]) {
         await reconcileHelp.click();
         await expect(page.getByText(/system never chooses a role automatically/i)).toBeVisible();
 
-        const githubRow = page.locator("#grants tr", { hasText: "Cillian Example" });
+        await expect(page.locator("#grants tr")).toHaveCount(2);
+        await expect(page.locator("#githubGrants tr")).toHaveCount(1);
+        await expect(page.getByRole("heading", { name: "Legacy GitHub grants" })).toBeVisible();
+        await expect(page.getByText(/ERS Brain is Entra-only/)).toBeVisible();
+
+        const githubRow = page.locator("#githubGrants tr", { hasText: "Cillian Example" });
         await expect(githubRow.locator(".user-primary")).toHaveText("Cillian Example");
         await expect(githubRow.locator(".user-meta")).toHaveText("@cillian-example · GitHub ID 257652621");
-        await expect(githubRow).toContainText("GitHub fallback · not managed here");
-        await expect(githubRow).toContainText("Not managed here");
         await expect(githubRow.locator("button")).toHaveCount(0);
 
         const matchedRow = page.locator("#grants tr", { hasText: "Cillian McGorman" });
@@ -120,6 +123,21 @@ for (const colorScheme of ["light", "dark"]) {
 
         const driftRow = page.locator("#grants tr", { hasText: "Jeronimo Duque" });
         await expect(driftRow).toContainText("Missing in Entra · expected Reader");
+
+        const roleSort = page.locator('button[data-sort-target="grants"][data-grant-sort="role"]');
+        await roleSort.click();
+        await expect(page.locator('th[data-sort-table="grants"][data-sort-key="role"]')).toHaveAttribute("aria-sort", "ascending");
+        await expect(page.locator("#grants tr").first().locator(".user-primary")).toHaveText("Jeronimo Duque");
+        await roleSort.click();
+        await expect(page.locator('th[data-sort-table="grants"][data-sort-key="role"]')).toHaveAttribute("aria-sort", "descending");
+        await expect(page.locator("#grants tr").first().locator(".user-primary")).toHaveText("Cillian McGorman");
+
+        const userSort = page.locator('button[data-sort-target="grants"][data-grant-sort="user"]');
+        await userSort.click();
+        await expect(page.locator("#grants tr").first().locator(".user-primary")).toHaveText("Cillian McGorman");
+        await userSort.click();
+        await expect(page.locator("#grants tr").first().locator(".user-primary")).toHaveText("Jeronimo Duque");
+
         await driftRow.getByRole("button", { name: "Review & reconcile" }).click();
         await expect(page.getByRole("heading", { name: "Review and reconcile access" })).toBeVisible();
         await expect(page.getByText(/Nothing changes until you confirm/i)).toBeVisible();

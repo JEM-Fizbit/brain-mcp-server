@@ -84,9 +84,10 @@ servers, and it exposes each local cockpit as a loopback browser surface:
   local process never receives a Graph token or permission mutation;
 - the hosted Access & Roles surface provides an always-visible role guide,
   contextual role help inside the confirmation modal, plain-language Entra
-  drift labels, and an expandable explanation of **Review & reconcile**;
-  legacy GitHub fallback rows remain visible during dual-provider validation
-  but cannot offer a non-functional Entra reconciliation action.
+  drift labels, an expandable explanation of **Review & reconcile**, and
+  sortable managed-grant columns; legacy GitHub fallback rows appear in a
+  separate sortable, read-only table and cannot offer a non-functional Entra
+  reconciliation action.
 
 Do not expose the current local Cockpit process as a hosted website. Its local
 signals and narrow maintenance endpoints remain loopback-only. Spec 018 adds a

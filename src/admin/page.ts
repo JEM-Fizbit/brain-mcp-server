@@ -50,6 +50,9 @@ export function accessAdminPage(): string {
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: top; }
     th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .sort-button { display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: 4px; padding: 2px; background: transparent; color: inherit; font: inherit; font-weight: 650; letter-spacing: inherit; text-transform: inherit; }
+    .sort-button:hover { color: var(--ink); }
+    .sort-indicator { display: inline-block; min-width: 1em; color: var(--muted); font-size: 11px; }
     code { font-size: 12px; }
     .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; background: var(--soft); }
     .drift-none { color: var(--green); }
@@ -145,8 +148,23 @@ export function accessAdminPage(): string {
         <summary>What does “Review &amp; reconcile” mean?</summary>
         <p>It appears when the audited local grant and Microsoft Entra group membership do not match, or when the Entra check is unavailable. Opening it does not change anything. The confirmation form starts with the local role and status; an Owner must review the evidence and explicitly confirm the intended state. Confirmation updates the fixed Entra groups and audited local grant using fail-closed ordering. The system never chooses a role automatically.</p>
       </details>
-      <p class="muted">Legacy GitHub fallback grants are shown for visibility but are not managed on this Entra page.</p>
-      <div class="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Entra check</th><th>Updated</th><th>Action</th></tr></thead><tbody id="grants"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr>
+        <th data-sort-table="grants" data-sort-key="user" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="user" data-sort-target="grants">User <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="grants" data-sort-key="role" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="role" data-sort-target="grants">Role <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="grants" data-sort-key="status" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="status" data-sort-target="grants">Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="grants" data-sort-key="entra" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="entra" data-sort-target="grants">Entra check <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="grants" data-sort-key="updated" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="updated" data-sort-target="grants">Updated <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th>Action</th>
+      </tr></thead><tbody id="grants"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-heading"><div><h2>Legacy GitHub grants</h2><p class="muted">Read-only historical visibility. ERS Brain is Entra-only; these grants cannot authenticate and are not managed on this page.</p></div><span id="githubGrantCount" class="pill">0 records</span></div>
+      <div class="table-wrap"><table><thead><tr>
+        <th data-sort-table="githubGrants" data-sort-key="user" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="user" data-sort-target="githubGrants">User <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="githubGrants" data-sort-key="role" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="role" data-sort-target="githubGrants">Role <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="githubGrants" data-sort-key="status" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="status" data-sort-target="githubGrants">Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+        <th data-sort-table="githubGrants" data-sort-key="updated" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="updated" data-sort-target="githubGrants">Updated <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+      </tr></thead><tbody id="githubGrants"></tbody></table></div>
     </div>
     <div class="card"><h2>Audit history</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Actor</th><th>Target</th><th>Change</th><th>Graph</th><th>Reason</th></tr></thead><tbody id="audit"></tbody></table></div></div>
   </section>
@@ -170,7 +188,11 @@ export function accessAdminPage(): string {
   </div>
 </dialog>
 <script>
-let csrf = "", selected = null;
+let csrf = "", selected = null, grantRows = [], githubGrantRows = [];
+const grantSort = {
+  grants: { key: null, direction: "asc" },
+  githubGrants: { key: null, direction: "asc" }
+};
 const $ = id => document.getElementById(id);
 const roleDescriptions = {
   reader: "Through MCP: can search and read Brain content and status. Cannot ask an AI client to change content. Separate SharePoint manual-edit permissions are unaffected.",
@@ -214,6 +236,54 @@ function userCell(grant) {
   return cell;
 }
 function roleLabel(role) { return role === "member" ? "Curator" : role.charAt(0).toUpperCase() + role.slice(1); }
+function primaryUser(grant) { return grant.name || grant.login || grant.email || grant.providerUserId || ""; }
+function grantSortValue(grant, key) {
+  if (key === "user") return primaryUser(grant);
+  if (key === "role") return ({ reader: 0, member: 1, admin: 2, owner: 3 })[grant.role] ?? 99;
+  if (key === "status") return ({ active: 0, suspended: 1, revoked: 2 })[grant.status] ?? 99;
+  if (key === "entra") return entraCheck(grant).text;
+  if (key === "updated") {
+    const value = grant.updatedAt ? new Date(grant.updatedAt).getTime() : null;
+    return Number.isFinite(value) ? value : null;
+  }
+  return "";
+}
+function compareGrantValues(left, right) {
+  const leftMissing = left == null || left === "";
+  const rightMissing = right == null || right === "";
+  if (leftMissing || rightMissing) return leftMissing === rightMissing ? 0 : leftMissing ? 1 : -1;
+  if (typeof left === "number" && typeof right === "number") return left - right;
+  return String(left).localeCompare(String(right), "en", { sensitivity: "base", numeric: true });
+}
+function sortedGrantRows(table, rows) {
+  const state = grantSort[table];
+  if (!state?.key) return [...rows];
+  return [...rows].sort((left, right) => {
+    const leftValue = grantSortValue(left, state.key);
+    const rightValue = grantSortValue(right, state.key);
+    const leftMissing = leftValue == null || leftValue === "";
+    const rightMissing = rightValue == null || rightValue === "";
+    if (leftMissing !== rightMissing) return leftMissing ? 1 : -1;
+    const compared = compareGrantValues(leftValue, rightValue);
+    if (compared) return state.direction === "asc" ? compared : -compared;
+    return compareGrantValues(primaryUser(left), primaryUser(right));
+  });
+}
+function updateGrantSortHeaders(table) {
+  const state = grantSort[table];
+  for (const header of document.querySelectorAll('th[data-sort-table="' + table + '"]')) {
+    const active = header.dataset.sortKey === state.key;
+    header.setAttribute("aria-sort", active ? (state.direction === "asc" ? "ascending" : "descending") : "none");
+    const indicator = header.querySelector(".sort-indicator");
+    if (indicator) indicator.textContent = active ? (state.direction === "asc" ? "▲" : "▼") : "↕";
+  }
+}
+function changeGrantSort(table, key) {
+  const state = grantSort[table];
+  state.direction = state.key === key && state.direction === "asc" ? "desc" : "asc";
+  state.key = key;
+  renderGrantTables();
+}
 function updateRoleHelp() { $("roleHelp").textContent = roleDescriptions[$("role").value] || ""; }
 function entraCheck(grant) {
   if (grant.provider !== "entra") return { text: "GitHub fallback · not managed here", className: "muted" };
@@ -242,6 +312,44 @@ function openChange(target, grant, mode = "change") {
   updateRoleHelp();
   $("changeDialog").showModal();
 }
+function renderManagedGrant(grant) {
+  const row = document.createElement("tr");
+  const check = entraCheck(grant);
+  const checkCell = td(check.text);
+  checkCell.className = check.className;
+  row.append(userCell(grant), td(roleLabel(grant.role)), td(grant.status), checkCell, td(grant.updatedAt ? new Date(grant.updatedAt).toLocaleString() : "—"));
+  const action = td("");
+  const button = document.createElement("button");
+  const reconciling = grant.drift !== "none";
+  button.textContent = reconciling ? "Review & reconcile" : "Change";
+  button.onclick = () => openChange({ id: grant.providerUserId, displayName: grant.name, mail: grant.email, userPrincipalName: grant.email }, grant, reconciling ? "reconcile" : "change");
+  action.replaceChildren(button);
+  row.append(action);
+  return row;
+}
+function renderLegacyGrant(grant) {
+  const row = document.createElement("tr");
+  row.append(userCell(grant), td(roleLabel(grant.role)), td(grant.status), td(grant.updatedAt ? new Date(grant.updatedAt).toLocaleString() : "—"));
+  return row;
+}
+function renderGrantTables() {
+  const managedBody = $("grants");
+  managedBody.replaceChildren(...sortedGrantRows("grants", grantRows).map(renderManagedGrant));
+  const githubBody = $("githubGrants");
+  if (githubGrantRows.length) {
+    githubBody.replaceChildren(...sortedGrantRows("githubGrants", githubGrantRows).map(renderLegacyGrant));
+  } else {
+    const row = document.createElement("tr");
+    const cell = td("No legacy GitHub grants recorded.");
+    cell.colSpan = 4;
+    cell.className = "muted";
+    row.append(cell);
+    githubBody.replaceChildren(row);
+  }
+  $("githubGrantCount").textContent = githubGrantRows.length + (githubGrantRows.length === 1 ? " record" : " records");
+  updateGrantSortHeaders("grants");
+  updateGrantSortHeaders("githubGrants");
+}
 async function load() {
   clearError();
   const session = await api("/admin/api/session").catch(error => ({ authenticated: false, error: error.message }));
@@ -260,28 +368,9 @@ async function refresh() {
   $("status").textContent = "Refreshing…";
   try {
     const data = await api("/admin/api/access");
-    const body = $("grants");
-    body.replaceChildren();
-    for (const grant of data.grants) {
-      const row = document.createElement("tr");
-      const check = entraCheck(grant);
-      const checkCell = td(check.text);
-      checkCell.className = check.className;
-      row.append(userCell(grant), td(roleLabel(grant.role)), td(grant.status), checkCell, td(grant.updatedAt ? new Date(grant.updatedAt).toLocaleString() : "—"));
-      const action = td("");
-      if (grant.provider === "entra") {
-        const button = document.createElement("button");
-        const reconciling = grant.drift !== "none";
-        button.textContent = reconciling ? "Review & reconcile" : "Change";
-        button.onclick = () => openChange({ id: grant.providerUserId, displayName: grant.name, mail: grant.email, userPrincipalName: grant.email }, grant, reconciling ? "reconcile" : "change");
-        action.replaceChildren(button);
-      } else {
-        action.textContent = "Not managed here";
-        action.className = "muted";
-      }
-      row.append(action);
-      body.append(row);
-    }
+    grantRows = data.grants.filter(grant => grant.provider === "entra");
+    githubGrantRows = data.grants.filter(grant => grant.provider === "github");
+    renderGrantTables();
     const audit = $("audit");
     audit.replaceChildren();
     for (const event of data.audit) {
@@ -314,6 +403,9 @@ $("searchBtn").onclick = async () => {
   } catch (error) { showError(error.message); }
 };
 $("role").onchange = updateRoleHelp;
+for (const button of document.querySelectorAll("[data-grant-sort]")) {
+  button.onclick = () => changeGrantSort(button.dataset.sortTarget, button.dataset.grantSort);
+}
 $("refresh").onclick = refresh;
 $("cancel").onclick = () => $("changeDialog").close();
 $("confirm").onclick = async () => {

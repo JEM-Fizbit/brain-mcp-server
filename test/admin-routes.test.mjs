@@ -98,7 +98,11 @@ test("ERS hosted access page is available but its APIs require a current Owner",
   assert.match(page.body, /does not change separate SharePoint, OneDrive or Obsidian editing permissions/);
   assert.match(page.body, /What does “Review &amp; reconcile” mean/);
   assert.match(page.body, /system never chooses a role automatically/);
-  assert.match(page.body, /GitHub fallback · not managed here/);
+  assert.match(page.body, /Legacy GitHub grants/);
+  assert.match(page.body, /ERS Brain is Entra-only/);
+  assert.match(page.body, /data-sort-target="grants"/);
+  assert.match(page.body, /data-sort-target="githubGrants"/);
+  assert.match(page.body, /aria-sort="none"/);
   assert.match(page.body, /GitHub ID/);
   assert.match(page.body, /Review & reconcile/);
   assert.match(page.body, /roleHelp/);
