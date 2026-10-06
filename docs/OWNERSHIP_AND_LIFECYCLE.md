@@ -27,8 +27,9 @@ parity is not mistaken for shared custody.
 ## Product lifecycle
 
 **Phase 0 — Personal beta (complete).** The JEM deployment proved the hosted
-MCP, local-first sync and multi-Brain routing patterns. The temporary ERS data
-on the personal pilot was removed after the dedicated ERS stack passed parity.
+MCP, local-first sync and multi-Brain routing patterns. The dedicated ERS stack
+superseded the personal pilot; the separate purge-evidence sign-off remains
+open as governance-register item 10 and is not a production-rollout gate.
 
 **Phase 1 — Dedicated owner-scoped stacks (complete).** ERS now operates its
 own private tag-tracking mirror, Fly app, Supabase project, custom hostname,
