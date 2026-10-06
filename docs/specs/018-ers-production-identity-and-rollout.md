@@ -1,6 +1,6 @@
 # 018 — ERS Production Identity, Access Administration And Team Rollout
 
-**Status:** rollout-authorised — tenant-neutral implementation complete in upstream
+**Status:** complete — production rollout executed 2026-10-06; tenant-neutral implementation complete in upstream
 release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`,
 and the observability-acceptance correction is included in `v1.8.2`. The tagged
 release is deployed and has passed the profile-bound JEM re-canary.
@@ -20,6 +20,12 @@ UptimeRobot Keyword monitor against the public health endpoint and its first
 live check passed. The Entra-only technical cutover is complete. On 2026-10-05
 the ERS governance pack recorded Fly.io and Supabase clearance, closed item 14
 through AI-DEC-2026-027, and authorised enrolment of the named Reader cohort.
+On 2026-10-06 John completed the named Entra enrolment and sent the team launch
+announcement with the published Quick Start Guide. The enrolled workforce
+Reader cohort includes Tiernan McMahon, Ross Kelly, Michael Arciero, Paul
+Carter, Dr Rodger Novak and Shaun Foy. Jeronimo Duque is Curator; Alice is a
+bounded AI-agent Curator identity rather than a person; John Milad and Cillian
+McGorman are human Owners; Rick Price is the break-glass Owner account.
 Residual provider-assurance and recovery items remain tracked as non-blocking
 backlog; they are not pre-rollout conditions.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,

@@ -2,7 +2,7 @@
 
 > **Canonical** statement of who owns what across the Brain MCP estate, and the intended product lifecycle from personal beta to a dedicated ERS service. This is the source of truth — other docs and the asset registers point here, not the other way around.
 >
-> **Last reviewed:** 2026-09-01
+> **Last reviewed:** 2026-10-06
 
 ## Why this doc exists
 
@@ -20,7 +20,7 @@ parity is not mistaken for shared custody.
 | Brain MCP server code (this repo) | **Personal** | Reusable MIT-licensed upstream. ERS consumes reviewed annotated tags through its private mirror; no ERS secrets or identities belong in public source. |
 | Fly.io app `jem-brain-mcp` + personal Supabase project | **Personal** | Permanent JEM runtime and data plane. Hosts only `ai-brain-jem`. |
 | ERS Brain — `01_ers-brain` content | **ERS** | Canonical SharePoint/OneDrive Markdown asset and local mirror. |
-| ERS private mirror + Fly app `ers-brain-mcp` + ERS Supabase project | **ERS** | Permanent ERS runtime and data plane. Hosts only `ers-brain`; live Entra-only on guarded v1.8.8. |
+| ERS private mirror + Fly app `ers-brain-mcp` + ERS Supabase project | **ERS** | Permanent ERS runtime and data plane. Hosts only `ers-brain`; live Entra-only on v1.12.6. |
 | ERS Brain connector and Entra app/role groups | **ERS** | Workforce identity and role plane; governed by Spec 018 and the ERS access runbook. |
 | Brain alerting credentials | **Owner-scoped** | Each deployment retains only its own alert destinations and secrets in its hosting secret store. |
 
@@ -38,7 +38,9 @@ The two stacks share released source code only.
 **Phase 2 — Controlled ERS workforce rollout (current).** ERS is live on
 its guarded Entra-only stack. The John/Cillian/Jeronimo technical and role
 acceptance checks passed. AI-DEC-2026-027 closed the final item-14 governance
-gate on 2026-10-05; the named Reader cohort may now be enrolled.
+gate on 2026-10-05; named workforce enrolment and launch communication
+completed on 2026-10-06. Residual provider-assurance and recovery items are
+non-blocking backlog.
 
 ### Fork scope (Phase 0 → Phase 1, completed)
 

@@ -1,7 +1,7 @@
 # ERS Brain Entra Access Runbook
 
-**Status:** ERS is live on guarded `v1.8.8` in Entra-only mode; the human client/role acceptance gate and technical cutover checks are complete, independent external health monitoring is live, and final governance closeout remains the gate before broader workforce enrolment.
-**Last updated:** 2026-09-01
+**Status:** ERS is live on `v1.12.6` in Entra-only production mode. Human client/role acceptance, technical cutover, external monitoring, governance clearance, named workforce enrolment and launch communication are complete. Residual provider-assurance and recovery items are non-blocking backlog.
+**Last updated:** 2026-10-06
 **Scope:** ERS-owned deployment only (`ers-brain`)
 
 This runbook activates and operates the Spec 018 identity and permissions
@@ -56,6 +56,11 @@ his displayed Owner role all work. John then reported Jeronimo's oral
 confirmation that his bounded Curator test passed. This closed the human
 client/role acceptance gate. AI-DEC-2026-027 subsequently closed the remaining
 governance gate on 2026-10-05 and authorised the named Reader cohort.
+John completed the named workforce enrolment and issued the team launch
+announcement with the published Quick Start Guide on 2026-10-06. Reader is the
+default role. Jeronimo Duque is Curator; Alice is an AI-agent Curator identity;
+John Milad and Cillian McGorman are human Owners; Rick Price is the break-glass
+Owner account. Cillian and Jeronimo are the human content-curation contacts.
 
 Release `v1.8.8` was deployed on 2026-09-01 to JEM Fly release 82 and then to
 the private ERS overlay as Fly release 20. JEM remained GitHub-only with no
