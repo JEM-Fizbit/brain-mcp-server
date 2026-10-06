@@ -1,5 +1,13 @@
 # Fly Deployment
 
+## Verified access-administration usability release — 6 October 2026
+
+Annotated **v1.12.6**, public source `c5a6065dbc54bc007008e16488cf8278958e2059`, is deployed on both existing owner-isolated services. Each guarded gate passed **630 tests: 619 passed, 11 optional skips, zero failures**. Four focused access-page browser checks also passed across light/dark and desktop/narrow layouts.
+
+JEM completed at **09:56:00 UTC**. The protected ERS overlay completed at **09:59:02 UTC** from the same annotated upstream source; its exact overlay/image receipt remains in the private operational repository. Live health reports **v1.12.6** on both services, preserves GitHub-only authentication with no access-admin route on JEM, and preserves Entra-only authentication with access administration enabled on ERS.
+
+The ERS **Access & Roles** page now sorts the managed Entra grants by user, role, status, Entra reconciliation state, or update time. Re-selecting a column reverses direction, the active direction is exposed accessibly, and missing values remain last. Legacy GitHub fallback records now appear in a separate sortable, read-only table so they cannot be mistaken for managed Entra access. Live markup verification confirmed both table surfaces and the sorting controls. No grant, credential, Brain content, schema, permission, telemetry or authentication-path change was made.
+
 ## Verified reason-aware authentication release — 4 October 2026
 
 Annotated **v1.12.5**, public source `d0c4afb0ccadff89fad614b77a47d1d7adf67452`, is deployed on both existing owner-isolated services. The final guarded suite, including the event-gap repetition refinement, passed **630 tests: 619 passed, 11 optional skips, zero failures**, independently in both release gates. All **12 isolated desktop/mobile browser checks** passed with ambient live-profile loading disabled.
