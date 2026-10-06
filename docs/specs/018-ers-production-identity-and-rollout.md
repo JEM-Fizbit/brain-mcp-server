@@ -395,12 +395,18 @@ structural call keeps host approval in addition to server authorization.
 
 Initial production owners:
 
-- John: `owner`;
-- Cillian: `owner`;
-- designated IT/TDM identity: `owner`;
+- John: human `owner` and support contact;
+- Cillian: human `owner` and support contact;
+- Rick Price: dedicated non-human break-glass administrative account with an
+  `owner` grant; it is not a person or support contact;
 - every additional colleague: `reader`;
 - additional Curator (`member`), `admin` or `owner` grants only through the
   permission rules above.
+
+Alice is an AI agent under development with an explicit bounded Curator grant.
+She is not a person and must not be presented as a contact or escalation route
+for corrections or curation. Human escalation remains with named human
+Curators and Owners.
 
 No existing GitHub role is automatically copied to an Entra identity. The
 bootstrap must explicitly map and review each initial owner Entra object ID;

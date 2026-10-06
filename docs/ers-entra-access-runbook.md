@@ -175,10 +175,11 @@ reviewed Owners. Delete the temporary JSON securely after the OIDs are retained
 in the private grant ledger/password-manager record.
 
 **Completed 2026-08-28:** the guarded bootstrap created exactly three active
-`ers-brain` Owners: John E. Milad, Cillian McGorman and Rick Price. Each
-principal is bound to the exact ERS tenant and reviewed Entra object ID; each
-grant records `Brain.Owner`, the fixed Owner group and
-`initial_owner_bootstrap`. The command created three metadata-only `grant`
+`ers-brain` Owner identities. John E. Milad and Cillian McGorman are the human
+Owner contacts. Rick Price is the dedicated break-glass administrative account,
+not a person or support contact. Each principal is bound to the exact ERS tenant
+and reviewed Entra object ID; each grant records `Brain.Owner`, the fixed Owner
+group and `initial_owner_bootstrap`. The command created three metadata-only `grant`
 audit rows with `graph_outcome=preverified` and empty metadata. Post-write
 checks retained 18/18 Brain tables under RLS with zero client/public grants and
 zero non-`brain_runtime` policies. The temporary owner JSON was removed after
@@ -375,6 +376,11 @@ or Obsidian. Those rights follow the Systems & IT SharePoint policy.
 Every action records immutable actor/target tenant and object IDs, old/new
 role/status, bounded reason and Graph outcome. Display name and email are for
 display only.
+
+Non-human identities must be described as such wherever a role roster is shown.
+Alice is an AI agent under development with a bounded Curator grant; she is not
+a person or a human escalation contact. Rick Price is the break-glass
+administrative account described above and is not a support contact.
 
 Hosted MCP revisions use the authenticated Entra principal. A revision detected
 from the SharePoint/OneDrive mirror is recorded as a SharePoint manual edit with

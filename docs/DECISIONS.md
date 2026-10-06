@@ -1,5 +1,19 @@
 # Working Decisions Log
 
+## 2026-10-06 — Distinguish human contacts from non-human ERS identities
+
+**Decision:** Alice is an AI agent under development, not a person or a human
+escalation contact for Brain corrections or curation. Rick Price is a dedicated
+break-glass administrative account, not a person or a support contact. User
+guidance, access records and operational documentation must label both identities
+accordingly. Human escalation routes remain named human Curators and Owners.
+
+**Why:** role grants describe technical authority, not whether an identity is a
+person or an appropriate support contact. Conflating the two creates misleading
+guidance and an unusable escalation path.
+
+**Source:** John E. Milad, 2026-10-06.
+
 ## 2026-10-05 — ERS wider-rollout governance gate is closed
 
 **Decision:** treat the Fly.io and Supabase vendor clearances recorded in the
