@@ -53,8 +53,9 @@ exactly the four permitted private overlay files. It is pushed but not deployed:
 Cillian's Owner path and Jeronimo's Reader path have passed. On 2026-09-01
 Cillian confirmed that Claude connection, the admin portal, the role page and
 his displayed Owner role all work. John then reported Jeronimo's oral
-confirmation that his bounded Curator test passed. This closes the human
-client/role acceptance gate; it does not itself authorize deployment.
+confirmation that his bounded Curator test passed. This closed the human
+client/role acceptance gate. AI-DEC-2026-027 subsequently closed the remaining
+governance gate on 2026-10-05 and authorised the named Reader cohort.
 
 Release `v1.8.8` was deployed on 2026-09-01 to JEM Fly release 82 and then to
 the private ERS overlay as Fly release 20. JEM remained GitHub-only with no
@@ -64,8 +65,8 @@ authorization start with HTTP 400. John's fresh Entra login, authenticated
 read and dedicated hosted-write-to-local canary passed. The ERS profile-bound
 doctor passed with 54 hosted files, zero conflicts and a current heartbeat;
 reciprocal ERS-to-JEM and JEM-to-ERS access probes were denied. This completes
-the Entra-only technical cutover. Do not enrol the broader workforce until the
-final item-14 governance decision is recorded.
+the Entra-only technical cutover. The final item-14 governance decision was
+recorded on 2026-10-05; named Reader enrolment is now authorised.
 
 ## 1. One-time TDM setup
 

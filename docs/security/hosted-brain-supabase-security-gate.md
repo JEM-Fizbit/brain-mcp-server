@@ -1,5 +1,11 @@
 # Hosted Brain Supabase Security Gate
 
+> **Current ERS rollout status (5 October 2026):** the ERS governance pack
+> records Supabase and Fly.io clearance and AI-DEC-2026-027 closes the wider
+> rollout gate. The dated checks below remain the technical security evidence;
+> their statements that the rollout hold was still open describe the position
+> at the time and are not current launch status.
+
 **Status:** passed for the live JEM and ERS hosted runtimes
 **Full database/Storage access gate checked:** both owners 2026-09-11, after the approved ingestion-job migration (below).
 **Projects:** `jem-brain-personal`; `brain-platform-pilot`

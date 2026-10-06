@@ -1,6 +1,6 @@
 # 018 — ERS Production Identity, Access Administration And Team Rollout
 
-**Status:** in progress — tenant-neutral implementation complete in upstream
+**Status:** rollout-authorised — tenant-neutral implementation complete in upstream
 release `v1.8.0`; corrective operator-profile binding is included in `v1.8.1`,
 and the observability-acceptance correction is included in `v1.8.2`. The tagged
 release is deployed and has passed the profile-bound JEM re-canary.
@@ -17,9 +17,11 @@ page and displayed Owner role all work; John then reported Jeronimo's oral
 confirmation that the Curator test passed. This closed the human client/role
 acceptance gate. On the same date John activated a five-minute ERS-owned
 UptimeRobot Keyword monitor against the public health endpoint and its first
-live check passed. The Entra-only technical cutover is complete; the final
-item-14 governance closeout remains the gate before broader workforce
-enrolment.
+live check passed. The Entra-only technical cutover is complete. On 2026-10-05
+the ERS governance pack recorded Fly.io and Supabase clearance, closed item 14
+through AI-DEC-2026-027, and authorised enrolment of the named Reader cohort.
+Residual provider-assurance and recovery items remain tracked as non-blocking
+backlog; they are not pre-rollout conditions.
 **Source:** John E. Milad, 2026-08-25: promote the ERS production rollout,
 make Microsoft Entra ID authentication and permission management the primary
 technical risk, and treat a restore rehearsal as useful resilience work rather

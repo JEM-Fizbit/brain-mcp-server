@@ -1,5 +1,10 @@
 # Hosted Brain monitoring
 
+> **Current ERS rollout status (5 October 2026):** AI-DEC-2026-027 closed the
+> remaining governance gate and authorised named Reader enrolment. References
+> below to an open company-rollout hold describe the dated delivery boundary of
+> this monitoring feature, not the current ERS launch status.
+
 **Version:** 1.0 — 11 September 2026
 **Release:** v1.10.0; see the owner-specific deployment record for live verification
 

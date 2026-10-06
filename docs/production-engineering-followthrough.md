@@ -1,10 +1,10 @@
 # Production engineering follow-through
 
-**Status:** approved engineering delivery deployed and verified; company rollout remains held
-**Updated:** 2026-09-11
+**Status:** approved engineering delivery deployed and verified; ERS governance rollout gate closed on 2026-10-05
+**Updated:** 2026-10-06
 **Scope:** remaining Brain-owned engineering after spec 020; existing permissions and connections stay in place
 
-The nine structural audit findings were addressed by spec 020. This pass fixes the remaining sync-health reporting defect, extends recovery and concurrency evidence, and prepares two follow-on designs. Installed-client acceptance remains a separate open rollout gate; this work does not weaken reviewed-write preconditions.
+The nine structural audit findings were addressed by spec 020. This pass fixed the remaining sync-health reporting defect, extended recovery and concurrency evidence, and prepared two follow-on designs. The installed-client and governance gates that were open when this delivery was recorded were subsequently closed. The dated evidence below is preserved and does not weaken reviewed-write preconditions.
 
 ## Sync health: implemented
 
@@ -124,4 +124,4 @@ The post-migration [Supabase security gate](security/hosted-brain-supabase-secur
 
 Production schema prerequisites are ready. The first real ingestion still requires an explicitly selected source and the existing operator byte credential; no production source was selected or uploaded during this delivery.
 
-Company-wide rollout remains held for the previously recorded installed-client acceptance and owner assurance items. These implementation deliveries do not close those separate gates. Provider physical-backup/Storage recovery remains non-blocking resilience work.
+At this 11 September delivery checkpoint, company-wide rollout remained held for the then-open installed-client acceptance and owner-assurance items. Those separate gates were subsequently closed, culminating in the 5 October governance decision recorded in [spec 018](specs/018-ers-production-identity-and-rollout.md). Provider physical-backup/Storage recovery remains non-blocking resilience work.

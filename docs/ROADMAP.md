@@ -1,8 +1,10 @@
 # Hosted Brain Roadmap
 
+**5 October 2026:** the ERS governance pack records Fly.io and Supabase clearance and AI-DEC-2026-027 closes the remaining wider-rollout gate. The named Reader cohort may now be enrolled. Residual provider-assurance and recovery items remain non-blocking backlog. [Identity and rollout specification](specs/018-ers-production-identity-and-rollout.md).
+
 **26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
 **Status:** active reference
-**Last updated:** 2026-09-26
+**Last updated:** 2026-10-06
 
 > **Active handoff:** before starting the next hosted Brain hardening slice, read [`docs/savepoints/2026-06-25-hosted-brain-hardening-baseline.md`](savepoints/2026-06-25-hosted-brain-hardening-baseline.md). It captures the clean baseline, two-Brain hosted status, recent cross-repo housekeeping, and recommended next work.
 
@@ -10,7 +12,7 @@ This roadmap records the intended path from the current JEM hosted Brain pilot t
 
 > **Ownership & lifecycle:** see [`OWNERSHIP_AND_LIFECYCLE.md`](OWNERSHIP_AND_LIFECYCLE.md). The reusable public server remains personal-owned; JEM and ERS operate permanently isolated hosted deployments. The historical fork phase is complete.
 
-**11 September delivery:** both isolated services run v1.11.0. Authenticated monitoring and the explicit-source resumable ingestion workflow are implemented; both private job-table migrations and security gates pass. No production source was selected. Both existing OpenAI Brain definitions have since passed the supported metadata refresh, with current schemas and actual read-only preflight verified in fresh ChatGPT and Codex CLI sessions. Remaining actual client/role acceptance and the company rollout hold remain open. [Delivery and remaining boundaries](production-engineering-followthrough.md#final-verification-and-activation-boundary).
+**11 September delivery (historical):** both isolated services ran v1.11.0. Authenticated monitoring and the explicit-source resumable ingestion workflow were implemented; both private job-table migrations and security gates passed. No production source was selected. Both existing OpenAI Brain definitions then passed the supported metadata refresh, with current schemas and actual read-only preflight verified in fresh ChatGPT and Codex CLI sessions. The client/role acceptance and governance holds recorded at that point were subsequently closed; see the 5 October update above. [Delivery and remaining boundaries](production-engineering-followthrough.md#final-verification-and-activation-boundary).
 
 The core product direction is local-first hosted Brain:
 
@@ -22,6 +24,11 @@ The core product direction is local-first hosted Brain:
 - maintenance is automation-first: routine linting, sync health, hosted health, inbox/source-ingestion state, and conflict detection should be checked by tools and surfaced proactively, leaving users to make judgement calls rather than babysit infrastructure.
 
 ## Current Position
+
+**5 October 2026:** Fly.io and Supabase vendor clearances are recorded, the
+final ERS governance gate is closed, and named-staff Reader enrolment is
+authorised. Rollout execution and team communication are the remaining launch
+work; they are not additional governance approvals.
 
 **13 September:** the agreed client/role test set is complete on the recorded surfaces. The additive [v1.11.1 preflight patch](preflight-maintenance-release.md) is deployed and verified on both existing services. Live structured/text parity, unchanged revision cursors, zero conflicts and both owner-bound cockpit doctors pass. Technical acceptance does not activate company enrolment; the existing vendor-review gate remains separate.
 
@@ -47,8 +54,8 @@ The hosted Brain rebuild has passed the first critical sync gates:
 - OpenAI cutover is verified for Codex plus ERS and personal ChatGPT accounts;
 - Claude personal Max and Claude ERS account have both been activated and verified against hosted Brain for John's personal use;
 - the owner-isolated runtimes are live: JEM remains John's personal Brain;
-  ERS has a completed John+Cillian GitHub pilot on its dedicated stack, while
-  wider production access is governed by spec 018 and remains inactive;
+  ERS runs Entra-only on its dedicated stack, has completed Owner, Curator and
+  Reader acceptance, and is authorised under spec 018 for named-staff rollout;
 - specs 015–016 are implemented and validated on JEM: release `v1.5.0`
   (`379b965`) established the source/Library pilot, the `v1.6.0` acceptance
   remediation (`e1e29b8`) closed the content/source gaps, and the `v1.6.1`

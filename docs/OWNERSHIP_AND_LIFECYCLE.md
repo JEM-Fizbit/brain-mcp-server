@@ -36,9 +36,9 @@ connector and Entra identity plane. JEM remains a separate personal deployment.
 The two stacks share released source code only.
 
 **Phase 2 — Controlled ERS workforce rollout (current).** ERS is live on
-guarded v1.8.8 in Entra-only mode. The John/Cillian/Jeronimo technical and role
-acceptance checks passed. The final item-14 governance decision remains the
-gate before broader workforce enrolment.
+its guarded Entra-only stack. The John/Cillian/Jeronimo technical and role
+acceptance checks passed. AI-DEC-2026-027 closed the final item-14 governance
+gate on 2026-10-05; the named Reader cohort may now be enrolled.
 
 ### Fork scope (Phase 0 → Phase 1, completed)
 

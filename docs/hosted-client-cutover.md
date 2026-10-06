@@ -1,8 +1,10 @@
 # Hosted Client Cutover Runbook
 
+**5 October 2026:** the ERS governance pack closes the remaining company-rollout gate through AI-DEC-2026-027. Named Reader enrolment is authorised; residual provider-assurance and recovery items are non-blocking backlog. The dated technical-gate history below remains evidence, not current rollout status. [Identity and rollout specification](specs/018-ers-production-identity-and-rollout.md).
+
 **26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
 **Status:** active operator guide
-**Last updated:** 2026-09-26
+**Last updated:** 2026-10-06
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 

@@ -1,5 +1,22 @@
 # Working Decisions Log
 
+## 2026-10-05 — ERS wider-rollout governance gate is closed
+
+**Decision:** treat the Fly.io and Supabase vendor clearances recorded in the
+ERS governance pack, together with AI-DEC-2026-027, as closure of the remaining
+item-14 rollout gate. ERS Brain Owners may enrol the named Reader cohort and
+issue the launch guide. Residual Fly.io and Supabase assurance, recovery,
+retention and change-notice actions remain visible backlog, but are not
+pre-rollout conditions.
+
+**Why:** the technical, identity, client/role and vendor-review evidence has
+been completed and the designated governance decision explicitly authorises
+rollout. Preserving the residual actions as backlog avoids turning useful
+resilience and assurance improvements into an unrecorded launch veto.
+
+**Source:** ERS AI Governance decision AI-DEC-2026-027 and Cillian McGorman's
+5 October 2026 clearance email, retained in the ERS Brain source archive.
+
 ## 2026-09-26 — App-scoped Fly credentials replace browser sessions in routine automation
 
 **Decision:** each owner deployment uses its own 180-day Keychain-held app token; Monitor receives a read-only derivative. Warn at 30 days remaining. Guarded releases bind the selected app to the checkout, remove Fly credentials from tests, and retrieve secrets only for the final Fly operation. Owner sign-in is reserved for account administration and replacement issuance. No permanent account-wide automation token is stored. Rotation stages and validates before atomic activation; previous credentials remain until matching deployment proof allows explicit retirement.
