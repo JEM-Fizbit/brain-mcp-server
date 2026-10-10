@@ -1,5 +1,14 @@
 # Fly Deployment
 
+**10 October 2026, ERS follow-through:** the separately approved ERS guarded
+v1.12.7 release is deployed and verified. The gate passed 622 tests with 11
+optional skips; live health, invalid-Origin rejection and the existing Codex
+authenticated read pass. Existing ChatGPT and Claude web tool refreshes completed
+without reconnecting. Claude CLI required authentication before deployment and
+was not repaired; browser conversational/role acceptance was not rerun. Exact
+overlay/image provenance and client evidence remain in the private operational
+repository. Both isolated deployments now run v1.12.7.
+
 ## MCP Origin validation — v1.12.7
 
 **Deployed and verified, 10 October 2026:** JEM completed its guarded release at

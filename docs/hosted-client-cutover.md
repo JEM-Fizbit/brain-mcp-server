@@ -1,5 +1,11 @@
 # Hosted Client Cutover Runbook
 
+**10 October 2026, ERS follow-through:** the ERS guarded v1.12.7 release is
+deployed. Existing Codex authenticated reads and ChatGPT/Claude web tool
+refreshes pass with retained OAuth connections. Claude CLI already required
+authentication before release; browser conversational/role acceptance was not
+rerun. [Release evidence](deploy-fly.md).
+
 **10 October 2026:** JEM alone is deployed and verified on v1.12.7 with early
 Origin validation. Existing direct and installed-app authenticated status reads
 pass. JEM's tool metadata was refreshed through **Plugins → JEM Brain → Manage

@@ -1,5 +1,10 @@
 # Hosted Brain Roadmap
 
+**10 October 2026:** ERS completed its separately approved guarded v1.12.7
+Origin-validation release. Both isolated services now run v1.12.7; ERS identity
+and storage boundaries are unchanged. The protocol upgrade remains deferred.
+[Release evidence and verification limits](deploy-fly.md).
+
 **6 October 2026:** the ERS production rollout is complete. AI-DEC-2026-027 closed the Fly.io/Supabase governance gate on 5 October; the named Entra cohort was then enrolled and the team announcement issued with the published Quick Start Guide. The live ERS service is Entra-only on v1.12.6 with hosted Access & Roles administration. Residual provider-assurance and recovery items remain non-blocking backlog. [Identity and rollout specification](specs/018-ers-production-identity-and-rollout.md).
 
 **26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
