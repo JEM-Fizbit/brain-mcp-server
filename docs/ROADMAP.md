@@ -25,6 +25,12 @@ The core product direction is local-first hosted Brain:
 
 ## Current Position
 
+**10 October 2026:** JEM's v1.12.7 Origin validation is deployed and verified;
+the existing client connections remain usable. SDK v2 / MCP 2026-07-28 is
+deferred backlog with explicit legacy-client and DCR compatibility, rather than
+an emergency cutover. This release did not deploy the separate ERS service.
+[Release evidence](deploy-fly.md#mcp-origin-validation--v1127).
+
 **6 October 2026:** Fly.io and Supabase vendor clearances are recorded, the
 final ERS governance gate is closed, and the named workforce cohort is enrolled.
 The launch guide is published and the team announcement has been sent. ERS is

@@ -1,10 +1,19 @@
 # Hosted Client Cutover Runbook
 
+**10 October 2026:** JEM alone is deployed and verified on v1.12.7 with early
+Origin validation. Existing direct and installed-app authenticated status reads
+pass. JEM's tool metadata was refreshed through **Plugins → JEM Brain → Manage
+→ Refresh tools**; its advertised tool list includes ingestion preflight and
+reviewed-revision guidance. This open Codex chat retains older declarations, so
+fresh-chat schema acceptance remains a separate check. OAuth connections were
+retained. [Release evidence](deploy-fly.md#mcp-origin-validation--v1127),
+[refresh procedure and limits](protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md).
+
 **6 October 2026:** the ERS production rollout is complete. AI-DEC-2026-027 closed the remaining company-rollout gate on 5 October; the named Entra cohort was enrolled and the launch announcement issued with the published Quick Start Guide on 6 October. Residual provider-assurance and recovery items are non-blocking backlog. The dated technical-gate history below remains evidence, not current rollout status. [Identity and rollout specification](specs/018-ers-production-identity-and-rollout.md).
 
 **26 September 2026:** v1.12.0 is deployed on both isolated services. Monitor now supervises sync independently with bounded retries and durable diagnostics; hosted lint completes across the source/vault boundary. Both live doctor profiles pass with zero conflicts. [Release evidence and recovery behavior](hosted-cockpit.md#independent-sync-recovery-v1120).
 **Status:** active operator guide
-**Last updated:** 2026-10-06
+**Last updated:** 2026-10-10
 
 This runbook covers the JEM Brain move from hosted pilot to normal remote-client usage.
 

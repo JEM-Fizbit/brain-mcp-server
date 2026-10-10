@@ -2,6 +2,21 @@
 
 ## MCP Origin validation — v1.12.7
 
+**Deployed and verified, 10 October 2026:** JEM completed its guarded release at
+**18:33:21 UTC**, annotated tag **v1.12.7**, source
+`a8421bde15fab35b91d4438bbf973c708d3a7f97`. Image:
+`registry.fly.io/jem-brain-mcp:deployment-01M4KHCPE8QJWQRHWC0ZFP1A0Q`,
+digest `sha256:387ca65df0eb7989291869552ec0a2e34cf9d3dea57bc3a4e5924f145788b247`.
+Both the implementation suite and guarded release gate passed **633 tests:
+622 passed, 11 existing optional skips, zero failures**. The 39 focused HTTP
+tests also passed. A live invalid-Origin request returned the fixed HTTP 403
+JSON-RPC rejection, and authenticated status reads succeeded independently
+through the direct connector and installed JEM app. The 18:34 UTC Doctor passed
+with hosted **1.12.7**, current sync, zero conflicts and zero credential
+rejections. Two low-count anonymous discovery rejections remained informational;
+the invalid-Origin probe produced no credential-failure event. Brain inventory
+and hosted cursor were unchanged. **ERS was not deployed.**
+
 The approved initial target is JEM only. The release adds an early `/mcp` Origin
 check, preserving bearer-authenticated requests without Origin. The resource
 URI's own origin is always trusted; `MCP_ALLOWED_ORIGINS` adds exact HTTP(S)
@@ -14,8 +29,7 @@ not feed credential-failure alerts. This does not add CORS permission, replace
 authentication, change OAuth callbacks or implement the newer MCP revision.
 
 Verification: focused HTTP tests cover authenticated native/trusted browser
-discovery and rejection cases; the guarded release runs the full suite. Verify
-live version/health and authenticated read tools after activation. The ERS
+discovery and rejection cases; the guarded release runs the full suite. The ERS
 deployment is not part of this change's activation; its owner must explicitly
 review its origin configuration during future tag intake. Roll back with a
 reviewed revert and new patch/tag through the same guarded release route.
