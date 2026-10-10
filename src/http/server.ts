@@ -14,6 +14,7 @@ import { handleToken } from "../oauth/token.js";
 import { makeFileStateProvider, type StateProvider } from "../oauth/state.js";
 import { makePostgresStateProvider } from "../oauth/postgres-state.js";
 import { resolveAuth, wwwAuthenticateHeader } from "./mcp-auth.js";
+import { buildMcpAllowedOrigins, isAllowedMcpOrigin } from "./mcp-origin.js";
 import {
   assertHttpRuntimeConfig,
   oauthStateProvider,
@@ -42,6 +43,7 @@ type AuthenticatedRequest = IncomingMessage & { auth?: AuthInfo };
 interface HttpContext {
   config: OauthConfig;
   state: StateProvider;
+  allowedMcpOrigins?: readonly string[];
   admin?: AdminRouteContext;
   monitor?: MonitoringRoutes;
 }
@@ -135,6 +137,20 @@ async function handleMcp(
   ctx: HttpContext
 ): Promise<void> {
   const startedAt = performance.now();
+  if (!isAllowedMcpOrigin(
+    req,
+    ctx.allowedMcpOrigins ?? buildMcpAllowedOrigins(ctx.config.resourceUri)
+  )) {
+    // Do not echo/log attacker-controlled Origin values or count these as
+    // credential failures. Reject before authentication, parsing or tool work.
+    sendJson(res, 403, {
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32000, message: "Forbidden: invalid Origin" },
+    });
+    logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
+    return;
+  }
   if (req.method !== "POST") {
     methodNotAllowed(res, "POST");
     logRequestTiming("INFO", "mcp request completed", req, res, startedAt);
@@ -398,7 +414,11 @@ export async function startHttpServer(): Promise<void> {
   const host = process.env.HOST || process.env.MCP_HTTP_HOST || "127.0.0.1";
   const config = buildOauthConfig();
   const state = makeHttpStateProvider();
-  const ctx: HttpContext = { config, state };
+  const ctx: HttpContext = {
+    config,
+    state,
+    allowedMcpOrigins: buildMcpAllowedOrigins(config.resourceUri),
+  };
   if (process.env.BRAIN_MONITORING_ENABLED !== "0" && process.env.BRAIN_REVISION_STORE === "postgres" && process.env.BRAIN_REVISION_DATABASE_URL) {
     const status = createMonitoringStatus(process.env.BRAIN_REVISION_DATABASE_URL);
     ctx.monitor = new MonitoringRoutes(config, state, (brainId, role) => status.read(brainId, role));

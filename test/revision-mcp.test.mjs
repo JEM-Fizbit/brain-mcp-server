@@ -323,7 +323,7 @@ async function callTool(harness, name, args = {}) {
   return result.structuredContent?.content ?? result.content.map(part => part.text).join("\n");
 }
 
-async function listTools(harness) {
+async function requestToolList(harness, extraHeaders = {}, allowedMcpOrigins) {
   const body = JSON.stringify({
     jsonrpc: "2.0",
     id: 1,
@@ -339,6 +339,7 @@ async function listTools(harness) {
     "content-type": "application/json",
     "content-length": String(Buffer.byteLength(body)),
     accept: "application/json, text/event-stream",
+    ...extraHeaders,
   };
   req.rawHeaders = Object.entries(req.headers).flat();
 
@@ -346,13 +347,39 @@ async function listTools(harness) {
   await handleHttpRequest(req, res, {
     config: harness.config,
     state: memoryState(),
+    allowedMcpOrigins,
   });
+  return res;
+}
+
+async function listTools(harness) {
+  const res = await requestToolList(harness);
   const dataLine = res.text().split("\n").find((line) => line.startsWith("data: "));
   assert.ok(dataLine, res.text());
   const message = JSON.parse(dataLine.slice("data: ".length));
   assert.ifError(message.error);
   return message.result.tools;
 }
+
+test("HTTP MCP Origin checks preserve authenticated native and trusted-browser discovery", async () => {
+  const harness = await setupHarness("origin-discovery");
+  const allowed = [harness.baseUrl, "https://chatgpt.com", "https://claude.ai"];
+  for (const origin of [undefined, ...allowed]) {
+    const res = await requestToolList(harness, origin ? { origin } : {}, allowed);
+    assert.equal(res.statusCode, 200, origin || "native client");
+    const data = res.text().split("\n").find(line => line.startsWith("data: "));
+    const result = JSON.parse(data.slice(6));
+    assert.ok(result.result.tools.some(tool => tool.name === "brain_prepare_ingest"));
+    assert.ok(result.result.tools.find(tool => tool.name === "brain_update_file")
+      .inputSchema.properties.expected_revision);
+  }
+  for (const origin of ["https://untrusted.example", "null", "", "https://chatgpt.com.evil.example"]) {
+    const res = await requestToolList(harness, { origin }, allowed);
+    assert.equal(res.statusCode, 403);
+    assert.equal(JSON.parse(res.text()).error.message, "Forbidden: invalid Origin");
+    assert.doesNotMatch(res.text(), /untrusted\.example|evil\.example/);
+  }
+});
 
 test("HTTP MCP reads and loads context from revision store harness", async () => {
   const harness = await setupHarness("read-context");

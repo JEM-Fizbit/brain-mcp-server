@@ -1,5 +1,25 @@
 # Fly Deployment
 
+## MCP Origin validation — v1.12.7
+
+The approved initial target is JEM only. The release adds an early `/mcp` Origin
+check, preserving bearer-authenticated requests without Origin. The resource
+URI's own origin is always trusted; `MCP_ALLOWED_ORIGINS` adds exact HTTP(S)
+origins. The JEM Fly configuration explicitly adds `https://chatgpt.com` and
+`https://claude.ai`. Do not add wildcards, paths, userinfo, trailing slashes or
+unreviewed origins. Invalid configuration refuses startup; invalid, opaque,
+empty or duplicate request Origins receive a generic HTTP 403 before auth or
+body parsing. Rejected Origin values are neither echoed nor recorded, and do
+not feed credential-failure alerts. This does not add CORS permission, replace
+authentication, change OAuth callbacks or implement the newer MCP revision.
+
+Verification: focused HTTP tests cover authenticated native/trusted browser
+discovery and rejection cases; the guarded release runs the full suite. Verify
+live version/health and authenticated read tools after activation. The ERS
+deployment is not part of this change's activation; its owner must explicitly
+review its origin configuration during future tag intake. Roll back with a
+reviewed revert and new patch/tag through the same guarded release route.
+
 ## Verified access-administration usability release — 6 October 2026
 
 Annotated **v1.12.6**, public source `c5a6065dbc54bc007008e16488cf8278958e2059`, is deployed on both existing owner-isolated services. Each guarded gate passed **630 tests: 619 passed, 11 optional skips, zero failures**. Four focused access-page browser checks also passed across light/dark and desktop/narrow layouts.

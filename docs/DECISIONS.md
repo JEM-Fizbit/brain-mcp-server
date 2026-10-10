@@ -1,5 +1,23 @@
 # Working Decisions Log
 
+## 2026-10-10 — Validate MCP Origins independently of the protocol upgrade
+
+**Decision:** reject untrusted, malformed, opaque or duplicate Origin headers
+on `/mcp` before authentication, body parsing or tool execution. Requests without
+Origin retain bearer authentication. Trust the configured resource's own origin
+and optional exact `MCP_ALLOWED_ORIGINS`, never request Host/forwarded headers or
+dynamically registered callbacks. JEM explicitly includes `https://chatgpt.com`
+and `https://claude.ai` for its existing browser clients. Do not echo or persist
+rejected Origin values, or classify these rejections as credential failures.
+
+**Why:** the local assessment demonstrated arbitrary authenticated Origins were
+accepted. This is a bounded transport hardening change; SDK v2 / MCP 2026-07-28
+remains deferred, with legacy client and DCR compatibility required. The initial
+release target is JEM only; ERS intake remains separately owner-controlled.
+
+**Source:** John E. Milad's explicit implementation instruction, 10 October 2026;
+[MCP Origin requirement](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http).
+
 ## 2026-10-06 — Distinguish human contacts from non-human ERS identities
 
 **Decision:** Alice is an AI agent under development, not a person or a human

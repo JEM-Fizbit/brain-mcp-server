@@ -10,6 +10,9 @@ const { handleHttpRequest } = await import(
 const { assertHttpRuntimeConfig } = await import(
   path.join(__dirname, "..", "dist", "services", "runtime-config.js")
 );
+const { buildMcpAllowedOrigins } = await import(
+  path.join(__dirname, "..", "dist", "http", "mcp-origin.js")
+);
 
 function memoryState() {
   return {
@@ -326,6 +329,43 @@ test("unauthenticated mcp request returns bearer challenge", async () => {
     res.headers["www-authenticate"] || "",
     /resource_metadata="http:\/\/127\.0\.0\.1\/\.well-known\/oauth-protected-resource\/mcp"/
   );
+});
+
+test("MCP origin policy rejects malformed configuration without reflecting its values", () => {
+  assert.deepEqual(buildMcpAllowedOrigins("https://brain.example/mcp", "https://chatgpt.com,https://claude.ai"),
+    ["https://brain.example", "https://chatgpt.com", "https://claude.ai"]);
+  assert.deepEqual(buildMcpAllowedOrigins("http://127.0.0.1:3000/mcp", ""), ["http://127.0.0.1:3000"]);
+  for (const invalid of ["*", "null", "https://chatgpt.com/", "https://user:secret@chatgpt.com",
+    "https://chatgpt.com/path", "https://chatgpt.com?secret=value", "https://chatgpt.com#fragment",
+    "https://chatgpt.com,", "file:///private/tmp", "https://*.example.com"]) {
+    assert.throws(() => buildMcpAllowedOrigins("https://brain.example/mcp", invalid),
+      { message: "MCP_ALLOWED_ORIGINS must contain exact HTTP(S) origins" });
+  }
+});
+
+test("invalid MCP Origins reject every method before auth or body reads; no-origin auth is unchanged", async () => {
+  const trusted = "http://127.0.0.1";
+  for (const origin of ["https://evil.example", "null", "", `${trusted}/`, `${trusted}:9999`,
+    `${trusted}, https://evil.example`, `${trusted} https://evil.example`, [trusted], `${trusted}@evil.example`]) {
+    for (const method of ["POST", "GET", "DELETE", "OPTIONS"]) {
+      const res = new FakeResponse();
+      await handleHttpRequest({method, url:"/mcp", headers:{origin, authorization:"Bearer fixture"}}, res, ctx);
+      assert.equal(res.status, 403);
+      assert.equal(res.headers["www-authenticate"], undefined);
+      assert.equal(JSON.parse(res.body).error.message, "Forbidden: invalid Origin");
+      assert.doesNotMatch(res.body, /evil\.example|fixture/);
+    }
+  }
+  const duplicate = new FakeResponse();
+  await handleHttpRequest({method:"POST",url:"/mcp",headers:{origin:trusted},
+    rawHeaders:["Origin",trusted,"Origin",trusted]}, duplicate, ctx);
+  assert.equal(duplicate.status,403);
+  for (const origin of [undefined, trusted]) {
+    const res = new FakeResponse();
+    await handleHttpRequest({method:"POST",url:"/mcp",headers:origin === undefined ? {} : {origin}}, res, ctx);
+    assert.equal(res.status,401);
+    assert.ok(res.headers["www-authenticate"]);
+  }
 });
 
 test("mcp timing logs omit request payloads when enabled", async () => {
