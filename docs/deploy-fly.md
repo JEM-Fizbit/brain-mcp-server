@@ -5,9 +5,9 @@ v1.12.7 release is deployed and verified. The gate passed 622 tests with 11
 optional skips; live health, invalid-Origin rejection and the existing Codex
 authenticated read pass. Existing ChatGPT and Claude web tool refreshes completed
 without reconnecting, followed by successful actual read-only status calls in
-both browser clients. Claude CLI's existing ERS MCP OAuth connection was repaired
-and reports Connected; a separate subscription sign-in recovery remains pending
-owner email verification, so CLI conversational execution is not yet verified.
+both browser clients. Claude CLI's existing ERS MCP OAuth connection and
+subscription sign-in were restored; its actual read-only status call also passed
+with the same result as both browsers.
 The broader write/role acceptance matrix was not rerun. Exact
 overlay/image provenance and client evidence remain in the private operational
 repository. Both isolated deployments now run v1.12.7.
