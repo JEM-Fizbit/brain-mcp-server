@@ -3,8 +3,10 @@
 **10 October 2026:** JEM alone is deployed and verified on v1.12.7 with early
 Origin validation. Existing direct and installed-app authenticated status reads
 pass. JEM's tool metadata was refreshed through **Plugins → JEM Brain → Manage
-→ Refresh tools**; its advertised tool list includes ingestion preflight and
-reviewed-revision guidance. This open Codex chat retains older declarations, so
+→ Manage app → Refresh tools**. The refresh button returned to its enabled state
+without an error. App details advertises 26 tools, including `brain_prepare_ingest`
+and `brain_update_file` guidance requiring the reviewed `expected_revision`.
+This open Codex chat retains older declarations, so
 fresh-chat schema acceptance remains a separate check. OAuth connections were
 retained. [Release evidence](deploy-fly.md#mcp-origin-validation--v1127),
 [refresh procedure and limits](protocols/OPENAI_MCP_CONNECTOR_RECOVERY.md).
