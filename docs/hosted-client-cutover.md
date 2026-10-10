@@ -2,9 +2,11 @@
 
 **10 October 2026, ERS follow-through:** the ERS guarded v1.12.7 release is
 deployed. Existing Codex authenticated reads and ChatGPT/Claude web tool
-refreshes pass with retained OAuth connections. Claude CLI already required
-authentication before release; browser conversational/role acceptance was not
-rerun. [Release evidence](deploy-fly.md).
+refreshes pass with retained OAuth connections. Fresh actual read-only status
+calls also pass in ChatGPT and Claude web. Claude CLI's existing ERS MCP OAuth
+connection and separate Max subscription sign-in were restored; its actual
+status call returned the same result. The broader write/role acceptance matrix
+was not rerun. [Release evidence and closeout](deploy-fly.md#session-closeout--10-october-2026).
 
 **10 October 2026:** JEM alone is deployed and verified on v1.12.7 with early
 Origin validation. Existing direct and installed-app authenticated status reads

@@ -12,6 +12,37 @@ The broader write/role acceptance matrix was not rerun. Exact
 overlay/image provenance and client evidence remain in the private operational
 repository. Both isolated deployments now run v1.12.7.
 
+## Session closeout — 10 October 2026
+
+The approved plugin metadata refresh, Origin validation releases and ERS
+client verification are complete. Public documentation baseline `95d653b`
+contains the final CLI receipt summary; this closeout lives in the commit
+containing this section. The running JEM release is still annotated `v1.12.7`,
+source `a8421bde15fab35b91d4438bbf973c708d3a7f97`; later documentation commits
+do not change the deployed image. Private ERS release/receipt provenance stays
+in its owning repository and follows its release-branch policy.
+
+At 19:47 UTC both normal Doctors passed with v1.12.7, current sync, zero
+conflicts and zero credential rejections. Existing release gates passed
+633 tests (622 pass, 11 optional skips, zero failures); no source changed
+after those gates. Closeout verification is documentation/link review plus
+`git diff --check`; no deployment or full test rerun is needed for this prose.
+
+The SDK v2 / MCP 2026-07-28 compatibility upgrade remains only in
+[`BACKLOG.md`](../BACKLOG.md). Do not start it, drop DCR, change credentials or
+expand access on the strength of this checkpoint. No task remains blocked and
+no new work unit is approved. If resumed, read `AGENTS.md`, this section and
+the owning backlog, then reconcile current state before selecting work.
+Preserve owner isolation, legacy clients, CAS and guarded ERS tag intake.
+
+OAuth credentials and ignored operational caches remain local/managed state,
+not Git artifacts or portable handoff material. A fresh checkout needs its own
+authorized access. No new backup or recovery exercise was performed. All
+in-scope evidence is in the existing runbooks; no separate handoff or task
+queue was created. For routine follow-up reconciliation, the next-session
+recommendation is **gpt-6.1-sol / medium**; reassess if a future task promotes
+the security-sensitive protocol upgrade.
+
 ## MCP Origin validation — v1.12.7
 
 **Deployed and verified, 10 October 2026:** JEM completed its guarded release at
