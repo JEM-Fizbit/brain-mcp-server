@@ -3,6 +3,8 @@
 > Lightweight capture for ideas, bugs, and small features. Newest at top, one line per item. No metadata, no IDs.
 >
 > **Capture:** say "add to backlog: X" mid-session, run `scripts/backlog.sh X` from terminal, or edit this file directly (mobile via Working Copy or any editor).
+
+- Evaluate per-Brain enforcement and behavioural routing checks for the confirmed Capture/knowledge boundary: retired general intake must not be reintroduced through `brain_capture_item`/`brain_report_item`, and generic write/ingest guidance must not imply that transient status, drafts, attachments or session handoffs belong in Brain; preserve reusable-server compatibility and explicit Brain-scoped maintenance.
 > **Promote:** say "promote item N" or "let's work on [item]" — Claude drafts a spec at `docs/specs/NNN-slug.md`.
 > **On ship:** the line is deleted from this file. The archived spec at `docs/specs/archive/NNN-slug.md` is the durable record (source, criteria, work, commit).
 >

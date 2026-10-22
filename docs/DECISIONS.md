@@ -1,5 +1,35 @@
 # Working Decisions Log
 
+## 2026-10-22 — Capture owns intake; Brain holds selected durable knowledge
+
+**Decision:** Brain supplies stable context. Same-domain Capture preserves incoming
+requests and originals, tracks clarification and verified delivery, and may own
+an individual's commitments without another established home. Existing project
+workspaces, backlogs and Asana retain execution and live state. Transient status,
+drafts and session handoffs stay with that work owner. Only selected durable
+facts, decisions or sources are curated into Brain under explicit user intent or
+clear task authority. Reading Brain, receiving an attachment or “save this” alone
+does not authorise ingestion. Precise direct Brain corrections remain possible
+without creating a Capture wrapper for every edit.
+
+**Handoff:** capture and original custody, assignment to a named capable harness,
+reviewed curation, and verified result are distinct steps. A Capture Brain result
+is attributed to its reporting harness; the coordinator does not independently
+inspect Brain content. Missing access or evidence stays pending/blocked. Do not
+use Brain hubs, NOW, JOURNAL, LOG, working artefacts or source indexes to bypass
+this boundary. A concise Brain-operation receipt is appropriate in LOG; detailed
+execution evidence belongs with the operation's owner.
+
+**Why:** the existing ownership model was sound, but broad ingestion wording and
+legacy general-capture tool descriptions could steer agents towards transient
+Brain writes. Both live loaders and their operations guides now state the
+boundary explicitly. Generic compatibility tools remain available; per-Brain
+enforcement and behavioural routing evaluation remain backlog work. This is an
+instruction clarification, not a runtime or permission change.
+
+**Source:** John E. Milad's explicit confirmation in the 22 October 2026 Capture
+handoff review. Domain-specific records stay in their own Brains and workspaces.
+
 ## 2026-10-10 — Validate MCP Origins independently of the protocol upgrade
 
 **Decision:** reject untrusted, malformed, opaque or duplicate Origin headers

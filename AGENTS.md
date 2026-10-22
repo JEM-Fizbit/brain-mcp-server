@@ -82,7 +82,9 @@ This project uses the layered backlog/spec system:
 
 For user requests that capture open work, update `BACKLOG.md` narrowly. For shipped backlog work, remove the shipped line and leave durable detail in specs, docs, decisions, or commit history as appropriate.
 
-Conversationally captured items may be held temporarily in a Brain `TASKS.md` `## Capture / Triage Queue` via `brain_capture_item` (`brain_report_item` is a compatibility alias). This queue is not the document-ingestion `inbox/` and is not canonical: transfer project work to the owning repo `BACKLOG.md`, Asana, or another tracker, then mark the Brain item transferred/closed. `brain_lint` flags stale or oversized capture queues so items do not accumulate silently.
+Brain supplies stable context; reading it does not authorise a write. Same-domain Capture preserves incoming requests/originals and tracks blocked filing; project backlogs, Asana and existing workspaces retain their work. General personal intake in JEM Brain `TASKS.md` is retired: use `capture-personal`; use `capture-ers` for private ERS intake. Curate only selected durable knowledge, never transient status, session handoffs or draft dumps. An attachment or “save this” alone does not select Brain ingestion. Follow the selected Brain's loader/operations guide and the [Capture boundary decision](docs/DECISIONS.md#2026-10-22--capture-owns-intake-brain-holds-selected-durable-knowledge).
+
+The reusable server still exposes `brain_capture_item` (`brain_report_item` compatibility alias) and lints legacy Capture / Triage queues. Tool availability is not routing permission: use those tools only when the selected Brain's current contract explicitly permits that scope; ERS `TASKS.md` is limited to Brain content/ingestion/maintenance. Do not recreate general intake in Brain when Capture is unavailable.
 
 ## Verification
 

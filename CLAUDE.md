@@ -63,7 +63,9 @@ This project uses the layered roadmap/backlog/spec system. Universal protocol: [
 
 Minimum-stack adoption: no strategic roadmap or audit-doc layers configured. Add later via `.backlogrc` if the project grows enough to need them.
 
-Conversationally captured items may be held temporarily in a Brain `TASKS.md` `## Capture / Triage Queue` via `brain_capture_item` (`brain_report_item` is a compatibility alias). This queue is not the document-ingestion `inbox/` and is not canonical: transfer project work to the owning repo `BACKLOG.md`, Asana, or another tracker, then mark the Brain item transferred/closed. `brain_lint` flags stale or oversized capture queues so items do not accumulate silently.
+Brain supplies stable context; reading it does not authorise a write. Same-domain Capture preserves incoming requests/originals and tracks blocked filing; project backlogs, Asana and existing workspaces retain their work. General personal intake in JEM Brain `TASKS.md` is retired: use `capture-personal`; use `capture-ers` for private ERS intake. Curate only selected durable knowledge, never transient status, session handoffs or draft dumps. An attachment or “save this” alone does not select Brain ingestion. Follow the selected Brain's loader/operations guide and the [Capture boundary decision](docs/DECISIONS.md#2026-10-22--capture-owns-intake-brain-holds-selected-durable-knowledge).
+
+The reusable server still exposes `brain_capture_item` (`brain_report_item` compatibility alias) and lints legacy Capture / Triage queues. Tool availability is not routing permission: use those tools only when the selected Brain's current contract explicitly permits that scope; ERS `TASKS.md` is limited to Brain content/ingestion/maintenance. Do not recreate general intake in Brain when Capture is unavailable.
 
 ### Verification commands (cite in every spec)
 
@@ -210,7 +212,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 **Operations:**
 - `brain_log` — Append an entry to the Brain change log (LOG.md)
 - `brain_read_log` — Read recent change log entries
-- `brain_capture_item` — Capture a temporary conversational bug/feature/observation/investigation/follow-up/idea/question/reminder/note/routing item in `TASKS.md` `## Capture / Triage Queue` before triage into the canonical destination.
+- `brain_capture_item` — Generic compatibility tool for a Brain `TASKS.md` Capture / Triage Queue; use only where that Brain's current contract permits the scope. JEM general intake is retired and routes through Personal Capture; ERS tasks here are Brain-scoped only.
 - `brain_report_item` — Compatibility alias for `brain_capture_item`.
 - `brain_lint` — Health check: bloat, staleness, orphans, drift, capture queue, unindexed working binaries. Auto-logs the pass.
 - `brain_prepare_ingest` — Read-only backend/category/capability preflight. Call before any ingestion-related write.
