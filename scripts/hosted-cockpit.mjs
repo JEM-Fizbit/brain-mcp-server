@@ -1720,6 +1720,7 @@ const page = String.raw`<!doctype html>
           <span class="muted" id="last-updated">Checking...</span>
           <select class="profile-switcher" id="profile-switcher" title="Brain profile" hidden></select>
           <a class="access-nav-link" id="hosted-monitor-link" href="${escapeAttribute(monitoringUrl)}" target="_blank" rel="noopener noreferrer">Hosted status ↗</a>
+          <a class="access-nav-link" id="hosted-changes-link" href="${escapeAttribute(monitoringUrl + '/changes?brain_id=' + encodeURIComponent(cockpitBrainId))}" target="_blank" rel="noopener noreferrer">Change log ↗</a>
           <button id="refresh" type="button" title="Re-run diagnostics now, bypassing the cached Brain Monitor report. Clears a transient failure without waiting for the next cycle.">Reload</button>
         </div>
       </header>

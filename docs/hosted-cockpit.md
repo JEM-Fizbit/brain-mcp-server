@@ -1,5 +1,14 @@
 # Hosted Brain Cockpit
 
+## Browse changes — v1.13.1
+
+The toolbar's **Change log** link opens the selected Brain's authenticated
+hosted history. It defaults to automatic source-backed updates and offers search,
+All entries and pagination. Open a revision for a Git-style line diff, original
+snapshots and source/verification evidence. Existing Brain sign-in is sufficient;
+there is no approval queue or local editing API. The local cockpit stays
+loopback-only. [History behavior and limits](hosted-monitoring.md#change-log-and-git-style-diffs).
+
 ## Write-admission holds — v1.13.0
 
 Policy-enrolled sync preserves local bytes when evidence or routing is missing.

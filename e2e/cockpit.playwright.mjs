@@ -615,6 +615,7 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(url);
     await expectCockpitReady(page);
+    await expect(page.locator("#hosted-changes-link")).toHaveAttribute("href", (await page.locator("#hosted-monitor-link").getAttribute("href")) + "/changes?brain_id=ai-brain-jem");
     await page.screenshot({ path: testInfo.outputPath("version-desktop.png") });
     await expectCockpitDashboardHierarchy(page);
     await expectCockpitLandingRedesign(page, { desktop: true });
@@ -651,6 +652,7 @@ test("ERS Cockpit is the clear entry point for Identity & Access", async ({ page
     );
     await expect(page.locator("#identity-access-action")).toContainText("Open Access & Roles");
     await expect(page.locator("#access-roles-link")).toContainText("Identity & Access");
+    await expect(page.locator("#hosted-changes-link")).toHaveAttribute("href", (await page.locator("#hosted-monitor-link").getAttribute("href")) + "/changes?brain_id=ers-brain");
   } finally {
     await stopCockpit(child);
   }

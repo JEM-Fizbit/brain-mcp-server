@@ -1,5 +1,15 @@
 # Working Decisions Log
 
+## 2026-10-23 — Human-browsable change history
+
+John requested a Git-style change log in both monitors. Reuse each Brain's
+existing LOG index and authenticated retained revision reader. Default to the
+explicit source-backed automatic receipt type; retain all older entries under
+All entries. Show line diffs, exact snapshots, source evidence and verification
+scope without requiring an agent. Existing read roles apply per request. This
+is retrospective review, with no per-fact approval gate, schema, notification
+schedule or broader write authority. [View contract](hosted-monitoring.md#change-log-and-git-style-diffs).
+
 ## 2026-10-22 — Capture owns intake; Brain holds selected durable knowledge
 
 **Decision:** Brain supplies stable context. Same-domain Capture preserves incoming

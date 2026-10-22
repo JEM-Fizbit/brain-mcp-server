@@ -1,5 +1,14 @@
 # Fly Deployment
 
+## Browseable change history — v1.13.1
+
+John authorised the Git-style history view in both owner monitors. This release
+adds a read-only LOG index, automatic/all filters, search, pagination and bounded
+line diffs in the existing authenticated revision reader. Current grants,
+identity providers, write policy and database schema stay unchanged. Release
+verification and owner deployment receipts are recorded here after execution.
+[View contract](hosted-monitoring.md#change-log-and-git-style-diffs).
+
 ## Spec 023 rollout — 22 October 2026
 
 The approved v1.13.0 release adds per-Brain write admission, automatic

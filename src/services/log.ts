@@ -68,7 +68,7 @@ function isRootHeading(line: string): boolean {
   return /^#(?!#)/.test(line);
 }
 
-function parseLogEntries(content: string): string[] {
+export function parseLogEntries(content: string): string[] {
   const entries: string[] = [];
   let current: string[] = [];
   let currentIsStandard = false;

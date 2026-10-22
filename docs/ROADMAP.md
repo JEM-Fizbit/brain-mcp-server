@@ -1,5 +1,9 @@
 # Hosted Brain Roadmap
 
+**23 October 2026:** v1.13.1 adds authenticated browse/search/filter history and
+Git-style revision diffs in both owner monitors. Source-backed corrections stay
+automatic; manual review is optional. [View and limits](hosted-monitoring.md#change-log-and-git-style-diffs).
+
 **22 October 2026:** Spec 023 implementation and both owner migrations/policy
 activations are approved. The reusable v1.13.0 engine and acceptance tests are
 complete; JEM and ERS v1.13.0 are independently deployed with approved policy

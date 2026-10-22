@@ -1,4 +1,5 @@
-const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+import { escapeHtml as escape } from './change-log.js';
+import { changeDiff } from './change-diff.js';
 function observedTime(value: unknown): string {
     const date = new Date(String(value));
     return Number.isFinite(date.getTime())
@@ -29,13 +30,16 @@ export function changePage(record: Record<string, any>): string {
     const evidence: Record<string, unknown>[] = context.evidence || [];
     const status = record.phase && record.phase !== "complete" ? record.result : context.verification || record.result;
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain change</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main>' +
+        '<nav aria-label="Brain monitor"><a href="/monitor/changes?brain_id=' + encodeURIComponent(record.brain_id) + '&amp;kind=' + (context.kind === 'source_backed' ? 'automatic' : 'all') + '">← Change log</a></nav>' +
         "<h1>" + escape(record.filename) + "</h1><p>" + escape(record.brain_id) + " · " +
         escape(observedTime(record.observed_at)) + " · " + escape(record.actor?.name || record.actor?.id || "Unattributed") + "</p>" +
         "<p>Result: " + escape(status || "historical revision; no automatic verification record") +
         ". Manual review is optional.</p><p>" + escape(context.reason || "Retained revision") + "</p>" +
+        '<p class="muted">Revision <code>' + escape(record.revision_id) + '</code> · Parent <code>' + escape(record.prior_revision_id || 'new file') + '</code></p>' +
+        '<h2>Changes</h2>' + changeDiff(String(record.before || ''), String(record.after || ''), String(record.filename || 'Brain file')) +
         "<h2>Sources and verification scope</h2>" +
         (evidence.length ? evidence.map(sourceItem).join("") : "<p>No source evidence recorded for this historical revision.</p>") +
-        "<h2>Before</h2><pre>" + escape(record.before || "(No prior text)") + "</pre>" +
+        '<details><summary>Full before and after text</summary>' + "<h2>Before</h2><pre>" + escape(record.before || "(No prior text)") + "</pre>" +
         "<h2>After</h2><pre>" + escape(record.after || "(No text)") + "</pre>" +
-        "<p>" + escape(record.note) + '</p><p><a href="/monitor">Brain status</a></p></main></body></html>';
+        '</details><p>' + escape(record.note) + '</p><p><a href="/monitor?brain_id=' + encodeURIComponent(record.brain_id) + '">Brain status</a></p></main></body></html>';
 }

@@ -27,6 +27,7 @@ test('hosted monitoring is usable in both themes and sizes and clears revoked or
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:900});await page.goto(base+'/monitor?brain_id=test-monitor');
    await expect(page.locator('#service')).toHaveText('Available');await expect(page.locator('#diagnostics')).toBeVisible();
    await expect(page.locator('#version')).toContainText('Deployed v');await expect(page.locator('#sync')).toHaveText('Recent activity');
+   await expect(page.getByRole('link',{name:'Change log →'})).toHaveAttribute('href','/monitor/changes?brain_id=test-monitor');
    await expect(page.locator('body')).toHaveJSProperty('scrollWidth',width);
    await page.screenshot({path:testInfo.outputPath(`monitor-${colorScheme}-${width}.png`),fullPage:true});
   }

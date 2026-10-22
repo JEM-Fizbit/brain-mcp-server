@@ -1,6 +1,6 @@
 {
   "name": "brain-mcp-server",
-  "version": "1.13.0",
+  "version": "1.13.1",
   "description": "Generic MCP server for Markdown-based AI Brain context systems",
   "repository": {
     "type": "git",
@@ -79,6 +79,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "@supabase/supabase-js": "^2.108.1",
+    "diff": "8.0.4",
     "jose": "^6.2.10",
     "markdown-it": "^14.3.0",
     "pg": "^8.21.0",
