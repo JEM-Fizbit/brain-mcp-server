@@ -10,7 +10,7 @@ import {makeFileStateProvider} from '../dist/oauth/state.js';
 test('hosted monitoring is usable in both themes and sizes and clears revoked or unavailable diagnostics',async({page,context},testInfo)=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'brain-monitor-ui-'));const prior=process.env.BRAIN_PLATFORM_CONFIG;
  process.env.BRAIN_PLATFORM_CONFIG=path.join(root,'registry.json');
- await writeFile(process.env.BRAIN_PLATFORM_CONFIG,JSON.stringify({version:1,brains:[{id:'test-monitor',type:'shared',template_used:'shared',integration_mode:'vertical',storage_backend:'postgres',storage_config:{}}]}));
+ await writeFile(process.env.BRAIN_PLATFORM_CONFIG,JSON.stringify({version:1,brains:[{id:'test-monitor',type:'shared',template_used:'shared',integration_mode:'vertical',storage_backend:'postgres',storage_config:{},metadata:{cockpit_url:'http://127.0.0.1:8787/'}}]}));
  let routes,role='owner',failed=false;
  const server=http.createServer((req,res)=>void routes.handle(req,res,new URL(req.url,'http://127.0.0.1')));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;
@@ -27,7 +27,8 @@ test('hosted monitoring is usable in both themes and sizes and clears revoked or
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:900});await page.goto(base+'/monitor?brain_id=test-monitor');
    await expect(page.locator('#service')).toHaveText('Available');await expect(page.locator('#diagnostics')).toBeVisible();
    await expect(page.locator('#version')).toContainText('Deployed v');await expect(page.locator('#sync')).toHaveText('Recent activity');
-   await expect(page.getByRole('link',{name:'Change log →'})).toHaveAttribute('href','/monitor/changes?brain_id=test-monitor');
+   await expect(page.getByRole('link',{name:'Change log →'})).toHaveAttribute('href','/monitor/changes?brain_id=test-monitor&return_to=http%3A%2F%2F127.0.0.1%3A8787%2F');
+   await expect(page.getByRole('link',{name:'← Back to cockpit'})).toHaveAttribute('href','http://127.0.0.1:8787/');
    await expect(page.locator('body')).toHaveJSProperty('scrollWidth',width);
    await page.screenshot({path:testInfo.outputPath(`monitor-${colorScheme}-${width}.png`),fullPage:true});
   }

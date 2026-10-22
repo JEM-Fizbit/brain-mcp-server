@@ -1,5 +1,6 @@
 import { escapeHtml as escape } from './change-log.js';
 import { changeDiff } from './change-diff.js';
+import { cockpitButton, withCockpit } from './navigation.js';
 function observedTime(value: unknown): string {
     const date = new Date(String(value));
     return Number.isFinite(date.getTime())
@@ -25,12 +26,12 @@ function sourceItem(evidence: Record<string, unknown>): string {
         " · Revision/hash: " + escape(evidence.revision || evidence.sha256 || "direct instruction") +
         "</p><details><summary>Supporting passage</summary><pre>" + escape(evidence.excerpt) + "</pre></details></section>";
 }
-export function changePage(record: Record<string, any>): string {
+export function changePage(record: Record<string, any>, cockpit?: string): string {
     const context = record.context || {};
     const evidence: Record<string, unknown>[] = context.evidence || [];
     const status = record.phase && record.phase !== "complete" ? record.result : context.verification || record.result;
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain change</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main>' +
-        '<nav aria-label="Brain monitor"><a href="/monitor/changes?brain_id=' + encodeURIComponent(record.brain_id) + '&amp;kind=' + (context.kind === 'source_backed' ? 'automatic' : 'all') + '">← Change log</a></nav>' +
+        '<nav class="toolbar" aria-label="Brain monitor">' + cockpitButton(cockpit) + '<a class="button" href="' + escape(withCockpit('/monitor/changes?brain_id=' + encodeURIComponent(record.brain_id) + '&kind=' + (context.kind === 'source_backed' ? 'automatic' : 'all'), cockpit)) + '">← Change log</a></nav>' +
         "<h1>" + escape(record.filename) + "</h1><p>" + escape(record.brain_id) + " · " +
         escape(observedTime(record.observed_at)) + " · " + escape(record.actor?.name || record.actor?.id || "Unattributed") + "</p>" +
         "<p>Result: " + escape(status || "historical revision; no automatic verification record") +
@@ -41,5 +42,5 @@ export function changePage(record: Record<string, any>): string {
         (evidence.length ? evidence.map(sourceItem).join("") : "<p>No source evidence recorded for this historical revision.</p>") +
         '<details><summary>Full before and after text</summary>' + "<h2>Before</h2><pre>" + escape(record.before || "(No prior text)") + "</pre>" +
         "<h2>After</h2><pre>" + escape(record.after || "(No text)") + "</pre>" +
-        '</details><p>' + escape(record.note) + '</p><p><a href="/monitor?brain_id=' + encodeURIComponent(record.brain_id) + '">Brain status</a></p></main></body></html>';
+        '</details><p>' + escape(record.note) + '</p><p><a href="' + escape(withCockpit('/monitor?brain_id=' + encodeURIComponent(record.brain_id), cockpit)) + '">Brain status</a></p></main></body></html>';
 }

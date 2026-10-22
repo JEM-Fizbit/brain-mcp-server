@@ -24,7 +24,7 @@ test("actual authenticated change reader works on desktop/mobile, escapes source
  const src=await revisions.proposeRevision({brainId:brain,filename:"SOURCE.md",content:source,baseRevisionId:null,origin:"system",writeContext:internalWriteContext("fixture")});
  const original=await revisions.proposeRevision({brainId:brain,filename:"FACT.md",content:"Old project link.\n",baseRevisionId:null,origin:"system",writeContext:internalWriteContext("fixture")});
  await store.writeFile(brain,"FACT.md","Canonical project link. <script>window.injected=true</script>\n","replace",undefined,{provider:"fixture",id:"agent"},"member",original.head.revisionId,{operation_id:"ui-correction-001",kind:"source_backed",reason:"Correct the project link from its owner.",evidence:[{brain_id:brain,reference:"SOURCE.md",observed_at:new Date().toISOString(),revision:src.head.revisionId,excerpt:source,method:"hosted_source",verification:"agent_observed"}]});
- const revision=await revisions.getHead(brain,"FACT.md"),url=base+"/monitor/changes/"+revision.revisionId+"?brain_id="+brain;
+ const revision=await revisions.getHead(brain,"FACT.md"),url=base+"/monitor/changes/"+revision.revisionId+"?brain_id="+brain+"&return_to="+encodeURIComponent(base+"/");
  const config={issuer:base,authorizationEndpoint:base+"/authorize",resourceUri:base+"/mcp",identityProviders:["github"],scopes:["mcp:tools"],signingSecret:"change-ui-only",accessTokenTtlSec:3600,refreshTokenTtlSec:3600};
  const state=makeFileStateProvider(path.join(root,"oauth"));
  routes=new MonitoringRoutes(config,state,async()=>({}),async()=>role?{[brain]:role}:{},()=>({readFile:async(...args)=>(await store.readFile(...args)).replaceAll("https://brain.example",base),readChange:(...args)=>store.readChange(...args)}));
@@ -37,6 +37,7 @@ test("actual authenticated change reader works on desktop/mobile, escapes source
   for(const colorScheme of ["light","dark"])for(const width of [1280,390]) {
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:900});await page.goto(url);
    await expect(page.getByRole("heading",{name:"FACT.md"})).toBeVisible();
+   await expect(page.getByRole("link",{name:"← Back to cockpit",exact:true})).toHaveAttribute("href",base+"/");
    await expect(page.getByText("Result: verified. Manual review is optional.",{exact:true})).toBeVisible();
    await expect(page.getByRole("table",{name:"Line-by-line changes"})).toBeVisible();
    await expect(page.locator('.diff-removed')).toContainText('Old project link.');
@@ -47,10 +48,11 @@ test("actual authenticated change reader works on desktop/mobile, escapes source
    await expect(page.locator("body")).toHaveJSProperty("scrollWidth",width);
    await page.screenshot({path:info.outputPath("change-"+colorScheme+"-"+width+".png"),fullPage:true});
   }
-  const listUrl=base+"/monitor/changes?brain_id="+brain;
+  const listUrl=base+"/monitor/changes?brain_id="+brain+"&return_to="+encodeURIComponent(base+"/");
   for(const colorScheme of ["light","dark"])for(const width of [1280,390]) {
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:900});await page.goto(listUrl);
    await expect(page.getByRole("heading",{name:"Change log",exact:true})).toBeVisible();
+   await expect(page.getByRole("link",{name:"← Back to cockpit",exact:true})).toHaveAttribute("href",base+"/");
    await expect(page.locator("article")).toHaveCount(1);
    await expect(page.locator("article").first()).toContainText("agent");
    await expect(page.locator("body")).toHaveJSProperty("scrollWidth",width);
@@ -60,6 +62,7 @@ test("actual authenticated change reader works on desktop/mobile, escapes source
    await page.getByRole("link",{name:"← Change log",exact:true}).click();
    await page.getByRole("searchbox").fill("no matching phrase");await page.getByRole("button",{name:"Apply filters"}).click();
    await expect(page.getByRole("heading",{name:"No matching entries"})).toBeVisible();
+   await expect(page.getByRole("link",{name:"← Back to cockpit",exact:true})).toHaveAttribute("href",base+"/");
   }
   role="reader";expect((await page.goto(listUrl)).status()).toBe(200);expect((await page.goto(url)).status()).toBe(200);
   role=null;expect((await page.goto(listUrl)).status()).toBe(403);await expect(page.locator("body")).not.toContainText("Correct the project link");

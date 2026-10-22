@@ -8,6 +8,7 @@ import {changeLogPage, changeLogOptions} from '../dist/monitor/change-log.js';
 import {changeDiff} from '../dist/monitor/change-diff.js';
 import {MonitoringRoutes} from '../dist/monitor/routes.js';
 import {makeFileStateProvider} from '../dist/oauth/state.js';
+import {safeCockpitUrl} from '../dist/monitor/navigation.js';
 
 const brain='test-history', issuer='https://brain.example';
 const receipt=(id,kind='Automatic source-backed update',origin=issuer,owner=brain)=>`## [2026-10-23] UPDATE | ${kind} — 2026-10-23T12:30:00Z; ${brain}
@@ -25,6 +26,8 @@ test('history filters before pagination, preserves legacy receipts, escapes cont
  const page=params=>changeLogPage(content,brain,issuer,changeLogOptions(new URLSearchParams(params)));
  const first=page('');assert.match(first,/30 matching entries/);assert.match(first,/Open diff/);assert.match(first,/Older/);assert.doesNotMatch(first,/facts\/rev-25.md|facts\/user.md|<script>/);assert.match(first,/&lt;script&gt;/);
  const second=page('offset=25');assert.match(second,/Showing 26–30/);assert.match(second,/Newer/);assert.doesNotMatch(second,/>Older</);
+ const linked=changeLogPage(content,brain,issuer,changeLogOptions(new URLSearchParams()),'http://127.0.0.1:8787/');
+ assert.match(linked,/Back to cockpit/);assert.match(linked,/name="return_to" value="http:\/\/127.0.0.1:8787\/"/);assert.match(linked,/return_to=http%3A%2F%2F127.0.0.1%3A8787%2F/);
  const filtered=page('q=rev-29');assert.match(filtered,/1 matching entry/);assert.match(filtered,/facts\/rev-29.md/);
  assert.match(page('kind=all&q=Historical'),/Historical entry · no linked before\/after record/);
  assert.match(page('kind=all&q=Historical'),/01 Oct 2026/);assert.doesNotMatch(page('kind=all&q=Historical'),/00:00/);
@@ -34,6 +37,11 @@ test('history filters before pagination, preserves legacy receipts, escapes cont
   const html=changeLogPage(raw,brain,issuer,changeLogOptions(new URLSearchParams()));assert.doesNotMatch(html,/href="[^\"]*\/changes\/bad/);
  }
  for(const params of ['offset=-1','offset=NaN','offset=1000001','kind=unknown','q='+ 'a'.repeat(201)]) assert.throws(()=>changeLogOptions(new URLSearchParams(params)),/invalid_change_filter/);
+});
+
+test('cockpit return navigation accepts only explicit loopback HTTP roots',()=>{
+ for(const url of ['http://127.0.0.1:8787/','http://localhost:9876/','http://[::1]:8788/']) assert.equal(safeCockpitUrl(url),url);
+ for(const url of ['https://attacker.example/','javascript:alert(1)','//attacker.example','http://127.0.0.1:8787/api/fixes/apply','http://127.0.0.1:8787/?action=do','http://user@127.0.0.1:8787/','http://127.0.0.1:8787/#x','http://127.0.0.1/','http://127.0.0.1.attacker.example:8787/']) assert.equal(safeCockpitUrl(url),undefined);
 });
 
 test('unified diff retains context, exact whitespace, line numbers and newline markers; large edits fall back to snapshots',()=>{
@@ -50,7 +58,7 @@ test('history HTTP uses the selected Brain only, rechecks revoked roles and refu
  const root=await mkdtemp(path.join(os.tmpdir(),'history-http-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const previous=process.env.BRAIN_PLATFORM_CONFIG;process.env.BRAIN_PLATFORM_CONFIG=path.join(root,'registry.json');
  t.after(()=>{if(previous===undefined)delete process.env.BRAIN_PLATFORM_CONFIG;else process.env.BRAIN_PLATFORM_CONFIG=previous;});
- await writeFile(process.env.BRAIN_PLATFORM_CONFIG,JSON.stringify({version:1,brains:[{id:brain,type:'personal',template_used:'personal',integration_mode:'vertical',storage_backend:'filesystem',storage_config:{brain_dir:root}}]}));
+ await writeFile(process.env.BRAIN_PLATFORM_CONFIG,JSON.stringify({version:1,brains:[{id:brain,type:'personal',template_used:'personal',integration_mode:'vertical',storage_backend:'filesystem',storage_config:{brain_dir:root},metadata:{cockpit_url:'http://127.0.0.1:8787/'}}]}));
  const config={issuer,authorizationEndpoint:issuer+'/authorize',resourceUri:issuer+'/mcp',identityProviders:['github'],scopes:['mcp:tools'],signingSecret:'history-fixture',accessTokenTtlSec:3600,refreshTokenTtlSec:3600};
  const state=makeFileStateProvider(root);let role='reader',reads=0,fail=false;
  const routes=new MonitoringRoutes(config,state,async()=>({}),async()=>role?{[brain]:role}:{},()=>({readFile:async(id,file)=>{reads++;assert.equal(id,brain);assert.equal(file,'LOG.md');if(fail)throw Error('PRIVATE secret');return receipt('one');},readChange:async()=>'{"before":"old","after":"new"}'}));
@@ -65,6 +73,9 @@ test('history HTTP uses the selected Brain only, rechecks revoked roles and refu
  assert.equal((await call('brain_id=other')).status,403);assert.equal((await call(undefined,{cookie,Origin:'https://attacker.example'})).status,403);assert.equal(reads,0);
  assert.equal((await call('brain_id='+brain+'&offset=-1')).status,400);assert.equal(reads,0);
  response=await call();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.match(await response.text(),/Correct fact/);
- role=null;assert.equal((await call()).status,403);assert.equal(reads,1);
+ response=await call('brain_id='+brain+'&return_to='+encodeURIComponent('http://localhost:9988/'));assert.match(await response.text(),/href="http:\/\/localhost:9988\/"/);
+ response=await call('brain_id='+brain+'&return_to='+encodeURIComponent('https://attacker.example/'));const safeBody=await response.text();assert.match(safeBody,/href="http:\/\/127.0.0.1:8787\/"/);assert.doesNotMatch(safeBody,/attacker.example/);
+ const beforeRevocation=reads;
+ role=null;assert.equal((await call()).status,403);assert.equal(reads,beforeRevocation);
  role='reader';fail=true;response=await call();assert.equal(response.status,503);assert.doesNotMatch(await response.text(),/PRIVATE|secret|Correct fact/);
 });

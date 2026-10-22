@@ -2073,6 +2073,14 @@ const page = String.raw`<!doctype html>
     </main>
 
     <script>
+      // Keep the actual local port/profile when opening hosted read-only views.
+      for (const id of ["hosted-monitor-link", "hosted-changes-link"]) {
+        const link = document.getElementById(id);
+        const destination = new URL(link.href);
+        destination.searchParams.set("return_to", location.origin + "/");
+        link.href = destination.href;
+      }
+
       const COCKPIT_NONCE = ${JSON.stringify(cockpitNonce)};
       const COCKPIT_BRAIN_ID = ${JSON.stringify(cockpitBrainId)};
       const operationLog = [];

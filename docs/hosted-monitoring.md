@@ -9,6 +9,16 @@
 **Version:** 1.1 — 23 October 2026
 **Release:** v1.13.1 change history; v1.13.2 preserves date-only historical receipts without invented times. See the owner-specific deployment record for live verification.
 
+**v1.13.3 navigation:** hosted status, history and diff views offer **Back to
+cockpit**. Local launch links carry their actual loopback root as `return_to`;
+filters, pagination and revision/status links preserve it. Direct hosted links
+use the selected Brain's non-secret registry `metadata.cockpit_url` default.
+Only explicit-port HTTP loopback roots are accepted, with no credentials, API
+path, query or fragment. These are user-clicked navigation links, never redirects
+or remote calls into the local cockpit. On a device without the local cockpit,
+the hosted views remain usable independently. Sign-in returns to status and its
+configured default cockpit link; no OAuth/session change is introduced.
+
 Open the Brain endpoint followed by `/monitor`, then sign in with the existing enabled GitHub or company identity. The browser is sufficient: no app, database credential, Fly access or local Brain folder is needed. Cockpit and Brain Monitor also link to this page for their selected profile.
 
 Readers and Curators see the deployed version, service availability, latest configured operator sync heartbeat and whether attention is required. Admins and Owners additionally see aggregate conflicts, operation failures, successful-operation p95 and authentication-event counts. Diagnostics use the latest 1,000 matching events within 24 hours, so they are a bounded sample. The status response returns no source bytes, filenames, individual actors or raw error text. Authenticated history deliberately shows the selected Brain's log and revision content, as described below.

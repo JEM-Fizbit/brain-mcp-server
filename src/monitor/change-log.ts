@@ -1,7 +1,6 @@
 import { parseLogEntries } from '../services/log.js';
-
-export const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+import { escapeHtml, cockpitButton, withCockpit } from './navigation.js';
+export { escapeHtml } from './navigation.js';
 
 export function changeLogOptions(params: URLSearchParams) {
   const offset = params.get('offset') || '0';
@@ -26,18 +25,19 @@ function recordLink(entry: string, brainId: string, issuer: string): {href: stri
   } catch { return null; }
 }
 
-export function changeLogPage(content: string, brainId: string, issuer: string, options: ReturnType<typeof changeLogOptions>): string {
+export function changeLogPage(content: string, brainId: string, issuer: string, options: ReturnType<typeof changeLogOptions>, cockpit?: string): string {
   const {offset, kind, q} = options;
   const entries = parseLogEntries(content).filter(entry =>
     (kind === 'all' || /^## \[\d{4}-\d{2}-\d{2}\] UPDATE \| Automatic source-backed update —/.test(entry)) &&
     (!q || entry.toLowerCase().includes(q.toLowerCase())));
   const page = entries.slice(offset, offset + 25);
-  const href = (start: number) => '/monitor/changes?' + new URLSearchParams({brain_id: brainId, kind, q, offset: String(start)});
+  const href = (start: number) => withCockpit('/monitor/changes?' + new URLSearchParams({brain_id: brainId, kind, q, offset: String(start)}), cockpit);
   const cards = page.map(entry => {
     const lines = entry.split('\n');
     const heading = lines[0].replace(/^## /, '');
     const field = (name: string) => lines.find(line => line.startsWith(name + ': '))?.slice(name.length + 2);
     const link = recordLink(entry, brainId, issuer);
+    if (link) link.href = withCockpit(link.href, cockpit);
     const author = /^(.*?); file: (.*)$/.exec(field('Agent') || '');
     const reason = field('Why') || heading.replace(/^\[.*?\] \w+ \| /, '');
     const stamp = /— (\d{4}-\d{2}-\d{2}T[^;]+);/.exec(heading)?.[1] || /^\[([^\]]+)\]/.exec(heading)?.[1] || '';
@@ -56,9 +56,10 @@ export function changeLogPage(content: string, brainId: string, issuer: string, 
       '<details><summary>Log receipt</summary><pre>' + escapeHtml(entry) + '</pre></details></article>';
   }).join('');
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain change log</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main>' +
-    '<nav aria-label="Brain monitor"><a href="/monitor?brain_id=' + encodeURIComponent(brainId) + '">← Brain status</a></nav>' +
+    '<nav class="toolbar" aria-label="Brain monitor">' + cockpitButton(cockpit) + '<a class="button" href="' + escapeHtml(withCockpit('/monitor?brain_id=' + encodeURIComponent(brainId), cockpit)) + '">Brain status</a></nav>' +
     '<header><div><p class="eyebrow">' + escapeHtml(brainId) + '</p><h1>Change log</h1><p>Browse changes, then open a revision to see its diff and sources. Manual review is optional.</p></div></header>' +
     '<form class="card change-filters" method="get" action="/monitor/changes"><input type="hidden" name="brain_id" value="' + escapeHtml(brainId) + '">' +
+    (cockpit ? '<input type="hidden" name="return_to" value="' + escapeHtml(cockpit) + '">' : '') +
     '<label>Show<select name="kind"><option value="automatic"' + (kind === 'automatic' ? ' selected' : '') + '>Automatic updates</option><option value="all"' + (kind === 'all' ? ' selected' : '') + '>All entries</option></select></label>' +
     '<label>Search<input name="q" type="search" maxlength="200" placeholder="File, reason or source" value="' + escapeHtml(q) + '"></label><button type="submit">Apply filters</button></form>' +
     '<p class="muted">Newest first · ' + entries.length + ' matching ' + (entries.length === 1 ? 'entry' : 'entries') + (page.length ? ' · Showing ' + (offset + 1) + '–' + (offset + page.length) : '') + '</p>' +

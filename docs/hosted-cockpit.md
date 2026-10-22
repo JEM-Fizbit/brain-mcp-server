@@ -9,6 +9,12 @@ snapshots and source/verification evidence. Existing Brain sign-in is sufficient
 there is no approval queue or local editing API. The local cockpit stays
 loopback-only. [History behavior and limits](hosted-monitoring.md#change-log-and-git-style-diffs).
 
+The v1.13.3 navigation follow-through carries the originating cockpit URL and
+provides **Back to cockpit** buttons on hosted status, history and diff pages.
+Search, pagination and revision navigation retain the local return route. A
+direct hosted link uses that Brain's configured local default. No iframe, public
+cockpit binding, credential sharing or local API proxy is added.
+
 ## Write-admission holds — v1.13.0
 
 Policy-enrolled sync preserves local bytes when evidence or routing is missing.

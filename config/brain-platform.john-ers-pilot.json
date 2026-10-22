@@ -45,7 +45,8 @@
         "authority_tier": "canonical",
         "access_policy": "personal-owner",
         "fallback_note": "If this Brain is not accessible, use user-provided context or first-class project documents and avoid inferring private personal facts.",
-        "production_cutover_requires_ers_owned_project": false
+        "production_cutover_requires_ers_owned_project": false,
+        "cockpit_url": "http://127.0.0.1:8787/"
       }
     }
   ],

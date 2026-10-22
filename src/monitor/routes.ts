@@ -9,6 +9,7 @@ import { activeBrainStore } from '../services/active-brain-store.js';
 import { changePage } from './change-page.js';
 import { changeLogOptions, changeLogPage } from './change-log.js';
 import type { BrainStore } from '../services/brain-store.js';
+import { safeCockpitUrl } from './navigation.js';
 import { monitoringPage, monitoringCss, monitoringJs, changeHistoryCss } from './page.js';
 
 const headers = {'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'};
@@ -56,8 +57,9 @@ export class MonitoringRoutes {
       }
       const brainId=url.searchParams.get('brain_id') || runtimeBrainId();
       const role=(await this.roles(session.principal))[brainId];
-      const registered=(await loadRegistry()).brains.some(brain=>brain.id===brainId);
+      const registered=(await loadRegistry()).brains.find(brain=>brain.id===brainId);
       if (!registered || !['reader','member','admin','owner'].includes(role)) {send(403,'{"error":"access_denied"}');return;}
+      const cockpit=safeCockpitUrl(url.searchParams.get('return_to')) || safeCockpitUrl(registered.metadata?.cockpit_url);
       if(changeLog) {
         let options;
         try { options=changeLogOptions(url.searchParams); } catch {send(400,'Invalid change-log filters.','text/plain');return;}
@@ -65,17 +67,17 @@ export class MonitoringRoutes {
         this.historyReads++;
         try {
           const content=await this.store().readFile(brainId,'LOG.md');
-          send(200,changeLogPage(content,brainId,this.config.issuer,options),'text/html; charset=utf-8');
+          send(200,changeLogPage(content,brainId,this.config.issuer,options,cockpit),'text/html; charset=utf-8');
         } finally {this.historyReads--;}
         return;
       }
       if(changeMatch) {
         try {const record=JSON.parse(await this.store().readChange(brainId,changeMatch[1]));
-          send(200,changePage(record),'text/html; charset=utf-8');
+          send(200,changePage(record,cockpit),'text/html; charset=utf-8');
         } catch {send(404,'Change is unavailable in this Brain.','text/plain');}
         return;
       }
-      send(200,JSON.stringify(await this.read(brainId,role)));
+      send(200,JSON.stringify({...await this.read(brainId,role) as Record<string,unknown>,cockpit_url:cockpit}));
     } catch(error) {
       const reason=error instanceof Error?error.message:'';
       if (reason==='monitor_login_rate_limited') send(429,'{"error":"try_later"}','application/json',{'Retry-After':'60'});
