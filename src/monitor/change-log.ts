@@ -42,7 +42,9 @@ export function changeLogPage(content: string, brainId: string, issuer: string, 
     const reason = field('Why') || heading.replace(/^\[.*?\] \w+ \| /, '');
     const stamp = /— (\d{4}-\d{2}-\d{2}T[^;]+);/.exec(heading)?.[1] || /^\[([^\]]+)\]/.exec(heading)?.[1] || '';
     const date = new Date(stamp);
-    const when = Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) + ' UTC' : stamp;
+    const when = Number.isFinite(date.getTime()) ? /^\d{4}-\d{2}-\d{2}$/.test(stamp)
+      ? date.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'})
+      : date.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) + ' UTC' : stamp;
     const automatic = /^## \[\d{4}-\d{2}-\d{2}\] UPDATE \| Automatic source-backed update —/.test(entry);
     return '<article class="card history-entry"><p class="eyebrow">' + (automatic ? 'AUTOMATIC UPDATE' : 'LOG ENTRY') + '</p>' +
       '<h2>' + (link ? '<a href="' + escapeHtml(link.href) + '">' : '') + escapeHtml(reason.slice(0, 300)) + (link ? '</a>' : '') + '</h2>' +

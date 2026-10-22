@@ -27,6 +27,7 @@ test('history filters before pagination, preserves legacy receipts, escapes cont
  const second=page('offset=25');assert.match(second,/Showing 26–30/);assert.match(second,/Newer/);assert.doesNotMatch(second,/>Older</);
  const filtered=page('q=rev-29');assert.match(filtered,/1 matching entry/);assert.match(filtered,/facts\/rev-29.md/);
  assert.match(page('kind=all&q=Historical'),/Historical entry · no linked before\/after record/);
+ assert.match(page('kind=all&q=Historical'),/01 Oct 2026/);assert.doesNotMatch(page('kind=all&q=Historical'),/00:00/);
  assert.match(page('kind=all&q=user'),/facts\/user.md/);
  assert.match(page('q=nothing'),/No matching entries/);
  for(const raw of [receipt('bad','Automatic source-backed update','https://attacker.example'),receipt('bad','Automatic source-backed update',issuer,'other-brain')]) {

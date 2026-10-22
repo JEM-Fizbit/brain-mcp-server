@@ -7,7 +7,7 @@
 > this monitoring feature, not the current ERS launch status.
 
 **Version:** 1.1 — 23 October 2026
-**Release:** v1.13.1 change history; see the owner-specific deployment record for live verification
+**Release:** v1.13.1 change history; v1.13.2 preserves date-only historical receipts without invented times. See the owner-specific deployment record for live verification.
 
 Open the Brain endpoint followed by `/monitor`, then sign in with the existing enabled GitHub or company identity. The browser is sufficient: no app, database credential, Fly access or local Brain folder is needed. Cockpit and Brain Monitor also link to this page for their selected profile.
 
