@@ -1,13 +1,38 @@
 # Fly Deployment
 
-## Browseable change history — v1.13.1
+## Browseable change history and cockpit navigation — v1.13.3
 
-John authorised the Git-style history view in both owner monitors. This release
-adds a read-only LOG index, automatic/all filters, search, pagination and bounded
-line diffs in the existing authenticated revision reader. Current grants,
-identity providers, write policy and database schema stay unchanged. Release
-verification and owner deployment receipts are recorded here after execution.
-[View contract](hosted-monitoring.md#change-log-and-git-style-diffs).
+**Deployed and live-verified, 23 October 2026 (Europe/London).** JEM guarded
+v1.13.3 completed at **2026-10-22T23:28:13.388Z**, annotated source
+`548b1150311c85b78603b3eb8b58bd002f30d811`, image
+`deployment-01M5JZ1ANQ1XW9N02D1VVQZ450`. ERS independently completed the same
+annotated release at **2026-10-22T23:29:11.208Z** through its private overlay;
+exact ERS image and overlay provenance remains in its private runbook.
+
+Both guarded gates passed **656 tests: 644 passed, 12 optional skips, zero
+failures**. All **13 Chromium checks** passed, including desktop/narrow layouts,
+both themes, list-to-diff navigation, search, exact snapshots, role revocation,
+and per-profile local return links. The final existing-account browser journeys
+independently verified **status → automatic history → retained diff → Back to
+cockpit** for JEM (8787) and ERS (8788). The actual local pages exposed the
+correct profile and outgoing return route. JEM's existing GitHub session was
+renewed through its normal account picker; ERS's existing Entra monitor session
+continued without re-enrolment. These are owner journeys, not a new workforce
+cohort acceptance run. Signed-out history requests returned 401 without receipts.
+Both Doctors passed after deployment (JEM 23:29:05 UTC; ERS 23:29:53 UTC),
+observing v1.13.3, healthy sync and zero conflicts/admission holds.
+
+The initial v1.13.1 delivered the read-only LOG index, automatic/all filters,
+search, pagination and bounded unified diffs. v1.13.2 removed false midnight
+precision from date-only historical receipts. John's navigation feedback added
+v1.13.3's Back to cockpit buttons across authenticated status/history/diff views,
+with actual originating loopback roots retained through search and pagination,
+and non-secret per-Brain defaults for direct hosted links. Existing grants,
+identity providers, write policy, credentials, schema and routines are unchanged.
+No Brain content was written for this UI release. Source-backed corrections
+remain automatic, with optional retrospective review. Older entries without
+record links remain readable receipts; the list is not a census of all database
+activity. [View contract and limits](hosted-monitoring.md#change-log-and-git-style-diffs).
 
 ## Spec 023 rollout — 22 October 2026
 

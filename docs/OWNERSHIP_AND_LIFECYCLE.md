@@ -20,7 +20,7 @@ parity is not mistaken for shared custody.
 | Brain MCP server code (this repo) | **Personal** | Reusable MIT-licensed upstream. ERS consumes reviewed annotated tags through its private mirror; no ERS secrets or identities belong in public source. |
 | Fly.io app `jem-brain-mcp` + personal Supabase project | **Personal** | Permanent JEM runtime and data plane. Hosts only `ai-brain-jem`. |
 | ERS Brain — `01_ers-brain` content | **ERS** | Canonical SharePoint/OneDrive Markdown asset and local mirror. |
-| ERS private mirror + Fly app `ers-brain-mcp` + ERS Supabase project | **ERS** | Permanent ERS runtime and data plane. Hosts only `ers-brain`; live Entra-only on v1.13.0. |
+| ERS private mirror + Fly app `ers-brain-mcp` + ERS Supabase project | **ERS** | Permanent ERS runtime and data plane. Hosts only `ers-brain`; live Entra-only on v1.13.3. |
 | ERS Brain connector and Entra app/role groups | **ERS** | Workforce identity and role plane; governed by Spec 018 and the ERS access runbook. |
 | Brain alerting credentials | **Owner-scoped** | Each deployment retains only its own alert destinations and secrets in its hosting secret store. |
 

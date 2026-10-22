@@ -1,7 +1,8 @@
 # Hosted Brain Roadmap
 
-**23 October 2026:** v1.13.1 adds authenticated browse/search/filter history and
-Git-style revision diffs in both owner monitors. Source-backed corrections stay
+**23 October 2026:** v1.13.3 is deployed and verified in both owner monitors:
+authenticated browse/search/filter history, Git-style revision diffs and
+Back to cockpit navigation. Source-backed corrections stay
 automatic; manual review is optional. [View and limits](hosted-monitoring.md#change-log-and-git-style-diffs).
 
 **22 October 2026:** Spec 023 implementation and both owner migrations/policy
