@@ -154,7 +154,7 @@ export async function loadContextWithObservations(brainId: string, selectedBrain
     inbox: inboxObservation,
     maintenance_issues: issuesObservation,
     lint: { state: logContent === null ? "unobserved" : "observed" },
-  }, capability_discovery: { tool: "brain_describe", version: 1 } };
+  }, capability_discovery: { tool: "brain_describe", version: 2 } };
 }
 
 export function asFileMetadata(files: FileMetadata[] | string[]): FileMetadata[] {

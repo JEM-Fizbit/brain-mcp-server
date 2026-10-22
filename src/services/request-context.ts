@@ -82,7 +82,7 @@ export function authorIdentity(ctx: ToolBrainContext): string | undefined {
 }
 
 export function revisionActor(ctx: ToolBrainContext): RevisionActor | undefined {
-  if (ctx.principal.provider === "stdio") return undefined;
+  if (ctx.principal.provider === "stdio") return {provider:"stdio",id:ctx.principal.providerUserId,name:"Local stdio operator"};
   return {
     provider: ctx.principal.provider,
     id: ctx.principal.providerUserId,

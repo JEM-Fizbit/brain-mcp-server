@@ -510,7 +510,7 @@ async function runWithConfig(
                 if (timedOut) return;
                 await writeSyncHealth(config, {
                   command,
-                  status: report.guardTripped ? "warn" : "ok",
+                  status: report.guardTripped || report.admissionHeld?.length ? "warn" : "ok",
                   cycle,
                   checkedAt: new Date().toISOString(),
                   report: summary,

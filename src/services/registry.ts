@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { validateWritePolicy, type BrainWritePolicy } from "./write-policy.js";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -53,6 +54,7 @@ export interface BrainDefinition {
   created_at?: string;
   metadata?: Record<string, unknown>;
   lint?: BrainLintConfig;
+  write_policy?: BrainWritePolicy;
 }
 
 export interface RegistryPrincipal {
@@ -202,6 +204,7 @@ function assertRegistryShape(registry: BrainRegistry): void {
         throw new Error(`Brain ${brain.id} source_categories must not contain duplicates.`);
       }
     }
+    validateWritePolicy(brain.write_policy);
     const lint = brain.lint;
     if (lint?.reachability_mode !== undefined && !isLintMode(lint.reachability_mode)) {
       throw new Error(

@@ -1,5 +1,24 @@
 # Fly Deployment
 
+## Spec 023 rollout — 22 October 2026
+
+The approved v1.13.0 release adds per-Brain write admission, automatic
+source-backed corrections and readable optional-review receipts. Both owner
+migrations and activations are authorised. JEM's exact migration and retired
+intake policy were applied at 22:21 UTC; its post-migration SQL gate passed.
+The application release remains pending until a guarded deployment receipt is
+recorded here. ERS remains on v1.12.7 pending access to its own admin connection;
+the available CLI returns 403 and the existing browser session cannot open its
+project. Do not substitute JEM credentials or a runtime login for ERS DDL.
+
+The Docker context explicitly includes only the non-secret
+`config/brain-write-policies.json` alongside existing reviewed configuration.
+Fly requires `BRAIN_WRITE_POLICY_CONFIG` and the exact owner-bound
+`BRAIN_REQUIRED_WRITE_POLICY`; a missing or invalid policy fails closed.
+Local Monitor profiles must also explicitly select the matching policy file.
+See [Spec 023](specs/023-brain-write-admission-and-routing.md) and
+[security gate](security/hosted-brain-supabase-security-gate.md).
+
 **10 October 2026, ERS follow-through:** the separately approved ERS guarded
 v1.12.7 release is deployed and verified. The gate passed 622 tests with 11
 optional skips; live health, invalid-Origin rejection and the existing Codex
@@ -242,6 +261,7 @@ db/migrations/2026-07-17_001_brain_revision_fts.sql
 db/migrations/2026-08-19_001_bounded_sync_observability.sql
 db/migrations/2026-08-22_001_source_reference_identity.sql
 db/migrations/2026-08-25_001_entra_access_grants.sql
+db/migrations/2026-10-22_001_brain_write_admission.sql
 db/migrations/20260911113912_resumable_local_ingestion.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql

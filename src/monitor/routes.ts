@@ -5,6 +5,8 @@ import { currentRolesForPrincipal } from '../services/access-grants.js';
 import { loadRegistry, type BrainPrincipal, type BrainRole } from '../services/registry.js';
 import { runtimeBrainId } from '../services/runtime-env.js';
 import { MonitorSessions } from './session.js';
+import { activeBrainStore } from '../services/active-brain-store.js';
+import { changePage } from './change-page.js';
 import { monitoringPage, monitoringCss, monitoringJs } from './page.js';
 
 const headers = {'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'};
@@ -39,13 +41,24 @@ export class MonitoringRoutes {
       if (url.pathname==='/monitor/callback') {
         redirect('/monitor',await this.sessions.complete(url.searchParams,req.headers.cookie));return;
       }
-      if (url.pathname!=='/monitor/api/status') {send(404,'{"error":"not_found"}');return;}
+      const changeMatch=/^\/monitor\/changes\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
+      if (!changeMatch && url.pathname!=='/monitor/api/status') {send(404,'{"error":"not_found"}');return;}
       const session=await this.sessions.get(req.headers.cookie);
-      if (!session) {send(401,'{"error":"sign_in_required"}');return;}
+      if (!session) {
+        if(changeMatch) send(401,'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Read Brain change</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main><h1>Sign in to read this Brain change</h1><p>Sign in with your Brain account, then reopen this change link.</p><a class="button" href="/monitor/login">Sign in</a></main></body></html>','text/html; charset=utf-8');
+        else send(401,'{"error":"sign_in_required"}');
+        return;
+      }
       const brainId=url.searchParams.get('brain_id') || runtimeBrainId();
       const role=(await this.roles(session.principal))[brainId];
       const registered=(await loadRegistry()).brains.some(brain=>brain.id===brainId);
       if (!registered || !['reader','member','admin','owner'].includes(role)) {send(403,'{"error":"access_denied"}');return;}
+      if(changeMatch) {
+        try {const record=JSON.parse(await activeBrainStore().readChange(brainId,changeMatch[1]));
+          send(200,changePage(record),'text/html; charset=utf-8');
+        } catch {send(404,'Change is unavailable in this Brain.','text/plain');}
+        return;
+      }
       send(200,JSON.stringify(await this.read(brainId,role)));
     } catch(error) {
       const reason=error instanceof Error?error.message:'';

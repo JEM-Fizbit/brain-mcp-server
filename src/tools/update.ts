@@ -20,6 +20,7 @@ import {
   revisionActor,
   resolveToolBrain,
 } from "../services/request-context.js";
+import { policyFailure } from "../services/write-policy.js";
 import { assertToolRole } from "../services/tool-authority.js";
 import {
   countInboundLinkers,
@@ -29,9 +30,9 @@ import {
 export function registerUpdateTools(server: McpServer): void {
   server.tool(
     "brain_update_file",
-    "Update a Brain-vault file. For replace, pass expected_revision from brain_read_file (or 'new' for creation); stale or missing reviewed revisions are refused. External sources/, inbox/, and .brain-sync/ paths are reserved for their dedicated workflows. Hosted revisions do not require Git. Filesystem fallback uses its configured operator workflow.",
+    "Update curated durable Brain knowledge; route drafts, tasks and temporary material to Capture/project home. Source-backed corrections remain automatic with write_context evidence and a readable retrospective log; no per-fact human approval. For replace, pass expected_revision from brain_read_file (or 'new' for creation); stale or missing reviewed revisions are refused. External sources/, inbox/, and .brain-sync/ paths are reserved for their dedicated workflows. Hosted revisions do not require Git. Filesystem fallback uses its configured operator workflow.",
     UpdateFileSchema.shape,
-    async ({ brain_id, filename, content, mode, old_content, expected_revision }, extra) => {
+    async ({ brain_id, filename, content, mode, old_content, expected_revision, write_context }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
         assertToolRole(ctx, "brain_update_file");
@@ -46,7 +47,8 @@ export function registerUpdateTools(server: McpServer): void {
           old_content,
           revisionActor(ctx),
           ctx.role,
-          expected_revision === "new" ? null : expected_revision
+          expected_revision === "new" ? null : expected_revision,
+          write_context
         );
         const sync = revisionStoreModeEnabled()
           ? ""
@@ -58,8 +60,7 @@ export function registerUpdateTools(server: McpServer): void {
         return { content: [{ type: "text", text: result + sync }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
+          ...policyFailure(error),
         };
       }
     }
@@ -197,8 +198,7 @@ export function registerUpdateTools(server: McpServer): void {
         return { content: [{ type: "text", text: result }] };
       } catch (error) {
         return {
-          content: [{ type: "text", text: String(error) }],
-          isError: true,
+          ...policyFailure(error),
         };
       }
     }

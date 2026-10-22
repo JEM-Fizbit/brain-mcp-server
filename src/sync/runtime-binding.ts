@@ -15,6 +15,8 @@ export type EnvMap = Record<string, string | undefined>;
 export const MONITOR_PROFILE_ENV_KEYS = [
   "BRAIN_ID",
   "BRAIN_PROFILE_NAME",
+  "BRAIN_WRITE_POLICY_CONFIG",
+  "BRAIN_REQUIRED_WRITE_POLICY",
   "BRAIN_DIR",
   "BRAIN_INBOX_DIR",
   "BRAIN_SYNC_CYCLE_TIMEOUT_MS",

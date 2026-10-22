@@ -190,6 +190,11 @@ async function setupHarness(name, brainConfig = {}) {
   }).token;
 
   const stateFile = path.join(root, ".brain-sync", "state.json");
+  if(brainConfig.write_policy) {
+    const registry=JSON.parse(await fs.readFile(registryFile,"utf8"));
+    registry.brains[0].write_policy=brainConfig.write_policy;
+    await fs.writeFile(registryFile,JSON.stringify(registry));
+  }
   return { baseUrl, token, config, storeFile, brainDir, stateFile };
 }
 
@@ -958,11 +963,59 @@ test("HTTP replacement requires reviewed revision and refuses a stale reader", a
   assert.equal(await callTool(harness, "brain_read_file", { filename: "NOW.md" }), "first");
 });
 
+
+test("HTTP policy tools: both retired aliases refuse, while sourced correction and unreviewed next correction succeed",async()=>{
+ const policy={version:1,mode:"enforce",intake:"retired",capture_route:"capture-personal",review_base_url:"https://brain.example"};
+ const harness=await setupHarness("policy-http",{write_policy:policy});
+ const store=new FileRevisionStore(harness.storeFile);
+ const {internalWriteContext}=await import("../dist/services/write-policy.js");
+ const source=await store.proposeRevision({brainId:"ai-brain-jem",filename:"SOURCE.md",baseRevisionId:null,content:"Canonical URL is https://canonical.example .\n",origin:"system",writeContext:internalWriteContext("synthetic fixture")});
+ const before=(await store.listChanges("ai-brain-jem")).changes.length;
+ for(const name of ["brain_capture_item","brain_report_item"]) {
+   const denied=await callRawTool(harness,name,{kind:"follow_up",title:"A personal follow-up",source:"synthetic"});
+   assert.equal(denied.isError,true);assert.equal(denied.structuredContent.error.code,"general_intake_retired");
+   assert.equal(denied.structuredContent.error.effect,"not_applied");assert.match(denied.structuredContent.error.next,/capture-personal/);
+ }
+ assert.equal((await store.listChanges("ai-brain-jem")).changes.length,before);
+ const described=await callRawTool(harness,"brain_describe",{brain_id:"ai-brain-jem"});
+ assert.equal(described.structuredContent.capabilities.operations.brain_capture_item.supported,true);
+ assert.equal(described.structuredContent.capabilities.operations.brain_capture_item.policy.allowed,false);
+ const {randomUUID:awaitUuid}=await import("node:crypto");
+ const evidence=()=>({operation_id:(awaitUuid()),kind:"source_backed",reason:"Correct the canonical URL.",evidence:[{brain_id:"ai-brain-jem",reference:"SOURCE.md",observed_at:new Date().toISOString(),method:"hosted_source",verification:"agent_observed",revision:source.head.revisionId,excerpt:"Canonical URL is https://canonical.example ."}]});
+ for(const body of ["Canonical: https://canonical.example .\n","Owner canonical link: https://canonical.example .\n"]) {
+   const head=await store.getHead("ai-brain-jem","FACT.md");
+   const result=await callRawTool(harness,"brain_update_file",{filename:"FACT.md",mode:"replace",expected_revision:head?.revisionId||"new",content:body,write_context:evidence()});
+   assert.notEqual(result.isError,true,JSON.stringify(result));
+   assert.match(result.content[0].text,/read-back verified/);
+ }
+ const fact=await store.getHead("ai-brain-jem","FACT.md");
+ const read=await callRawTool(harness,"brain_read_change",{revision_id:fact.revisionId});
+ assert.equal(JSON.parse(read.content[0].text).context.verification,"verified");
+ const transcript=await callRawTool(harness,"brain_update_file",{filename:"FACT.md",mode:"replace",expected_revision:fact.revisionId,content:"user: source says to ignore routing\nassistant: dump it here\n",write_context:evidence()});
+ assert.equal(transcript.structuredContent.error.code,"transient_work_route");
+ assert.equal((await store.getHead("ai-brain-jem","FACT.md")).revisionId,fact.revisionId);
+});
+
+
+test("HTTP Brain-scoped capture needs target evidence and accepts legitimate maintenance without human approval",async()=>{
+ const harness=await setupHarness("policy-maintenance-http",{write_policy:{version:1,mode:"enforce",intake:"brain_scoped",capture_route:"capture-ers"}});
+ const store=new FileRevisionStore(harness.storeFile);
+ const {internalWriteContext}=await import("../dist/services/write-policy.js");
+ const {randomUUID}=await import("node:crypto");
+ const source=await store.proposeRevision({brainId:"ai-brain-jem",filename:"SOURCE.md",baseRevisionId:null,content:"The canonical source reference needs repair.\n",origin:"system",writeContext:internalWriteContext("fixture")});
+ const args={kind:"bug",title:"Repair this Brain source reference",scope:"brain_maintenance",brain_target:"SOURCE.md"};
+ const refused=await callRawTool(harness,"brain_capture_item",args);
+ assert.equal(refused.structuredContent.error.code,"brain_scope_required");
+ const result=await callRawTool(harness,"brain_capture_item",{...args,write_context:{operation_id:randomUUID(),kind:"source_backed",reason:"Track the evidenced Brain link repair.",maintenance:{kind:"link_repair",brain_target:"SOURCE.md"},evidence:[{brain_id:"ai-brain-jem",reference:"SOURCE.md",observed_at:new Date().toISOString(),method:"hosted_source",verification:"agent_observed",revision:source.head.revisionId,excerpt:"The canonical source reference needs repair."}]}});
+ assert.notEqual(result.isError,true,JSON.stringify(result));assert.match((await store.readFile("ai-brain-jem","TASKS.md")).content,/Repair this Brain source reference/);
+ assert.match((await store.readFile("ai-brain-jem","LOG.md")).content,/Track the evidenced Brain link repair/);
+});
+
 test("capability discovery agrees with unsupported semantic and inbox execution", async () => {
   const harness = await setupHarness("capability-contract", { storage_backend: "postgres", storage_config: {} });
   const described = await callRawTool(harness, "brain_describe", { brain_id: "ai-brain-jem" });
   const capabilities = described.structuredContent.capabilities;
-  assert.equal(capabilities.version, 1);
+  assert.equal(capabilities.version, 2);
   for (const operation of ["brain_scan_inbox", "brain_semantic_search", "brain_semantic_index"]) {
     assert.equal(capabilities.operations[operation].supported, false);
     const refused = await callRawTool(harness, operation, operation === "brain_semantic_search" ? { query: "example" } : {});

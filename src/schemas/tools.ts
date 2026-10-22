@@ -55,7 +55,22 @@ export const ReadFileSchema = BrainIdSchema.extend({
     ),
 });
 
+export const WriteContextSchema = z.object({
+  operation_id:z.string().regex(/^[A-Za-z0-9_-]{8,160}$/),
+  kind:z.enum(["source_backed","user_directed"]),
+  reason:z.string().min(1).max(2000),
+  maintenance:z.object({kind:z.enum(["content_gap","source_ingestion","link_repair","lint_finding"]),brain_target:z.string().min(1).max(500)}).strict().optional(),
+  evidence:z.array(z.object({
+    brain_id:z.string(),reference:z.string().min(1).max(2000),
+    observed_at:z.string().datetime({offset:true}),
+    method:z.enum(["hosted_source","connector_read","local_read","user_instruction"]),
+    verification:z.enum(["agent_observed","retrieved"]),
+    revision:z.string().optional(),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    excerpt:z.string().min(1).max(4000)
+  }).strict()).min(1).max(10)
+}).strict();
 export const UpdateFileSchema = BrainIdSchema.extend({
+  write_context:WriteContextSchema.optional().describe("Source-backed corrections remain automatic. On a policy-enabled Brain, supply a stable operation ID, reason, and actual same-Brain source observations; a URL alone is not evidence. No human approval field is required."),
   expected_revision: z.string().min(1).optional().describe("Required for replace: revision_id returned by brain_read_file, or 'new' to create a file that must not exist. Stale replacements are refused."),
   filename: z
     .string()
@@ -204,6 +219,9 @@ export const ReadLogSchema = BrainIdSchema.extend({
 });
 
 export const CaptureItemSchema = BrainIdSchema.extend({
+  write_context:WriteContextSchema.optional().describe("A scoped Brain maintenance record needs current evidence for its actual Brain target. This is automatic admission, not human approval."),
+  scope:z.literal("brain_maintenance").optional().describe("Only for explicitly Brain-scoped maintenance on a Brain whose policy permits it. Retired general intake remains refused."),
+  brain_target:z.string().optional().describe("Brain-relative Markdown target for a scoped maintenance item."),
   kind: z
     .enum([
       "bug",

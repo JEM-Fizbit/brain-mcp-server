@@ -15,7 +15,7 @@
 
 <!-- backlog items below; newest first -->
 
-- Design per-Brain write admission and behavioural routing checks under [spec 023](docs/specs/023-brain-write-admission-and-routing.md): retain automatic source-backed updates with readable logs for optional manual review, hard-block retired capture intake and route transient work to same-domain Capture/project homes; implementation remains unapproved.
+- Complete approved [spec 023](docs/specs/023-brain-write-admission-and-routing.md): automatic source-backed corrections, readable retrospective logs, retired-queue enforcement and evidence-bound routing/sync; finish per-owner migration, release and activation acceptance.
 
 - Deferred source-review sweep: compare source custody/index coverage, identify under-integrated material and consolidation candidates; consider a monthly operator review. Migrated from JEM TASKS Future (Karpathy gap 2); design context remains `sources/analysis/2026-04-14_brain-architecture-review-karpathy.md`. Inventory only, no scheduler or implementation authorized.
 - Deferred proactive lint: assess `--stale` and `--reconcile` first, then `--impute`, `--connections` and `--questions`; measure false positives before automatic changes. Migrated from JEM TASKS Future (Karpathy gap 3), with the same architecture-review source.

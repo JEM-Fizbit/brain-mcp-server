@@ -31,6 +31,13 @@ export class FileRevisionStore implements RevisionStore {
 
   constructor(private readonly filePath: string) {}
 
+  findWriteOperation(brainId:string, operationId:string):Promise<RevisionContent|null> {
+    return this.withStore(false, store=>store.findWriteOperation(brainId,operationId));
+  }
+  setWriteVerification(brainId:string, revisionId:string, state:"verified"|"verification_failed"):Promise<void> {
+    return this.withStore(true, store=>store.setWriteVerification(brainId,revisionId,state));
+  }
+
   getHead(brainId: string, filename: string): Promise<FileHead | null> {
     return this.withStore(false, (store) => store.getHead(brainId, filename));
   }

@@ -5,9 +5,20 @@
     "category": "personal_contact",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["01_identity.md"],
-      "loader_must_contain": ["contact details", "01_identity.md", "08_personal.md"],
-      "search": { "query": "my email address", "must_hit_files": ["01_identity.md"] }
+      "route_files": [
+        "01_identity.md"
+      ],
+      "loader_must_contain": [
+        "contact details",
+        "01_identity.md",
+        "08_personal.md"
+      ],
+      "search": {
+        "query": "my email address",
+        "must_hit_files": [
+          "01_identity.md"
+        ]
+      }
     }
   },
   {
@@ -16,9 +27,20 @@
     "category": "personal_contact",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["01_identity.md"],
-      "loader_must_contain": ["phone number", "mobile", "01_identity.md"],
-      "search": { "query": "phone number mobile", "must_hit_files": ["01_identity.md"] }
+      "route_files": [
+        "01_identity.md"
+      ],
+      "loader_must_contain": [
+        "phone number",
+        "mobile",
+        "01_identity.md"
+      ],
+      "search": {
+        "query": "phone number mobile",
+        "must_hit_files": [
+          "01_identity.md"
+        ]
+      }
     }
   },
   {
@@ -27,9 +49,19 @@
     "category": "personal_contact",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["01_identity.md"],
-      "loader_must_contain": ["headshots", "headshot/photo assets"],
-      "search": { "query": "preferred headshot", "must_hit_files": ["01_identity.md"] }
+      "route_files": [
+        "01_identity.md"
+      ],
+      "loader_must_contain": [
+        "headshots",
+        "headshot/photo assets"
+      ],
+      "search": {
+        "query": "preferred headshot",
+        "must_hit_files": [
+          "01_identity.md"
+        ]
+      }
     }
   },
   {
@@ -38,8 +70,14 @@
     "category": "private_personal",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["08_personal.md"],
-      "loader_must_contain": ["private home", "family/location context", "08_personal.md"]
+      "route_files": [
+        "08_personal.md"
+      ],
+      "loader_must_contain": [
+        "private home",
+        "family/location context",
+        "08_personal.md"
+      ]
     }
   },
   {
@@ -48,11 +86,21 @@
     "category": "account_identifier",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["09_tools_stack.md"],
+      "route_files": [
+        "09_tools_stack.md"
+      ],
       "allow_store_non_secret_identifier": true,
       "refuse_secret_storage": true,
-      "loader_must_contain": ["Stable identifiers vs secrets", "service-specific account identifiers/logins"],
-      "search": { "query": "uchicago cnet id", "must_hit_files": ["09_tools_stack.md"] }
+      "loader_must_contain": [
+        "Stable identifiers vs secrets",
+        "service-specific account identifiers/logins"
+      ],
+      "search": {
+        "query": "uchicago cnet id",
+        "must_hit_files": [
+          "09_tools_stack.md"
+        ]
+      }
     }
   },
   {
@@ -61,8 +109,15 @@
     "category": "account_identifier",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["09_tools_stack.md"],
-      "search": { "query": "c net id academic access", "must_hit_files": ["09_tools_stack.md"] }
+      "route_files": [
+        "09_tools_stack.md"
+      ],
+      "search": {
+        "query": "c net id academic access",
+        "must_hit_files": [
+          "09_tools_stack.md"
+        ]
+      }
     }
   },
   {
@@ -71,8 +126,13 @@
     "category": "account_identifier",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["09_tools_stack.md"],
-      "loader_must_contain": ["service-specific account identifiers/logins", "no secrets"]
+      "route_files": [
+        "09_tools_stack.md"
+      ],
+      "loader_must_contain": [
+        "service-specific account identifiers/logins",
+        "no secrets"
+      ]
     }
   },
   {
@@ -82,7 +142,12 @@
     "expected": {
       "brain_id": "ai-brain-jem",
       "refuse_secret_storage": true,
-      "loader_must_contain": ["Do not store passwords", "tokens", "MFA secrets", "private keys"]
+      "loader_must_contain": [
+        "Do not store passwords",
+        "tokens",
+        "MFA secrets",
+        "private keys"
+      ]
     }
   },
   {
@@ -92,7 +157,10 @@
     "expected": {
       "brain_id": "ai-brain-jem",
       "refuse_secret_storage": true,
-      "loader_must_contain": ["recovery codes", "authenticating secrets"]
+      "loader_must_contain": [
+        "recovery codes",
+        "authenticating secrets"
+      ]
     }
   },
   {
@@ -102,7 +170,10 @@
     "expected": {
       "brain_id": "ers-brain",
       "canonical_for": "ers-genomics",
-      "loader_must_contain": ["company facts", "entities/ers_genomics.md"]
+      "loader_must_contain": [
+        "company facts",
+        "entities/ers_genomics.md"
+      ]
     }
   },
   {
@@ -112,8 +183,14 @@
     "expected": {
       "brain_id": "ers-brain",
       "canonical_for": "ers-genomics",
-      "route_files": ["entities/ers_genomics.md"],
-      "loader_must_contain": ["company facts", "history", "positioning"]
+      "route_files": [
+        "entities/ers_genomics.md"
+      ],
+      "loader_must_contain": [
+        "company facts",
+        "history",
+        "positioning"
+      ]
     }
   },
   {
@@ -122,9 +199,15 @@
     "category": "cross_brain_fallback",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["ers_genomics.md"],
+      "route_files": [
+        "ers_genomics.md"
+      ],
       "fallback_disclosure_required": true,
-      "loader_must_contain": ["accessible canonical ERS Brain", "legacy fallback", "may lag"]
+      "loader_must_contain": [
+        "accessible canonical ERS Brain",
+        "legacy fallback",
+        "may lag"
+      ]
     }
   },
   {
@@ -133,9 +216,14 @@
     "category": "cross_brain_fallback",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["Reference_ERS_Brain_Context/README.md"],
+      "route_files": [
+        "Reference_ERS_Brain_Context/README.md"
+      ],
       "fallback_disclosure_required": true,
-      "loader_must_contain": ["Pointer only", "fallback"]
+      "loader_must_contain": [
+        "Pointer only",
+        "fallback"
+      ]
     }
   },
   {
@@ -144,9 +232,19 @@
     "category": "work_contact",
     "expected": {
       "brain_id": "ers-brain",
-      "route_files": ["entities/john_milad.md"],
-      "loader_must_contain": ["ERS staff/CEO professional contact details", "approved signature block"],
-      "search": { "query": "ERS Work Contact Details", "must_hit_files": ["entities/john_milad.md"] }
+      "route_files": [
+        "entities/john_milad.md"
+      ],
+      "loader_must_contain": [
+        "ERS staff/CEO professional contact details",
+        "approved signature block"
+      ],
+      "search": {
+        "query": "ERS Work Contact Details",
+        "must_hit_files": [
+          "entities/john_milad.md"
+        ]
+      }
     }
   },
   {
@@ -155,8 +253,15 @@
     "category": "work_contact",
     "expected": {
       "brain_id": "ers-brain",
-      "route_files": ["entities/cillian_mcgorman.md"],
-      "search": { "query": "Cillian email address", "must_hit_files": ["entities/cillian_mcgorman.md"] }
+      "route_files": [
+        "entities/cillian_mcgorman.md"
+      ],
+      "search": {
+        "query": "Cillian email address",
+        "must_hit_files": [
+          "entities/cillian_mcgorman.md"
+        ]
+      }
     }
   },
   {
@@ -165,9 +270,19 @@
     "category": "work_contact",
     "expected": {
       "brain_id": "ers-brain",
-      "route_files": ["references/templates.md"],
-      "loader_must_contain": ["standard signature/disclosure templates", "references/templates.md"],
-      "search": { "query": "standard ERS staff signature block", "must_hit_files": ["references/templates.md"] }
+      "route_files": [
+        "references/templates.md"
+      ],
+      "loader_must_contain": [
+        "standard signature/disclosure templates",
+        "references/templates.md"
+      ],
+      "search": {
+        "query": "standard ERS staff signature block",
+        "must_hit_files": [
+          "references/templates.md"
+        ]
+      }
     }
   },
   {
@@ -176,9 +291,22 @@
     "category": "source_escalation",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["SOURCES.md", "quanta.md"],
-      "loader_must_contain": ["scope: \"sources\"", "original ingested material", "KRUK bio"],
-      "search": { "query": "KRUK Trustee Bio", "must_hit_files": ["SOURCES.md", "quanta.md"] }
+      "route_files": [
+        "SOURCES.md",
+        "quanta.md"
+      ],
+      "loader_must_contain": [
+        "scope: \"sources\"",
+        "original ingested material",
+        "KRUK bio"
+      ],
+      "search": {
+        "query": "KRUK Trustee Bio",
+        "must_hit_files": [
+          "SOURCES.md",
+          "quanta.md"
+        ]
+      }
     }
   },
   {
@@ -187,9 +315,20 @@
     "category": "source_escalation",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["ref_psychometric_assessments.md"],
-      "loader_must_contain": ["Hogan", "sources", "all"],
-      "search": { "query": "Hogan Insight Report MVPI HPI", "must_hit_files": ["ref_psychometric_assessments.md"] }
+      "route_files": [
+        "ref_psychometric_assessments.md"
+      ],
+      "loader_must_contain": [
+        "Hogan",
+        "sources",
+        "all"
+      ],
+      "search": {
+        "query": "Hogan Insight Report MVPI HPI",
+        "must_hit_files": [
+          "ref_psychometric_assessments.md"
+        ]
+      }
     }
   },
   {
@@ -198,8 +337,11 @@
     "category": "task_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["TASKS.md"],
-      "loader_must_contain": ["TASKS.md", "personal/professional non-ERS/non-project actions"]
+      "loader_must_contain": [
+        "capture-personal",
+        "retired as general personal intake",
+        "verified receipt"
+      ]
     }
   },
   {
@@ -208,8 +350,14 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["05_projects.md"],
-      "loader_must_contain": ["owning project", "BACKLOG.md", "project work"]
+      "route_files": [
+        "05_projects.md"
+      ],
+      "loader_must_contain": [
+        "owning project",
+        "BACKLOG.md",
+        "project work"
+      ]
     }
   },
   {
@@ -218,8 +366,15 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["05_projects.md", "09_tools_stack.md"],
-      "loader_must_contain": ["Working on a software / AI project", "05_projects.md", "09_tools_stack.md"]
+      "route_files": [
+        "05_projects.md",
+        "09_tools_stack.md"
+      ],
+      "loader_must_contain": [
+        "Working on a software / AI project",
+        "05_projects.md",
+        "09_tools_stack.md"
+      ]
     }
   },
   {
@@ -228,17 +383,27 @@
     "category": "working_artifact",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["working/INDEX.md"],
-      "loader_must_contain": ["Working artifact discovery", "working/INDEX.md", "binary working artefacts"]
+      "route_files": [
+        "working/INDEX.md"
+      ],
+      "loader_must_contain": [
+        "Working artifact discovery",
+        "working/INDEX.md",
+        "binary working artefacts"
+      ]
     }
   },
   {
     "id": "output-capture-analysis",
-    "prompt": "We produced a substantive strategy memo; save it to the Brain.",
+    "prompt": "We drafted a strategy memo; keep the deliverable with its project and retain only selected reusable knowledge.",
     "category": "source_escalation",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "loader_must_contain": ["Output capture", "sources/analysis", "substantive original thinking"]
+      "loader_must_contain": [
+        "Before output capture",
+        "first-class deliverable",
+        "selected reusable knowledge"
+      ]
     }
   },
   {
@@ -247,8 +412,13 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["06_writing_voice.md"],
-      "loader_must_contain": ["Writing on John's behalf", "06_writing_voice.md"]
+      "route_files": [
+        "06_writing_voice.md"
+      ],
+      "loader_must_contain": [
+        "Writing on John's behalf",
+        "06_writing_voice.md"
+      ]
     }
   },
   {
@@ -257,8 +427,15 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["01_identity.md", "02_expertise.md", "04_active_roles.md", "11_next_chapter_framework.md"],
-      "loader_must_contain": ["Career / job search / applications"]
+      "route_files": [
+        "01_identity.md",
+        "02_expertise.md",
+        "04_active_roles.md",
+        "11_next_chapter_framework.md"
+      ],
+      "loader_must_contain": [
+        "Career / job search / applications"
+      ]
     }
   },
   {
@@ -267,8 +444,14 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["nbgi.md", "REF_nbgi_track_record.md"],
-      "loader_must_contain": ["NBGI Ventures context", "nbgi.md"]
+      "route_files": [
+        "nbgi.md",
+        "REF_nbgi_track_record.md"
+      ],
+      "loader_must_contain": [
+        "NBGI Ventures context",
+        "nbgi.md"
+      ]
     }
   },
   {
@@ -277,9 +460,19 @@
     "category": "semantic_destination",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["quanta.md"],
-      "loader_must_contain": ["Entity or prior-role context", "quanta"],
-      "search": { "query": "Quanta Dialysis Technologies", "must_hit_files": ["quanta.md"] },
+      "route_files": [
+        "quanta.md"
+      ],
+      "loader_must_contain": [
+        "Entity or prior-role context",
+        "quanta"
+      ],
+      "search": {
+        "query": "Quanta Dialysis Technologies",
+        "must_hit_files": [
+          "quanta.md"
+        ]
+      },
       "destinations": [
         {
           "file": "quanta.md",
@@ -295,9 +488,19 @@
     "category": "semantic_destination",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["nitec.md"],
-      "loader_must_contain": ["Entity or prior-role context", "nitec"],
-      "search": { "query": "Nitec Pharma", "must_hit_files": ["nitec.md"] },
+      "route_files": [
+        "nitec.md"
+      ],
+      "loader_must_contain": [
+        "Entity or prior-role context",
+        "nitec"
+      ],
+      "search": {
+        "query": "Nitec Pharma",
+        "must_hit_files": [
+          "nitec.md"
+        ]
+      },
       "destinations": [
         {
           "file": "nitec.md",
@@ -313,8 +516,15 @@
     "category": "semantic_destination",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["edge_biotech.md"],
-      "search": { "query": "Edge Biotech", "must_hit_files": ["edge_biotech.md"] },
+      "route_files": [
+        "edge_biotech.md"
+      ],
+      "search": {
+        "query": "Edge Biotech",
+        "must_hit_files": [
+          "edge_biotech.md"
+        ]
+      },
       "destinations": [
         {
           "file": "edge_biotech.md",
@@ -330,8 +540,15 @@
     "category": "semantic_destination",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["04_active_roles.md"],
-      "search": { "query": "Nextkidney Neokidney identity", "must_hit_files": ["04_active_roles.md"] },
+      "route_files": [
+        "04_active_roles.md"
+      ],
+      "search": {
+        "query": "Nextkidney Neokidney identity",
+        "must_hit_files": [
+          "04_active_roles.md"
+        ]
+      },
       "destinations": [
         {
           "file": "04_active_roles.md",
@@ -347,8 +564,13 @@
     "category": "project_routing",
     "expected": {
       "brain_id": "ai-brain-jem",
-      "route_files": ["edge_biotech.md"],
-      "loader_must_contain": ["Edge Biotech opportunity", "edge_biotech.md"]
+      "route_files": [
+        "edge_biotech.md"
+      ],
+      "loader_must_contain": [
+        "Edge Biotech opportunity",
+        "edge_biotech.md"
+      ]
     }
   }
 ]

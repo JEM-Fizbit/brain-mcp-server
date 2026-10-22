@@ -35,8 +35,14 @@ source-backed updates with a clear human-readable change log for optional manual
 review. Do not require approval for each factual correction. Hard-block retired
 capture intake and route transient material to same-domain Capture or its project
 home. [Spec 023](specs/023-brain-write-admission-and-routing.md) reflects this
-direction; implementation and activation remain unapproved. The earlier proposal
-for exact human approval of all prose is superseded, not an outstanding decision.
+direction. John approved implementation/deployment and then separately approved
+both JEM and ERS production migrations and policy activations on 22 October.
+Source-backed corrections run automatically with bounded evidence, stable retry
+identities, CAS and readable retrospective receipts; unread logs do not gate the
+next correction. Deployment-owned per-Brain policy separates this admission from
+RBAC. JEM retired intake is fenced at tools, stores, sync and database heads;
+ERS scoped Brain maintenance remains available. The earlier proposal for exact
+human approval of all prose is superseded, not an outstanding decision.
 
 ## 2026-10-10 — Validate MCP Origins independently of the protocol upgrade
 

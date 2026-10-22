@@ -108,6 +108,11 @@ export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeM
 export function syncHealthAction(sync) {
   if (!sync || (sync.status !== "warn" && sync.status !== "fail")) return null;
   const details = sync.details || {};
+  if (details.admissionHeld?.length) return {
+    level:"warn",reason:"sync_admission_held",
+    title:"Resolve evidence or routing for held local edits.",
+    detail:details.admissionHeld.map(item=>item.filename+": "+item.code+". "+item.next).join(" ")+" Unrelated sync continues; this is not a per-fact approval request."
+  };
   if (details.guardTripped) return { level: "warn", reason: "sync_guard",
     title: "Review protected local sync state.", detail: String(details.guardTripped) };
   if (details.errorClass) return {

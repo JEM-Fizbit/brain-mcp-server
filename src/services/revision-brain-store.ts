@@ -1,4 +1,9 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { changeRecord } from "./write-admission.js";
+import { isInternalWrite, WritePolicyError } from "./write-policy.js";
+import { assertReceipt, internalWriteContext } from "./write-policy.js";
+import { writePolicyForBrain } from "./write-policy-runtime.js";
 import { LOG_FILE, type SourceCategory, type LogOpType } from "../constants.js";
 import {
   MAX_SEARCH_RESULTS,
@@ -340,10 +345,24 @@ export class RevisionBrainStore implements BrainStore {
     oldContent?: string,
     actor?: RevisionActor,
     role?: BrainRole,
-    expectedRevisionId?: string | null
+    expectedRevisionId?: string | null,
+    writeContext?: import('./write-policy.js').BrainWriteContext
   ): Promise<string> {
     validateFilename(filename);
     assertStructuralWriteAllowed(filename, role);
+    if (writeContext && !isInternalWrite(writeContext)) {
+      writeContext={...writeContext,evidence:writeContext.evidence.map(e=>({...e}))};
+      writeContext.tool_request_hash=createHash("sha256").update(JSON.stringify({
+        brainId,filename,content,mode,oldContent,expectedRevisionId,actor,
+        context:{operation_id:writeContext.operation_id,kind:writeContext.kind,reason:writeContext.reason,maintenance:writeContext.maintenance,
+          evidence:writeContext.evidence.map(({verification,...e})=>e)}
+      })).digest("hex");
+      const replay=await this.revisionStore.findWriteOperation(brainId,writeContext.operation_id);
+      if(replay) {
+        if(replay.writeContext?.tool_request_hash!==writeContext.tool_request_hash) throw new WritePolicyError("operation_identity_conflict",brainId,"This operation id belongs to another tool request; inspect its original change record.");
+        return "Already applied "+filename+"; original change "+replay.revisionId+"; read-back "+(replay.writeContext?.verification||"applied")+". No duplicate write.";
+      }
+    }
     const current = await this.revisionStore.getHead(brainId, filename);
     if (mode === "replace" && current && expectedRevisionId === undefined) {
       throw new Error("expected_revision is required for replacement; read the file and submit its reviewed revision.");
@@ -385,6 +404,7 @@ export class RevisionBrainStore implements BrainStore {
       content: nextContent,
       origin: "hosted_mcp",
       actor,
+      writeContext,
     });
 
     if (!result.ok) {
@@ -393,7 +413,22 @@ export class RevisionBrainStore implements BrainStore {
       );
     }
 
+    if(result.revision.writeContext?.request_hash) {
+      let verified=false;
+      try {verified=(await this.readFile(brainId,filename))===nextContent;} catch {}
+      try {await this.revisionStore.setWriteVerification(brainId,result.revision.revisionId,verified ? "verified":"verification_failed");}
+      catch {verified=false;}
+      return "Updated "+filename+"; "+(verified ? "exact read-back verified":"applied, read-back/verification record unavailable")+
+        ". Change "+result.revision.revisionId+" is in LOG.md; manual review is optional.";
+    }
     return `Updated ${filename}: ${lineCount(nextContent)} lines, ${byteCount(nextContent)} bytes`;
+  }
+
+  async readChange(brainId:string,revisionId:string):Promise<string> {
+    const revision=await this.revisionStore.findWriteOperation(brainId,revisionId) || await this.revisionStore.readRevision(brainId,revisionId);
+    if(!revision) throw new Error("Change not found in selected Brain");
+    const prior=revision.parentRevisionId ? await this.revisionStore.readRevision(brainId,revision.parentRevisionId):null;
+    return JSON.stringify(changeRecord(revision,prior),null,2);
   }
 
   async deleteFile(
@@ -483,6 +518,7 @@ export class RevisionBrainStore implements BrainStore {
       filename,
       baseRevisionId: null,
       content: prior.content,
+      writeContext: internalWriteContext("explicit restore of retained revision"),
       origin: "hosted_mcp",
       actor,
     });
@@ -499,6 +535,7 @@ export class RevisionBrainStore implements BrainStore {
     summary: string,
     actor?: RevisionActor
   ): Promise<string> {
+    assertReceipt(await writePolicyForBrain(brainId),brainId,summary);
     const current = await this.revisionStore.getHead(brainId, LOG_FILE);
     const existing = current
       ? (await this.revisionStore.readFile(brainId, LOG_FILE)).content
@@ -515,6 +552,7 @@ export class RevisionBrainStore implements BrainStore {
       content: nextContent,
       origin: "hosted_mcp",
       actor,
+      writeContext:internalWriteContext("bounded operation receipt"),
     });
 
     if (!result.ok) {

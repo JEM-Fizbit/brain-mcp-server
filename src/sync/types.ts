@@ -1,3 +1,5 @@
+import type { BrainWriteContext } from "../services/write-policy.js";
+
 export type RevisionOrigin = "local_agent" | "hosted_mcp" | "import" | "system";
 
 export interface RevisionActor {
@@ -63,11 +65,13 @@ export interface RevisionRenameProposal {
 }
 
 export interface RevisionContent extends FileHead {
+  writeContext?: BrainWriteContext;
   parentRevisionId: string | null;
   content: string;
 }
 
 export interface RevisionProposal {
+  writeContext?: BrainWriteContext;
   brainId: string;
   filename: string;
   baseRevisionId: string | null;
@@ -158,6 +162,8 @@ export interface ChangePage {
 }
 
 export interface RevisionStore {
+  findWriteOperation(brainId: string, operationId: string): Promise<RevisionContent | null>;
+  setWriteVerification(brainId: string, revisionId: string, state: "verified" | "verification_failed"): Promise<void>;
   getHead(brainId: string, filename: string): Promise<FileHead | null>;
   readFile(brainId: string, filename: string): Promise<RevisionContent>;
   listFiles(brainId: string, options?: ListFilesOptions): Promise<FileHead[]>;
@@ -199,6 +205,7 @@ export interface LocalSyncState {
    * tombstone anything.
    */
   pendingDeletions?: string[];
+  admissionHolds?:Record<string,{fingerprint:string;localHash:string;code:string;next:string}>;
 }
 
 export type SyncOperation = "push" | "pull" | "sync";
@@ -222,6 +229,7 @@ export interface SyncTiming {
 export interface LocalSyncReport {
   /** Hosted source companions intentionally outside vault sync custody. */
   excludedSourceFiles?: string[];
+  admissionHeld?:{filename:string;code:string;next:string}[];
   pushed: string[];
   pulled: string[];
   unchanged: string[];

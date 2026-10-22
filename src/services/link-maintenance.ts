@@ -1,3 +1,4 @@
+import { internalWriteContext } from "./write-policy.js";
 import {
   isProtectedStructuralFile,
   type BrainStore,
@@ -62,7 +63,8 @@ export async function rewriteLinksAfterRename(
       undefined,
       actor,
       role,
-      snapshot.revisionId
+      snapshot.revisionId,
+      internalWriteContext("deterministic inbound link rewrite")
     );
   }
   return {

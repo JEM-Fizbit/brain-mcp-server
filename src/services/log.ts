@@ -160,6 +160,10 @@ export async function appendLog(
   summary: string,
   brainId?: string
 ): Promise<string> {
+  const {writePolicyForBrain}=await import("./write-policy-runtime.js");
+  const {assertReceipt}=await import("./write-policy.js");
+  const {runtimeBrainId}=await import("./runtime-env.js");
+  assertReceipt(await writePolicyForBrain(brainId || runtimeBrainId()),brainId || runtimeBrainId(),summary);
   const filePath = await ensureLogFile(brainId);
   const date = brainDate();
   const entry = formatLogEntry(opType, filesTouched, summary, date);

@@ -12,6 +12,7 @@ export const TOOL_MINIMUM_ROLES = {
   brain_sync_status: "reader",
   brain_list_conflicts: "reader",
   brain_read_log: "reader",
+  brain_read_change: "reader",
   brain_lint: "reader",
   brain_scan_inbox: "reader",
   brain_prepare_ingest: "reader",

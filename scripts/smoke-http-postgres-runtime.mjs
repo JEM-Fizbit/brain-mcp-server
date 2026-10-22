@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
 import { Readable, Writable } from "node:stream";
 import pg from "pg";
 import { handleHttpRequest } from "../dist/http/server.js";
@@ -279,9 +280,10 @@ if (process.env.BRAIN_HTTP_SMOKE_WRITE === "1") {
     filename,
     mode: "replace",
     expected_revision: expectedRevision,
+    write_context:{operation_id:randomUUID(),kind:"user_directed",reason:"Finite operator-authorised HTTP acceptance fixture.",evidence:[{brain_id:brainId,reference:"operator-command:smoke-http-postgres-runtime",observed_at:new Date().toISOString(),method:"user_instruction",verification:"agent_observed",excerpt:"Run the finite HTTP write smoke with BRAIN_HTTP_SMOKE_WRITE=1."}]},
     content,
   });
-  assert.match(update, new RegExp(`Updated ${filename.replace(".", "\\.")}:`));
+  assert.match(update, new RegExp(`Updated ${filename.replace(".", "\\.")}`));
   writeStatus = filename;
 }
 

@@ -1,6 +1,6 @@
 # 023 — Per-Brain write admission and Capture routing
 
-**Status:** draft — revised design direction confirmed; not approved for implementation or activation
+**Status:** in-progress — revised implementation approved by John on 22 October 2026; JEM and ERS production migration/policy activation separately approved by John on 22 October 2026; technical security and release gates remain
 
 **Source:** John's 22 October design request and correction: retain automatic source-backed updates, log changes for optional manual review, hard-block retired intake
 
@@ -42,7 +42,7 @@ source URL, a short patch, an owner role or a caller's “durable” label with 
 - Root/database administrators and arbitrary manual filesystem editing remain
   outside the supported-agent boundary; ordinary runtime writers must not bypass
   enforceable retired-queue rules.
-- This draft changes no deployed code, profile, data, credential or schedule.
+- Implementation and tests are authorised. Production migrations and each owner’s activation retain the separate rollout gate; no new schedule is introduced.
 
 ## Current implementation findings
 
@@ -363,8 +363,7 @@ A finite successful sample is not proof that semantic dumps are impossible.
 
 Use existing Monitor/Doctor for truthful held/failed/healthy observations, without
 a duplicate notifier or approval queue. Production migrations, access/privilege
-changes, deployment and new routines retain their existing gates. This is a
-design revision, not implementation authority.
+changes, deployment and new routines retain their existing gates. John approved the revised implementation and then separately approved both production migrations and policy activations on 22 October 2026. Complete the technical gates before each owner’s deployment.
 
 Rollback preserves originals, change records, local held bytes and completed
 operation identities. Pause the affected automatic lane if needed; keep reads
@@ -385,12 +384,57 @@ Hard-blocking retired intake is a deterministic guarantee; universal semantic
 dump prevention is not. Improve from observed errors without claiming a perfect
 classifier or quietly reintroducing per-fact approval.
 
+
+## Implementation and acceptance record — 22 October 2026
+
+John approved implementation and deployment as a goal. The implementation uses
+the existing update tools and stores, a deployment-owned policy file, private
+revision metadata for automatic evidence/operation identities, the existing LOG
+as index, and an authenticated read-only change reader. There is no per-fact
+approval API or pending-review queue.
+
+The concrete request and operator contract is in
+[backend capabilities](../backend-capabilities.md#spec-023-write-admission).
+The private-schema migration is
+[2026-10-22_001_brain_write_admission.sql](../../db/migrations/2026-10-22_001_brain_write_admission.sql).
+It creates a runtime-SELECT-only policy table, private queue triggers and a
+partial unique operation-identity index. It activates no Brain by itself.
+
+Configured receipt limit: 2,000 characters. Evidence: up to ten observations,
+each with a passage of at most 4,000 characters. Automatic receipts carry short
+before/after excerpts and at most two source summaries; full bounded evidence
+and complete prior/result text are available in the change reader. Source
+byte correspondence is checked where available; external observations remain
+explicitly agent-attributed. No new paid/model classifier is used.
+
+Deterministic coverage exercises actual HTTP MCP, memory/file revision stores,
+filesystem publication/recovery, source evidence and domain isolation, the
+PostgreSQL runtime role and raw-writer fence, log rollback, concurrent replay,
+post-write verification failure, scoped maintenance, held sync, and the
+authenticated desktop/mobile change page. Synthetic fixture tests do not prove
+universal agent judgement or substitute for independent human semantic grading.
+The corrected frozen routing baseline covers the previously stale personal
+TASKS and broad output-capture expectations. No paid model evaluation was run.
+
+Rollout remains ordered: complete local/security acceptance, apply the exact
+migration through each owner's admin path with separately recorded approval,
+activate JEM and verify a finite acceptance batch, then independently activate
+ERS through its private overlay and admin path. Existing content, originals,
+completed operation identities and held local bytes are preserved on rollback.
+Do not roll back into retired general intake. No recurring schedule is added.
+
+John separately approved both owner migrations and policy activations on 22 October 2026. Current production preflight: JEM admin read succeeded; ERS admin read returned
+HTTP 403 for the available Supabase CLI account. A Supabase connection with ERS
+project administration is required for its migration/security gate. Until the
+rollout records below are complete, this document does not claim deployment or
+enforcement by old runtime clients.
+
 ## Files and verification
 
 Likely seams: registry/capabilities, schemas and tool handlers, BrainStore and
 RevisionStore, source/evidence adapters, log and maintenance services, ingestion,
 sync status and state, private-schema queue/audit transactions and routing
-fixtures. These are proposed changes only. No native approval UI, new approval
+fixtures. Implementation is in progress under the approval recorded above. No native approval UI, new approval
 credential, public owner-presence channel or general pending-proposal database
 is required. Evidence records reuse private operational storage, not Brain intake.
 
@@ -398,8 +442,7 @@ Design-only verification: local Markdown/link checks and git diff --check.
 Implementation gates: Node 22 build/test, focused real-path evidence/routing/log
 and disposable Postgres tests, affected UI checks if a log view changes, the
 existing Supabase security gate for migrations/privileges, and separately
-authorised guarded deployments/health/sync verification. No implementation
-tests, production writes, model evaluations or deployments run in this revision.
+authorised guarded deployments/health/sync verification. The original design revision ran no implementation tests or deployments; the implementation acceptance record above supersedes that design-only scope. Production effects are recorded only when actually verified.
 
 **Revision note — 22 October 2026:** replaced the strict prose-approval default
 with automatic source-backed updates and optional retrospective review; retained

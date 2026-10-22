@@ -812,6 +812,7 @@ async function checkSyncHealth() {
       conflicts: health.report?.conflicts ?? null,
       conflictFiles: health.report?.conflictFiles ?? [],
       guardTripped: health.report?.guardTripped ?? null,
+      admissionHeld: health.report?.admissionHeld ?? [],
       totalMs: health.report?.totalMs ?? null,
       error: health.error || null,
     });

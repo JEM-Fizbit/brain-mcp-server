@@ -5,6 +5,7 @@ import type {
   RevisionActor,
 } from "../sync/types.js";
 import { contentHash } from "../sync/hash.js";
+import type { BrainWriteContext } from "./write-policy.js";
 import * as brain from "./brain.js";
 import * as git from "./git.js";
 import * as log from "./log.js";
@@ -95,7 +96,8 @@ export interface BrainStore {
     oldContent?: string,
     actor?: RevisionActor,
     role?: BrainRole,
-    expectedRevisionId?: string | null
+    expectedRevisionId?: string | null,
+    writeContext?: BrainWriteContext
   ): Promise<string>;
   deleteFile(
     brainId: string,
@@ -123,6 +125,7 @@ export interface BrainStore {
     actor?: RevisionActor
   ): Promise<string>;
   readLog(brainId: string, limit?: number, offset?: number): Promise<string>;
+  readChange(brainId:string,revisionId:string):Promise<string>;
   commit(
     brainId: string,
     message: string,
@@ -146,6 +149,9 @@ export interface BrainStore {
 
 export class FilesystemBrainStore implements BrainStore {
   readonly capabilities = { revisions: false };
+  async readChange(brainId:string,revisionId:string):Promise<string> {
+    return (await import("./filesystem-write-audit.js")).readFilesystemChange(brainId,revisionId);
+  }
   async readFileSnapshot(brainId: string, filename: string): Promise<FileSnapshot> {
     const content = await this.readFile(brainId, filename);
     return { content, revisionId: contentHash(content), contentHash: contentHash(content) };
@@ -191,9 +197,10 @@ export class FilesystemBrainStore implements BrainStore {
     oldContent?: string,
     _actor?: RevisionActor,
     _role?: BrainRole,
-    expectedRevisionId?: string | null
+    expectedRevisionId?: string | null,
+    writeContext?: BrainWriteContext
   ): Promise<string> {
-    return brain.updateFile(filename, content, mode, oldContent, brainId, expectedRevisionId);
+    return brain.updateFile(filename, content, mode, oldContent, brainId, expectedRevisionId,writeContext,_actor);
   }
 
   deleteFile(

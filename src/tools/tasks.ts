@@ -18,19 +18,30 @@ import {
 } from "../services/task-intake.js";
 import { authorIdentity, revisionActor, resolveToolBrain } from "../services/request-context.js";
 import { assertToolRole } from "../services/tool-authority.js";
+import { policyFailure, assertCapturePolicy, internalWriteContext } from "../services/write-policy.js";
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
 
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification> | undefined;
 interface CaptureToolArgs extends IntakeItem {
+  scope?:string;
+  brain_target?:string;
+  write_context?: import("../services/write-policy.js").BrainWriteContext;
   brain_id?: string;
 }
 
 async function captureItem(
-  { brain_id, kind, title, source, target, route_hint, details, urgency }: CaptureToolArgs,
+  { brain_id, kind, title, source, target, route_hint, details, urgency, scope, brain_target, write_context }: CaptureToolArgs,
   extra: ToolExtra
 ) {
   try {
     const ctx = await resolveToolBrain(brain_id, extra);
     assertToolRole(ctx, "brain_capture_item");
+    const policy=await writePolicyForBrain(ctx.brainId);
+    assertCapturePolicy(ctx.brainId,policy,scope,brain_target);
+    if(policy?.intake==="brain_scoped" && (!write_context?.maintenance || write_context.maintenance.brain_target!==brain_target)) {
+      throw new (await import("../services/write-policy.js")).WritePolicyError("brain_scope_required",ctx.brainId,"Supply maintenance kind, actual Brain target and current evidence; general work belongs in "+policy.capture_route+".");
+    }
+    if(brain_target) await activeBrainStore().readFile(ctx.brainId,brain_target);
     let existing = "";
     let expectedRevision: string | null = null;
     try {
@@ -59,7 +70,8 @@ async function captureItem(
       undefined,
       revisionActor(ctx),
       ctx.role,
-      expectedRevision
+      expectedRevision,
+      policy?.intake==="brain_scoped" ? write_context : internalWriteContext("legacy compatible intake")
     );
     const sync = revisionStoreModeEnabled()
       ? ""
@@ -81,8 +93,7 @@ async function captureItem(
     };
   } catch (error) {
     return {
-      content: [{ type: "text" as const, text: String(error) }],
-      isError: true,
+      ...policyFailure(error),
     };
   }
 }
@@ -90,14 +101,14 @@ async function captureItem(
 export function registerTaskTools(server: McpServer): void {
   server.tool(
     "brain_capture_item",
-    "Capture a temporary Brain item in TASKS.md Capture / Triage Queue before triage into the canonical destination.",
+    "Policy-scoped Brain maintenance only where configured. General JEM intake is retired: use capture-personal. ERS general work uses ERS Capture/Asana. Read brain_describe for the selected Brain; a refusal saves nothing.",
     CaptureItemSchema.shape,
     captureItem
   );
 
   server.tool(
     "brain_report_item",
-    "Compatibility alias for brain_capture_item. Capture a temporary Brain item in TASKS.md Capture / Triage Queue before triage.",
+    "Compatibility alias for brain_capture_item with identical per-Brain restrictions. Never a bypass for retired general intake.",
     ReportItemSchema.shape,
     captureItem
   );

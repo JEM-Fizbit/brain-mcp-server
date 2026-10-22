@@ -3,6 +3,10 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { assertBrainVaultPath } from "../services/brain-path.js";
+import { readWriteJournals, journalContext, generatedLogCandidate, readSidecarContext } from "./write-journal-context.js";
+import { admitRevision } from "../services/write-admission.js";
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
+import { WritePolicyError, policyDigest } from "../services/write-policy.js";
 import { contentHash } from "./hash.js";
 import { mutateLocalFile, inspectLocalRecovery } from "./recoverable-file.js";
 import type {
@@ -378,7 +382,10 @@ export class LocalSyncAgent {
       return report;
     }
 
+    const journals=await readWriteJournals(this.options.brainDir,this.options.brainId);
+    const generatedLog=await generatedLogCandidate(this.options.brainDir,this.options.brainId,state,this.options.store,journals);
     for (const filename of filenames) {
+      if(filename==="LOG.md" && generatedLog) continue;
       const fullPath = safeMarkdownPath(this.options.brainDir, filename);
       const content = await this.timed(report, "push", "local_read", () =>
         fs.readFile(fullPath, "utf-8")
@@ -387,20 +394,45 @@ export class LocalSyncAgent {
       const tracked = state.files[filename];
 
       if (tracked && tracked.localHash === localHash) {
+        if(state.admissionHolds) delete state.admissionHolds[filename];
         report.unchanged.push(filename);
         continue;
       }
 
-      const result = await this.timed(report, "push", "revision_store_write", () =>
+      const policy=await writePolicyForBrain(this.options.brainId);
+      let sidecar:Awaited<ReturnType<typeof readSidecarContext>>={candidate:undefined,context:undefined};
+      let contextFailure:unknown;
+      try {sidecar=await readSidecarContext(this.options.stateFile,this.options.brainId,filename,tracked?.revisionId||null,localHash);}
+      catch(error) {contextFailure=error;}
+      const candidate=sidecar.candidate;
+      const journal=journalContext(journals,filename,localHash,tracked?.localHash||null);
+      const writeContext=sidecar.context || journal?.context;
+      const fingerprint=contentHash(JSON.stringify([localHash,tracked?.revisionId,policy && policyDigest(policy),candidate,journal?.context]));
+      const held=state.admissionHolds?.[filename];
+      if(held?.fingerprint===fingerprint) {
+        (report.admissionHeld??=[]).push({filename,code:held.code,next:held.next});continue;
+      }
+      let result;
+      try {
+      if(contextFailure && !journal)throw contextFailure;
+      result = await this.timed(report, "push", "revision_store_write", () =>
         this.options.store.proposeRevision({
           brainId: this.options.brainId,
           filename,
           baseRevisionId: tracked?.revisionId || null,
           content,
           origin: "local_agent",
-          actor: this.options.actor,
+          actor: journal?.actor || this.options.actor,
+          writeContext,
         })
       );
+      } catch(error) {
+        if(!(error instanceof WritePolicyError)) throw error;
+        (state.admissionHolds??={})[filename]={fingerprint,localHash,code:error.code,next:error.next};
+        (report.admissionHeld??=[]).push({filename,code:error.code,next:error.next});
+        continue;
+      }
+      if(state.admissionHolds) delete state.admissionHolds[filename];
 
       if (!result.ok) {
         report.conflicts.push(result.conflict);
@@ -413,6 +445,11 @@ export class LocalSyncAgent {
         localHash,
       };
 
+      if(result.revision.writeContext?.request_hash) {
+        let verified=false;
+        try {verified=(await this.options.store.readFile(this.options.brainId,filename)).content===content;} catch {}
+        await this.options.store.setWriteVerification(this.options.brainId,result.revision.revisionId,verified?"verified":"verification_failed").catch(()=>{});
+      }
       if (result.status === "accepted") {
         report.pushed.push(filename);
       } else {
@@ -420,6 +457,27 @@ export class LocalSyncAgent {
       }
     }
 
+    if(generatedLog) {
+      let completed=true;
+      for(const record of generatedLog.records) {
+        const receipt=await this.options.store.findWriteOperation(this.options.brainId,record.context.operation_id);
+        if(!receipt || receipt.content!==record.after) {completed=false;break;}
+      }
+      if(completed) {
+        const remote=await this.options.store.readFile(this.options.brainId,"LOG.md");
+        const applied=await mutateLocalFile(this.options.brainDir,"LOG.md",remote.content,contentHash(generatedLog.local));
+        if(applied.ok) {
+          state.files["LOG.md"]={revisionId:remote.revisionId,contentHash:remote.contentHash,localHash:remote.contentHash};
+          if(state.admissionHolds)delete state.admissionHolds["LOG.md"];
+          report.pulled.push("LOG.md");
+        } else completed=false;
+      }
+      if(!completed) {
+        const next="The generated local receipt remains intact until its evidenced correction is acknowledged; unrelated sync continues.";
+        (state.admissionHolds??={})["LOG.md"]={fingerprint:contentHash(generatedLog.local),localHash:contentHash(generatedLog.local),code:"audit_sync_pending",next};
+        (report.admissionHeld??=[]).push({filename:"LOG.md",code:"audit_sync_pending",next});
+      }
+    }
     await this.inferGuardedDeletions(report, state, new Set(filenames));
 
     await this.timed(report, "push", "state_write", () => this.saveState(state));
@@ -515,6 +573,7 @@ export class LocalSyncAgent {
     const totalStartedAt = performance.now();
     const recovery = await this.unresolvedRecoveries();
     const state = await this.timed(report, "pull", "state_read", () => this.loadState());
+    const pullPolicy=await writePolicyForBrain(this.options.brainId);
     for (const item of recovery) {
       const head = await this.options.store.getHead(this.options.brainId, item.filename);
       report.conflicts.push(await this.recordPullConflict(item.filename,
@@ -547,6 +606,29 @@ export class LocalSyncAgent {
         readFileHash(fullPath)
       );
 
+      if(state.admissionHolds?.[filename] && localHash!==tracked?.localHash) {
+        const held=state.admissionHolds[filename];
+        (report.admissionHeld??=[]).push({filename,code:held.code,next:held.next});
+        // Keep both local bytes and the prior tracked base, even if hosted changed.
+        // Policy holds are not ordinary content conflicts.
+        continue;
+      }
+      if(pullPolicy && (pullPolicy.mode==="enforce" || pullPolicy.intake==="retired") && localHash!==null && localHash!==head.contentHash && (!tracked || localHash!==tracked.localHash)) {
+        try {
+          const content=await fs.readFile(fullPath,"utf8");
+          const sidecar=await readSidecarContext(this.options.stateFile,this.options.brainId,filename,tracked?.revisionId||null,contentHash(content));
+          const records=await readWriteJournals(this.options.brainDir,this.options.brainId);
+          const journal=journalContext(records,filename,contentHash(content),tracked?.localHash||null);
+          const prior=tracked?.revisionId ? await this.options.store.readRevision(this.options.brainId,tracked.revisionId):null;
+          await admitRevision({brainId:this.options.brainId,filename,content,baseRevisionId:tracked?.revisionId||null,
+            origin:"local_agent",actor:journal?.actor||this.options.actor,writeContext:sidecar.context||journal?.context},
+            prior?.content||"",source=>this.options.store.readFile(this.options.brainId,source));
+        } catch(error) {
+          if(!(error instanceof WritePolicyError))throw error;
+          (state.admissionHolds??={})[filename]={fingerprint:contentHash(JSON.stringify([localHash,tracked?.revisionId,error.code])),localHash,code:error.code,next:error.next};
+          (report.admissionHeld??=[]).push({filename,code:error.code,next:error.next});continue;
+        }
+      }
       // A hosted tombstone is an explicit deletion signal (not inference):
       // apply it by removing a clean local copy, refuse if the copy has
       // unsynced edits, and never touch a protected structural file.
@@ -679,6 +761,7 @@ export class LocalSyncAgent {
       deletionsSkipped: [...pushed.deletionsSkipped, ...pulled.deletionsSkipped],
       guardTripped: pushed.guardTripped ?? pulled.guardTripped,
       excludedSourceFiles: pulled.excludedSourceFiles,
+      ...((pushed.admissionHeld?.length||pulled.admissionHeld?.length) ? {admissionHeld:Array.from(new Map([...(pushed.admissionHeld||[]),...(pulled.admissionHeld||[])].map(h=>[h.filename,h])).values())}:{}),
     };
     addTiming(report, "sync", "total", startedAt);
     if (this.options.store.recordSyncHeartbeat) {

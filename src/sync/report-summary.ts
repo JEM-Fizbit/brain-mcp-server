@@ -23,6 +23,7 @@ export function summarizeReport(report: LocalSyncReport) {
     ...(report.excludedSourceFiles?.length ? {
       excludedSourceFiles: report.excludedSourceFiles,
     } : {}),
+    ...(report.admissionHeld?.length ? {admissionHeld:report.admissionHeld}:{}),
     totalMs: totalTiming?.ms ?? null,
   };
 }

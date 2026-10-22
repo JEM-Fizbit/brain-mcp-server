@@ -3,9 +3,117 @@
 **Status:** implemented in v1.9.0; deployment acceptance is tracked in spec 020.
 **Date:** 2026-09-10
 
+
+## Spec 023 write admission
+
+Policy and authority are separate. Capability manifest v2 adds each operation's
+policy reason and same-domain route. The deployment may supply a registry
+`write_policy`, or `BRAIN_WRITE_POLICY_CONFIG` naming a deployment-owned
+`{version:1, brains:[{id,write_policy}]}` JSON file outside served Markdown.
+`BRAIN_REQUIRED_WRITE_POLICY` lists enrolled Brain IDs; an absent/invalid
+required policy refuses writes rather than silently reverting to legacy intake.
+Generic unconfigured deployments report legacy compatibility explicitly.
+
+JEM's policy retires both capture aliases and protects `TASKS.md` and
+`capture-queue.md` (case/NFKC canonicalised) across all update modes, imports,
+restore, rename and sync. New active records are compared as complete blocks,
+including adjacent/nested records and duplicate multiplicity. Historical
+Transferred/closed rows remain readable and can receive narrow sourced pointer
+corrections. Arbitrary prose disguised as history still needs agent judgement;
+this is not a universal semantic classifier.
+
+A normal factual correction requires no new human approval:
+
+```json
+{
+  "brain_id": "selected-brain",
+  "filename": "CONTEXT.md",
+  "mode": "replace",
+  "expected_revision": "revision-from-reviewed-read",
+  "content": "The selected durable correction.",
+  "write_context": {
+    "operation_id": "one-stable-operation-id",
+    "kind": "source_backed",
+    "reason": "Correct the canonical project link from its owner document.",
+    "evidence": [{
+      "brain_id": "selected-brain",
+      "reference": "PROJECT.md",
+      "observed_at": "2026-10-22T12:00:00Z",
+      "method": "hosted_source",
+      "verification": "agent_observed",
+      "revision": "revision-from-source-read",
+      "excerpt": "The exact supporting passage."
+    }]
+  }
+}
+```
+
+`hosted_source` rechecks current same-Brain revision/hash and passage under the
+write transaction. Connector/local reads carry their observed provider revision
+or SHA-256 and a bounded passage; the server labels them agent-observed rather
+than independently retrieved. Direct instructions use `user_directed` with
+`method:user_instruction` and the actual instruction reference/passage.
+None of these labels grants wider authority or proves semantic entailment.
+Do not ingest a whole document merely to correct one fact.
+
+Existing reviewed ingestion, deterministic lint/link maintenance, explicit
+restore and reviewed conflict resolution retain their own gates. Their internal
+workflow identity cannot be supplied through request JSON. The queue fence
+always applies, including those workflows.
+
+ERS-style `brain_scoped` TASKS writes additionally require
+`write_context.maintenance: {kind,brain_target}`, with `kind` one of
+`content_gap`, `source_ingestion`, `link_repair`, `lint_finding`, and
+evidence referencing the existing same-Brain target. The capture tools also
+require `scope:brain_maintenance` and matching `brain_target`. A scope label
+does not prove that an operational task is Brain maintenance; the writing agent
+must route general work to Capture/Asana/project home.
+
+Automatic corrections publish their bounded LOG index and private evidence as
+one Postgres transaction. Audit failure rolls back the correction. Exact replay
+returns the original revision/receipt, even after later edits, without another
+log. Applied and read-back verification states remain distinct. Unread logs do
+not block the next update. `brain_read_change({brain_id,revision_id})` and the
+authenticated `/monitor/changes/:revisionId?brain_id=...` page expose exact
+before/after text, evidence and actual verification status. Every page request
+rechecks the current Brain role. No new approval inbox or notification exists.
+
+Generic updates cannot rewrite LOG; use the bounded brain_log receipt workflow. Automatic knowledge corrections already log themselves. JOURNAL appends preserve historical bytes; existing rotation/curation workflows retain their gates.
+
+New free-text log receipts are limited to 2,000 characters by the enrolled
+profiles; full diffs/evidence stay in revision history. This is a receipt limit,
+not a blanket knowledge/source length limit. Historical logs are preserved.
+Filesystem mode uses a private fsynced intent journal and existing recoverable
+CAS publication; interruption reports applied-but-incomplete recovery truthfully
+and never replays over later content. It does not claim a database-style
+multi-file transaction.
+
+Filesystem correction journals are also consumed by sync when their before/result hashes match the tracked base. Recognised generated log receipts are reconciled only after the hosted operation is acknowledged; any extra manual LOG content remains local and held. This produces one hosted index entry without deleting local evidence.
+
+For local sync, place matching context beside the configured state file:
+`<stateFile>.write-context.json`, keyed by filename:
+
+```json
+{
+  "CONTEXT.md": {
+    "base_revision": "reviewed-hosted-revision",
+    "result_hash": "sha256-of-complete-result",
+    "context": {"operation_id":"same-operation-id","kind":"source_backed","reason":"...","evidence":[]}
+  }
+}
+```
+
+The illustrative empty evidence list must be replaced with actual evidence.
+Public schemas reject caller-supplied internal workflow/hash fields. Held edits
+retain local bytes and their tracked base, survive a changed hosted head, and
+do not become ordinary conflicts. Unrelated edits continue. The health file,
+Doctor and Monitor distinguish admission holds from a broken sync process.
+A refusal provides a route; it does not create Capture custody or a receipt.
+Use the actual same-domain Capture/project tool and verify its filing receipt.
+
 ## Select a workflow before approval
 
-Call `brain_describe({brain_id})`. Its structured response contains `capabilities.version = 1`, per-operation support, execution surface, custody, effects, role requirement and preconditions. `variants` distinguishes ingestion analysis from source-path execution and lint inspection from apply. `brain_prepare_ingest` uses the same resolver for its read-only workflow advice. Actual handlers recheck support and authority when called.
+Call `brain_describe({brain_id})`. Its structured response contains `capabilities.version = 2`, per-operation support, execution surface, custody, effects, role requirement and preconditions. `variants` distinguishes ingestion analysis from source-path execution and lint inspection from apply. `brain_prepare_ingest` uses the same resolver for its read-only workflow advice. Actual handlers recheck support and authority when called.
 
 | Operation | Filesystem endpoint | Hosted revision endpoint |
 |---|---|---|

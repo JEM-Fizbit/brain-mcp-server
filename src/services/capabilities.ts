@@ -4,6 +4,7 @@ import { roleAllows, TOOL_MINIMUM_ROLES, type BrainToolName } from "./tool-autho
 export interface StoreCapabilities { revisions: boolean }
 export interface OperationCapability {
   supported: boolean;
+  policy: {allowed:boolean;reason_code:string;capture_route?:string;recheck_at_execution:true};
   reason_code: "supported" | "operator_surface_required" | "revision_store_required";
   execution_surface: "endpoint" | "operator_workspace" | "revision_endpoint";
   custody: "brain_store" | "operator_filesystem";
@@ -46,13 +47,18 @@ export function operationCapability(
   return { supported, reason_code: supported ? "supported" : sourceOperation ? "operator_surface_required" : "revision_store_required",
     execution_surface: supported ? "endpoint" : needsRevision ? "revision_endpoint" : "operator_workspace",
     custody: sourceOperation ? "operator_filesystem" : "brain_store", effects,
+    policy: {allowed:!(['brain_capture_item','brain_report_item'].includes(tool) && brain.write_policy?.intake==='retired'),
+      reason_code:['brain_capture_item','brain_report_item'].includes(tool) ?
+        brain.write_policy?.intake==='retired' ? 'general_intake_retired' : brain.write_policy?.intake==='brain_scoped' ? 'brain_scope_required' : 'legacy_compatibility' :
+        effects.includes('brain_write') && brain.write_policy?.mode==='enforce' ? 'write_context_required' : 'allowed',
+      capture_route:brain.write_policy?.capture_route,recheck_at_execution:true},
     authorization: { required_role: required, role_allowed: roleAllows(role, required), recheck_at_execution: true }, preconditions };
 }
 
 export function describeCapabilities(brain: BrainDefinition, role: BrainRole, store: StoreCapabilities) {
   const operations = Object.fromEntries((Object.keys(TOOL_MINIMUM_ROLES) as BrainToolName[]).map(tool =>
     [tool, operationCapability(brain, role, store, tool)]));
-  return { version: 1, brain_id: brain.id, backend: brain.storage_backend, operations,
+  return { version: 2, write_policy:brain.write_policy || {mode:"legacy_compatibility"}, brain_id: brain.id, backend: brain.storage_backend, operations,
     variants: {
       "brain_ingest.analysis": operationCapability(brain, role, store, "brain_ingest", "analysis"),
       "brain_ingest.source_path": operationCapability(brain, role, store, "brain_ingest", "source_path"),

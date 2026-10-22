@@ -8,6 +8,7 @@
 !tsconfig.json
 !src/**/*.ts
 !config/brain-platform.*.json
+!config/brain-write-policies.json
 !config/prod-ca-2021.crt
 !README.md
 !LICENSE

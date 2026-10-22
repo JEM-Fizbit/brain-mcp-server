@@ -1,4 +1,8 @@
 import { contentHash } from "./hash.js";
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
+import { assertQueuePolicy, formatAutomaticChange, internalWriteContext, isInternalWrite } from "../services/write-policy.js";
+import { admitRevision, assertReplay } from "../services/write-admission.js";
+import { appendLogEntryToContent, formatLogEntry, LOG_HEADER } from "../services/log.js";
 import {
   isDefaultKnowledgeSearchPath,
   rankSearchCandidates,
@@ -168,10 +172,39 @@ export class MemoryRevisionStore implements RevisionStore {
     }));
   }
 
+  private writeQueue:Promise<void>=Promise.resolve();
+  async findWriteOperation(brainId:string,operationId:string):Promise<RevisionContent|null> {
+    return Array.from(this.revisions.values()).find(r=>r.brainId===brainId &&
+      r.writeContext?.operation_id===operationId && r.writeContext?.request_hash) || null;
+  }
+  async setWriteVerification(brainId:string,revisionId:string,state:"verified"|"verification_failed"):Promise<void> {
+    const revision=await this.readRevision(brainId,revisionId);
+    if(!revision?.writeContext) throw new Error("Automatic change record not found");
+    revision.writeContext={...revision.writeContext,verification:state};
+  }
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
+    const run=this.writeQueue.then(async()=>{
+      const snapshot=this.snapshot();
+      try {return await this.applyRevision(input);} catch(error) {
+        const restored=new MemoryRevisionStore(snapshot);
+        this.heads=restored.heads; this.revisions=restored.revisions; this.changes=restored.changes;
+        this.conflicts=restored.conflicts; this.revisionSeq=restored.revisionSeq;
+        this.cursorSeq=restored.cursorSeq; this.conflictSeq=restored.conflictSeq;
+        throw error;
+      }
+    });
+    this.writeQueue=run.then(()=>undefined,()=>undefined);
+    return run;
+  }
+  private async applyRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
+    if(input.writeContext && !isInternalWrite(input.writeContext)) {
+      const replay=await this.findWriteOperation(input.brainId,input.writeContext.operation_id);
+      if(replay) {assertReplay(input,replay);return {ok:true,status:"unchanged",head:headOf(replay),revision:replay};}
+    }
     const fileKey = key(input.brainId, input.filename);
     const current = this.heads.get(fileKey) || null;
     const nextHash = contentHash(input.content);
+    const policy=await admitRevision(input,current?.deleted ? "" : current?.content || "",filename=>this.readFile(input.brainId,filename));
 
     // Recreate-over-tombstone (spec 011): writing new content with base=null onto a
     // deleted head is an accepted recreate/undelete, not a conflict.
@@ -226,6 +259,7 @@ export class MemoryRevisionStore implements RevisionStore {
       actor: input.actor,
       cursor,
       content: input.content,
+      writeContext: input.writeContext,
     };
     this.revisions.set(revisionId, revision);
     this.heads.set(fileKey, revision);
@@ -240,6 +274,14 @@ export class MemoryRevisionStore implements RevisionStore {
       actor: input.actor,
     });
 
+    if (policy) {
+      const log=this.heads.get(key(input.brainId,"LOG.md"));
+      const summary=formatAutomaticChange(input.brainId,input.filename,current?.content||"",input.content,
+        input.writeContext!,input.actor,revisionId,policy);
+      await this.applyRevision({brainId:input.brainId,filename:"LOG.md",baseRevisionId:log?.revisionId||null,
+        content:appendLogEntryToContent(log?.content||LOG_HEADER,formatLogEntry("UPDATE",[input.filename],summary)),
+        origin:"system",actor:input.actor,writeContext:internalWriteContext("automatic change index")});
+    }
     return {
       ok: true,
       status: "accepted",
@@ -383,6 +425,7 @@ export class MemoryRevisionStore implements RevisionStore {
       };
     }
 
+    assertQueuePolicy(input.brainId,await writePolicyForBrain(input.brainId),input.to,toHead?.content||"",fromHead.content);
     // Atomic in memory: no awaits between the two head mutations.
     const updatedAt = new Date().toISOString();
     const toRevisionId = `rev_${++this.revisionSeq}`;
@@ -522,6 +565,7 @@ export class MemoryRevisionStore implements RevisionStore {
       throw new Error("Stale or missing reviewed revision: re-read the hosted file before resolving the conflict.");
     }
     const resolution = await this.proposeRevision({
+      writeContext: internalWriteContext("explicit reviewed conflict resolution"),
       brainId: input.brainId,
       filename: conflict.filename,
       baseRevisionId: current?.revisionId || null,

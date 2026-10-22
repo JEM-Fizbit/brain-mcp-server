@@ -4,6 +4,7 @@
  * reviewed-date writes, so no fix plan or apply path can touch 00_loader.md or
  * NOW.md.
  */
+import { internalWriteContext } from "./write-policy.js";
 import { TASKS_ARCHIVE_FILE, TASKS_FILE } from "../constants.js";
 import type { RevisionActor } from "../sync/types.js";
 import type { BrainStore } from "./brain-store.js";
@@ -180,7 +181,8 @@ export async function applyLintFixes(
       oldContent,
       actor,
       role,
-      state.revisions[filename]
+      state.revisions[filename],
+      internalWriteContext("reviewed mechanical lint transform")
     );
     summary.filesWritten.push(filename);
   }
@@ -244,7 +246,8 @@ export async function applyLintFixSelection(
       oldContent,
       actor,
       role,
-      state.revisions[filename]
+      state.revisions[filename],
+      internalWriteContext("reviewed mechanical lint transform")
     );
     result.filesWritten.push(filename);
   }

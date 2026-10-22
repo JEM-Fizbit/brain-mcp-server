@@ -1,3 +1,4 @@
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
 import { describeCapabilities } from "../services/capabilities.js";
 import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -34,7 +35,8 @@ export function registerRegistryTools(server: McpServer): void {
     { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     async ({ brain_id }, extra) => {
       try {
-        const brain = await describeBrainForExtra(brain_id, extra);
+        const selected = await describeBrainForExtra(brain_id, extra);
+        const brain={...selected,write_policy:await writePolicyForBrain(selected.id)};
         const result = { ...brain, capabilities: describeCapabilities(brain, brain.role, activeBrainStore().capabilities) };
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], structuredContent: result };
       } catch (error) {

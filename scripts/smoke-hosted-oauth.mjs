@@ -291,7 +291,16 @@ async function getToken() {
   return (await refreshFromTokenCache()) || authorizeWithBrowser();
 }
 
+function smokeWriteContext() {
+  assert.ok(shouldWrite || shouldLocalWrite || shouldConflict, "Explicit finite write-smoke authorisation is required");
+  return {operation_id:crypto.randomUUID(),kind:"user_directed",
+    reason:"Finite operator-authorised acceptance fixture; preserve its receipt, not live project knowledge.",
+    evidence:[{brain_id:brainId,reference:"operator-command:scripts/smoke-hosted-oauth.mjs",
+      observed_at:new Date().toISOString(),method:"user_instruction",verification:"agent_observed",
+      excerpt:"Run the finite acceptance writes selected by --write, --local-write or --conflict (or their explicit environment equivalents)."}]};
+}
 async function callTool(accessToken, name, args = {}, snapshot = false) {
+  if(name==="brain_update_file" && !args.write_context) args={...args,write_context:smokeWriteContext()};
   const response = await fetch(resource, {
     method: "POST",
     headers: {
@@ -530,9 +539,21 @@ async function runLocalSyncOnce(env = {}) {
   return runLocalSync("once", env);
 }
 
+async function annotateLocalSmoke(stateFile,expectedContent) {
+  const state=JSON.parse(await fs.readFile(stateFile,"utf8"));
+  const contextFile=stateFile+".write-context.json";
+  let contexts={};
+  try {contexts=JSON.parse(await fs.readFile(contextFile,"utf8"));} catch(error) {if(error.code!=="ENOENT")throw error;}
+  contexts[smokeFilename]={base_revision:state.files[smokeFilename]?.revisionId||null,
+    result_hash:crypto.createHash("sha256").update(expectedContent).digest("hex"),context:smokeWriteContext()};
+  await fs.writeFile(contextFile+".tmp",JSON.stringify(contexts,null,2)+"\n",{mode:0o600});
+  await fs.rename(contextFile+".tmp",contextFile);
+}
 async function writeLocalSmokeFile(expectedContent) {
   const localPath = path.join(localBrainDir, smokeFilename);
   await fs.mkdir(path.dirname(localPath), { recursive: true });
+  const stateFile=process.env.BRAIN_SYNC_STATE_FILE || path.resolve(localBrainDir,"..",".brain-sync","state.json");
+  await annotateLocalSmoke(stateFile,expectedContent);
   await fs.writeFile(localPath, expectedContent, "utf-8");
   return localPath;
 }
@@ -582,6 +603,7 @@ async function runHostedConflictSmoke(accessToken, tool = timedTool) {
     await waitForLocalFile(baselineContent, tempBrainDir);
 
     const dirtyLocalContent = `${baselineContent}Local dirty edit before hosted update.\n`;
+    await annotateLocalSmoke(tempStateFile,dirtyLocalContent);
     await fs.writeFile(path.join(tempBrainDir, smokeFilename), dirtyLocalContent, "utf-8");
 
     const hostedConflictContent = [

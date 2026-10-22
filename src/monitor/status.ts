@@ -13,8 +13,10 @@ export class MonitoringStatus {
     try {
       const data = await this.pool.query({text: `select
         (select last_seen_at from brain.sync_heartbeats where brain_id=$1) as sync_at,
+        (select metadata from brain.sync_heartbeats where brain_id=$1) as sync_meta,
         (select count(*)::int from brain.sync_conflicts where brain_id=$1 and status='open') as conflicts`, values:[brainId]});
       const row = data.rows[0];
+      const heldCount=Number(row.sync_meta?.counts?.admissionHeld)||0;
       const observed = new Date().toISOString();
       const syncAt = row.sync_at ? new Date(row.sync_at).toISOString() : null;
       const age = syncAt ? Date.now()-Date.parse(syncAt) : null;
@@ -35,8 +37,9 @@ export class MonitoringStatus {
         diagnostics = {window:'latest 1000 matching events within 24 hours',operations:Number(values.operations),failed_operations:Number(values.failed_operations),auth_events:Number(values.auth_events),p95_ms:values.p95_ms === null ? null : Math.round(Number(values.p95_ms)),open_conflicts:Number(row.conflicts)};
       }
       return {brain_id:brainId,role:role === 'member' ? 'curator' : role,server_version:SERVER_VERSION,
-        observed_at:observed,service:'available',attention_required:Number(row.conflicts)>0,
-        sync:{state:age===null?'unknown':age<0?'unknown':age>300_000?'stale':'recent',observed_at:syncAt,source:'hosted per-Brain heartbeat',description:'Activity from the configured sync operator; not a check of every colleague device.'},
+        observed_at:observed,service:'available',attention_required:Number(row.conflicts)>0 || heldCount>0,
+        attention_description:heldCount>0 ? heldCount+' local edit(s) held for source or routing evidence; unrelated sync continues.' : Number(row.conflicts)>0 ? 'A sync conflict needs operator review.' : 'No open sync conflict or admission hold reported.',
+        sync:{held_count:heldCount,state:age===null?'unknown':age<0?'unknown':age>300_000?'stale':'recent',observed_at:syncAt,source:'hosted per-Brain heartbeat',description:'Activity from the configured sync operator; not a check of every colleague device.'},
         local_inbox:{state:'unobserved',surface:'local operator workspace',description:'Manual inbox access is independent of this monitoring page.'},
         ...(diagnostics ? {diagnostics} : {})};
     } finally { this.active--; }

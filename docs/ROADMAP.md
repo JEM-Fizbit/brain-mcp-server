@@ -1,5 +1,11 @@
 # Hosted Brain Roadmap
 
+**22 October 2026:** Spec 023 implementation and both owner migrations/policy
+activations are approved. The reusable v1.13.0 engine and acceptance tests are
+complete; JEM's private database fence is active. Guarded application releases
+and per-owner live acceptance are recorded separately in the
+[deployment runbook](deploy-fly.md#spec-023-rollout--22-october-2026).
+
 **10 October 2026:** ERS completed its separately approved guarded v1.12.7
 Origin-validation release. Both isolated services now run v1.12.7; ERS identity
 and storage boundaries are unchanged. The protocol upgrade remains deferred.

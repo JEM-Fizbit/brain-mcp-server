@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "brains": [
+    {
+      "id": "ai-brain-jem",
+      "write_policy": {
+        "version": 1,
+        "mode": "enforce",
+        "intake": "retired",
+        "capture_route": "capture-personal",
+        "task_paths": [
+          "TASKS.md",
+          "capture-queue.md"
+        ],
+        "review_base_url": "https://jem-brain-mcp.fly.dev",
+        "max_receipt_chars": 2000
+      }
+    }
+  ]
+}

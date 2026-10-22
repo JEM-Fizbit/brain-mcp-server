@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LogSchema, ReadLogSchema } from "../schemas/tools.js";
 import {
@@ -13,9 +14,17 @@ import { authorIdentity, revisionActor, resolveToolBrain } from "../services/req
 import { assertToolRole } from "../services/tool-authority.js";
 
 export function registerLogTools(server: McpServer): void {
+  server.tool("brain_read_change","Read the exact retained before/after text, source evidence and verification result for a Brain change. Read-only; manual review is optional.",
+    {brain_id:z.string().optional(),revision_id:z.string().min(1).max(160)},
+    {readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+    async ({brain_id,revision_id},extra)=>{
+      try {const ctx=await resolveToolBrain(brain_id,extra);assertToolRole(ctx,"brain_read_change");
+        return {content:[{type:"text" as const,text:await activeBrainStore().readChange(ctx.brainId,revision_id)}]};
+      } catch(error) {return {content:[{type:"text" as const,text:String(error)}],isError:true};}
+    });
   server.tool(
     "brain_log",
-    "Append an entry to the Brain change log. Use after making updates to record what changed and why.",
+    "Append a concise operation/check receipt to the Brain change log. Source-backed updates already create their own automatic records; do not duplicate them or paste chats, documents, task inventories or diagnostic dumps here.",
     LogSchema.shape,
     async ({ brain_id, opType, filesTouched, summary }, extra) => {
       try {

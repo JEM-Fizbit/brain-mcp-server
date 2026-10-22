@@ -15,6 +15,25 @@
 
 ## Gate Decision
 
+### Write-admission migration — 22 October 2026
+
+John separately approved both JEM and ERS migrations and policy activations.
+The exact `2026-10-22_001_brain_write_admission.sql` was applied to JEM through
+its existing admin CLI, then its JEM-only retired-intake policy was activated at
+22:21:20 UTC. No existing content was rewritten. SQL re-gate: 19/19 Brain tables
+have RLS; zero client/public table grants, zero policies outside `brain_runtime`,
+private artifact bucket, zero Storage policies, non-login/non-superuser/non-bypass
+runtime role. The policy table permits runtime SELECT only. Both queue triggers
+are enabled, the retry index is valid/ready/unique, and both functions have fixed
+search paths with no anonymous/authenticated execute. A fresh Supabase Security
+Advisor rerun returned 0 errors, 0 warnings and 0 suggestions. Hosted application
+and live runtime checks are recorded separately after completion.
+
+ERS is not migrated yet: current admin CLI access returns 403 and the existing
+browser session cannot open that project. Its prior dated gate remains historical;
+it does not attest this new migration. No access grant or credential was changed
+as a workaround.
+
 ### Ingestion-job migration gate — 11 September 2026
 
 Following John's explicit production approval, `20260911113912_resumable_local_ingestion.sql` was applied separately to JEM and ERS. ERS used its scoped Supabase migration connector; JEM used the existing authenticated Supabase CLI administration path with a transaction containing the exact migration. Neither used a runtime login for DDL or changed workforce grants. Both tables were absent immediately before application and contain zero rows afterward.

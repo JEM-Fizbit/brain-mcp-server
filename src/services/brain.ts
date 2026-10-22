@@ -121,15 +121,32 @@ export async function readFile(
 }
 
 export async function updateFile(
+  filename:string,content:string,mode:"replace"|"append"|"patch",old_content?:string,brainId?:string,
+  expectedRevisionId?:string|null,writeContext?:import("./write-policy.js").BrainWriteContext,
+  actor?:import("../sync/types.js").RevisionActor
+):Promise<string> {
+  const {brainDir}=await getBrainPaths(brainId);
+  const audit=await import("./filesystem-write-audit.js");
+  return audit.withFilesystemWrite(brainDir,()=>updateFileInLane(filename,content,mode,old_content,brainId,expectedRevisionId,writeContext,actor));
+}
+
+async function updateFileInLane(
   filename: string,
   content: string,
   mode: "replace" | "append" | "patch",
   old_content?: string,
   brainId?: string,
-  expectedRevisionId?: string | null
+  expectedRevisionId?: string | null,
+  writeContext?: import("./write-policy.js").BrainWriteContext,
+  actor?: import("../sync/types.js").RevisionActor
 ): Promise<string> {
   const { brainDir } = await getBrainPaths(brainId);
   const filePath = resolveFilePath(brainDir, filename);
+  const audit=await import("./filesystem-write-audit.js");
+  const selectedBrain=brainId || (await import("./runtime-env.js")).runtimeBrainId();
+  const requestHash=audit.filesystemRequestHash({selectedBrain,filename,content,mode,old_content,expectedRevisionId,writeContext,actor});
+  const replay=await audit.filesystemReplay(brainDir,selectedBrain,writeContext,requestHash);
+  if(replay) return replay;
 
   let existing: string | null;
   try { existing = await fs.readFile(filePath, "utf8"); }
@@ -149,6 +166,15 @@ export async function updateFile(
     const text = existing ?? "";
     next = text + (text.endsWith("\n") || !text.length ? "" : "\n") + content;
   }
+  const proposal:import("../sync/types.js").RevisionProposal={brainId:selectedBrain,filename,content:next,
+    baseRevisionId:currentHash,origin:"hosted_mcp",actor,writeContext:writeContext && {...writeContext,tool_request_hash:requestHash,evidence:writeContext.evidence.map(e=>({...e}))}};
+  const {admitRevision}=await import("./write-admission.js");
+  const policy=await admitRevision(proposal,existing||"",async source=>{
+    const text=await fs.readFile(resolveFilePath(brainDir,source),"utf8");
+    return {brainId:selectedBrain,filename:source,content:text,contentHash:contentHash(text),revisionId:contentHash(text),
+      parentRevisionId:null,updatedAt:new Date().toISOString(),origin:"local_agent",cursor:"0"};
+  });
+  if(policy) return audit.applyFilesystemChange(brainDir,proposal,existing,policy);
   const mutation = await mutateLocalFile(brainDir, filename, next, currentHash);
   if (!mutation.ok) throw new Error(`Concurrent local edit preserved at ${mutation.recoveryPath}; review before retrying.`);
 
@@ -192,6 +218,10 @@ export async function renameFile(
   if (targetExists) {
     throw new Error(`Target already exists: ${to}`);
   }
+  const {assertQueuePolicy}=await import("./write-policy.js");
+  const {writePolicyForBrain}=await import("./write-policy-runtime.js");
+  const selectedBrain=brainId || (await import("./runtime-env.js")).runtimeBrainId();
+  assertQueuePolicy(selectedBrain,await writePolicyForBrain(selectedBrain),to,"",await fs.readFile(fromPath,"utf8"));
   await fs.mkdir(path.dirname(toPath), { recursive: true });
   try {
     await fs.rename(fromPath, toPath);

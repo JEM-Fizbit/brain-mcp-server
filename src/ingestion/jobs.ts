@@ -1,3 +1,4 @@
+import { internalWriteContext } from "../services/write-policy.js";
 import pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -170,7 +171,7 @@ export class IngestionJobs {
         await client.query(`insert into brain.source_artifact_text(artifact_id,text_format,content,content_sha256) values($1,$2,$3,$4) on conflict(artifact_id) do nothing`,[current.artifact_id,current.extraction.format,current.extraction.content,current.extraction.sha256]);
         const revisions=[];
         for(const change of changes){
-          const result=await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:change.filename,baseRevisionId:change.expectedRevision==='new'?null:change.expectedRevision,content:change.content,origin:'import',actor:current.approval.actor});
+          const result=await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:change.filename,baseRevisionId:change.expectedRevision==='new'?null:change.expectedRevision,content:change.content,origin:'import',actor:current.approval.actor,writeContext:internalWriteContext('existing reviewed source ingestion')});
           if(!result.ok)throw new IngestionError('write_conflict');
           revisions.push({filename:change.filename,revisionId:result.revision.revisionId,sha256:result.revision.contentHash});
         }

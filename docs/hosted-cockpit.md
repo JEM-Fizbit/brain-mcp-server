@@ -1,5 +1,20 @@
 # Hosted Brain Cockpit
 
+## Write-admission holds — v1.13.0
+
+Policy-enrolled sync preserves local bytes when evidence or routing is missing.
+Doctor reports an actionable admission hold separately from a transport failure
+or content conflict. A hold is not a request for John to approve each correction:
+attach observed source context through the documented sidecar, or route temporary
+material to Capture or its project home. Unread change logs never create a hold.
+Retries with unchanged content, base and context do not generate duplicate work.
+
+Automatic corrections add a bounded human-readable LOG receipt. Its authenticated
+change link opens exact before/after text, actor, reason, bounded source passages
+and verification state; read permission is checked on every request. Manual review
+is optional. The existing cockpit remains loopback-only and no schedule or new
+notifier is added. [Write contract and local sync](backend-capabilities.md#spec-023-write-admission).
+
 ## Reason-aware authentication readiness — v1.12.5
 
 Reason-aware auth reporting (v1.12.5): only `missing_bearer` events are classified as anonymous rejections. They remain in the original telemetry and Auth panel; below the existing fail-count threshold they are informational, and at that threshold (default 10/60m) they produce an anonymous-activity warning/channel review, never a credential-failure DM. Caller origin remains unknown. Other/unknown/incomplete reason evidence counts conservatively toward credential/authentication rejection thresholds (default warn 3, fail 10), independently of anonymous counts. Both Slack and Doctor use the same pure classifier. Slack includes the exact runtime Brain id. Successful dispatch metadata v2 adds category and last observed category-event timestamp, with owner-scoped durable dedup; legacy dispatches are interpreted without rewriting them. After the existing 30m cooldown, continued incidents notify only for a newly observed reason or at least doubled count with a new event; a cleared-window new incident may notify again. Credential warn-to-fail escalation remains immediate. Failed sends do not consume the dedup state. No auth enforcement, secrets, network-identifier collection, watcher or access change is included.

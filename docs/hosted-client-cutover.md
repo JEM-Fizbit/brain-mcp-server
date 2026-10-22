@@ -1,5 +1,14 @@
 # Hosted Client Cutover Runbook
 
+**Spec 023 / v1.13.0:** enrolled Brains advertise capability manifest v2 and
+`brain_read_change`. Update requests carry observed `write_context`; source-backed
+corrections do not need a new human approval. Existing clients with cached schemas
+may need their normal tool-metadata refresh after deployment. Missing context
+fails with a routing/evidence explanation and saves no knowledge revision.
+Reading context does not authorise writing it. Use same-domain Capture or the
+existing project home for transient work. No OAuth reconnect or permission change
+is required by this feature. [Exact contract](backend-capabilities.md#spec-023-write-admission).
+
 **10 October 2026, ERS follow-through:** the ERS guarded v1.12.7 release is
 deployed. Existing Codex authenticated reads and ChatGPT/Claude web tool
 refreshes pass with retained OAuth connections. Fresh actual read-only status

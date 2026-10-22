@@ -1,5 +1,9 @@
 import pg from "pg";
 import { contentHash } from "./hash.js";
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
+import { assertQueuePolicy, formatAutomaticChange, internalWriteContext, isInternalWrite, WritePolicyError } from "../services/write-policy.js";
+import { admitRevision, assertReplay } from "../services/write-admission.js";
+import { appendLogEntryToContent, formatLogEntry, LOG_HEADER } from "../services/log.js";
 import { attachPoolErrorLogger } from "../services/pg-pool.js";
 import {
   meaningfulSearchTokens,
@@ -97,7 +101,7 @@ interface RevisionRow {
   content: string | null;
   content_sha256: string | null;
   deleted: boolean;
-  metadata: { renamedFrom?: string; renamedTo?: string } | null;
+  metadata: { renamedFrom?: string; renamedTo?: string; writeContext?: import("../services/write-policy.js").BrainWriteContext } | null;
   origin: RevisionOrigin;
   actor_provider: string | null;
   actor_id: string | null;
@@ -158,6 +162,7 @@ function revisionFromRow(row: RevisionRow): RevisionContent {
     filename: row.filename,
     revisionId: row.id,
     parentRevisionId: row.parent_revision_id,
+    writeContext: row.metadata?.writeContext,
     contentHash: row.content_sha256 ?? TOMBSTONE_HASH,
     updatedAt: row.created_at.toISOString(),
     origin: row.origin,
@@ -286,6 +291,7 @@ export class PostgresRevisionStore implements RevisionStore {
       conflicts: input.report.conflicts.length,
       deleted: input.report.deleted.length,
       deletionsSkipped: input.report.deletionsSkipped.length,
+      ...(input.report.admissionHeld?.length ? {admissionHeld:input.report.admissionHeld.length}:{}),
     };
     const durationMs = input.report.timings.find(
       (timing) => timing.operation === "sync" && timing.phase === "total"
@@ -521,12 +527,28 @@ export class PostgresRevisionStore implements RevisionStore {
     return rankRows(fallbackFiles.rows, false);
   }
 
+  async findWriteOperation(brainId:string,operationId:string):Promise<RevisionContent|null> {
+    const result=await this.pool.query<RevisionRow>(
+      "select * from brain.brain_file_revisions where brain_id=$1 and metadata->'writeContext'->>'operation_id'=$2 and metadata->'writeContext'->>'request_hash' is not null",
+      [brainId,operationId]);
+    return result.rows[0] ? revisionFromRow(result.rows[0]) : null;
+  }
+  async setWriteVerification(brainId:string,revisionId:string,state:"verified"|"verification_failed"):Promise<void> {
+    await this.pool.query("update brain.brain_file_revisions set metadata=jsonb_set(metadata,'{writeContext,verification}',to_jsonb($3::text)) where brain_id=$1 and id=$2 and metadata->'writeContext' is not null",[brainId,revisionId,state]);
+  }
   async proposeRevision(input: RevisionProposal): Promise<RevisionProposalResult> {
     return transaction(this.pool, client => this.proposeRevisionInTransaction(client, input));
   }
 
   /** Caller owns the transaction; shared CAS also serves atomic ingestion receipts. */
   async proposeRevisionInTransaction(client: PoolClient, input: RevisionProposal): Promise<RevisionProposalResult> {
+      if(input.writeContext && !isInternalWrite(input.writeContext)) {
+        await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[input.brainId+"/operation/"+input.writeContext.operation_id]);
+        const existing=await client.query<RevisionRow>("select * from brain.brain_file_revisions where brain_id=$1 and metadata->'writeContext'->>'operation_id'=$2 and metadata->'writeContext'->>'request_hash' is not null",[input.brainId,input.writeContext.operation_id]);
+        if(existing.rows[0]) {const replay=revisionFromRow(existing.rows[0]);assertReplay(input,replay);return {ok:true,status:"unchanged",head:headFromRow(existing.rows[0]),revision:replay};}
+        // Order all automatic changes before their LOG lock, avoiding file/LOG lock inversion.
+        await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))",[input.brainId+"/automatic-write"]);
+      }
       // Serialize writers per (brain, filename). The head-row lock below
       // cannot lock a row that does not exist yet, so two concurrent first
       // creations would otherwise both be accepted and one head silently
@@ -547,6 +569,10 @@ export class PostgresRevisionStore implements RevisionStore {
       );
       const current = currentResult.rows[0] || null;
       const nextHash = contentHash(input.content);
+      const policy=await admitRevision(input,current?.deleted ? "" : current?.content || "",async filename=>{
+        const result=await client.query<RevisionRow>("select r.* from brain.brain_files f join brain.brain_file_revisions r on r.id=f.current_revision_id where f.brain_id=$1 and f.filename=$2 for share of f",[input.brainId,filename]);
+        if(!result.rows[0]) throw new Error("Source not found");return revisionFromRow(result.rows[0]);
+      });
 
       // Recreate-over-tombstone (spec 011): new content with base=null onto a
       // deleted head is an accepted recreate, not a conflict.
@@ -632,7 +658,20 @@ export class PostgresRevisionStore implements RevisionStore {
           input.actor?.email || null,
         ]
       );
-      const revision = revisionResult.rows[0];
+      let revision = revisionResult.rows[0];
+      if(policy) {
+        const saved=await client.query<RevisionRow>("update brain.brain_file_revisions set metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('writeContext',$2::jsonb) where id=$1 returning *",[revision.id,JSON.stringify(input.writeContext)]);
+        revision=saved.rows[0];
+        const log=await client.query<RevisionRow>("select r.* from brain.brain_files f join brain.brain_file_revisions r on r.id=f.current_revision_id where f.brain_id=$1 and f.filename='LOG.md'",[input.brainId]);
+        const logHead=log.rows[0];
+        const summary=formatAutomaticChange(input.brainId,input.filename,current?.content||"",input.content,input.writeContext!,input.actor,revision.id,policy);
+        try {
+        const receipt=await this.proposeRevisionInTransaction(client,{brainId:input.brainId,filename:"LOG.md",baseRevisionId:logHead?.id||null,
+          content:appendLogEntryToContent(logHead?.content||LOG_HEADER,formatLogEntry("UPDATE",[input.filename],summary)),
+          origin:"system",actor:input.actor,writeContext:internalWriteContext("automatic change index")});
+        if(!receipt.ok) throw new Error("audit_record_failed");
+        } catch {throw new WritePolicyError("audit_record_failed",input.brainId,"The required audit record failed; the automatic correction was not committed.");}
+      }
       await client.query(
         `
           update brain.brain_files
@@ -775,6 +814,7 @@ export class PostgresRevisionStore implements RevisionStore {
       `;
       const from = (await client.query<HeadRow>(headQuery, [input.brainId, input.from])).rows[0] || null;
       const to = (await client.query<HeadRow>(headQuery, [input.brainId, input.to])).rows[0] || null;
+      if(from) assertQueuePolicy(input.brainId,await writePolicyForBrain(input.brainId),input.to,to?.deleted ? "" : to?.content||"",from.content||"");
 
       // Source must be live and the base must match (CAS).
       if (!from?.id || from.deleted === true || input.baseRevisionId !== from.id) {
@@ -986,6 +1026,7 @@ export class PostgresRevisionStore implements RevisionStore {
         throw new Error("Stale or missing reviewed revision: re-read the hosted file before resolving the conflict.");
       }
       const nextHash = contentHash(input.content);
+      assertQueuePolicy(input.brainId,await writePolicyForBrain(input.brainId),conflict.filename,current?.deleted ? "" : current?.content||"",input.content);
 
       if (!current) {
         await client.query(
