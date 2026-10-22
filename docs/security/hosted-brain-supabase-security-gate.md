@@ -32,10 +32,19 @@ and a direct retired-queue insert refusal (`23514`) in a rolled-back transaction
 Hosted deployment and live acceptance passed; see the
 [Spec 023 receipt](../specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
 
-ERS is not migrated yet: current admin CLI access returns 403 and the existing
-browser session cannot open that project. Its prior dated gate remains historical;
-it does not attest this new migration. No access grant or credential was changed
-as a workaround.
+ERS then used John's existing ERS admin browser session. The exact upstream SQL
+was compared byte-for-byte in its editor before execution. Its ERS-only
+`brain_scoped` policy row was activated at **22:38:49.450791 UTC**. The independent
+gate passed: 20/20 Brain tables with RLS, zero client/public table grants, zero
+non-runtime policies, private artifact bucket, zero Storage policies, no elevated
+runtime-role flags, SELECT-only runtime policy access, both enabled triggers,
+valid/ready/unique operation index and fixed function search paths with no client
+execute. Fresh Security Advisor: 0 errors, 0 warnings, 0 suggestions. The actual
+ERS runtime login independently confirmed policy read access and no mutation
+privilege. Existing legacy registration was preserved under its separate
+governance item; this release did not activate or inspect another Brain's content.
+No new login, workforce grant or plugin was introduced. Both owners' live
+application acceptance passed after these gates.
 
 ### Ingestion-job migration gate — 11 September 2026
 

@@ -1,6 +1,6 @@
 # 023 — Per-Brain write admission and Capture routing
 
-**Status:** in-progress — JEM v1.13.0 deployed and verified; ERS release prepared and tested, awaiting its own Supabase admin connection. Both production migrations/policy activations are approved.
+**Status:** deployed — JEM and ERS independently run v1.13.0 with approved migrations/policies, passing security gates and live admission/routing/sync acceptance.
 
 **Source:** John's 22 October design request and correction: retain automatic source-backed updates, log changes for optional manual review, hard-block retired intake
 
@@ -44,7 +44,7 @@ source URL, a short patch, an owner role or a caller's “durable” label with 
   enforceable retired-queue rules.
 - Implementation and tests are authorised. Production migrations and each owner’s activation retain the separate rollout gate; no new schedule is introduced.
 
-## Current implementation findings
+## Design seams addressed
 
 | Current seam | Required design response |
 |---|---|
@@ -59,11 +59,12 @@ source URL, a short patch, an owner role or a caller's “durable” label with 
 
 ## Per-Brain configuration
 
-Proposed deployment-owned write_policy configuration sits outside served Brain
-Markdown and cannot be changed through Brain content tools. Schema names remain
-proposals until implementation. Policy declares its version/digest, intake mode,
-safe same-domain route hints, task-file families, automatic workflow classes,
-existing reserved actions and activation state.
+Deployment-owned `write_policy` configuration sits outside served Brain Markdown
+and cannot be changed through Brain content tools. The implemented policy declares
+version, enforce/observe mode, intake scope, same-domain route, task paths,
+receipt limit and authenticated review URL. Its digest is retained with applied
+operations. Workflow/evidence context and existing RBAC/reserved actions remain
+separate; see the [implemented contract](../backend-capabilities.md#spec-023-write-admission).
 
 | Facet | JEM | ERS | Reusable server |
 |---|---|---|---|
@@ -208,8 +209,9 @@ For the retired-queue guarantee across old supported runtimes/sync clients,
 add a database-side queue-policy fence or guarded-write interface that ordinary
 runtime credentials cannot bypass. Preserve generic compatibility per Brain.
 The exact SQL mechanism and required privilege changes need isolated tests and
-the existing production security/migration gates; they are not deployed by
-this draft. Semantic source interpretation is not delegated to a SQL trigger.
+the existing production security/migration gates. Both owner gates and separate
+deployments are recorded below. Semantic source interpretation is not delegated
+to a SQL trigger.
 
 Stdio uses the same automatic evidence/routing checks before file writes.
 Sync carries matching write context bound to base and result hashes, never an
@@ -423,11 +425,11 @@ ERS through its private overlay and admin path. Existing content, originals,
 completed operation identities and held local bytes are preserved on rollback.
 Do not roll back into retired general intake. No recurring schedule is added.
 
-John separately approved both owner migrations and policy activations on 22 October 2026. Current production preflight: JEM admin read succeeded; ERS admin read returned
-HTTP 403 for the available Supabase CLI account. A Supabase connection with ERS
-project administration is required for its migration/security gate. Until the
-rollout records below are complete, this document does not claim deployment or
-enforcement by old runtime clients.
+John separately approved both owner migrations and policy activations on
+22 October 2026. JEM used its existing admin CLI. ERS initially returned 403 to
+that CLI account, then completed through John's existing ERS admin browser
+session. Both exact migrations, per-owner policies and security gates passed.
+No new plugin or privilege expansion was used as an access workaround.
 
 ## Files and verification
 
@@ -438,12 +440,17 @@ enforcement by old runtime clients.
 - JEM's approved exact migration and policy activation passed the private-schema/Storage security gate and fresh Security Advisor (0 errors/warnings/suggestions). Its actual runtime login can SELECT policy but cannot mutate it. A direct runtime queue insert was refused with `23514/general_intake_retired` in a rolled-back transaction; no content changed.
 - Actual existing Codex hosted-connector calls completed two source-backed synthetic corrections before reading any receipt; both exact read-backs passed. Exact retry returned its original revision without replacing the later edit. Changed payload, stale CAS, absent evidence, both capture aliases, direct TASKS append and transcript dump were refused without effects. TASKS retained its reviewed revision. The authenticated live browser change page showed exact prior/result text, retrieved source revision and verified status; the signed-out page withheld content. Both synthetic files were then soft-deleted, retaining audit history. New `brain_read_change` is advertised by live discovery, but this existing Codex chat retains its older tool declarations; native execution of that new tool is not claimed. The equivalent live browser reader passed.
 - JEM loader and operations guide now state the automatic-correction and optional-review contract, with CAS and exact read-back. The existing local Monitor was restarted with JEM explicitly enrolled in the released policy. Both owner Doctors pass; sync reports zero conflicts and no admission holds. Existing sync/heartbeat/Doctor cadence and recurring routines were preserved.
-- ERS branch `codex/ers-v1.13.0`, overlay `284b955`, is pushed to its private origin with zero engine/migration/script/package divergence from the annotated public tag. Its policy selects `ers-brain`, `brain_scoped`, and `capture-ers`. **ERS production remains v1.12.7 and is not activated:** admin CLI returned 403 and the current browser account cannot access its project. An ERS-authorised admin connection is the remaining input; approval is already recorded. After connection, apply the exact migration, activate the ERS row, rerun its security gate, guarded deploy and run its independent live acceptance. JEM evidence does not substitute for these ERS checks.
+- ERS independently deployed annotated v1.13.0 through its clean four-surface private overlay at **22:42:02.061 UTC**. Its protected engine/migration/script/package diff is empty. Entra-only identity, current grants, metadata-only artifact custody and alerts remain owner-isolated. Both actual runtime policy roles are SELECT-only and both machines' OCI version/source labels match their intended release. Exact ERS image/overlay provenance remains private.
+- ERS actual Codex calls passed two automatic sourced corrections with unread prior receipts, exact replay preserving a later edit, and changed-payload/stale-base/missing-evidence/transcript/wrong-domain refusals. Both general capture aliases and direct general TASKS writes refused. A positive evidenced maintenance record succeeded and was then removed with reviewed CAS, restoring existing TASKS content byte-for-byte. Existing ERS Entra browser sign-in opened the verified exact-change page; signed-out access withheld content. Reader/revocation behavior is covered by the isolated HTTP/browser suites, not a new production workforce cohort run.
+- Actual ERS local sync pushed an evidenced synthetic correction while preserving a separate transient edit locally as `source_evidence_required`, with unchanged hosted bytes and zero conflicts. The sourced sync revision is verified/retrieved with exactly one LOG link. Recoverable CAS restored the synthetic held baseline, retained recovery bytes, and the existing watcher cleared the hold. Only its acknowledged context entry was removed. All synthetic files were soft-deleted, preserving audit history; ERS returned to its original 59 active files.
+- Both live loaders and operations guides state automatic corrections, optional retrospective review and same-domain routing, with exact read-back. At **22:48:50 UTC**, both owner Doctors passed; both sync profiles had zero conflicts and no admission holds. Each explicitly selects its own policy file and retains 5-second sync, 60-second heartbeat/Doctor, bounded supervision and existing recurring routines. No new approval inbox, notifier, daemon, credential or schedule was added. These measured client/fixture results do not prove universal semantic classification.
+- Existing ChatGPT app definitions were refreshed without OAuth reconnection or approval-policy changes. Both workspace Brain inventories now show 27 tools including the new read-only change reader and automatic evidence guidance. See [client refresh receipts and limits](../hosted-client-cutover.md). This supports subsequent routine clients discovering the new contract; it does not claim an unobserved future scheduled write or a universal agent-behavior score.
 
-Likely seams: registry/capabilities, schemas and tool handlers, BrainStore and
+Delivered seams: registry/capabilities, schemas and tool handlers, BrainStore and
 RevisionStore, source/evidence adapters, log and maintenance services, ingestion,
 sync status and state, private-schema queue/audit transactions and routing
-fixtures. Implementation is in progress under the approval recorded above. No native approval UI, new approval
+fixtures. Implementation and owner deployment gates passed under the approvals
+recorded above. No native approval UI, new approval
 credential, public owner-presence channel or general pending-proposal database
 is required. Evidence records reuse private operational storage, not Brain intake.
 

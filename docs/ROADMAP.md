@@ -2,9 +2,9 @@
 
 **22 October 2026:** Spec 023 implementation and both owner migrations/policy
 activations are approved. The reusable v1.13.0 engine and acceptance tests are
-complete; JEM v1.13.0 is deployed with its database fence and live acceptance
-verified. ERS's tested overlay awaits its own admin connection before migration
-and deployment. Per-owner receipts and verification limits are in the
+complete; JEM and ERS v1.13.0 are independently deployed with approved policy
+activation, security gates and live acceptance verified. Both Doctors pass with
+zero conflicts or admission holds. Per-owner receipts and verification limits are in the
 [deployment runbook](deploy-fly.md#spec-023-rollout--22-october-2026).
 
 **10 October 2026:** ERS completed its separately approved guarded v1.12.7

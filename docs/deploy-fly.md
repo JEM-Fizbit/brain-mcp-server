@@ -12,9 +12,15 @@ JEM guarded deployment completed at **22:25:14.911 UTC** from annotated
 12 optional skips), live synthetic admission/replay/routing and authenticated
 change-page acceptance passed, and both owner Doctors remain healthy. Full
 receipts and verification limits are in [Spec 023](specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
-ERS remains on v1.12.7 pending access to its own admin connection;
-the available CLI returns 403 and the existing browser session cannot open its
-project. Do not substitute JEM credentials or a runtime login for ERS DDL.
+ERS independently completed its guarded v1.13.0 deployment at **22:42:02.061 UTC**
+after John signed into its existing admin browser session. Its exact migration,
+ERS-only scoped policy activation, security gate and fresh Security Advisor
+passed before deployment. Actual sourced corrections, retry/CAS/domain refusals,
+scoped-maintenance acceptance, authenticated change reading and local sourced
+sync alongside a preserved transient hold all passed. Fixtures were cleaned up;
+both Doctors pass with zero conflicts and admission holds. Exact ERS overlay and
+image provenance remain in its private operational runbook. No new plugin,
+credential, workforce grant, daemon or recurring schedule was introduced.
 
 The Docker context explicitly includes only the non-secret
 `config/brain-write-policies.json` alongside existing reviewed configuration.

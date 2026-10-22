@@ -9,6 +9,20 @@ Reading context does not authorise writing it. Use same-domain Capture or the
 existing project home for transient work. No OAuth reconnect or permission change
 is required by this feature. [Exact contract](backend-capabilities.md#spec-023-write-admission).
 
+**22 October client follow-through:** refreshed the existing personal JEM app and
+the existing ERS-workspace ERS/JEM definitions through Manage app → Refresh tools,
+retaining their OAuth connections and approval settings. The two workspace app
+detail views now advertise **27 tools (22 Write, 5 Read)**, including
+`brain_read_change` and the automatic `write_context` update guidance. The ERS
+settings panel briefly reported “Couldn't load plugin settings”; the independently
+loaded app inventory confirmed the updated tool surface afterward. This is tool
+discovery evidence. Actual admission/routing writes and exact read-back were
+verified through the existing Codex hosted connectors; authenticated review links
+were verified in both owner browsers. This existing Codex chat retains older new-
+tool declarations; no fresh-chat or wider Claude/client matrix is claimed.
+No connection was removed or recreated. [Official refresh guidance](https://developers.openai.com/plugins/build/app-quickstart#next-steps),
+[release acceptance](specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
+
 **10 October 2026, ERS follow-through:** the ERS guarded v1.12.7 release is
 deployed. Existing Codex authenticated reads and ChatGPT/Claude web tool
 refreshes pass with retained OAuth connections. Fresh actual read-only status

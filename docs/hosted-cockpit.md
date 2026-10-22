@@ -15,6 +15,14 @@ and verification state; read permission is checked on every request. Manual revi
 is optional. The existing cockpit remains loopback-only and no schedule or new
 notifier is added. [Write contract and local sync](backend-capabilities.md#spec-023-write-admission).
 
+**Live verification, 22 October 2026:** both owner profiles are explicitly enrolled
+in their separate policy files. A finite ERS local sourced edit synced while an
+unrelated synthetic transient edit remained held locally without a conflict or
+hosted overwrite. After recoverable fixture restoration and cleanup, both
+Doctors passed with zero conflicts and no holds. Sync remains every 5 seconds,
+heartbeat/Doctor every 60 seconds, under the existing bounded supervisor.
+[Per-owner release evidence](specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
+
 ## Reason-aware authentication readiness — v1.12.5
 
 Reason-aware auth reporting (v1.12.5): only `missing_bearer` events are classified as anonymous rejections. They remain in the original telemetry and Auth panel; below the existing fail-count threshold they are informational, and at that threshold (default 10/60m) they produce an anonymous-activity warning/channel review, never a credential-failure DM. Caller origin remains unknown. Other/unknown/incomplete reason evidence counts conservatively toward credential/authentication rejection thresholds (default warn 3, fail 10), independently of anonymous counts. Both Slack and Doctor use the same pure classifier. Slack includes the exact runtime Brain id. Successful dispatch metadata v2 adds category and last observed category-event timestamp, with owner-scoped durable dedup; legacy dispatches are interpreted without rewriting them. After the existing 30m cooldown, continued incidents notify only for a newly observed reason or at least doubled count with a new event; a cleared-window new incident may notify again. Credential warn-to-fail escalation remains immediate. Failed sends do not consume the dedup state. No auth enforcement, secrets, network-identifier collection, watcher or access change is included.

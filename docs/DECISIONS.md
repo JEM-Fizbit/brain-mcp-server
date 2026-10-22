@@ -44,6 +44,12 @@ RBAC. JEM retired intake is fenced at tools, stores, sync and database heads;
 ERS scoped Brain maintenance remains available. The earlier proposal for exact
 human approval of all prose is superseded, not an outstanding decision.
 
+**Implemented:** both owner-isolated v1.13.0 deployments completed their approved
+migrations, policy activations, security gates and independent live acceptance.
+The readable history uses existing LOG/revision storage and an authenticated
+change reader. Missing evidence produces a preserved admission hold, rather
+than a new per-fact approval request. [Release receipt and limits](specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
+
 ## 2026-10-10 — Validate MCP Origins independently of the protocol upgrade
 
 **Decision:** reject untrusted, malformed, opaque or duplicate Origin headers
