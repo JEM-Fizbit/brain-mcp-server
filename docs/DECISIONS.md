@@ -30,6 +30,14 @@ instruction clarification, not a runtime or permission change.
 **Source:** John E. Milad's explicit confirmation in the 22 October 2026 Capture
 handoff review. Domain-specific records stay in their own Brains and workspaces.
 
+**Enforcement design direction, confirmed later on 22 October:** retain automatic
+source-backed updates with a clear human-readable change log for optional manual
+review. Do not require approval for each factual correction. Hard-block retired
+capture intake and route transient material to same-domain Capture or its project
+home. [Spec 023](specs/023-brain-write-admission-and-routing.md) reflects this
+direction; implementation and activation remain unapproved. The earlier proposal
+for exact human approval of all prose is superseded, not an outstanding decision.
+
 ## 2026-10-10 — Validate MCP Origins independently of the protocol upgrade
 
 **Decision:** reject untrusted, malformed, opaque or duplicate Origin headers

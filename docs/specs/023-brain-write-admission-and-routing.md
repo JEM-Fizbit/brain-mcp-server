@@ -1,358 +1,406 @@
 # 023 — Per-Brain write admission and Capture routing
 
-**Status:** draft — design proposal; not approved for implementation or activation  
-**Source:** BACKLOG.md item “Evaluate per-Brain enforcement and behavioural routing checks”; John's 22 October design request  
-**Roadmap link:** ad-hoc knowledge-boundary hardening  
-**Decisions impact:** would narrow unattended free-form factual corrections in strict mode; requires explicit approval  
+**Status:** draft — revised design direction confirmed; not approved for implementation or activation
+
+**Source:** John's 22 October design request and correction: retain automatic source-backed updates, log changes for optional manual review, hard-block retired intake
+
+**Roadmap link:** ad-hoc knowledge-boundary hardening
+
+**Decisions impact:** preserves the existing automatic source-backed correction mandate; rejects per-correction human approval as the default
+
 **Related:** [confirmed ownership boundary](../DECISIONS.md#2026-10-22--capture-owns-intake-brain-holds-selected-durable-knowledge), [capabilities](../backend-capabilities.md), [routing baseline](008-brain-routing-evals.md), [source preflight](017-hosted-ingestion-preflight.md), [reviewed ingestion](022-resumable-local-ingestion.md)
 
-## Recommendation and decision
+## Confirmed design direction
 
-Keep Brain reads unrestricted within current roles. Enforce the retired intake
-policy deterministically. Admit new Brain prose only through an exact reviewed
-change; retain automatic lanes for server-computed mechanical changes and typed
-operation receipts. Review related factual corrections as one batch, not one
-prompt per line. Existing approved curation remains possible through its normal
-source/provenance workflow, with stronger approval evidence where needed.
+Source-backed updates remain automatic within each Brain's existing authority.
+Every automatic change gets a concise human-readable, source-linked change
+record that John can inspect later. Reading or approving that log is optional,
+not a prerequisite for the next correction. Do not create an approval inbox,
+owner-presence requirement or new confirmation step for ordinary factual updates.
 
-This prevents an agent from publishing an **unreviewed** transient dump through a
-supported write path. It cannot prove that human-approved content is useful or
-true. A caller's `purpose=durable`, an owner role, a short patch, a source URL or
-an LLM verdict is not proof of curation authority.
+Hard-block the retired general capture queue and its compatibility aliases.
+Transient material goes to same-domain Capture or the work's existing project
+home. Brain holds curated domain knowledge, not task intake or live execution
+state. Keep existing controls for ambiguous judgement, new ingestion,
+destructive operations, access, structural changes and other reserved actions;
+this design does not broaden or remove those separate authorities.
 
-The material choice is **strict admission versus unrestricted automatic prose
-correction**. Recommend strict admission for JEM and ERS. It adds one exact-change
-approval for free-form corrections that lack an existing trusted approval. It
-would narrow the current standing automatic factual-correction mandate; nothing
-in this draft changes that mandate. A trusted future adapter may capture approval
-already given by the user without asking again, but no current connector is
-assumed to expose independently verifiable approval evidence.
+This is **automatic correction with evidence and retrospective accountability**.
+It hard-enforces known intake and write-path rules. Assessing whether prose is
+durable and faithful to a source still involves agent judgement and routing
+evaluation. The system must not claim perfect semantic prevention or equate a
+source URL, a short patch, an owner role or a caller's “durable” label with proof.
 
-## Scope and assurance boundary
+## Scope and boundaries
 
-- Protect normal Brain tools, ingestion, maintenance and sync from accidental or
-  policy-confused agent writes, including stale clients and alternative tool names.
-- Apply the same rules to hosted HTTP and local stdio. Preserve explicit source
-  custody, domain/owner separation, current RBAC and reviewed-revision protection.
-- Do not build a general work manager, a second Capture inbox, a paid semantic
-  classifier, a new polling daemon or the deferred task-context compiler.
-- A database administrator, root process or human with arbitrary filesystem
-  access remains outside this application trust boundary. Ordinary runtime/sync
-  database credentials must not be an escape from the hosted admission gate.
-- Do not silently delete or rewrite existing Brain content. Historical tasks and
-  prior revisions remain evidence; the initial rule governs new mutations.
+- Same policy resolution for HTTP, stdio, supported imports/maintenance and sync.
+- Same-domain credentials, sources, logs and Capture destinations stay separate.
+- Existing RBAC, source custody and reviewed-revision/CAS checks remain required.
+- No new agent harness, semantic service, paid classifier, task inbox or daemon.
+- No blanket approval gate, native owner-presence signing, or per-edit review UI.
+- No automatic historical cleanup, source ingestion or unrestricted task closure.
+- Root/database administrators and arbitrary manual filesystem editing remain
+  outside the supported-agent boundary; ordinary runtime writers must not bypass
+  enforceable retired-queue rules.
+- This draft changes no deployed code, profile, data, credential or schedule.
 
-## Observed implementation gaps
+## Current implementation findings
 
-| Current seam | Consequence for this design |
+| Current seam | Required design response |
 |---|---|
-| `src/tools/tasks.ts` applies the same capture handler to both tool names | Both names must resolve the same per-Brain policy before changing TASKS |
-| `RevisionBrainStore.writeFile` assembles replace, append and patch content | Judge the resulting complete revision/diff, not only the caller's fragment |
-| Store role/CAS/path checks do not check retention intent | Add admission separately from authentication, RBAC and backend capability |
-| `appendLog`, restore, rename/link rewriting, conflict resolution and lint have their own write paths | A guard on `brain_update_file` alone is insufficient |
-| Local sync directly calls `RevisionStore.proposeRevision` | Gate below BrainStore too; do not trust `origin=local_agent` as human proof |
-| Ingestion calls `proposeRevisionInTransaction` with source metadata/receipt | Preserve atomic batch semantics and enforce admission inside that transaction |
-| Ingestion approval records the configured operator actor and digest | Reuse exact-bundle/CAS mechanics; do not reinterpret the actor string as independent proof that a human approved |
-| The current golden set routes a personal task to TASKS and expects broad output-capture wording | Correct those expectations before using the suite as an acceptance gate |
-| Existing loopback Cockpit confirmation uses a nonce accessible to a local client | Keep its existing protections; the nonce is not proof of human presence for free-form admission |
+| Both capture tool names call the handler in src/tools/tasks.ts | Resolve the selected Brain's policy once and enforce it for both aliases |
+| RevisionBrainStore assembles replace, append and patch | Evaluate the complete resulting diff, not just the submitted fragment |
+| Current role/CAS/path checks do not classify knowledge versus live work | Add explicit workflow/evidence/routing checks without conflating them with RBAC |
+| Logs, restore, rename/link rewriting, lint and ingestion have separate writers | Share enforceable checks below individual tool handlers |
+| Local sync calls RevisionStore directly | Do not exempt a mutation merely because its origin is local_agent |
+| Ingestion already binds an exact candidate to source identity and target revisions | Reuse those mechanics and retain its existing separate approval policy |
+| The routing golden set still expects personal TASKS intake and broad output capture | Correct the baseline; historical passes do not prove the new contract |
+| Existing Brain-operation logs can contain lengthy run summaries | Make changes readable at a glance; retain detailed execution evidence with its operational owner |
 
-## Per-Brain policy
+## Per-Brain configuration
 
-Add a validated deployment-owned `write_policy` to registry/profile configuration,
-outside served Brain Markdown. Agents cannot change it through Brain tools.
-Names below are proposed API vocabulary, not adopted schema.
+Proposed deployment-owned write_policy configuration sits outside served Brain
+Markdown and cannot be changed through Brain content tools. Schema names remain
+proposals until implementation. Policy declares its version/digest, intake mode,
+safe same-domain route hints, task-file families, automatic workflow classes,
+existing reserved actions and activation state.
 
-| Policy facet | JEM proposal | ERS proposal | Reusable server |
+| Facet | JEM | ERS | Reusable server |
 |---|---|---|---|
-| General intake | Retired; route to Personal Capture | External; route to private ERS Capture | Explicit deployment policy; preserve named legacy deployments |
-| Brain task scope | No new general tasks; retain historical pointers | Only accepted Brain content/ingestion/maintenance work | Explicit scope, never inferred from tool availability |
-| Free-form writes | Exact approved change required | Same, within ERS role/content authority | Explicit strict or legacy compatibility mode |
-| Automatic writes | Named deterministic operations and typed receipts | Same, separately configured | No universal unchecked bypass |
-| Policy changes | Owner-controlled deployment/config action | Separate ERS authority | No MCP setter |
+| General intake | Retired in Brain; Personal Capture | External; private ERS Capture or existing tracker | Explicit deployment policy |
+| TASKS scope | Historical pointers and recovery records; no new general intake | Accepted Brain content/ingestion/maintenance only | Explicit configured scope |
+| Factual/link updates | Automatic with current source evidence and change record | Same within ERS authority/content restrictions | Explicit supported workflow policy |
+| New sources/distillations | Existing selected-ingestion mandate and gates | Same, separately scoped | Preserve configured workflows |
+| Policy edits | Deployment/config authority | Separate ERS authority | No content-tool setter |
 
-Policy includes a version/digest, configured route identifiers, approved workflow
-classes, protected file families and activation mode. Personal and ERS policy/data
-are never merged. Route hints contain no tokens, payloads or opposite-domain IDs.
+Discovery reports backend support, role authority and policy separately. Both
+capture aliases can remain physically supported while policy denies general
+intake. Execution rechecks the current policy. An enrolled deployment must not
+silently fall back to legacy intake if its required policy is missing or invalid.
+Other tenants retain their explicit compatibility configuration until migrated.
 
-`brain_describe` exposes a separate admission result beside backend support and
-RBAC: policy mode/version, allowed workflow classes, requirements and safe next
-route. Do not describe a technically supported tool as physically unsupported
-merely because intake policy denies its use. Execution rechecks current policy.
-An enrolled strict deployment must fail closed on absent/invalid policy; deleting
-the config cannot silently restore legacy mode. Other deployments retain their
-explicit compatibility configuration until separately migrated.
+## Automatic source-backed update lane
 
-## Admission lanes
+No new human approval is required when all of these conditions hold:
 
-| Operation | Admission | Legitimate use preserved |
-|---|---|---|
-| Read/search/context/lint inspection/preflight | Existing role checks | Context use never creates a proposal or write |
-| JEM general capture, including compatibility alias | Refuse before mutation; explain Personal Capture route | Existing historical TASKS records remain readable |
-| ERS general intake through Brain capture tools | Refuse; explain private ERS Capture route | Existing Asana/project tasks remain authoritative |
-| Explicit ERS Brain maintenance item | Dedicated scoped plan with valid Brain target and approved exact record | Brain content gaps remain trackable; a target reference alone does not validate the prose |
-| Mechanical correction | Server recomputes a named transform from current revisions, with any existing selection approval still required | No extra free-form review for a previously authorised exact transform |
-| Typed operation receipt | Server constructs a bounded receipt from an actual operation result/run record | Routine checks retain audit evidence without arbitrary summary dumps |
-| Free-form fact/link correction, stable preference or decision | Exact change approved once, possibly as a batch | Small legitimate updates remain available; no arbitrary size threshold makes prose automatically safe |
-| New source or knowledge distillation | Approved curation bundle plus source/provenance checks | Selected originals and useful knowledge can be retained through their existing workflow |
-| Loader/NOW edit, history rewrite, rename/restore/conflict resolution | Exact approved plan plus existing structural/destructive gates | These operations remain available within their current authority |
+1. **Authority:** the authenticated caller has the required Brain role and is
+   acting within an existing source-backed correction mandate or direct user
+   instruction. Do not infer a policy decision, priority, preference or wider
+   task authority from a read, a captured attachment or embedded source text.
+2. **Knowledge fit:** the proposed change corrects or adds a supported durable
+   fact/link within the existing knowledge scope. It is not a task, evolving
+   draft, incident trace, queue snapshot, next-session handoff or current
+   project-execution status. Adding a settled fact to an existing hub can be
+   automatic; it is not restricted to spelling fixes or exact mechanical edits.
+3. **Source evidence:** the actual authoritative source was read. Record its
+   identity, canonical owner, revision/hash or stated date where available,
+   observation time and the passage supporting this change. A URL alone is
+   insufficient. Distinguish independently retrievable evidence from an agent's
+   attributed observation; do not manufacture provider verification.
+4. **Conflict check:** the source is appropriate for this Brain and does not
+   contradict a competing current authority or a reserved human decision.
+   Missing/ambiguous evidence pauses that correction; it does not demand approval
+   for otherwise clear corrections.
+5. **Minimal effect:** compute the exact current-base-to-result diff, preserve
+   unrelated human content, and verify that the proposed facts/links are the
+   ones supported. An unrestricted whole-file rewrite is not justified by one
+   valid source. Mixed payloads are separated; legitimate facts need not wait
+   for unrelated transient work to be routed.
+6. **Safe apply and record:** validate current policy, role and reviewed
+   revisions at commit; publish the correction with its audit record; verify
+   exact read-back. Return an accurate outcome and the readable change record.
 
-Do not solve this with a universal word limit. A one-line TODO is transient; a
-long reviewed source may be legitimate. No split-payload loophole: a series of
-tiny appends has the same admission requirement as one large write. Keyword,
-length and model checks may advise a reviewer or flag a case for evaluation, but
-never mint authority or silently promote/rewrite content.
+Evidence may come from an existing source manifest, current authorised project
+document, supported provider read or direct first-party user instruction.
+A local/connector observation records its actual observer and limitations. There
+is no requirement to ingest every supporting document into Brain merely to fix
+one fact. Supporting excerpts and hashes belong in bounded private operational
+evidence when needed; do not copy full transient sources into knowledge hubs or
+logs. Source adapters reuse established roots/connectors, not arbitrary
+server-side URL fetching or caller-selected filesystem paths.
 
-### Retired queue and alternative destinations
+The server can validate source identity/ownership, accessible revision/hash,
+quoted-text correspondence where bytes are available, changed file families and
+CAS. The writing agent remains responsible for source authority, entailment and
+knowledge fit where those are semantic judgements. An unverified “source-backed”
+claim is not upgraded into an independently verified fact by storing it.
 
-Normalise the operation and canonical path before policy evaluation. Reject both
-capture aliases under JEM's retired policy. For direct TASKS edits, compare full
-record blocks with the reviewed base, not just a checkbox count or heading name.
-Existing records may remain unchanged; changes to their history require an exact
-approved migration/correction. Moving a new open item under another heading,
-using plain bullets instead of checkboxes, or creating a new file does not gain an
-automatic lane: arbitrary additions still require reviewed admission.
+## Routing and permitted operations
 
-In strict mode generic edits to LOG, JOURNAL, working/, SOURCES or archive files
-cannot use those locations as a staging bypass. Source companions are different:
-complete selected source text is legitimate only through approved source custody
-and ingestion. A receipt reference or source ID must resolve in the same owner
-and Brain; its mere presence does not approve arbitrary appended content.
-
-## Exact-change workflow and approval boundary
-
-Proposed API shape: `brain_plan_write` prepares a candidate and
-`brain_apply_write` applies it. Existing write tool names can remain compatibility
-wrappers that require the same admission for strict Brains. Do not remove a tool
-and assume cached clients can no longer call it.
-
-1. Resolve principal, Brain, backend, role and current policy. Preparation is
-   explicit and non-publishing. It returns the proposed route, full diff, evidence
-   references and structured refusal/review reasons. An unsafe request is not
-   automatically forwarded to Capture or copied into another domain.
-2. Bind the immutable candidate to owner/deployment/Brain, policy digest, workflow,
-   canonical target paths, exact before revisions, exact after hashes, selected
-   source/job identities and requested operation. Derive actor/roles from trusted
-   execution context, never caller-supplied JSON.
-3. Obtain approval from a trusted owner-review channel that shows those exact
-   bytes, or recompute an already authorised deterministic operation. A boolean,
-   chat quotation, self-declared actor, model recommendation, matching filename
-   or existing member/owner OAuth token is insufficient to prove human approval.
-4. Apply rechecks policy, current role, approval provenance, exact digest and all
-   source/target preconditions in the committing transaction. The grant is bound
-   to this candidate and authorised applier context; it is not a general write key.
-5. Commit the whole approved batch and receipt together. A changed target, source,
-   role or policy invalidates the approval without partial publication. The agent
-   re-reads and prepares a new plan; it cannot re-token the obsolete one.
-6. Replaying a completed operation returns its original receipt without another
-   write. Verify exact read-back and only then report completion. A denied or
-   expired operation cannot be made successful by changing its purpose label.
-
-**Recommended review surface:** extend the existing native Brain Monitor with an
-exact-diff approval action requiring independent owner presence. Its approval
-capability must be separate from agent MCP/loopback credentials, bound to the
-displayed candidate digest, and unusable by a background agent alone. This is a
-proposed capability, not something the current app already proves. Validate a
-real owner-presence mechanism in an isolated spike before relying on it. A cloud
-client can prepare/read a proposal and await that approval; unavailable approval
-preserves the proposal and originals, rather than losing work or unlocking writes.
-Remote owner approval can be a later separately scoped extension.
-
-Existing ingestion review bundles are reusable; the current CLI `approve` actor
-field alone cannot satisfy the new owner-presence requirement. Existing Cockpit
-mechanical selections remain valid for their exact narrow workflow and cannot
-be reused as generic content approvals. This proposal does not grant a general
-Brain editor to Cockpit or broaden the ERS Access & Roles surface.
-
-Pending candidates are private operational workflow records, outside vault
-search, graph, context and source discovery. They may retain immutable proposed
-bytes needed for review, with a defined expiry and owner-approved retention policy
-before activation. They are not a new task inbox: link the originating request,
-keep its canonical owner, expose the candidate for that operation, and never
-auto-promote it. Do not fabricate a source-ingestion job for a source-less typo or
-instruction edit merely to reuse storage. Use a small admission record alongside
-the existing private job substrate; avoid a new database/service. Runtime agents
-cannot create trusted approval records or grant themselves workflow privileges.
-
-## One gate across every mutation route
-
-Provide one policy evaluator, used for preflight and immediately before commit.
-BrainStore provides early errors; the shared revision write boundary provides
-final enforcement for tools, import, maintenance, link rewriting and sync. Bind
-approval consumption to the existing CAS/transaction, not a check followed by an
-unprotected write. Cover tombstones, recreations, rename targets/rewritten links,
-source companions, history rotation and conflict resolution as well as new prose.
-
-For hosted strict enforcement, the database must reject missing/invalid admission
-even from an older supported runtime or sync binary. This needs a protected
-guarded-write interface and database-side validation, plus removal of ordinary
-runtime privileges that can directly update admitted heads or approval state.
-System/transform paths must recompute their allowed effect rather than accept an
-arbitrary `system=true` flag. The exact SQL mechanism is an implementation design
-gate, with disposable-Postgres bypass tests before production. A TypeScript-only
-guard is useful containment but is not the complete guarantee claimed here.
-
-RBAC, tenant isolation and authority remain independent. Database/admin credential
-changes and migrations require their normal explicit rollout gates. The Brain
-schema stays private; no anon/authenticated/public access is introduced.
-
-### Local stdio and sync
-
-Apply the same policy before stdio changes local files. A direct filesystem edit
-has no trustworthy agent-versus-human origin: sync cannot grant an exemption
-because a file exists, a local principal owns it or `origin=local_agent` was set.
-In strict mode a meaningful local change needs the same exact admission or a
-valid deterministic transform before reaching the hosted head.
-
-Keep a denied local edit intact and report `admission_pending` for that path;
-continue unrelated sync. Do not replace its tracked base/hash as if it was pushed,
-overwrite it on pull, delete it, or create an ordinary content conflict merely
-because policy refused publication. Reuse existing preservation/recovery rules
-when a remote head also changes. Deduplicate holds by content/base/policy identity;
-retry only when those inputs or admission change, not as a new failure every five
-seconds. Doctor/Monitor must distinguish pending review from broken sync.
-
-Local recovery reads may still encounter human-edited files. Mark an unadmitted
-local version as such; do not present it as admitted hosted knowledge. This design
-cannot stop arbitrary manual editing of a human-owned folder. Hosted admitted
-heads remain protected. Do not add a second general WIP mirror or sync daemon.
-
-## Refusals, receipts and Capture handoff
-
-Return machine-readable reasons such as `general_intake_retired`,
-`brain_scope_required`, `reviewed_change_required`, `approval_invalid`,
-`stale_admission`, and `policy_unavailable`, with the selected Brain and safe
-same-domain next route. Payload-dependent refusal reports no publication; it
-does not claim the material was saved elsewhere. Source/role/backend failures
-remain distinct. The caller can then capture the original intent with a stable
-idempotency key under the existing Capture contract and verify the receipt.
-
-Typed receipts contain actual operation identity, affected revisions, result and
-an evidence reference. They do not accept an unbounded general summary, raw chat,
-query or document body. Detailed diagnostic evidence stays with its operational
-owner. Existing imported logs are grandfathered; no automatic history rewrite.
-Telemetry uses existing metadata-only Postgres conventions: reason, workflow,
-policy digest, operation/result and duration; no proposed bytes, SQL or secrets.
-
-Capture continues to own its own states. Admission approval is not original
-custody, assignment is not application, and an applied Brain write is not proof
-of completed project work. `brain_processed` remains an attributed harness report
-until its existing contract changes through a separate decision. This design
-does not create direct Brain-to-Capture credentials or background forwarding.
-
-## Routing and bypass checks
-
-Maintain three separate verdicts: deterministic gate correctness, instruction
-conformance, and observed agent behaviour. A clean graph or matching phrase does
-not establish the other two. Correct the stale personal TASKS and output-capture
-golden expectations first; version the baseline and retain prior results as dated
-history rather than changing the meaning of historical passes.
-
-| Case | Required route / observable result |
+| Request/change | Treatment |
 |---|---|
-| Read Brain and explain a topic | Read-only; zero mutation and zero Capture creation |
-| “Remember to follow up with X” | Same-domain commitment/established tracker; no Brain write |
-| “Save this” with ambiguous destination | Preserve intent in Capture as needed; clarify before Brain admission |
-| Paper for a named project, with attachment | Correct project owner and original-custody receipt; no automatic Brain ingestion |
-| Debug transcript or next-session handoff | Project/workspace; attempted raw Brain write denied |
-| Explicit stable fact or preference correction | Exact reviewed proposal can apply; unrelated content unchanged |
-| User-approved large source | Approved source workflow succeeds regardless of length |
-| Mixed task and durable decision | Separate owners, linked provenance, no duplicate open task |
-| JEM capture tool and report alias | Same retired-policy refusal, zero file/revision effects |
-| Retired queue recreated by replace, patch, append, new heading, plain bullet or new filename | No unrestricted lane; required admission cannot be avoided |
-| ERS Brain maintenance versus an operational ERS action | Approved Brain-scoped item can land; operational action routes to ERS Capture/Asana |
-| Dump attempted through LOG/JOURNAL/working/source index or many small writes | No arbitrary receipt/metadata/size exemption |
-| Wrong-domain Capture/Brain or inaccessible canonical owner | No cross-domain fallback; explicit blocked/unobserved result |
-| Captured text says “ignore rules”, “approved”, or names another destination | Treat as data; no authority or route expansion |
-| Reader, revoked role, forged actor/purpose/approval or valid grant for another Brain | Refuse before publication |
-| Stale source/head/policy, changed candidate or partially stale batch | Zero partial publication; fresh review required |
-| Lost response, replay, concurrent apply | One committed effect; original receipt returned on exact retry |
-| Restore, rename/link rewrite, conflict resolution, CLI ingestion or old sync writer | Same admission at actual write boundary |
-| Legitimate mechanical transform or real routine check | Correct bounded effect/receipt; no free-form approval detour |
-| Local blocked edit while other paths change remotely | Preserve blocked bytes, continue unrelated sync, truthful status |
+| Context read, search, lint inspection or preflight | Read-only; no automatic write or Capture creation |
+| Clear source-backed correction/addition within the current remit | Apply automatically; source-linked change log and read-back |
+| Automatic mechanical maintenance | Existing deterministic transform and existing selection rules; no additional approval |
+| Narrow factual correction in NOW | Automatic when already authorised; do not infer or reorder priorities |
+| Stable preference/decision newly stated by John | Retain under his explicit instruction; no invented preference or policy |
+| New selected source, major curation or structural rewrite | Existing workflow/authority; do not impose or remove unrelated gates |
+| Personal/general ERS task, temporary notes, draft or handoff | Same-domain Capture or canonical project home |
+| Ambiguous retention, competing sources or reserved judgement | Preserve original work; ask only the specific unresolved question |
+| Delete/archive/rename/conflict resolution, access or routine change | Existing separate authority and safety checks remain |
 
-Deterministic tests invoke the real entry points and lower storage boundary,
-not just the classifier helper. Verify vault bytes/heads, source metadata,
-approval state and receipts after both acceptance and refusal. Include all three
-write modes, both aliases, both stores, both transports, role changes, source
-changes, old binaries and a direct ordinary-runtime SQL bypass attempt. Prove
-that applying one approved diff cannot smuggle a second mutation in its receipt.
+A source-backed update must not mean “anything mentioned by a source.” A source
+can describe a transient deployment incident or pending task accurately; that
+does not make its full contents durable Brain knowledge. Conversely, a long
+approved source is not a dump merely because it is long. Word counts and keyword
+or model classifiers are diagnostic signals, never universal admission rules.
 
-Agent-routing evaluation uses a frozen synthetic Brain/Capture/project fixture
-and intercepted tool traces with no production effects. Score required and
-forbidden tool calls, arguments/domains, original custody, requested intent,
-honest status and actual byte effects. Include positive updates as well as
-negative dumps so “deny everything” fails. Use paraphrases and holdout cases;
-inspect ambiguous outcomes manually instead of making an LLM grader the sole
-standard. Model/client runs need named version/effort and separate authorised
-capacity; no paid calls or background evaluation is authorised by this proposal.
-Fixture tests prove mechanics; actual native-client checks establish those named
-clients only. Do not translate a small successful sample into reliability claims.
+### Hard-block the retired capture queue
 
-## Ordered implementation and acceptance gates
+- Resolve canonical Brain, operation name and path before any mutation. JEM's
+  brain_capture_item and brain_report_item aliases return the same
+  general_intake_retired refusal with a safe Personal Capture route.
+- Protect JEM's TASKS record family against new active/intake records through
+  replace, patch, append, heading changes and configured filename/path aliases.
+  Compare complete blocks to the reviewed base, not checkbox counts alone.
+  Preserve existing historical entries. Supported historical pointer corrections
+  can be automatic with evidence; archival retains its existing approval rule.
+- ERS general intake is also external. Brain-scoped maintenance/content records
+  remain legitimate within the accepted scope; an arbitrary project action cannot
+  qualify just because the caller supplies a Brain path.
+- Unknown new task-file names or prose disguised as facts are semantic routing
+  cases, not something a regex can prove. They must not acquire a catch-all
+  factual-update exemption; require the same knowledge-fit/evidence checks and
+  include disguises in behavioural evaluation.
+- No generic summary/log/source-index operation can recreate retired intake.
+  Purpose labels, system=true and local_agent origin are not policy bypasses.
 
-1. **Baseline and policy contract:** inventory all writers; update obsolete eval
-   expectations; freeze positive/negative cases; validate per-Brain policy and
-   discovery/refusal semantics in fixtures. Record the standing-mandate choice.
-2. **Queue enforcement:** implement shared policy checks for both aliases and
-   capture scope. Explicitly label this partial containment; generic write paths
-   remain a gap until the following stages pass.
-3. **Exact approval and admission:** prove owner-presence approval with a real
-   isolated prototype; implement immutable bundles, workflow receipts, CAS/replay
-   and transactional batch enforcement. No automatic factual-correction exception
-   until its independent authority is demonstrated.
-4. **Close alternative paths:** cover ingestion, logs, restore/rename/conflicts,
-   filesystem stdio and sync; add database-side fences. Run the full test suite,
-   disposable Postgres security/bypass checks and affected Cockpit desktop/mobile
-   checks if its interface changes. No production profile change yet.
-5. **JEM acceptance:** observe decisions without writes first; classify false
-   positives with the owner; use one finite authorised synthetic end-to-end batch
-   to prove accepted updates, denied dumps, recovery and receipts. Enable strict
-   mode only after explicit approval of the narrower prose mandate.
-6. **ERS acceptance:** separate deployment/policy approval and security gate;
-   repeat same-domain tests under its real roles and private overlay. JEM success
-   does not authorise ERS activation. Preserve independent Capture ownership.
+### Route transient material without losing intent
 
-Full acceptance requires every supported runtime write path to be covered,
-positive legitimate updates to succeed, rejected operations to leave vault and
-source state unchanged, and observed clients to route correctly in the named
-cases. No fixed “100% reliable” percentage is inferred. Production migration,
-credential/role changes, deployment and owner-review capability remain separately
-controlled actions; this document executes none of them.
+The agent uses the owning project/workspace when that is the established home;
+same-domain Capture preserves intake/originals, individual commitments without
+another owner and blocked/unclear filing. Keep the original request, requested
+treatment and original attachments, with one stable capture identity and an
+actual filing receipt. Filing does not execute the task or complete its work.
 
-Rollback stops new applies while preserving candidates, originals, approvals and
-receipts; read access and unrelated sync continue. Do not silently disable policy
-and resume unrestricted writes, reset a consumed grant or discard held local edits.
-An owner-approved return to legacy mode is an explicit authority change.
+A refused Brain write does not automatically transfer or save its payload.
+Return a structured route and reason; the client performs the authorised
+same-domain Capture/project operation and verifies it. If unavailable, retain
+the original at its authorised origin and report the blocker. Do not create a
+Brain fallback queue, silently switch domains or install new service credentials.
 
-## Alternatives and unresolved design gate
+## Common write check, transaction and local sync
 
-| Option | Disposition | Reason / cost |
-|---|---|---|
-| Loader flags and static routing phrases alone | Reject as enforcement | Already clarified; write bypass remains |
-| Block only capture tools | Accept as first containment, incomplete | Stops the retired entrypoint but not raw writes |
-| Small patch/keyword/LLM “durable” label unlocks writes | Reject as hard approval | Short transient text and plausible labels bypass it; classifiers can misjudge |
-| Broad source-backed automatic prose grant | Defer unless John prefers the weaker guarantee | Preserves current autonomy but a confused authorised writer can still publish a dump |
-| Exact reviewed prose plus verified deterministic lanes | Recommended | Strongest bounded guarantee; adds review for unapproved free-form updates |
-| Block all writes or force every update through Capture | Reject | Breaks legitimate maintenance/direct corrections and creates needless intake |
+Reuse the existing write tool interfaces. Add workflow/evidence/change-summary
+context where needed; an internal prepared diff can serve all modes. A new
+public plan/apply API or human approval token is not a prerequisite for routine
+automatic corrections. A standalone purpose string never unlocks a write.
 
-Before implementation approval, John should choose whether the stricter review
-boundary is acceptable. The independent owner-presence mechanism must then be
-proved before implementation can claim approval enforcement. No new TTL, patch
-size or semantic-confidence threshold is silently adopted here; operational
-expiry/retention values must be explicit in the implementation/rollout plan.
+Use one policy evaluator for discovery/preflight and immediately before commit.
+BrainStore provides early explanations; the shared RevisionStore boundary covers
+tool writes, log append, import, link rewrites, restore and conflict resolution.
+Existing destructive/structural restrictions remain independent.
+
+For automatic factual changes, persist the mutation and the required audit
+record as one Postgres transaction. A failed audit write must not silently
+publish an unlogged correction. Bind evidence, before revisions, after hashes,
+policy and execution identity to the operation. Recheck sources that have a
+verifiable revision precondition. On stale evidence or targets, re-read and
+reconsider from current content; never replay the obsolete change with a new
+token or override intervening human edits. Exact replay returns the original
+operation result, without a duplicate correction or log entry.
+
+Filesystem mode cannot promise a database-style multi-file transaction. Use a
+recoverable intent journal and atomic file replacement to prevent a mutation
+from being silently treated as logged/verified when recovery is incomplete.
+
+For the retired-queue guarantee across old supported runtimes/sync clients,
+add a database-side queue-policy fence or guarded-write interface that ordinary
+runtime credentials cannot bypass. Preserve generic compatibility per Brain.
+The exact SQL mechanism and required privilege changes need isolated tests and
+the existing production security/migration gates; they are not deployed by
+this draft. Semantic source interpretation is not delegated to a SQL trigger.
+
+Stdio uses the same automatic evidence/routing checks before file writes.
+Sync carries matching write context bound to base and result hashes, never an
+unscoped exemption based on local origin. Source-backed changes with valid
+evidence continue automatically. An edit lacking adequate evidence is retained
+as source_evidence_required, not approval_required; an authorised agent may
+resolve its source and reconsider without asking John to approve each fact.
+
+Preserve held local bytes and the prior tracked base; do not overwrite on pull,
+pretend the edit was pushed, or turn a policy hold into an ordinary content
+conflict. Continue unrelated sync and deduplicate holds by content/base/policy
+identity. Existing recovery rules apply if a remote head also changes. Ordinary
+manual folder editing remains possible, with its attribution limitations. Do
+not activate a strengthened sync profile until real source-backed updates and
+existing human-edit/recovery workflows have passed acceptance; queue protection
+can be tested independently. No new general WIP mirror or daemon is introduced.
+
+## Human-readable change log and optional manual review
+
+Use the existing per-Brain LOG as a concise change index, linked to retained
+revision history and bounded private operation evidence. Do not create another
+task tracker. A routine automatic correction should answer at a glance:
+
+- **When and who:** local date/time with timezone, Brain and attributed agent.
+- **What changed:** human-readable subject, file/section and short exact before
+  and after excerpts; group related changes under one clearly identified operation.
+- **Why and source:** the reason and a usable source link/reference, with its
+  date/revision and actual verification scope.
+- **Outcome:** applied, read-back verified, or applied with verification
+  pending/failed; links to the exact revision diff, prior revision and evidence.
+
+Example layout, using placeholders rather than a claimed real correction:
+
+> Automatic source-backed correction — date/time and Brain
+>
+> - Project link: old URL → current canonical URL.
+> - Why: the owning project's current README declares the replacement.
+> - Source: linked README and observed revision/time.
+> - Result: applied; exact read-back verified. Open full diff / prior revision.
+
+Manual review is retrospective and optional. Opening, acknowledging or approving
+a log row is not required for that correction or the next scheduled update.
+John can inspect the actual diff/source and request a correction or restoration;
+there is no automatic rollback over later edits. Do not mark routine logged
+changes as Needs you merely because no human has reviewed them.
+
+Diff/source/history references must resolve through a real implemented reader or
+operator view. A raw revision UUID or invented URL is not a usable review link;
+if the existing view cannot show the retained diff, that reader is part of the
+log acceptance work, not a reason to add approval steps.
+
+An operation commits an applied receipt before claiming post-write verification.
+Read-back failure updates/links the operation's status and preserves its result;
+do not repeat an uncertain write or falsely mark it verified. Source excerpts
+and displayed diffs respect each domain's existing content restrictions.
+
+Periodic no-change checks use a short typed check receipt. Logs do not accept
+raw chats, full documents, source dumps, queue inventories or troubleshooting
+transcripts as correction summaries. Preserve old log/history bytes; no automatic
+cleanup is authorised here. Detailed operational evidence stays with its owner.
+Existing correction-reporting obligations remain; this design does not invent a
+recurring digest, new notification channel or new approval role.
+
+## Refusal and observation contract
+
+Proposed reasons include general_intake_retired, transient_work_route,
+source_evidence_required, source_conflict, outside_current_mandate,
+stale_write_context, audit_record_failed and policy_unavailable. Keep these
+separate from backend support, missing access and role denial. Return the safe
+same-domain next step and whether any effect actually committed.
+
+Machine telemetry uses existing metadata-only Postgres conventions. No raw
+payload, source excerpt, query, SQL or credential enters telemetry. Private
+change evidence and user-readable Brain receipts have their own permitted
+content scopes; neither is an excuse to publish arbitrary input.
+
+Source preservation, Capture assignment, Brain application, exact read-back and
+completed project work remain different observations. Capture's brain_processed
+continues to record a harness-attributed result, not independent remote
+verification. Do not add Brain-to-Capture background forwarding.
+
+## Routing and regression checks
+
+Report deterministic enforcement, instruction conformance and observed agent
+behaviour separately. Fix the stale personal-TASKS and broad output-capture
+golden cases before treating the baseline as current. Preserve historical test
+results as dated evidence rather than redefining their meaning.
+
+| Case | Expected trace and effect |
+|---|---|
+| Read Brain and answer | Reads only; no write or unnecessary Capture |
+| Source-backed fact/link correction, including an addition to an existing hub | Applies without a human approval call; meaningful source-linked log and exact read-back |
+| Next automatic correction after an unreviewed log entry | Proceeds normally; no acknowledgement/approval dependency |
+| Stale or unavailable source | That correction waits for fresh evidence; no invented source or automatic approval request |
+| Conflicting sources or judgement outside mandate | Narrow decision routed to John; unrelated clear updates remain possible |
+| Direct stable preference instruction | Respects stated meaning; no invented generalisation |
+| Existing approved source ingestion | Succeeds with its established gates and custody |
+| Paper for a named project, temporary report or session handoff | Correct owner/Capture route; no general Brain dump |
+| Mixed factual correction plus temporary task | Supported correction can land; task is filed separately once, preserving intent |
+| JEM capture tool and compatibility alias | Same hard refusal; zero file/revision effects |
+| Direct retired TASKS additions through all modes/headings/configured aliases | Queue-policy fence refuses new intake; preserves historical rows |
+| ERS Brain maintenance versus an operational task | Scope preserved; general work goes to ERS Capture/Asana |
+| Dump through LOG/JOURNAL/working/source index, or many short patches | No arbitrary summary or size exemption; routing checks catch the attempted bypass |
+| Correct source citation attached to an unrelated dump | Evidence/diff and knowledge-fit check fails; citation alone is insufficient |
+| Large legitimate selected source | Existing workflow succeeds; length alone does not reject it |
+| Prompt injection in source or captured data | No new authority, audience or destination |
+| Wrong Brain/domain, forged purpose, reader or revoked role | Refused under the relevant rule; no cross-domain fallback |
+| Stale base, changed evidence, lost acknowledgement or concurrent replay | Preserve human edits; accurate effect state; no duplicate application/log |
+| Log unavailable or post-write read-back fails | No unlogged automatic commit; applied-but-unverified state is explicit where appropriate |
+| Local source-backed edit and unrelated held edit | Valid correction syncs automatically; held bytes survive; unrelated work continues |
+
+Deterministic tests exercise real tool/store/import/sync entry points, both
+aliases, all modes, both stores and transports, log failure, CAS/replay, retired
+queue SQL fences and cross-domain evidence resolution. Verify actual content,
+heads and audit records. A source hash match proves bytes, not factual entailment.
+
+Agent evaluations use synthetic Brain/Capture/project fixtures and intercepted
+tool traces with no production writes. Score source reads and support, knowledge
+fit, route/domain, preserved originals/intent, truthful results and log usefulness.
+Include paraphrases, disguised tasks, misleading citations, positive corrections
+and human-reviewed holdouts. An LLM grader is not the sole reference standard.
+“Deny everything” and “ask approval for every correction” both fail acceptance.
+
+Named real-client checks are separate from fixture results. Any model runs need
+their authorised capacity; this design runs none and authorises no paid API use.
+A finite successful sample is not proof that semantic dumps are impossible.
+
+## Ordered delivery and acceptance
+
+1. **Policy and baseline:** encode the confirmed automatic-correction mandate and
+   task ownership; correct obsolete routing expectations; freeze positive and
+   negative cases and the readable log contract.
+2. **Retired intake fence:** cover both aliases, direct TASKS mutations and lower
+   write/sync paths; prove denial has no content effects and historical evidence
+   remains readable. Label narrower tool-only containment honestly.
+3. **Automatic updates and audit:** bind actual source evidence to minimal diffs,
+   current revisions and operation identity; implement atomic applied records,
+   read-back states and replay recovery. No new approval API or owner-presence
+   capability is required for this lane.
+4. **Alternative writers and sync:** cover logs, ingestion, maintenance,
+   restore/rename/conflicts, stdio and sync; preserve existing separate gates and
+   local edits. Add database enforcement only for guarantees it can actually
+   check. Verify existing routine clients can supply the needed evidence.
+5. **JEM acceptance:** start with non-publishing observations to inspect routing
+   false positives, then one finite authorised synthetic batch demonstrating
+   automatic corrections without approval, readable logs, queue denial, transient
+   routing, outage recovery and ordinary local workflows.
+6. **ERS acceptance:** separate deployment/security/policy approval, private
+   overlay and role/source-isolation checks. JEM results do not authorise ERS
+   activation or shared source access.
+
+Use existing Monitor/Doctor for truthful held/failed/healthy observations, without
+a duplicate notifier or approval queue. Production migrations, access/privilege
+changes, deployment and new routines retain their existing gates. This is a
+design revision, not implementation authority.
+
+Rollback preserves originals, change records, local held bytes and completed
+operation identities. Pause the affected automatic lane if needed; keep reads
+and unrelated work available. Do not silently restore retired intake, discard
+audit history or replay an uncertain mutation.
+
+## Rejected default and residual risk
+
+The earlier exact-human-approval-for-all-prose proposal is superseded by John's
+explicit direction. It is not an unresolved choice and must not reappear as an
+implementation prerequisite. Retrospective manual review does not become a
+mandatory review stage under another name.
+
+The accepted trade-off is trust in source-backed agent judgement, backed by
+traceable evidence, a readable log, hard structural rules and behavioural checks.
+A confused authorised agent may still misclassify apparently sourced prose.
+Hard-blocking retired intake is a deterministic guarantee; universal semantic
+dump prevention is not. Improve from observed errors without claiming a perfect
+classifier or quietly reintroducing per-fact approval.
 
 ## Files and verification
 
-Likely seams: `registry.ts`, `capabilities.ts`, tool schemas/handlers, BrainStore
-and RevisionStore implementations, ingestion jobs, log/lint/link maintenance,
-sync agent/status handling, native Monitor approval UI, private-schema migrations
-and routing fixtures. These are proposed changes only. Keep public shared source
-generic; ERS deployment configuration stays in its private overlay.
+Likely seams: registry/capabilities, schemas and tool handlers, BrainStore and
+RevisionStore, source/evidence adapters, log and maintenance services, ingestion,
+sync status and state, private-schema queue/audit transactions and routing
+fixtures. These are proposed changes only. No native approval UI, new approval
+credential, public owner-presence channel or general pending-proposal database
+is required. Evidence records reuse private operational storage, not Brain intake.
 
-For this design-only change: targeted Markdown/link checks and
-`git diff --check`. Implementation gates: Node 22 `npm run build`, `npm test`,
-focused real-path admission/routing/Postgres tests, affected Cockpit E2E, the
-existing Supabase security gate, then separately authorised guarded deployments
-and same-day read-only health/sync observations. No code tests, migrations,
-production writes, behavioural model runs or deployments are performed by saving
-this draft.
+Design-only verification: local Markdown/link checks and git diff --check.
+Implementation gates: Node 22 build/test, focused real-path evidence/routing/log
+and disposable Postgres tests, affected UI checks if a log view changes, the
+existing Supabase security gate for migrations/privileges, and separately
+authorised guarded deployments/health/sync verification. No implementation
+tests, production writes, model evaluations or deployments run in this revision.
+
+**Revision note — 22 October 2026:** replaced the strict prose-approval default
+with automatic source-backed updates and optional retrospective review; retained
+hard retired-intake protection and source/CAS/domain checks.
