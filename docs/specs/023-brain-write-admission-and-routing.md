@@ -1,6 +1,6 @@
 # 023 — Per-Brain write admission and Capture routing
 
-**Status:** in-progress — revised implementation approved by John on 22 October 2026; JEM and ERS production migration/policy activation separately approved by John on 22 October 2026; technical security and release gates remain
+**Status:** in-progress — JEM v1.13.0 deployed and verified; ERS release prepared and tested, awaiting its own Supabase admin connection. Both production migrations/policy activations are approved.
 
 **Source:** John's 22 October design request and correction: retain automatic source-backed updates, log changes for optional manual review, hard-block retired intake
 
@@ -430,6 +430,15 @@ rollout records below are complete, this document does not claim deployment or
 enforcement by old runtime clients.
 
 ## Files and verification
+
+### Verified release receipt — 22 October 2026
+
+- Public annotated **v1.13.0**, source `be324ad46c65ff7905823ff9eb4f231914293221`, is merged and pushed to main. JEM guarded deployment completed at **22:25:14.911 UTC**, image `deployment-01M5JVDB6EW0HC8VXBK6GFTZCK`; its existing London machine is started with passing health. Health reports 1.13.0, GitHub identity, Postgres revisions/OAuth, metadata-only artifacts and disabled Git hot path.
+- Release gate: **652 tests, 640 passed, 12 optional skips, zero failures**. The separate disposable PostgreSQL gate passed **46/46**; browser acceptance passed **13/13**, with desktop/mobile and light/dark change-page inspection. ERS's prepared overlay independently passed the same 652-test gate. No paid model evaluation or independent human semantic grading was performed.
+- JEM's approved exact migration and policy activation passed the private-schema/Storage security gate and fresh Security Advisor (0 errors/warnings/suggestions). Its actual runtime login can SELECT policy but cannot mutate it. A direct runtime queue insert was refused with `23514/general_intake_retired` in a rolled-back transaction; no content changed.
+- Actual existing Codex hosted-connector calls completed two source-backed synthetic corrections before reading any receipt; both exact read-backs passed. Exact retry returned its original revision without replacing the later edit. Changed payload, stale CAS, absent evidence, both capture aliases, direct TASKS append and transcript dump were refused without effects. TASKS retained its reviewed revision. The authenticated live browser change page showed exact prior/result text, retrieved source revision and verified status; the signed-out page withheld content. Both synthetic files were then soft-deleted, retaining audit history. New `brain_read_change` is advertised by live discovery, but this existing Codex chat retains its older tool declarations; native execution of that new tool is not claimed. The equivalent live browser reader passed.
+- JEM loader and operations guide now state the automatic-correction and optional-review contract, with CAS and exact read-back. The existing local Monitor was restarted with JEM explicitly enrolled in the released policy. Both owner Doctors pass; sync reports zero conflicts and no admission holds. Existing sync/heartbeat/Doctor cadence and recurring routines were preserved.
+- ERS branch `codex/ers-v1.13.0`, overlay `284b955`, is pushed to its private origin with zero engine/migration/script/package divergence from the annotated public tag. Its policy selects `ers-brain`, `brain_scoped`, and `capture-ers`. **ERS production remains v1.12.7 and is not activated:** admin CLI returned 403 and the current browser account cannot access its project. An ERS-authorised admin connection is the remaining input; approval is already recorded. After connection, apply the exact migration, activate the ERS row, rerun its security gate, guarded deploy and run its independent live acceptance. JEM evidence does not substitute for these ERS checks.
 
 Likely seams: registry/capabilities, schemas and tool handlers, BrainStore and
 RevisionStore, source/evidence adapters, log and maintenance services, ingestion,

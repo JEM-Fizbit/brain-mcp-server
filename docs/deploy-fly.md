@@ -6,8 +6,13 @@ The approved v1.13.0 release adds per-Brain write admission, automatic
 source-backed corrections and readable optional-review receipts. Both owner
 migrations and activations are authorised. JEM's exact migration and retired
 intake policy were applied at 22:21 UTC; its post-migration SQL gate passed.
-The application release remains pending until a guarded deployment receipt is
-recorded here. ERS remains on v1.12.7 pending access to its own admin connection;
+JEM guarded deployment completed at **22:25:14.911 UTC** from annotated
+**v1.13.0**, source `be324ad46c65ff7905823ff9eb4f231914293221`, image
+`deployment-01M5JVDB6EW0HC8VXBK6GFTZCK`. The 652-test gate passed (640 passes,
+12 optional skips), live synthetic admission/replay/routing and authenticated
+change-page acceptance passed, and both owner Doctors remain healthy. Full
+receipts and verification limits are in [Spec 023](specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
+ERS remains on v1.12.7 pending access to its own admin connection;
 the available CLI returns 403 and the existing browser session cannot open its
 project. Do not substitute JEM credentials or a runtime login for ERS DDL.
 
