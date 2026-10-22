@@ -26,8 +26,11 @@ private artifact bucket, zero Storage policies, non-login/non-superuser/non-bypa
 runtime role. The policy table permits runtime SELECT only. Both queue triggers
 are enabled, the retry index is valid/ready/unique, and both functions have fixed
 search paths with no anonymous/authenticated execute. A fresh Supabase Security
-Advisor rerun returned 0 errors, 0 warnings and 0 suggestions. Hosted application
-and live runtime checks are recorded separately after completion.
+Advisor rerun returned 0 errors, 0 warnings and 0 suggestions. The actual JEM
+runtime login then verified policy SELECT, absence of policy mutation privilege,
+and a direct retired-queue insert refusal (`23514`) in a rolled-back transaction.
+Hosted deployment and live acceptance passed; see the
+[Spec 023 receipt](../specs/023-brain-write-admission-and-routing.md#verified-release-receipt--22-october-2026).
 
 ERS is not migrated yet: current admin CLI access returns 403 and the existing
 browser session cannot open that project. Its prior dated gate remains historical;

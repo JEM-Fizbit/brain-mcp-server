@@ -117,6 +117,11 @@ When changing launcher, LaunchAgent, cockpit, or telemetry behaviour, update `do
 
 ## Capability and write preconditions
 
+Policy-enrolled Brains require observed `write_context` for durable corrections;
+source-backed updates remain automatic with optional retrospective log review.
+Use the selected Brain's policy from `brain_describe`; never invent per-fact
+approval or bypass retired intake. See [write admission and routing](docs/backend-capabilities.md#spec-023-write-admission).
+
 Use `brain_describe` for endpoint support before selecting an operation or requesting approval. Manual inbox custody and filesystem access are independent of MCP roles. Follow `docs/backend-capabilities.md` for support, effects, authorization and observations. Replacements must carry the `revision_id` from the read used for review as `expected_revision` (`new` only for creation); conflict resolution also requires the reviewed hosted revision. A stale refusal requires a fresh review, never an automatic retry with the new head. Local sync retains displaced bytes under `.brain-sync-recovery/`; do not silently delete those records.
 
 ## Reason-aware authentication alert contract
