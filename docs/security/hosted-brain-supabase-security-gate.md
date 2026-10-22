@@ -43,7 +43,7 @@ execute. Fresh Security Advisor: 0 errors, 0 warnings, 0 suggestions. The actual
 ERS runtime login independently confirmed policy read access and no mutation
 privilege. Existing legacy registration was preserved under its separate
 governance item; this release did not activate or inspect another Brain's content.
-No new login, workforce grant or plugin was introduced. Both owners' live
+No new database login, workforce grant or plugin was introduced. Both owners' live
 application acceptance passed after these gates.
 
 ### Ingestion-job migration gate — 11 September 2026
