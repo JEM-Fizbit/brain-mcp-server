@@ -3,8 +3,6 @@
 > Lightweight capture for ideas, bugs, and small features. Newest at top, one line per item. No metadata, no IDs.
 >
 > **Capture:** say "add to backlog: X" mid-session, run `scripts/backlog.sh X` from terminal, or edit this file directly (mobile via Working Copy or any editor).
-
-- Evaluate per-Brain enforcement and behavioural routing checks for the confirmed Capture/knowledge boundary: retired general intake must not be reintroduced through `brain_capture_item`/`brain_report_item`, and generic write/ingest guidance must not imply that transient status, drafts, attachments or session handoffs belong in Brain; preserve reusable-server compatibility and explicit Brain-scoped maintenance.
 > **Promote:** say "promote item N" or "let's work on [item]" — Claude drafts a spec at `docs/specs/NNN-slug.md`.
 > **On ship:** the line is deleted from this file. The archived spec at `docs/specs/archive/NNN-slug.md` is the durable record (source, criteria, work, commit).
 >
@@ -17,6 +15,7 @@
 
 <!-- backlog items below; newest first -->
 
+- Design per-Brain write admission and behavioural routing checks for the confirmed Capture/knowledge boundary; [spec 023](docs/specs/023-brain-write-admission-and-routing.md) is a draft, with strict prose review versus unattended correction requiring John's decision before implementation.
 
 - Deferred source-review sweep: compare source custody/index coverage, identify under-integrated material and consolidation candidates; consider a monthly operator review. Migrated from JEM TASKS Future (Karpathy gap 2); design context remains `sources/analysis/2026-04-14_brain-architecture-review-karpathy.md`. Inventory only, no scheduler or implementation authorized.
 - Deferred proactive lint: assess `--stale` and `--reconcile` first, then `--impute`, `--connections` and `--questions`; measure false positives before automatic changes. Migrated from JEM TASKS Future (Karpathy gap 3), with the same architecture-review source.
