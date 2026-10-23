@@ -4,6 +4,10 @@
 #import <CommonCrypto/CommonDigest.h>
 #ifdef MONITOR_SPARKLE
 #import <Sparkle/Sparkle.h>
+static NSString *noUpdateState(NSError *error) {
+  NSNumber *reason=error.userInfo[SPUNoUpdateFoundReasonKey];
+  return reason && reason.integerValue==SPUNoUpdateFoundReasonOnLatestVersion?@"current":@"deferred";
+}
 #endif
 
 static NSDictionary *releaseInfo(void) {
@@ -164,9 +168,15 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
 }
 - (void)updater:(SPUUpdater *)updater didFindValidUpdate:(SUAppcastItem *)item {(void)updater;(void)item;self.updateState=@"available";[self menu];}
 - (void)updater:(SPUUpdater *)updater didDownloadUpdate:(SUAppcastItem *)item {(void)updater;(void)item;self.updateState=@"downloaded";[self menu];}
-- (void)updater:(SPUUpdater *)updater didAbortWithError:(NSError *)error {(void)updater;(void)error;self.updateState=@"failed";[self menu];}
+- (void)updater:(SPUUpdater *)updater didAbortWithError:(NSError *)error {
+  (void)updater;
+  if([error.domain isEqualToString:SUSparkleErrorDomain] && error.code==SUNoUpdateError)self.updateState=noUpdateState(error);
+  else if([error.domain isEqualToString:SUSparkleErrorDomain] && (error.code==SUInstallationCanceledError || error.code==SUInstallationAuthorizeLaterError))self.updateState=@"deferred";
+  else self.updateState=@"failed";
+  [self menu];
+}
 - (void)updaterDidNotFindUpdate:(SPUUpdater *)updater error:(NSError *)error {
-  (void)updater;self.updateState=[error.userInfo[SPUNoUpdateFoundReasonKey] integerValue]==SPUNoUpdateFoundReasonOnLatestVersion?@"current":@"deferred";[self menu];
+  (void)updater;self.updateState=noUpdateState(error);[self menu];
 }
 #endif
 @end
