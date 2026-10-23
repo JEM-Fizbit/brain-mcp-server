@@ -1,0 +1,27 @@
+{
+  "brain_id": "ai-brain-jem",
+  "origin": "https://jem-brain-mcp.fly.dev",
+  "prepared_at": "2026-10-23T15:21:17.145Z",
+  "release": {
+    "bundle_id": "com.johnmilad.brainmonitor.jem",
+    "origin": "https://jem-brain-mcp.fly.dev",
+    "brain_id": "ai-brain-jem",
+    "app_version": "1.14.0",
+    "build": "6",
+    "source_revision": "1d1f6c43835ea75f01ffe78f18ef615962be3004",
+    "update_mode": "automatic",
+    "arch": "arm64"
+  },
+  "files": [
+    {
+      "filename": "Brain-Monitor-6-arm64.zip",
+      "bytes": 37557006,
+      "sha256": "884c886128fb643646e97fd4a758ea0d09901960d4a38be8b462b0c9c4f94b49"
+    },
+    {
+      "filename": "canary.xml",
+      "bytes": 1263,
+      "sha256": "5a42c4152e4fb6e215f210c7c6d45b2f384c4b52e05351805aeed4f93433ea9c"
+    }
+  ]
+}
