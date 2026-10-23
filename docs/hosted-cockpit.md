@@ -1,5 +1,15 @@
 # Hosted Brain Cockpit
 
+## Installation inventory and native updates — v1.14.2
+
+ERS's existing Identity & Access page now includes **Installed Monitors**; JEM's
+hosted status links to its Owner inventory. These show authenticated build/source
+reports, last contact, current update policy, missing receipts and stale/offline
+observations. Both owner feeds serve signed/notarised portable build 9. Developer
+supervision and its private profiles remain separate and excluded from fleet
+replacement. Older colleague apps still require bootstrap; no installation is
+inferred from their access role. [Downloads, release process and proof](monitor-distribution.md).
+
 ## Browse changes — v1.13.1
 
 The toolbar's **Change log** link opens the selected Brain's authenticated

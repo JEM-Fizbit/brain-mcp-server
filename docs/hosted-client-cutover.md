@@ -1,5 +1,16 @@
 # Hosted Client Cutover Runbook
 
+## Signed native Monitor distribution — v1.14.2
+
+Both hosted stacks and their signed update feeds are deployed. Browser/MCP users
+receive current hosted code without a package. Existing uninstrumented native
+Monitors need one bootstrap into the portable app and existing Brain sign-in;
+future published signed packages update automatically. Preserve developer/MDM
+exclusions and never copy SQL profiles to colleagues. Current accepted packages
+are Apple silicon build 9; other installations/architectures remain unverified.
+Installation/build evidence is visible in ERS Identity & Access and JEM's Owner
+inventory. [Downloads and acceptance steps](monitor-distribution.md#install-and-review).
+
 ## Distribution after v1.13.3 — 23 October 2026
 
 Ordinary hosted users need no new binary/package. Their existing authorised MCP

@@ -1,9 +1,42 @@
 # Brain write admission and monitor parity — session closeout
 
 **Date:** 23 October 2026 (Europe/London)  
-**Status:** complete and deployed for both JEM and ERS; no blocker in the approved scope  
-**Application release:** annotated `v1.13.3`, source `548b1150311c85b78603b3eb8b58bd002f30d811`  
-**Source baseline before this documentation checkpoint:** public `main` at `566fee9`; the checkpoint is the commit containing this file, not a new application build.
+**Status:** engineering complete and deployed for both JEM and ERS; colleague Monitor bootstrap acceptance remains unverified
+**Current application release:** annotated `v1.14.2`; signed portable Monitor build 9
+**Original release before the distribution extension:** `v1.13.3`, source `548b1150311c85b78603b3eb8b58bd002f30d811`
+**Original source baseline before this documentation checkpoint:** public `main` at `566fee9`; later savepoint-only commits are not new application builds.
+
+## Automatic Monitor updates — completed engineering extension
+
+Both cloud services and normal signed update feeds run v1.14.2. JEM deployed
+source `d7d2adc9d987a82a78801b81d97eee984c894721` at 15:59:51 UTC; ERS deployed
+its private overlay `d0527578d30e411c2c149552cbd847c17cd2e393` at 15:59:10 UTC.
+Protected ERS runtime/tooling/migration sources match the public tag exactly.
+Approved inventory migrations and both security re-gates passed; signing keys
+remain separate in Keychain under the existing personal Developer ID custody.
+
+Both guards passed 658 tests with 13 optional skips, real disposable PostgreSQL
+checks passed and 10 Chromium checks passed. Both signed upgrade canaries passed;
+ERS also installed its automatically downloaded normal-channel update on quit.
+Both final build 9 apps retained sign-in, reported into inventory and displayed
+**current** after a no-update check. Both complete Doctor profiles passed at
+16:01 UTC. A Homebrew Node 22 linkage fault was repaired at the stable configured
+path. A later ERS child-process file-access fault recovered through restart of
+the unchanged developer Monitor and its documented bounded retry. No privacy
+grant, access role, Brain content or developer profile changed in that recovery.
+
+The observed portable test installations have explicit per-device automatic
+exceptions; the original developer app/toolchain and default exclusions remain
+intact. Other installations stay unverified. Legacy apps need one bootstrap;
+Apple silicon is accepted, Intel-native packaging and colleague OS/installation
+receipts are not. No Intune target or messages to colleagues were sent. The
+portable app supplies hosted diagnostics, not a copied local SQL Doctor/sync stack.
+
+Next action: use the [download/acceptance runbook](../monitor-distribution.md)
+to bootstrap eligible colleague Macs and confirm their own inventory receipts.
+No new schema/key approval is needed. Keep named ERS policy and rollout receipts
+in the existing private operations runbook; do not create a Brain intake queue or
+another handoff tracker. The original completed effort is recorded below.
 
 Read this after `AGENTS.md` when resuming. This is a completed-effort handoff,
 not a new task list or authority to start the wider backlog. Current product work

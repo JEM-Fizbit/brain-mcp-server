@@ -1,5 +1,23 @@
 # Working Decisions Log
 
+## 2026-10-23 — Signed Monitor updates and observed installation inventory
+
+John approved automatic updates with developer exclusions and build visibility
+inside the existing access control plane. Eligibility requires exact approved
+human identities and current roles; break-glass accounts and agents are excluded.
+Default developer holds remain conservative, with exceptions tied to observed
+installation UUIDs. Access grants do not prove installation. Reports are bounded,
+authenticated self-reports, not hardware identity or remote attestation.
+
+The portable app carries its runtime and no database profile or developer sync
+stack. Use the existing Developer ID/notarisation custody and separate JEM/ERS
+Sparkle keys held in Keychain. Signed owner-origin feeds publish only after a
+signed upgrade canary passes. John separately approved both private inventory
+migrations and keys; both are complete. Published releases check daily and install
+on quit while the app runs; legacy apps need one bootstrap. Source-backed Brain
+corrections and their retrospective review remain automatic.
+[Deployment, evidence and remaining rollout](monitor-distribution.md).
+
 ## 2026-10-23 — Human-browsable change history
 
 John requested a Git-style change log in both monitors. Reuse each Brain's

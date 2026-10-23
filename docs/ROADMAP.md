@@ -1,5 +1,12 @@
 # Hosted Brain Roadmap
 
+**23 October 2026 — Monitor distribution:** both owner stacks run v1.14.2 with
+private installation/build inventories and signed automatic update feeds. Native
+build 9 is signed/notarised; both canaries and final Doctors passed. Developer
+exclusions remain in force. Colleagues' legacy apps still need bootstrap and
+actual installation receipts; Intel-native acceptance remains open.
+[Delivery and limits](monitor-distribution.md).
+
 **23 October 2026:** v1.13.3 is deployed and verified in both owner monitors:
 authenticated browse/search/filter history, Git-style revision diffs and
 Back to cockpit navigation. Source-backed corrections stay

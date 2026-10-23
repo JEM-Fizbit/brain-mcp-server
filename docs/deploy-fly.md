@@ -1,5 +1,24 @@
 # Fly Deployment
 
+## Current Monitor release — v1.14.2, 23 October 2026
+
+Both owner services and signed normal update feeds are deployed. JEM source
+`d7d2adc9d987a82a78801b81d97eee984c894721` deployed at 15:59:51 UTC; ERS
+overlay `d0527578d30e411c2c149552cbd847c17cd2e393`, against that same annotated
+upstream tag, deployed at 15:59:10 UTC. Each mandatory guard passed 658 tests with
+13 optional skips. ERS protected source/runtime/migration/tooling diffs are zero.
+Both 20/21-table private security gates passed following the separately approved
+inventory migration. Both final Doctors passed at 16:01 UTC after bounded local
+ERS sync recovery, preserving the developer app and its profiles.
+
+Signed/notarised native build 9, separate Keychain signing accounts, installation
+reports, normal/canary feed signatures and in-place upgrades were verified. No
+colleague install or Intel-native acceptance is claimed. Release archives stay
+out of Git; their owner-bound hashes are committed and checked against Docker
+input by the release guard. [Downloads and complete acceptance boundary](monitor-distribution.md).
+
+## Original closeout — before native update distribution
+
 **Session closed, 23 October 2026:** both complete stacks are deployed on
 v1.13.3 and final health/schema/parity checks pass. Read the
 [completed-session handoff](savepoints/2026-10-23-brain-write-admission-and-monitor-parity.md)

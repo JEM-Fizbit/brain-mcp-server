@@ -1,9 +1,9 @@
 # 024 — Monitor distribution, automatic updates and installation inventory
 
-**Status:** in-progress — implementation authorised by John on 23 October 2026;
-production migration, release signing and fleet activation require their concrete
-deployment checks. Inventory and isolated canary feeds are deployed to both owners;
-normal feeds and colleague installations remain pending.
+**Status:** implemented and deployed to both owners as v1.14.2 on 23 October 2026.
+Approved inventory migrations, independent signing keys, normal signed feeds and
+build 9 acceptance are complete. Colleague bootstrap/installation acceptance is
+still unverified; it is not inferred from the identity roster.
 **Source:** BACKLOG.md optional Monitor packaging; John's 23 October request for
 automatic updates, developer exclusions and a build inventory in Identity & Access.
 **Roadmap link:** ad-hoc
@@ -113,7 +113,26 @@ work, not a reopened defect in that release.
 - [Identity and rollout contract](018-ers-production-identity-and-rollout.md)
 
 
-## Implementation checkpoint — 23 October 2026
+## Final acceptance — 23 October 2026
+
+JEM deployed v1.14.2 source `d7d2adc9d987a82a78801b81d97eee984c894721`
+at 15:59:51 UTC; ERS deployed its isolated overlay
+`d0527578d30e411c2c149552cbd847c17cd2e393` at 15:59:10 UTC. ERS protected
+runtime, package, migration and release-tool sources match the annotated public
+tag. Both guards passed 658 tests with 13 optional skips; isolated PostgreSQL
+checks and 10 browser checks passed. Both private security gates passed.
+
+Both signed canaries upgraded 5→6. The normal-channel trial verified automatic
+download and ERS installation on quit (7→8). Final build 9 retained sign-in,
+reported into each inventory and stayed **current** after a no-update result.
+Both Doctor profiles passed at 16:01 UTC. The existing developer app, profiles,
+checkout paths and exclusion defaults remain intact. Only the observed portable
+test installations have explicit automatic-mode exceptions. No colleague install,
+Intune target, Intel-native acceptance or full local SQL Doctor distribution is
+claimed. Bootstrap links and future release checks are in the
+[distribution runbook](../monitor-distribution.md).
+
+## Historical implementation checkpoint — before live activation, 23 October 2026
 
 Implemented on the feature branch: private installation schema, bounded report
 API with exact current-role/identity checks, Owner inventory in the existing
