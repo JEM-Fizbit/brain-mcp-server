@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {createHash} from 'node:crypto';
+import {monitorDeployEnv,verifyMonitorReleaseAssets} from '../scripts/lib/monitor-release-assets.mjs';
+test('deployment verifies owner-bound release bytes from Fly configuration rather than ambient overrides',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'monitor-release-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const env=monitorDeployEnv('[env]\n BRAIN_ID = "test-brain"\n MCP_OAUTH_PUBLIC_BASE = "https://brain.example"\n BRAIN_MONITOR_RELEASE_DIR = "/app/config/monitor-release-assets"\n[http_service]\n', {BRAIN_ID:'foreign'});
+ assert.equal(env.BRAIN_ID,'test-brain');
+ const directory=path.join(root,'config','monitor-release-assets');await fs.mkdir(directory,{recursive:true});
+ const bytes=Buffer.from('<rss/>');await fs.writeFile(path.join(directory,'appcast.xml'),bytes);
+ const manifest={brain_id:'test-brain',origin:'https://brain.example',files:[{filename:'appcast.xml',bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}]};
+ const filename=path.join(root,'config','monitor-release-manifest.json');await fs.writeFile(filename,JSON.stringify(manifest));
+ await verifyMonitorReleaseAssets(root,env);
+ await assert.rejects(verifyMonitorReleaseAssets(root,{...env,BRAIN_ID:'foreign'}),/binding/);
+ await fs.writeFile(path.join(directory,'appcast.xml'),'<changed/>');await assert.rejects(verifyMonitorReleaseAssets(root,env),/size|digest/);
+ await fs.writeFile(path.join(directory,'appcast.xml'),bytes);await fs.writeFile(path.join(directory,'not-a-release'),'private');
+ await assert.rejects(verifyMonitorReleaseAssets(root,env),/Unmanifested/);
+});

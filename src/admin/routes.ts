@@ -14,6 +14,7 @@ import { runtimeBrainId } from "../services/runtime-env.js";
 import { AccessAdministrationService, AccessReconciliationError } from "./access-service.js";
 import { accessAdminPage } from "./page.js";
 import { AdminSessionStore, type AdminSession } from "./session.js";
+import type { MonitorInstallations } from '../monitor/installations.js';
 
 const MAX_ADMIN_BODY = 32 * 1024;
 const SECURITY_HEADERS = {
@@ -31,6 +32,7 @@ export interface AdminRouteContext {
   grants: PostgresAccessGrantStore;
   service: AccessAdministrationService;
   rolesForPrincipal?: typeof currentRolesForPrincipal;
+  installations?: MonitorInstallations;
 }
 
 function sendJson(res: ServerResponse, status: number, value: unknown, headers = {}): void {
@@ -179,6 +181,12 @@ export async function handleAdminRequest(
     if (req.method === "GET" && url.pathname === "/admin/api/users") {
       const users = await ctx.service.graph(session.graphAccessToken).searchUsers(url.searchParams.get("q") || "");
       sendJson(res, 200, { users });
+      return true;
+    }
+    if (req.method === 'GET' && url.pathname === '/admin/api/monitors') {
+      if (!ctx.installations) {sendJson(res,503,{error:'Monitor inventory is not activated'});return true;}
+      try {sendJson(res,200,await ctx.installations.list());}
+      catch {sendJson(res,503,{error:'Monitor inventory is unavailable; no installation conclusion can be drawn'});}
       return true;
     }
     if (req.method === "GET" && url.pathname === "/admin/api/access") {

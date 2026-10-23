@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
+import { verifyMonitorReleaseAssets, monitorDeployEnv } from './lib/monitor-release-assets.mjs';
 import {
   assertReleaseState,
   assertFlyAppBinding,
@@ -91,6 +92,7 @@ function releaseState() {
 
 assertFlyAppBinding(fs.readFileSync(path.join(repoRoot, "fly.toml"), "utf8"), flyApp);
 const initial = releaseState();
+await verifyMonitorReleaseAssets(repoRoot,monitorDeployEnv(fs.readFileSync(path.join(repoRoot,'fly.toml'),'utf8'),process.env));
 const tag = assertReleaseState({ ...initial, packageVersion: packageJson.version });
 const sha = run("git", ["rev-parse", "HEAD"], { capture: true });
 const flyDeployArgs = buildFlyDeployArgs({ app: flyApp, sha, version: packageJson.version });
@@ -102,6 +104,7 @@ console.log(`[deploy-guarded] Verifying ${releaseDescription} for ${flyApp || "<
 run("npm", ["test"], { env: buildReleaseTestEnv(process.env) });
 
 assertReleaseState({ ...releaseState(), packageVersion: packageJson.version });
+await verifyMonitorReleaseAssets(repoRoot,monitorDeployEnv(fs.readFileSync(path.join(repoRoot,'fly.toml'),'utf8'),process.env));
 // Read the app-bound secret only after tests and the final release guard.
 const deployEnv = await managedFlyEnv({app: flyApp, brainId: process.env.BRAIN_ID});
 run(flyBin, flyDeployArgs, {env: deployEnv});

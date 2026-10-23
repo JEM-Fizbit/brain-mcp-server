@@ -33,6 +33,9 @@ import { runtimeBrainId } from "../services/runtime-env.js";
 import { loadRegistry } from "../services/registry.js";
 
 import { MonitoringRoutes } from "../monitor/routes.js";
+import { MonitorInstallations, loadMonitorPolicy } from '../monitor/installations.js';
+import { InstallationRoutes } from '../monitor/installation-routes.js';
+import { MonitorUpdateAssets } from '../monitor/update-assets.js';
 import { createMonitoringStatus } from "../monitor/status.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -46,6 +49,8 @@ interface HttpContext {
   allowedMcpOrigins?: readonly string[];
   admin?: AdminRouteContext;
   monitor?: MonitoringRoutes;
+  installations?: InstallationRoutes;
+  monitorUpdates?: MonitorUpdateAssets;
 }
 
 function log(level: string, message: string, extra?: unknown): void {
@@ -227,6 +232,14 @@ export async function handleHttpRequest(
   const pathname = url.pathname;
 
   try {
+    if (pathname.startsWith('/monitor/updates/')) {
+      if (!ctx.monitorUpdates) {sendJson(res,404,{error:'not_found'});return;}
+      await ctx.monitorUpdates.handle(req,res,url);return;
+    }
+    if (pathname === '/monitor/api/installations' && req.method === 'POST') {
+      if (!ctx.installations) {sendJson(res,503,{error:'inventory_not_activated'});return;}
+      await ctx.installations.handle(req,res);return;
+    }
     if (pathname === "/monitor" || pathname.startsWith("/monitor/")) {
       if (!ctx.monitor) { sendJson(res, 404, {error: "not found"}); return; }
       await ctx.monitor.handle(req, res, url);
@@ -419,9 +432,17 @@ export async function startHttpServer(): Promise<void> {
     state,
     allowedMcpOrigins: buildMcpAllowedOrigins(config.resourceUri),
   };
+  let installations: MonitorInstallations | undefined;
+  if (process.env.BRAIN_MONITOR_RELEASE_DIR) ctx.monitorUpdates = new MonitorUpdateAssets(process.env.BRAIN_MONITOR_RELEASE_DIR);
+  if (process.env.BRAIN_MONITOR_POLICY_FILE) {
+    installations = new MonitorInstallations(postgresAccessGrantStore().pool,
+      await loadMonitorPolicy(process.env.BRAIN_MONITOR_POLICY_FILE,runtimeBrainId()));
+    ctx.installations = new InstallationRoutes(config,installations);
+  }
   if (process.env.BRAIN_MONITORING_ENABLED !== "0" && process.env.BRAIN_REVISION_STORE === "postgres" && process.env.BRAIN_REVISION_DATABASE_URL) {
     const status = createMonitoringStatus(process.env.BRAIN_REVISION_DATABASE_URL);
-    ctx.monitor = new MonitoringRoutes(config, state, (brainId, role) => status.read(brainId, role));
+    ctx.monitor = new MonitoringRoutes(config, state, (brainId, role, operator) => status.read(brainId, role, operator));
+    ctx.monitor.installations = installations;
   }
   if (
     runtimeBrainId() === "ers-brain" &&
@@ -432,6 +453,7 @@ export async function startHttpServer(): Promise<void> {
     // same steady-state floor as the transactional administration policy.
     await assertSteadyStateOwnerRoster(grants, "ers-brain", config.entra.tenantId);
     ctx.admin = {
+      installations,
       config,
       state,
       sessions: new AdminSessionStore(config),

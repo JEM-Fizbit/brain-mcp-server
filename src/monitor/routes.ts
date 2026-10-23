@@ -11,13 +11,16 @@ import { changeLogOptions, changeLogPage } from './change-log.js';
 import type { BrainStore } from '../services/brain-store.js';
 import { safeCockpitUrl } from './navigation.js';
 import { monitoringPage, monitoringCss, monitoringJs, changeHistoryCss } from './page.js';
+import { monitorOperator, type MonitorInstallations } from './installations.js';
+import { installationsPage } from './installations-page.js';
 
 const headers = {'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'};
 export class MonitoringRoutes {
+  installations?: MonitorInstallations;
   readonly sessions: MonitorSessions;
   private historyReads=0;
   constructor(readonly config: OauthConfig, state: StateProvider,
-    readonly read: (brainId:string,role:BrainRole)=>Promise<unknown>,
+    readonly read: (brainId:string,role:BrainRole,operator?:boolean)=>Promise<unknown>,
     readonly roles: (principal:BrainPrincipal)=>Promise<Record<string,BrainRole>> = currentRolesForPrincipal,
     readonly store: () => Pick<BrainStore,'readFile'|'readChange'> = activeBrainStore) {
     this.sessions = new MonitorSessions(config,state);
@@ -48,7 +51,7 @@ export class MonitoringRoutes {
       }
       const changeMatch=/^\/monitor\/changes\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
       const changeLog=url.pathname==='/monitor/changes';
-      if (!changeMatch && !changeLog && url.pathname!=='/monitor/api/status') {send(404,'{"error":"not_found"}');return;}
+      if (!changeMatch && !changeLog && !['/monitor/api/status','/monitor/api/installations','/monitor/installations'].includes(url.pathname)) {send(404,'{"error":"not_found"}');return;}
       const session=await this.sessions.get(req.headers.cookie);
       if (!session) {
         if(changeMatch || changeLog) send(401,'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Read Brain changes</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main><h1>Sign in to read Brain changes</h1><p>Sign in with your Brain account, then select Change log on Brain status.</p><a class="button" href="/monitor/login">Sign in</a></main></body></html>','text/html; charset=utf-8');
@@ -60,6 +63,13 @@ export class MonitoringRoutes {
       const registered=(await loadRegistry()).brains.find(brain=>brain.id===brainId);
       if (!registered || !['reader','member','admin','owner'].includes(role)) {send(403,'{"error":"access_denied"}');return;}
       const cockpit=safeCockpitUrl(url.searchParams.get('return_to')) || safeCockpitUrl(registered.metadata?.cockpit_url);
+      if (url.pathname==='/monitor/api/installations' || url.pathname==='/monitor/installations') {
+        if (brainId !== runtimeBrainId() || role !== 'owner') {send(403,'{"error":"owner_required"}');return;}
+        if (!this.installations) {send(503,'{"error":"inventory_not_activated"}');return;}
+        const data=await this.installations.list();
+        if(url.pathname==='/monitor/installations')send(200,installationsPage(brainId,data),'text/html; charset=utf-8');
+        else send(200,JSON.stringify(data));return;
+      }
       if(changeLog) {
         let options;
         try { options=changeLogOptions(url.searchParams); } catch {send(400,'Invalid change-log filters.','text/plain');return;}
@@ -77,7 +87,8 @@ export class MonitoringRoutes {
         } catch {send(404,'Change is unavailable in this Brain.','text/plain');}
         return;
       }
-      send(200,JSON.stringify({...await this.read(brainId,role) as Record<string,unknown>,cockpit_url:cockpit}));
+      const operator=Boolean(this.installations && monitorOperator(this.installations.policy,session.principal,role));
+      send(200,JSON.stringify({...await this.read(brainId,role,operator) as Record<string,unknown>,cockpit_url:cockpit}));
     } catch(error) {
       const reason=error instanceof Error?error.message:'';
       if (reason==='monitor_login_rate_limited') send(429,'{"error":"try_later"}','application/json',{'Retry-After':'60'});

@@ -166,6 +166,7 @@ export function accessAdminPage(): string {
         <th data-sort-table="githubGrants" data-sort-key="updated" aria-sort="none"><button type="button" class="sort-button" data-grant-sort="updated" data-sort-target="githubGrants">Updated <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
       </tr></thead><tbody id="githubGrants"></tbody></table></div>
     </div>
+    <div class="card"><h2>Installed Monitors</h2><p class="muted">Authenticated build reports, separate from access grants. No report means installation unverified; an old report does not mean uninstalled. Developer and IT exclusions remain in force.</p><p id="monitorState" role="status">Loading installation inventory…</p><div class="table-wrap"><table><thead><tr><th>Person / identity</th><th>Role / eligibility</th><th>Monitor build</th><th>Last contact</th><th>Updates</th></tr></thead><tbody id="monitorInstallations"></tbody></table></div></div>
     <div class="card"><h2>Audit history</h2><div class="table-wrap"><table><thead><tr><th>When</th><th>Actor</th><th>Target</th><th>Change</th><th>Graph</th><th>Reason</th></tr></thead><tbody id="audit"></tbody></table></div></div>
   </section>
 </main>
@@ -363,6 +364,30 @@ async function load() {
   $("signout").classList.remove("hidden");
   await refresh();
 }
+function monitorKey(value) { return JSON.stringify([value.provider, (value.provider_tenant_id || value.providerTenantId || "").toLowerCase(), value.provider_user_id || value.providerUserId]); }
+async function refreshMonitors() {
+  const table = $("monitorInstallations"); table.replaceChildren();
+  $("monitorState").textContent = "Refreshing installation inventory…";
+  try {
+    const data = await api("/admin/api/monitors");
+    for (const grant of grantRows) {
+      const key = monitorKey(grant);
+      const operator = data.operators.find(value => monitorKey(value) === key);
+      const reports = data.installations.filter(value => monitorKey(value) === key);
+      for (const report of reports.length ? reports : [null]) {
+        const row = document.createElement("tr");
+        const recent = report && Date.now()-Date.parse(report.last_seen_at) < 86400000;
+        row.append(td(grant.name || grant.email || grant.providerUserId),
+          td(roleLabel(grant.role) + " · " + (operator && grant.status === "active" && grant.role !== "reader" ? "Operator cohort" : "Outside operator cohort")),
+          td(report ? report.app_version + " (" + report.build + ") · " + report.source_revision.slice(0,12) + " · " + report.installation_id.slice(0,8) : "Installation unverified"),
+          td(report ? new Date(report.last_seen_at).toLocaleString() + (recent ? " · recent" : " · stale / offline") : "No authenticated report"),
+          td(report ? report.update_mode + " · " + report.update_state : operator ? operator.update_mode : "Not targeted"));
+        table.append(row);
+      }
+    }
+    $("monitorState").textContent = "Observed " + new Date(data.observed_at).toLocaleString() + ". " + data.evidence + (data.truncated ? ". First 500 records; inventory truncated." : "");
+  } catch (error) { table.replaceChildren(); $("monitorState").textContent = "Inventory unavailable: " + error.message; }
+}
 async function refresh() {
   clearError();
   $("status").textContent = "Refreshing…";
@@ -371,6 +396,7 @@ async function refresh() {
     grantRows = data.grants.filter(grant => grant.provider === "entra");
     githubGrantRows = data.grants.filter(grant => grant.provider === "github");
     renderGrantTables();
+    await refreshMonitors();
     const audit = $("audit");
     audit.replaceChildren();
     for (const event of data.audit) {
@@ -382,6 +408,8 @@ async function refresh() {
     $("status").className = "status ok";
   } catch (error) {
     showError(error.message);
+    $("monitorInstallations").replaceChildren();
+    $("monitorState").textContent = "Access refresh failed; installation status is unobserved.";
     $("status").textContent = "Needs attention";
     $("status").className = "status fail";
   }

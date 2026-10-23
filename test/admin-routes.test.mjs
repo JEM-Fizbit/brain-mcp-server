@@ -187,3 +187,15 @@ test("admin mutations enforce same-origin, CSRF, confirmation, and server-contro
   assert.match(sanitized.body, /Identity provider request failed/);
   assert.doesNotMatch(sanitized.body, /token secret/);
 });
+
+test('Monitor inventory in access administration requires the existing current Owner and fails closed', async()=>{
+  process.env.BRAIN_ID='ers-brain';
+  const owner=context();const call=async(ctx,cookie)=>{const res=response();await handleAdminRequest(request('GET',{cookie}),res,new URL('https://brain.example.test/admin/api/monitors'),ctx);return res;};
+  assert.equal((await call(owner.ctx,owner.cookie)).statusCode,503);
+  owner.ctx.installations={list:async()=>({installations:[],operators:[],evidence:'unobserved'})};
+  assert.equal((await call(owner.ctx,owner.cookie)).statusCode,200);
+  const curator=context('member');curator.ctx.installations=owner.ctx.installations;
+  assert.equal((await call(curator.ctx,curator.cookie)).statusCode,401);
+  owner.ctx.installations={list:async()=>{throw Error('password=PRIVATE');}};
+  const failed=await call(owner.ctx,owner.cookie);assert.equal(failed.statusCode,503);assert.doesNotMatch(failed.body,/PRIVATE/);
+});

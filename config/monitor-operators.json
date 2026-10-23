@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "brain_id": "ai-brain-jem",
+  "operators": [
+    {
+      "provider": "github",
+      "provider_tenant_id": "",
+      "provider_user_id": "220941196",
+      "person_id": "john-milad",
+      "update_mode": "developer"
+    }
+  ]
+}

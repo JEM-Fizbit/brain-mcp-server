@@ -54,13 +54,21 @@ const fixture = {
   audit: [],
 };
 
-async function startAccessPage() {
+async function startAccessPage({ inventoryError = false } = {}) {
   const port = await openPort();
   const server = http.createServer((request, response) => {
     response.setHeader("content-type", request.url?.startsWith("/admin/api/") ? "application/json" : "text/html; charset=utf-8");
     if (request.url === "/admin/api/session") {
       response.end(JSON.stringify({ authenticated: true, csrfToken: "test-csrf", name: "John Milad", expiresAt: Math.floor(Date.now() / 1000) + 900 }));
       return;
+    }
+    if (request.url === "/admin/api/monitors") {
+      response.statusCode = inventoryError ? 503 : 200;
+      response.end(JSON.stringify(inventoryError ? {error:"Fixture inventory unavailable"} : {
+        operators:[{provider:"entra",provider_tenant_id:"",provider_user_id:"22222222-2222-4222-8222-222222222222",person_id:"fixture-person",update_mode:"developer"}],
+        installations:[{provider:"entra",provider_tenant_id:"",provider_user_id:"22222222-2222-4222-8222-222222222222",installation_id:"11111111-1111-4111-8111-111111111111",app_version:"1.14.0",build:"41",source_revision:"a".repeat(40),last_seen_at:new Date().toISOString(),update_mode:"developer",update_state:"unknown"}],
+        observed_at:new Date().toISOString(),truncated:false,evidence:"Authenticated, self-reported installation; not remote attestation"
+      }));return;
     }
     if (request.url === "/admin/api/access") {
       response.end(JSON.stringify(fixture));
@@ -165,3 +173,24 @@ for (const colorScheme of ["light", "dark"]) {
     });
   }
 }
+
+for (const viewport of [{width:1280,height:900},{width:390,height:844}]) {
+  test("Monitor inventory keeps builds, missing reports and developer exclusions distinct at " + viewport.width,async({browser})=>{
+    const {server,url}=await startAccessPage();const context=await browser.newContext({viewport});const page=await context.newPage();
+    try {await page.goto(url);await expect(page.getByRole("heading",{name:"Installed Monitors",exact:true})).toBeVisible();
+      await expect(page.locator("#monitorInstallations tr")).toHaveCount(2);
+      await expect(page.locator("#monitorInstallations")).toContainText("1.14.0 (41)");
+      await expect(page.locator("#monitorInstallations")).toContainText("developer · unknown");
+      await expect(page.locator("#monitorInstallations")).toContainText("Installation unverified");
+      await expect(page.locator("#monitorState")).toContainText("not remote attestation");
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
+    } finally {await context.close();await stopServer(server);}
+  });
+}
+test("Monitor inventory failure never renders a zero-installation conclusion",async({page})=>{
+  const {server,url}=await startAccessPage({inventoryError:true});
+  try {await page.goto(url);await expect(page.locator("#monitorState")).toContainText("Inventory unavailable");
+    await expect(page.locator("#monitorInstallations tr")).toHaveCount(0);
+    await expect(page.locator("#grants tr")).toHaveCount(2);
+  } finally {await stopServer(server);}
+});

@@ -7,7 +7,7 @@ import type { BrainRole } from '../services/registry.js';
 export class MonitoringStatus {
   private active = 0;
   constructor(readonly pool: pg.Pool) {}
-  async read(brainId: string, role: BrainRole) {
+  async read(brainId: string, role: BrainRole, operator = false) {
     if (this.active >= 4) throw new Error('monitor_busy');
     this.active++;
     try {
@@ -20,7 +20,7 @@ export class MonitoringStatus {
       const observed = new Date().toISOString();
       const syncAt = row.sync_at ? new Date(row.sync_at).toISOString() : null;
       const age = syncAt ? Date.now()-Date.parse(syncAt) : null;
-      const detailed = role === 'admin' || role === 'owner';
+      const detailed = role === 'admin' || role === 'owner' || role === 'member' && operator;
       let diagnostics;
       if (detailed) {
         const result = await this.pool.query({text: `with recent as (

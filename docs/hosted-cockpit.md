@@ -846,3 +846,19 @@ candidates. Recurring application would require separately approved standing
 scope, deterministic block eligibility, reviewed current revisions, complete
 history preservation and receipts; this change adds no auto-archive, deletion,
 schedule or daemon authority. Review dates are not refreshed automatically.
+
+
+## Monitor distribution and installation inventory — spec 024
+
+The [distribution runbook](monitor-distribution.md) defines the new portable
+Monitor, signed automatic updates and the Owner installation/build inventory.
+Implementation is under verification; production schema/feed/key activation and
+colleague installation receipts are still pending. The existing developer
+Monitor continues to own local sync and the full loopback Cockpit/Doctor. Its
+profiles, checkout and toolchain are excluded from fleet replacement.
+
+The portable app carries no local sync or database login. It uses existing Brain
+sign-in for hosted diagnostics and an authenticated metadata-only build report.
+An installation report is separate from a Brain access grant; no report means
+installation unverified. Explicit operator policy preserves developer/MDM modes
+and excludes break-glass and agent accounts. It does not upgrade content roles.

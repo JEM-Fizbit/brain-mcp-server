@@ -56,3 +56,16 @@ Set `BRAIN_MONITORING_ENABLED=0` to disable this surface. Existing private `oaut
 `test/monitoring.test.mjs` covers session binding, expiry, replay, logout, provider/tenant/Brain isolation, mutable role checks, sanitization and admission. `test/monitoring-postgres.test.mjs` runs against the explicit disposable loopback Postgres fixture to verify durable sessions and real grants/revocation. `test/monitor-change-log.test.mjs` covers filtering, pagination, legacy receipts, link scoping, diff correctness/limits and HTTP authorization/failure behavior. `e2e/monitoring.playwright.mjs` and `e2e/brain-change.playwright.mjs` check desktop/narrow layouts in both themes, list-to-diff navigation, search, exact snapshots, role redaction and failure clearing.
 
 After the guarded release, verify the live shell/assets, unauthenticated API refusal and ordinary existing-provider sign-in. Record any remaining identity-provider journey separately; fixture success is not evidence of a completed live colleague journey. Installed MCP client acceptance and the company rollout hold remain separate.
+
+
+## Optional native Monitor inventory
+
+[Spec 024](specs/024-monitor-distribution-and-automatic-updates.md) adds an opt-in
+Owner inventory at `/monitor/installations` (JEM) and **Identity & Access → Installed
+Monitors** (ERS). Its private-schema/policy activation is pending; an ordinary
+server deploy does not activate it. Reports are authenticated, self-reported build
+metadata, not attestation or a census of every device. A missing report is
+installation unverified. Explicitly enrolled human Curators may read bounded
+hosted operational diagnostics while retaining their current content role;
+Readers and excluded identities retain the existing view. No SQL credential is
+issued. See [distribution and acceptance](monitor-distribution.md).

@@ -9,6 +9,11 @@
 !src/**/*.ts
 !config/brain-platform.*.json
 !config/brain-write-policies.json
+!config/monitor-operators.json
+!config/monitor-release-manifest.json
+!config/monitor-release-assets/appcast.xml
+!config/monitor-release-assets/Brain-Monitor-*-arm64.zip
+!config/monitor-release-assets/Brain-Monitor-*-x64.zip
 !config/prod-ca-2021.crt
 !README.md
 !LICENSE

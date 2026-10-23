@@ -313,6 +313,7 @@ db/migrations/2026-08-19_001_bounded_sync_observability.sql
 db/migrations/2026-08-22_001_source_reference_identity.sql
 db/migrations/2026-08-25_001_entra_access_grants.sql
 db/migrations/2026-10-22_001_brain_write_admission.sql
+db/migrations/2026-10-23_001_monitor_installations.sql
 db/migrations/20260911113912_resumable_local_ingestion.sql
 db/seeds/2026-06-14_001_bootstrap_pilot_brain.sql
 db/seeds/2026-06-24_001_bootstrap_ers_brain_pilot.sql
@@ -643,3 +644,22 @@ Private overlay documentation includes `BACKLOG.md` and the exact `docs/reviews/
 ## Local ingestion delivery
 
 The v1.11.0 operator CLI uses the additive `ingestion_jobs` migration listed above; apply it under each deployment owner and rerun the Supabase security gate. Both existing owner deployments completed this migration and passed the gate on 11 September 2026; their job tables remained empty. Runtime hosting stays metadata-only and receives no Storage service key. The migration is unused by hosted MCP/monitoring until an explicit operator job is created. [Local ingestion runbook](local-source-ingestion.md).
+
+
+## Optional Monitor release assets
+
+[Spec 024 distribution](monitor-distribution.md) adds an opt-in installation
+inventory and signed application feed. Neither is activated by a normal server
+upgrade. The inventory migration above requires separate production approval and
+the Supabase security gate per owner. Exact private operator IDs live in the
+owner's `config/monitor-operators.json`; enable only through
+`BRAIN_MONITOR_POLICY_FILE` after the gate.
+
+Prepared signed archives and appcast are staged under ignored
+`config/monitor-release-assets/`, with a committed
+`config/monitor-release-manifest.json`. The guarded deploy verifies owner, digest,
+size and exact file allowlist against the selected `fly.toml`, then repeats after
+tests. Docker admits only the named appcast/architecture archives and policy/
+manifest. Do not put profiles, credentials or Brain source bytes there. Set
+`BRAIN_MONITOR_RELEASE_DIR=/app/config/monitor-release-assets` only after a signed
+bootstrap/upgrade canary and the separately approved publication decision.

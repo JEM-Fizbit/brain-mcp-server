@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import {MonitorUpdateAssets} from '../dist/monitor/update-assets.js';
+test('update hosting serves only bounded release assets and refuses paths, symlinks, queries and writes',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'monitor-assets-'));const release=path.join(root,'release');await fs.mkdir(release);
+  t.after(()=>fs.rm(root,{recursive:true,force:true}));
+  await fs.writeFile(path.join(release,'appcast.xml'),'<rss/>');await fs.writeFile(path.join(root,'private'),'PRIVATE');
+  await fs.symlink(path.join(root,'private'),path.join(release,'Brain-Monitor-9-arm64.zip'));
+  const assets=new MonitorUpdateAssets(release);
+  const server=http.createServer((req,res)=>void assets.handle(req,res,new URL(req.url,'http://127.0.0.1')));
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+  const base='http://127.0.0.1:'+server.address().port+'/monitor/updates/';
+  let response=await fetch(base+'appcast.xml');assert.equal(response.status,200);assert.equal(await response.text(),'<rss/>');assert.equal(response.headers.get('cache-control'),'no-store');
+  response=await fetch(base+'appcast.xml',{method:'HEAD'});assert.equal(response.status,200);assert.equal(await response.text(),'');
+  for(const suffix of ['private','Brain-Monitor-9-arm64.zip','appcast.xml?token=x','%2e%2e/private','.env','notary-key'])assert.equal((await fetch(base+suffix)).status,404);
+  assert.equal((await fetch(base+'appcast.xml',{method:'POST'})).status,405);
+});
