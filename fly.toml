@@ -24,7 +24,7 @@ primary_region = "lhr"
   BRAIN_WRITE_POLICY_CONFIG = "/app/config/brain-write-policies.json"
   BRAIN_REQUIRED_WRITE_POLICY = "ai-brain-jem"
   BRAIN_MONITOR_POLICY_FILE = "/app/config/monitor-operators.json"
-  # Canary feed only: appcast.xml remains absent until signed upgrade acceptance.
+  # Signed normal feed, activated after both owner upgrade canaries passed.
   BRAIN_MONITOR_RELEASE_DIR = "/app/config/monitor-release-assets"
   BRAIN_PLATFORM_STATE_ROOT = "/data/state"
   BRAIN_OAUTH_STATE_STORE = "postgres"
