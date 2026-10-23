@@ -38,6 +38,11 @@ No new schema/key approval is needed. Keep named ERS policy and rollout receipts
 in the existing private operations runbook; do not create a Brain intake queue or
 another handoff tracker. The original completed effort is recorded below.
 
+Signed recovery assets and feed manifests are now published in each owner's
+GitHub release, with uploaded sizes/digests checked against its own manifest.
+Both final inventory rows report v1.14.2 build 9 and **current**. Public and private
+closeout commits are pushed; application sources still match the deployed tag.
+
 Read this after `AGENTS.md` when resuming. This is a completed-effort handoff,
 not a new task list or authority to start the wider backlog. Current product work
 remains in [BACKLOG.md](../../BACKLOG.md). Durable release evidence is in the

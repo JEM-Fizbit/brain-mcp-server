@@ -29,6 +29,13 @@ packages still need target-Mac acceptance; no Rosetta installation was made.
 
 ## Two operator surfaces
 
+Signed recovery archives, feeds and their manifest are saved in the
+[JEM v1.14.2 release](https://github.com/JEM-Fizbit/brain-mcp-server/releases/tag/v1.14.2)
+and ERS's corresponding private release (linked from its operations runbook).
+GitHub's uploaded archive/feed sizes and SHA-256 digests matched each owner's
+manifest before publication. Both inventories subsequently recorded build 9 with
+update state **current**; these are portable trial receipts, not colleague rollout.
+
 The existing native developer Monitor supervises local sync, a loopback Cockpit
 and database-backed Doctor. Its private profiles remain on the developer machine.
 Do not copy that app/configuration to colleagues, or replace its configured
