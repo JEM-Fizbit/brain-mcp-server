@@ -1,0 +1,9 @@
+{
+  "brain_id": "ai-brain-jem",
+  "bundle_id": "com.johnmilad.brainmonitor.jem",
+  "apple_team_id": "4572MYV4X5",
+  "sparkle_version": "2.10.0",
+  "keychain_account": "brain-monitor-jem",
+  "public_ed_key": "XbM3gH9I3vrCrtqvDkZcrJCMUn5dvrM/ktgaH/NmRwI=",
+  "feed_url": "https://jem-brain-mcp.fly.dev/monitor/updates/appcast.xml"
+}

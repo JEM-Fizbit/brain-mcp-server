@@ -16,3 +16,4 @@ test-results/
 playwright-report/
 monitor-package/
 config/monitor-release-assets/
+supabase/.temp/

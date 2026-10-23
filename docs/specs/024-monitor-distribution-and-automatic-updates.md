@@ -119,17 +119,25 @@ API with exact current-role/identity checks, Owner inventory in the existing
 control plane plus a JEM Owner page, cohort diagnostics, portable native host,
 Keychain-only credential custody, PKCE reporting client, exclusion-aware Sparkle
 startup and signed package/feed preparation with deploy-time hash verification.
-Private ERS operator IDs are prepared separately without activating the policy.
+Private ERS operator IDs are prepared separately. John approved both production
+inventory migrations and the two owner-specific Sparkle signing keys on 23
+October. Both migrations are applied; the private keys remain in Keychain.
 
-Observed verification: the full clean Node 22 gate passed 657 tests with 13
+Observed verification: the full clean Node 22 gate passed 658 tests with 13
 optional integration skips; the separate isolated PostgreSQL test passed real
 RLS, runtime-privilege, deduplication, restart and Brain-isolation checks. Nine
 Chromium checks passed, including desktop/narrow inventory and unavailable-data
 handling. Both developer and Sparkle 2.10 automatic native fixture modes compiled.
-The synthetic native OAuth/refresh flow also passed. Production signing,
-feed verification/upgrade, migration/security re-gates and actual installation
+The synthetic native OAuth/refresh flow also passed. Developer ID signing and
+notarisation passed for an initial developer-mode package. Final package signing,
+feed verification/upgrade, fresh security re-gates and actual installation
 receipts remain pending; do not mark the work complete or deployed from these
 fixtures. The existing Apple certificate/notarisation profile is verified usable.
+
+The isolated portable installation uses `canary.xml` while normal `appcast.xml`
+remains absent. Its observed installation UUID may be classified explicitly for
+the upgrade trial without replacing the developer supervisor or its profiles.
+Normal feed publication remains conditional on the signed upgrade canary.
 
 
 Device policy clarification: a default developer hold preserves pre-inventory

@@ -15,6 +15,20 @@
 
 ## Gate Decision
 
+### Monitor installation inventory — 23 October 2026
+
+John separately approved the exact private inventory migration for both owners
+and distinct Sparkle signing keys. The migration was applied through the existing
+JEM administration CLI and ERS admin browser session. Fresh SQL checks report
+20/20 JEM and 21/21 ERS Brain tables with RLS, zero client/public Brain table
+grants, runtime-only policies and a private artifact bucket with no Storage
+policies. Inventory allows runtime SELECT/INSERT/UPDATE and denies DELETE.
+Dedicated runtime logins remain non-elevated; the expected database owner
+`postgres` is an administrative member, not a runtime credential. Both existing
+write-admission policies and retired-queue fences remain in place. JEM's fresh
+Security Advisor reports no issues. ERS's rerun likewise reports 0 errors,
+0 warnings and 0 suggestions.
+
 ### Write-admission migration — 22 October 2026
 
 John separately approved both JEM and ERS migrations and policy activations.

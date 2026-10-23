@@ -11,6 +11,8 @@ const origin=monitorOrigin(env.BRAIN_MONITOR_ORIGIN);
 if(receipt.release.origin!==origin || receipt.release.brain_id!==env.BRAIN_MONITOR_BRAIN_ID)throw Error('Release owner binding mismatch');
 const account=env.BRAIN_MONITOR_SIGNING_ACCOUNT;
 if(!account || !/^[A-Za-z0-9_-]{1,80}$/.test(account))throw Error('Explicit owner-held Sparkle Keychain account required');
+const feedName=env.BRAIN_MONITOR_FEED_NAME || 'appcast.xml';
+if(!['appcast.xml','canary.xml'].includes(feedName))throw Error('Unexpected release feed name');
 const output=path.resolve(env.BRAIN_MONITOR_RELEASE_OUTPUT);
 await fs.mkdir(output,{recursive:false});
 // A previous release directory is copied, never edited or pruned in place.
@@ -27,9 +29,10 @@ await fs.writeFile(target,archiveBytes,{flag:'wx'});
 const tools=env.BRAIN_MONITOR_SPARKLE_BIN;
 await exec(path.join(tools,'generate_appcast'),['--account',account,'--download-url-prefix',origin+'/monitor/updates/','--maximum-deltas','0','--maximum-versions','0',output],{maxBuffer:1024*1024});
 await exec(path.join(tools,'sign_update'),['--account',account,'--verify',path.join(output,'appcast.xml')]);
+if(feedName!=='appcast.xml')await fs.rename(path.join(output,'appcast.xml'),path.join(output,feedName));
 const manifest={brain_id:receipt.release.brain_id,origin,prepared_at:new Date().toISOString(),release:receipt.release,files:[]};
 for(const file of await fs.readdir(output)) {
-  if(file==='appcast.xml' || /^Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip$/.test(file)) {
+  if(['appcast.xml','canary.xml'].includes(file) || /^Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip$/.test(file)) {
     const bytes=await fs.readFile(path.join(output,file));manifest.files.push({filename:file,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
   }
 }

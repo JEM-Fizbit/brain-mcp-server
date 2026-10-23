@@ -12,8 +12,8 @@ export async function verifyMonitorReleaseAssets(root,env) {
   const directory=await fs.realpath(path.join(root,'config','monitor-release-assets'));
   const seen=new Set();let hasFeed=false;
   for(const file of manifest.files) {
-    if(!/^(appcast\.xml|Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip)$/.test(file.filename) || seen.has(file.filename) || !/^[a-f0-9]{64}$/.test(file.sha256))throw Error('Invalid Monitor asset manifest');
-    seen.add(file.filename);if(file.filename==='appcast.xml')hasFeed=true;
+    if(!/^(appcast\.xml|canary\.xml|Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip)$/.test(file.filename) || seen.has(file.filename) || !/^[a-f0-9]{64}$/.test(file.sha256))throw Error('Invalid Monitor asset manifest');
+    seen.add(file.filename);if(file.filename==='appcast.xml' || file.filename==='canary.xml')hasFeed=true;
     const filename=await fs.realpath(path.join(directory,file.filename));
     if(path.dirname(filename)!==directory)throw Error('Monitor asset escaped release directory');
     const stat=await fs.stat(filename);if(!stat.isFile() || stat.size!==file.bytes || stat.size>200*1024*1024)throw Error('Monitor asset size mismatch');

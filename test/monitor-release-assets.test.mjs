@@ -18,4 +18,8 @@ test('deployment verifies owner-bound release bytes from Fly configuration rathe
  await fs.writeFile(path.join(directory,'appcast.xml'),'<changed/>');await assert.rejects(verifyMonitorReleaseAssets(root,env),/size|digest/);
  await fs.writeFile(path.join(directory,'appcast.xml'),bytes);await fs.writeFile(path.join(directory,'not-a-release'),'private');
  await assert.rejects(verifyMonitorReleaseAssets(root,env),/Unmanifested/);
+ await fs.rm(path.join(directory,'not-a-release'));
+ await fs.rename(path.join(directory,'appcast.xml'),path.join(directory,'canary.xml'));
+ manifest.files[0].filename='canary.xml';await fs.writeFile(filename,JSON.stringify(manifest));
+ await verifyMonitorReleaseAssets(root,env);
 });

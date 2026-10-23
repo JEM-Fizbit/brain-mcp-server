@@ -1,7 +1,9 @@
 # Monitor distribution and automatic updates
 
 **Status:** implementation and local verification in progress, 23 October 2026.
-No production inventory migration, update feed, new signing key, fleet targeting
+The private inventory migrations were approved and applied to both owners on
+23 October. Separate `brain-monitor-jem` and `brain-monitor-ers` signing keys are
+held in the existing Mac Keychain. No normal update feed, fleet targeting
 or colleague installation has been activated. Existing v1.13.3 services and the
 developer operator stack remain live. [Implementation brief](specs/024-monitor-distribution-and-automatic-updates.md).
 
@@ -102,6 +104,10 @@ and a fresh `BRAIN_MONITOR_RELEASE_OUTPUT`. Optional
 `BRAIN_MONITOR_PREVIOUS_RELEASES` retains prior archives in the new output.
 The official Sparkle tools sign/verify the feed and archives. Do not prune old
 archives or reuse a build number. Prepared output is not published.
+For the isolated upgrade trial, `BRAIN_MONITOR_FEED_NAME=canary.xml` prepares a
+separate signed feed. Only the portable test installation uses that URL; normal
+`appcast.xml` stays absent until the signed upgrade passes. The developer
+supervisor app and its profiles are not the test installation.
 
 `npm run monitor:release:stage` uses `BRAIN_MONITOR_PREPARED_RELEASE`, bound
 `BRAIN_ID` and `BRAIN_HOSTED_BASE_URL`. It copies only feed/archives into ignored

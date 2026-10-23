@@ -9,6 +9,7 @@ test('update hosting serves only bounded release assets and refuses paths, symli
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'monitor-assets-'));const release=path.join(root,'release');await fs.mkdir(release);
   t.after(()=>fs.rm(root,{recursive:true,force:true}));
   await fs.writeFile(path.join(release,'appcast.xml'),'<rss/>');await fs.writeFile(path.join(root,'private'),'PRIVATE');
+  await fs.writeFile(path.join(release,'canary.xml'),'<rss>canary</rss>');
   await fs.symlink(path.join(root,'private'),path.join(release,'Brain-Monitor-9-arm64.zip'));
   const assets=new MonitorUpdateAssets(release);
   const server=http.createServer((req,res)=>void assets.handle(req,res,new URL(req.url,'http://127.0.0.1')));
@@ -16,6 +17,7 @@ test('update hosting serves only bounded release assets and refuses paths, symli
   const base='http://127.0.0.1:'+server.address().port+'/monitor/updates/';
   let response=await fetch(base+'appcast.xml');assert.equal(response.status,200);assert.equal(await response.text(),'<rss/>');assert.equal(response.headers.get('cache-control'),'no-store');
   response=await fetch(base+'appcast.xml',{method:'HEAD'});assert.equal(response.status,200);assert.equal(await response.text(),'');
+  response=await fetch(base+'canary.xml');assert.equal(response.status,200);assert.equal(await response.text(),'<rss>canary</rss>');assert.equal(response.headers.get('cache-control'),'no-store');
   for(const suffix of ['private','Brain-Monitor-9-arm64.zip','appcast.xml?token=x','%2e%2e/private','.env','notary-key'])assert.equal((await fetch(base+suffix)).status,404);
   assert.equal((await fetch(base+'appcast.xml',{method:'POST'})).status,405);
 });
