@@ -1,14 +1,14 @@
 {
   "brain_id": "ai-brain-jem",
   "origin": "https://jem-brain-mcp.fly.dev",
-  "prepared_at": "2026-10-23T15:41:09.160Z",
+  "prepared_at": "2026-10-23T15:55:28.879Z",
   "release": {
     "bundle_id": "com.johnmilad.brainmonitor.jem",
     "origin": "https://jem-brain-mcp.fly.dev",
     "brain_id": "ai-brain-jem",
-    "app_version": "1.14.1",
-    "build": "8",
-    "source_revision": "f2c61dc58d1899b566e5ef124f6c42ae61ce936a",
+    "app_version": "1.14.2",
+    "build": "9",
+    "source_revision": "2b6be506b8fe4c4c8fc2a16af67156afb8699fb7",
     "update_mode": "automatic",
     "arch": "arm64"
   },
@@ -24,14 +24,19 @@
       "sha256": "a0935b99213c92f47f93e6e4dec884bc3df8c01919c64aef52d007c57866a9b1"
     },
     {
+      "filename": "Brain-Monitor-9-arm64.zip",
+      "bytes": 37557490,
+      "sha256": "2194cb029bfefa64a58aa55ad7e3c79760f6f1285d823e4f221562e9a73f04e1"
+    },
+    {
       "filename": "appcast.xml",
       "bytes": 1263,
-      "sha256": "40ed4b83eb35c9695138edfe4b4d34698260a37175fd6c182cafd20836100238"
+      "sha256": "66b54f086d3f05f0e4854a59c1623e815db89d10982e4b29f3a20f70c0322856"
     },
     {
       "filename": "canary.xml",
       "bytes": 1263,
-      "sha256": "40ed4b83eb35c9695138edfe4b4d34698260a37175fd6c182cafd20836100238"
+      "sha256": "66b54f086d3f05f0e4854a59c1623e815db89d10982e4b29f3a20f70c0322856"
     }
   ]
 }
