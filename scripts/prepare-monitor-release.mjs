@@ -27,9 +27,8 @@ const archiveBytes=await fs.readFile(receipt.archive);
 if(createHash('sha256').update(archiveBytes).digest('hex')!==receipt.archive_sha256)throw Error('Release archive differs from verified notarisation receipt');
 await fs.writeFile(target,archiveBytes,{flag:'wx'});
 const tools=env.BRAIN_MONITOR_SPARKLE_BIN;
-await exec(path.join(tools,'generate_appcast'),['--account',account,'--download-url-prefix',origin+'/monitor/updates/','--maximum-deltas','0','--maximum-versions','0',output],{maxBuffer:1024*1024});
-await exec(path.join(tools,'sign_update'),['--account',account,'--verify',path.join(output,'appcast.xml')]);
-if(feedName!=='appcast.xml')await fs.rename(path.join(output,'appcast.xml'),path.join(output,feedName));
+await exec(path.join(tools,'generate_appcast'),['--account',account,'-o',path.join(output,feedName),'--download-url-prefix',origin+'/monitor/updates/','--maximum-deltas','0','--maximum-versions','0',output],{maxBuffer:1024*1024});
+await exec(path.join(tools,'sign_update'),['--account',account,'--verify',path.join(output,feedName)]);
 const manifest={brain_id:receipt.release.brain_id,origin,prepared_at:new Date().toISOString(),release:receipt.release,files:[]};
 for(const file of await fs.readdir(output)) {
   if(['appcast.xml','canary.xml'].includes(file) || /^Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip$/.test(file)) {
