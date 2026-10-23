@@ -89,6 +89,8 @@ export class MonitorInstallations {
         do update set app_version=excluded.app_version,build=excluded.build,source_revision=excluded.source_revision,
           platform=excluded.platform,arch=excluded.arch,update_mode=excluded.update_mode,update_state=excluded.update_state,last_seen_at=now()
         where brain.monitor_installations.last_seen_at <= now()-interval '5 minutes'
+          or (brain.monitor_installations.app_version,brain.monitor_installations.build,brain.monitor_installations.source_revision,brain.monitor_installations.update_mode)
+            is distinct from (excluded.app_version,excluded.build,excluded.source_revision,excluded.update_mode)
         returning last_seen_at`,values:[this.policy.brain_id,p.provider,(p.providerTenantId || '').toLowerCase(),p.providerUserId,
           report.installation_id,report.app_version,report.build,report.source_revision,report.platform,report.arch,report.update_mode,report.update_state]});
       if (!result.rows.length) {

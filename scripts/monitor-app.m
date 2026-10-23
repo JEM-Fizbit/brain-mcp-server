@@ -64,11 +64,15 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
   self.updater=[[SPUStandardUpdaterController alloc] initWithStartingUpdater:NO updaterDelegate:self userDriverDelegate:nil];
 #endif
   [self menu];[self runReporter:NO];
-  if(!readCredential(self.releaseMetadata))[self showMonitor:nil];
+  [self showMonitor:nil];
   self.timer=[NSTimer scheduledTimerWithTimeInterval:900 target:self selector:@selector(heartbeat:) userInfo:nil repeats:YES];
 }
 - (void)heartbeat:(id)sender {(void)sender;[self runReporter:NO];}
 - (void)signin:(id)sender {(void)sender;[self runReporter:YES];}
+- (void)refresh:(id)sender {(void)sender;[self runReporter:NO];}
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)application hasVisibleWindows:(BOOL)visible {
+  (void)application;(void)visible;[self showMonitor:nil];return YES;
+}
 - (void)showMonitor:(id)sender {
   (void)sender;
   if(!self.window) {
@@ -88,6 +92,10 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
     NSButton *updates=[NSButton buttonWithTitle:@"Check for Updates…" target:self.updater action:@selector(checkForUpdates:)];
     updates.frame=NSMakeRect(20,34,190,32);[self.window.contentView addSubview:updates];
 #endif
+    NSButton *refresh=[NSButton buttonWithTitle:@"Refresh status" target:self action:@selector(refresh:)];
+    refresh.frame=NSMakeRect(218,34,130,32);[self.window.contentView addSubview:refresh];
+    NSButton *quit=[NSButton buttonWithTitle:@"Quit Monitor" target:NSApp action:@selector(terminate:)];
+    quit.frame=NSMakeRect(364,34,130,32);[self.window.contentView addSubview:quit];
   }
   [self.window center];[self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
 }

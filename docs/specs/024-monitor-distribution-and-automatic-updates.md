@@ -2,7 +2,8 @@
 
 **Status:** in-progress — implementation authorised by John on 23 October 2026;
 production migration, release signing and fleet activation require their concrete
-deployment checks. No update feed or colleague installation is active yet.
+deployment checks. Inventory and isolated canary feeds are deployed to both owners;
+normal feeds and colleague installations remain pending.
 **Source:** BACKLOG.md optional Monitor packaging; John's 23 October request for
 automatic updates, developer exclusions and a build inventory in Identity & Access.
 **Roadmap link:** ad-hoc
@@ -138,6 +139,12 @@ The isolated portable installation uses `canary.xml` while normal `appcast.xml`
 remains absent. Its observed installation UUID may be classified explicitly for
 the upgrade trial without replacing the developer supervisor or its profiles.
 Normal feed publication remains conditional on the signed upgrade canary.
+Both owners' signed/notarised canaries subsequently passed automatic download and
+the 5-to-6 in-place installation/relaunch, with code-signature verification. JEM
+also passed post-upgrade Gatekeeper assessment. Altered signed feed metadata was
+rejected by the official verifier. The real PostgreSQL check now proves identical
+release reports coalesce while changed builds record immediately. The final full
+Node 22 gate remains 658 passes and 13 optional skips.
 
 
 Device policy clarification: a default developer hold preserves pre-inventory

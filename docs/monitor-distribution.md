@@ -1,11 +1,13 @@
 # Monitor distribution and automatic updates
 
-**Status:** implementation and local verification in progress, 23 October 2026.
+**Status:** inventory deployed; normal update-feed activation in progress, 23 October 2026.
 The private inventory migrations were approved and applied to both owners on
 23 October. Separate `brain-monitor-jem` and `brain-monitor-ers` signing keys are
 held in the existing Mac Keychain. No normal update feed, fleet targeting
-or colleague installation has been activated. Existing v1.13.3 services and the
-developer operator stack remain live. [Implementation brief](specs/024-monitor-distribution-and-automatic-updates.md).
+or colleague installation has been activated. Both hosted services run v1.14.0;
+the developer operator stack remains live. Signed canaries for both owners
+automatically downloaded build 6, then installed/relaunched from build 5 with
+Developer ID verification. [Implementation brief](specs/024-monitor-distribution-and-automatic-updates.md).
 
 ## Two operator surfaces
 
@@ -46,12 +48,13 @@ classification from a role or invent installation UUIDs.
 
 The app's **Sign in / Register this Monitor** uses existing Brain OAuth, PKCE S256
 and a random loopback callback. Credentials stay in the signed native host's
-Keychain. A first-launch window exposes registration, status and the hosted-page
+Keychain. The launch window exposes registration, status, refresh, quit and hosted-page
 links; **Show Monitor** reopens it from the menu bar. Only private child pipes
 carry credentials to the bundled reporter. There is
 no token-export CLI, .env loading or command-line token argument. The updater starts only after an accepted report confirms automatic mode; every
 update check requires a policy receipt less than 20 minutes old. The app reports
-every 15 minutes while running. Five-minute server coalescing and bounded request,
+every 15 minutes while running. Identical release reports coalesce for five
+minutes; a changed build/version/source/mode is recorded immediately. Bounded request,
 query and device admission prevent a tight retry/write loop. A failed report does
 not open a login browser automatically. A failed refresh is retried only at the
 next heartbeat or explicit sign-in.

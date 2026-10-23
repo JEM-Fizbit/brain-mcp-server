@@ -14,8 +14,9 @@ test('private inventory persists across processes and runtime privileges preserv
   const first=new MonitorInstallations(pool,policy);assert.equal((await first.report(principal,'member',report)).recorded,true);
   const restored=new MonitorInstallations(pool,policy);let result=await restored.list();
   let rows=result.installations.filter(row=>row.provider_user_id===principal.providerUserId);assert.equal(rows.length,1);assert.equal(rows[0].build,'21');
-  assert.equal((await restored.report(principal,'member',{...report,build:'22'})).recorded,false);
-  assert.equal((await restored.list()).installations.find(row=>row.provider_user_id===principal.providerUserId).build,'21');
+  assert.equal((await restored.report(principal,'member',report)).recorded,false);
+  assert.equal((await restored.report(principal,'member',{...report,build:'22'})).recorded,true);
+  assert.equal((await restored.list()).installations.find(row=>row.provider_user_id===principal.providerUserId).build,'22');
   const foreign=new MonitorInstallations(pool,{...policy,brain_id:'foreign-brain'});assert.equal((await foreign.list()).installations.some(row=>row.installation_id===report.installation_id),false);
   for(let i=0;i<9;i++)await restored.report(principal,'member',{...report,installation_id:randomUUID()});
   await assert.rejects(restored.report(principal,'member',{...report,installation_id:randomUUID()}),/device_limit/);
