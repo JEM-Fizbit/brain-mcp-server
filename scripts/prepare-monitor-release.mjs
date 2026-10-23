@@ -15,8 +15,6 @@ const feedName=env.BRAIN_MONITOR_FEED_NAME || 'appcast.xml';
 if(!['appcast.xml','canary.xml'].includes(feedName))throw Error('Unexpected release feed name');
 const output=path.resolve(env.BRAIN_MONITOR_RELEASE_OUTPUT);
 await fs.mkdir(output,{recursive:false});
-// A previous release directory is copied, never edited or pruned in place.
-if(env.BRAIN_MONITOR_PREVIOUS_RELEASES)await fs.cp(path.resolve(env.BRAIN_MONITOR_PREVIOUS_RELEASES),output,{recursive:true,errorOnExist:false,force:false});
 const name=path.basename(receipt.archive);
 if(!/^Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip$/.test(name))throw Error('Unexpected release archive name');
 const target=path.join(output,name);
@@ -29,6 +27,22 @@ await fs.writeFile(target,archiveBytes,{flag:'wx'});
 const tools=env.BRAIN_MONITOR_SPARKLE_BIN;
 await exec(path.join(tools,'generate_appcast'),['--account',account,'-o',path.join(output,feedName),'--download-url-prefix',origin+'/monitor/updates/','--maximum-deltas','0','--maximum-versions','0',output],{maxBuffer:1024*1024});
 await exec(path.join(tools,'sign_update'),['--account',account,'--verify',path.join(output,feedName)]);
+// Generate from the new archive only: Sparkle refuses mixing archives whose
+// embedded feed URLs differ (canary -> normal). Retain reviewed old archives
+// afterwards as recovery assets, without changing their bytes or old directory.
+if(env.BRAIN_MONITOR_PREVIOUS_RELEASES) {
+  const previous=await fs.realpath(path.resolve(env.BRAIN_MONITOR_PREVIOUS_RELEASES));
+  const prior=JSON.parse(await fs.readFile(path.join(previous,'manifest.json'),'utf8'));
+  if(prior.brain_id!==receipt.release.brain_id || prior.origin!==origin || !Array.isArray(prior.files) || prior.files.length>50)throw Error('Previous release owner binding mismatch');
+  for(const file of prior.files) {
+    if(!/^Brain-Monitor-[1-9][0-9]{0,15}-(arm64|x64)\.zip$/.test(file.filename))continue;
+    const source=await fs.realpath(path.join(previous,file.filename));if(path.dirname(source)!==previous)throw Error('Previous archive escaped release directory');
+    const bytes=await fs.readFile(source);
+    if(bytes.length!==file.bytes || createHash('sha256').update(bytes).digest('hex')!==file.sha256)throw Error('Previous archive digest mismatch');
+    if(file.filename===name) {if(file.sha256!==receipt.archive_sha256)throw Error('Immutable archive differs');continue;}
+    await fs.writeFile(path.join(output,file.filename),bytes,{flag:'wx'});
+  }
+}
 if(env.BRAIN_MONITOR_PROMOTE_CANARY==='1') {
   if(feedName!=='appcast.xml')throw Error('Canary promotion requires the normal release feed');
   // Feed signatures cover XML bytes, not the URL. Retained canary clients can

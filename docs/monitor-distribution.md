@@ -109,6 +109,9 @@ and a fresh `BRAIN_MONITOR_RELEASE_OUTPUT`. Optional
 `BRAIN_MONITOR_PREVIOUS_RELEASES` retains prior archives in the new output.
 The official Sparkle tools sign/verify the feed and archives. Do not prune old
 archives or reuse a build number. Prepared output is not published.
+The current feed contains the new build. Prior archives are checked against
+their same-owner manifest and retained separately as deliberate recovery assets;
+they are not mixed into feed generation across channel URLs.
 For the isolated upgrade trial, `BRAIN_MONITOR_FEED_NAME=canary.xml` prepares a
 separate signed feed. Only the portable test installation uses that URL; normal
 `appcast.xml` stays absent until the signed upgrade passes. The developer

@@ -6,6 +6,24 @@ import path from 'node:path';
 import {MonitoringRoutes} from '../dist/monitor/routes.js';
 import {MonitoringStatus} from '../dist/monitor/status.js';
 import {makeFileStateProvider} from '../dist/oauth/state.js';
+import {installationsPage,installationInventoryCss} from '../dist/monitor/installations-page.js';
+import {monitoringCss} from '../dist/monitor/page.js';
+
+test('JEM inventory preserves effective device policy and stays within desktop and narrow viewports under production CSP',async({page},testInfo)=>{
+ const operator={person_id:'john-milad',provider:'github',provider_tenant_id:'',provider_user_id:'fixture',update_mode:'developer',devices:[{installation_id:'11111111-1111-4111-8111-111111111111',update_mode:'automatic'}]};
+ const data={operators:[operator],installations:[{provider:'github',provider_tenant_id:'',provider_user_id:'fixture',installation_id:operator.devices[0].installation_id,app_version:'1.14.1',build:'8',source_revision:'a'.repeat(40),update_mode:'automatic',update_state:'current',last_seen_at:'2026-10-20T12:00:00Z'}],truncated:false,observed_at:'2026-10-23T12:00:00Z',evidence:'Authenticated self-report'};
+ const server=http.createServer((req,res)=>{
+  if(req.url==='/monitor/style.css'){res.writeHead(200,{'Content-Type':'text/css'});res.end(monitoringCss+installationInventoryCss);return;}
+  res.writeHead(200,{'Content-Type':'text/html', 'Content-Security-Policy':"default-src 'none'; style-src 'self'; frame-ancestors 'none'"});res.end(installationsPage('ai-brain-jem',data));
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{for(const width of [1280,390]){
+  await page.setViewportSize({width,height:900});await page.goto('http://127.0.0.1:'+server.address().port);
+  await expect(page.getByRole('table')).toContainText('automatic · default developer');await expect(page.getByRole('table')).toContainText('stale / offline');
+  await expect(page.locator('body')).toHaveJSProperty('scrollWidth',width);
+  await page.screenshot({path:testInfo.outputPath('inventory-'+width+'.png'),fullPage:true});
+ }}finally{await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});}
+});
 
 test('hosted monitoring is usable in both themes and sizes and clears revoked or unavailable diagnostics',async({page,context},testInfo)=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'brain-monitor-ui-'));const prior=process.env.BRAIN_PLATFORM_CONFIG;

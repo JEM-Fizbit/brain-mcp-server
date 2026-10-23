@@ -12,7 +12,7 @@ import type { BrainStore } from '../services/brain-store.js';
 import { safeCockpitUrl } from './navigation.js';
 import { monitoringPage, monitoringCss, monitoringJs, changeHistoryCss } from './page.js';
 import { monitorOperator, type MonitorInstallations } from './installations.js';
-import { installationsPage } from './installations-page.js';
+import { installationsPage, installationInventoryCss } from './installations-page.js';
 
 const headers = {'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'};
 export class MonitoringRoutes {
@@ -41,7 +41,7 @@ export class MonitoringRoutes {
       }
       if (req.method!=='GET') {send(405,'{"error":"method_not_allowed"}','application/json',{Allow:'GET'});return;}
       if (url.pathname==='/monitor' || url.pathname==='/monitor/') {send(200,monitoringPage,'text/html; charset=utf-8');return;}
-      if (url.pathname==='/monitor/style.css') {send(200,monitoringCss + changeHistoryCss,'text/css');return;}
+      if (url.pathname==='/monitor/style.css') {send(200,monitoringCss + changeHistoryCss + installationInventoryCss,'text/css');return;}
       if (url.pathname==='/monitor/app.js') {send(200,monitoringJs,'text/javascript');return;}
       if (url.pathname==='/monitor/login') {
         const result=await this.sessions.begin(req.headers.cookie);redirect(result.location,[result.cookie]);return;
