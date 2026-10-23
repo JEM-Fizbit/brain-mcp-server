@@ -1,10 +1,56 @@
 # Brain write admission and monitor parity — session closeout
 
-**Date:** 23 October 2026 (Europe/London)  
-**Status:** engineering complete and deployed for both JEM and ERS; colleague Monitor bootstrap acceptance remains unverified
+**Date:** 23 October 2026; updated 24 October 2026 (Europe/London)
+
+**Status:** macOS engineering complete and deployed for both JEM and ERS; colleague rollout incomplete; Windows package backlogged
 **Current application release:** annotated `v1.14.2`; signed portable Monitor build 9
 **Original release before the distribution extension:** `v1.13.3`, source `548b1150311c85b78603b3eb8b58bd002f30d811`
 **Original source baseline before this documentation checkpoint:** public `main` at `566fee9`; later savepoint-only commits are not new application builds.
+
+## Latest closeout — 24 October 2026
+
+Both runtime source trees still match annotated `v1.14.2`; subsequent commits are
+documentation/backlog changes and were not redeployed. Public source baseline at
+this closeout is `99e62f0238e51827fb0f95a3156aaf026d1f0864`; private rollout
+receipts remain in the ERS operations runbook. This checkpoint is the commit
+containing this update, not a new application build.
+
+Fresh Doctors passed on **24 October at 00:48:56/57 Europe/London**
+(23 October 23:48:56/57 UTC), both reporting hosted **v1.14.2**, healthy local sync
+and zero conflicts. No full Node/browser suite was repeated for prose-only work;
+`git diff --check` is the applicable closeout gate. Prior signed upgrade, database,
+security and browser acceptance below remain historical engineering evidence.
+
+The **Windows Monitor package is backlog work**, not implemented or deployed.
+The [existing backlog](../../BACKLOG.md) explicitly requires a signed Windows
+installer, automatic updates, build reporting and preserved developer/IT-managed
+exclusions. The [Windows proposal](../specs/024-monitor-distribution-and-automatic-updates.md#windows-extension--proposed-24-october-2026)
+identifies the current macOS-only client/API/database constraints and the Windows
+signing/build/test prerequisites. Do not implement or deploy wider backlog work
+merely because this handoff is being resumed.
+
+Colleague platform and build acceptance remain unverified. Communication receipts,
+the rejected sender/review assumptions, corrected email authority and an **unsent**
+correction draft live only in the existing private ERS operations runbook. Review
+that before any further distribution. Do not assume colleagues use Macs. No
+correction email or further outreach was sent after the user's correction.
+
+A bounded read-only thread follow-up remains active through 30 October, quiet
+when unchanged. It does not authorise implementation, deployment, policy changes
+or messages. The private runbook records its exact schedule and authority.
+
+Signed build 9 recovery archives/feed manifests are retained in each owner's
+GitHub release. The private owner release also retains the separately signed
+no-updater developer companion build 10. Generated local `monitor-package/` and
+staged release-assets directories remain ignored; a fresh checkout must retrieve
+its own owner's signed assets. Keychain signing custody and original developer
+profiles are deliberately not copied into Git or packages. Do not replace the
+original developer supervisor to reproduce a portable canary.
+
+When the Windows item is selected, the next bounded step is to verify device/IT
+management and existing Windows signing/build/test access, then review its
+implementation plan. Suggested next setup: **GPT-6.1 Sol / high** for the Windows
+authentication and updater design. No delegation or settings change is implied.
 
 ## Automatic Monitor updates — completed engineering extension
 
@@ -29,18 +75,22 @@ The observed portable test installations have explicit per-device automatic
 exceptions; the original developer app/toolchain and default exclusions remain
 intact. Other installations stay unverified. Legacy apps need one bootstrap;
 Apple silicon is accepted, Intel-native packaging and colleague OS/installation
-receipts are not. No Intune target or messages to colleagues were sent. The
-portable app supplies hosted diagnostics, not a copied local SQL Doctor/sync stack.
+receipts are not. No Intune target was deployed. Later owner-scoped distribution
+receipts are in the private runbook; they do not prove recipient installation.
+The portable app supplies hosted diagnostics, not a copied local SQL Doctor/sync stack.
 
-Next action: use the [download/acceptance runbook](../monitor-distribution.md)
-to bootstrap eligible colleague Macs and confirm their own inventory receipts.
-No new schema/key approval is needed. Keep named ERS policy and rollout receipts
-in the existing private operations runbook; do not create a Brain intake queue or
-another handoff tracker. The original completed effort is recorded below.
+Next action: review the private rollout correction and Windows backlog before
+selecting an appropriate package for any colleague. Keep named ERS policy,
+communication and acceptance receipts in the existing private operations runbook;
+do not create a Brain intake queue or another handoff tracker. Original
+schema/key approvals covered the deployed Mac work; any Windows production
+migration needs its own concrete review and security gate. The original
+completed effort is recorded below.
 
 Signed recovery assets and feed manifests are now published in each owner's
 GitHub release, with uploaded sizes/digests checked against its own manifest.
-Both final inventory rows report v1.14.2 build 9 and **current**. Public and private
+Both final portable-trial inventory rows reported v1.14.2 build 9 and **current**
+at the 23 October trial; this is not colleague fleet acceptance. Public and private
 closeout commits are pushed; application sources still match the deployed tag.
 
 Read this after `AGENTS.md` when resuming. This is a completed-effort handoff,
