@@ -51,10 +51,11 @@ export class MonitoringRoutes {
       }
       const changeMatch=/^\/monitor\/changes\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
       const changeLog=url.pathname==='/monitor/changes';
+      const inventoryPage=url.pathname==='/monitor/installations';
       if (!changeMatch && !changeLog && !['/monitor/api/status','/monitor/api/installations','/monitor/installations'].includes(url.pathname)) {send(404,'{"error":"not_found"}');return;}
       const session=await this.sessions.get(req.headers.cookie);
       if (!session) {
-        if(changeMatch || changeLog) send(401,'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Read Brain changes</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main><h1>Sign in to read Brain changes</h1><p>Sign in with your Brain account, then select Change log on Brain status.</p><a class="button" href="/monitor/login">Sign in</a></main></body></html>','text/html; charset=utf-8');
+        if(changeMatch || changeLog || inventoryPage) send(401,`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain sign-in</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main><h1>Sign in to ${inventoryPage?'view installed Monitors':'read Brain changes'}</h1><p>Sign in with your Brain account, then select ${inventoryPage?'Installed Monitors':'Change log'} on Brain status.</p><a class="button" href="/monitor/login">Sign in</a></main></body></html>`,'text/html; charset=utf-8');
         else send(401,'{"error":"sign_in_required"}');
         return;
       }

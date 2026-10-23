@@ -52,6 +52,8 @@ test('device exceptions apply to one observed installation without removing deve
   assert.equal((await inventory.report(principal,'member',{...value,update_mode:'automatic'})).update_mode,'automatic');
   await assert.rejects(inventory.report(principal,'member',{...value,installation_id:randomUUID(),update_mode:'automatic'}),/policy_mismatch/);
   assert.equal((await inventory.report(principal,'member',{...value,installation_id:randomUUID()})).update_mode,'developer');
+  const html=installationsPage('test-brain',{operators:devicePolicy.operators,installations:[{...value,update_mode:'automatic',provider:'entra',provider_tenant_id:'tenant-one',provider_user_id:'user-one',last_seen_at:'2026-10-20T12:00:00Z'}],truncated:false,observed_at:'2026-10-23T12:00:00Z',evidence:'Fixture'});
+  assert.match(html,/automatic · default developer/);assert.match(html,/stale \/ offline/);assert.match(html,/2026-10-20 12:00:00 UTC/);
 });
 test('inventory reporting enforces bearer, tenant, current grant, scope, origin and admission',async t=>{
   let role='member',fail=false,count=0;

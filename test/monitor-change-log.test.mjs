@@ -70,6 +70,8 @@ test('history HTTP uses the selected Brain only, rechecks revoked roles and refu
  const base='http://127.0.0.1:'+server.address().port;
  const call=(query='brain_id='+brain,headers={cookie})=>fetch(base+'/monitor/changes?'+query,{headers});
  let response=await call(undefined,{});assert.equal(response.status,401);assert.doesNotMatch(await response.text(),/Correct fact/);assert.equal(reads,0);
+ response=await fetch(base+'/monitor/installations');assert.equal(response.status,401);assert.match(response.headers.get('content-type'),/text\/html/);assert.match(await response.text(),/Sign in to view installed Monitors/);assert.equal(reads,0);
+ response=await fetch(base+'/monitor/api/installations');assert.equal(response.status,401);assert.match(response.headers.get('content-type'),/application\/json/);
  assert.equal((await call('brain_id=other')).status,403);assert.equal((await call(undefined,{cookie,Origin:'https://attacker.example'})).status,403);assert.equal(reads,0);
  assert.equal((await call('brain_id='+brain+'&offset=-1')).status,400);assert.equal(reads,0);
  response=await call();assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);assert.match(await response.text(),/Correct fact/);

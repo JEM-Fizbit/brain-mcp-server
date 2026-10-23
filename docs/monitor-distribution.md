@@ -113,6 +113,9 @@ For the isolated upgrade trial, `BRAIN_MONITOR_FEED_NAME=canary.xml` prepares a
 separate signed feed. Only the portable test installation uses that URL; normal
 `appcast.xml` stays absent until the signed upgrade passes. The developer
 supervisor app and its profiles are not the test installation.
+After acceptance, `BRAIN_MONITOR_PROMOTE_CANARY=1` publishes the verified normal
+feed at the retained canary URL too. Trial installations can then upgrade into
+the normal channel with the same bundle identity and Keychain credentials.
 
 `npm run monitor:release:stage` uses `BRAIN_MONITOR_PREPARED_RELEASE`, bound
 `BRAIN_ID` and `BRAIN_HOSTED_BASE_URL`. It copies only feed/archives into ignored
