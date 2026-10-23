@@ -46,6 +46,8 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
 @property(strong) NSString *receipt;
 @property(strong) NSString *updateState;
 @property(strong) NSDate *lastPolicyAt;
+@property(strong) NSWindow *window;
+@property(strong) NSTextField *windowStatus;
 #ifdef MONITOR_SPARKLE
 @property(strong) SPUStandardUpdaterController *updater;
 #endif
@@ -62,10 +64,33 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
   self.updater=[[SPUStandardUpdaterController alloc] initWithStartingUpdater:NO updaterDelegate:self userDriverDelegate:nil];
 #endif
   [self menu];[self runReporter:NO];
+  if(!readCredential(self.releaseMetadata))[self showMonitor:nil];
   self.timer=[NSTimer scheduledTimerWithTimeInterval:900 target:self selector:@selector(heartbeat:) userInfo:nil repeats:YES];
 }
 - (void)heartbeat:(id)sender {(void)sender;[self runReporter:NO];}
 - (void)signin:(id)sender {(void)sender;[self runReporter:YES];}
+- (void)showMonitor:(id)sender {
+  (void)sender;
+  if(!self.window) {
+    self.window=[[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,520,280) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable backing:NSBackingStoreBuffered defer:NO];
+    self.window.releasedWhenClosed=NO;
+    self.window.title=[NSString stringWithFormat:@"%@ · Brain Monitor",self.releaseMetadata[@"brain_id"]];
+    NSTextField *intro=[NSTextField wrappingLabelWithString:@"Sign in once to register this installation and open your Brain's operational pages. Developer and IT update exclusions remain in force."];
+    intro.frame=NSMakeRect(24,192,472,56);[self.window.contentView addSubview:intro];
+    self.windowStatus=[NSTextField wrappingLabelWithString:self.receipt];self.windowStatus.frame=NSMakeRect(24,134,472,48);[self.window.contentView addSubview:self.windowStatus];
+    NSArray *titles=@[@"Sign in / Register",@"Open Cockpit / Doctor",@"Open Change Log"];
+    NSArray *actions=@[@"signin:",@"openCockpit:",@"openChanges:"];
+    for(NSUInteger i=0;i<titles.count;i++) {
+      NSButton *button=[NSButton buttonWithTitle:titles[i] target:self action:NSSelectorFromString(actions[i])];
+      button.frame=NSMakeRect(20+i*164,82,160,32);[self.window.contentView addSubview:button];
+    }
+#ifdef MONITOR_SPARKLE
+    NSButton *updates=[NSButton buttonWithTitle:@"Check for Updates…" target:self.updater action:@selector(checkForUpdates:)];
+    updates.frame=NSMakeRect(20,34,190,32);[self.window.contentView addSubview:updates];
+#endif
+  }
+  [self.window center];[self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
+}
 - (void)openCockpit:(id)sender {(void)sender;[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:[self.releaseMetadata[@"origin"] stringByAppendingString:@"/monitor"]]];}
 - (void)openChanges:(id)sender {(void)sender;[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:[self.releaseMetadata[@"origin"] stringByAppendingString:@"/monitor/changes"]]];}
 - (void)runReporter:(BOOL)login {
@@ -100,13 +125,14 @@ static BOOL writeCredential(NSDictionary *metadata,NSDictionary *credential) {
   [input.fileHandleForWriting writeData:ipc];[input.fileHandleForWriting closeFile];
 }
 - (void)menu {
+  self.windowStatus.stringValue=[NSString stringWithFormat:@"Monitor %@ (%@) · %@\n%@ · %@",self.releaseMetadata[@"app_version"],self.releaseMetadata[@"build"],self.receipt,self.releaseMetadata[@"update_mode"],self.updateState];
   NSMenu *menu=[NSMenu new];
   NSArray *labels=@[[NSString stringWithFormat:@"Monitor %@ (%@)",self.releaseMetadata[@"app_version"],self.releaseMetadata[@"build"]],
     [NSString stringWithFormat:@"Brain: %@",self.releaseMetadata[@"brain_id"]],self.receipt,
     [NSString stringWithFormat:@"Updates: %@ · %@",self.releaseMetadata[@"update_mode"],self.updateState]];
   for(NSString *label in labels){NSMenuItem *item=[[NSMenuItem alloc] initWithTitle:label action:NULL keyEquivalent:@""];[menu addItem:item];}
   [menu addItem:[NSMenuItem separatorItem]];
-  for(NSArray *entry in @[@[@"Open Cockpit / Doctor",@"openCockpit:"],@[@"Open Change Log",@"openChanges:"],@[@"Sign in / Register this Monitor",@"signin:"]]) {
+  for(NSArray *entry in @[@[@"Show Monitor",@"showMonitor:"],@[@"Open Cockpit / Doctor",@"openCockpit:"],@[@"Open Change Log",@"openChanges:"],@[@"Sign in / Register this Monitor",@"signin:"]]) {
     NSMenuItem *item=[[NSMenuItem alloc] initWithTitle:entry[0] action:NSSelectorFromString(entry[1]) keyEquivalent:@""];item.target=self;[menu addItem:item];
   }
 #ifdef MONITOR_SPARKLE

@@ -46,7 +46,9 @@ classification from a role or invent installation UUIDs.
 
 The app's **Sign in / Register this Monitor** uses existing Brain OAuth, PKCE S256
 and a random loopback callback. Credentials stay in the signed native host's
-Keychain; only private child pipes carry them to the bundled reporter. There is
+Keychain. A first-launch window exposes registration, status and the hosted-page
+links; **Show Monitor** reopens it from the menu bar. Only private child pipes
+carry credentials to the bundled reporter. There is
 no token-export CLI, .env loading or command-line token argument. The updater starts only after an accepted report confirms automatic mode; every
 update check requires a policy receipt less than 20 minutes old. The app reports
 every 15 minutes while running. Five-minute server coalescing and bounded request,

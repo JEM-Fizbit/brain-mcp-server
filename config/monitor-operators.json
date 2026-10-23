@@ -7,7 +7,13 @@
       "provider_tenant_id": "",
       "provider_user_id": "220941196",
       "person_id": "john-milad",
-      "update_mode": "developer"
+      "update_mode": "developer",
+      "devices": [
+        {
+          "installation_id": "389da313-5e78-403b-a082-65d53c8d5ef6",
+          "update_mode": "automatic"
+        }
+      ]
     }
   ]
 }
