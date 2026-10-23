@@ -6,6 +6,11 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const exec=promisify(execFile);
+import {assertPortableNodeLinks} from '../scripts/lib/monitor-package.mjs';
+test('portable-runtime validation checks dependency lines, not the build-user path header',()=>{
+  assert.doesNotThrow(()=>assertPortableNodeLinks('/Users/example/Monitor.app/Contents/Resources/runtime/node:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n'));
+  for(const dependency of ['/opt/homebrew/opt/icu/libicu.dylib','/usr/local/lib/node.dylib','@rpath/libnode.dylib','/Users/example/libnode.dylib'])assert.throws(()=>assertPortableNodeLinks('node:\n\t'+dependency+' (compatibility version 1.0.0)\n'),/self-contained/);
+});
 test('Monitor distribution refuses unsigned production and malformed release inputs before installation',async t=>{
   if(process.platform!=='darwin')return t.skip('native macOS packaging');
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'monitor-package-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));

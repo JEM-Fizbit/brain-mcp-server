@@ -5,6 +5,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createHash} from 'node:crypto';
 import {monitorOrigin} from './lib/monitor-client.mjs';
+import {assertPortableNodeLinks} from './lib/monitor-package.mjs';
 const exec=promisify(execFile),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const fixture=process.argv.includes('--fixture');
 const env=process.env;
@@ -54,7 +55,7 @@ await fs.copyFile(node,path.join(resources,'runtime','node'));
 await fs.chmod(path.join(resources,'runtime','node'),0o755);
 // Homebrew Node links to external libraries and cannot be used in a portable app.
 const links=(await exec('/usr/bin/otool',['-L',path.join(resources,'runtime','node')])).stdout;
-if(!fixture && /\/(opt\/homebrew|usr\/local|Users)\//.test(links))throw Error('Use the official self-contained Node 22 binary, not a Homebrew runtime');
+if(!fixture)assertPortableNodeLinks(links);
 for(const name of ['monitor-client.mjs','lib/monitor-client.mjs'])await fs.copyFile(path.join(root,'scripts',name),path.join(resources,'scripts',name));
 await fs.writeFile(path.join(resources,'monitor-release.json'),JSON.stringify(release,null,2)+'\n');
 await fs.writeFile(path.join(contents,'Info.plist'),`<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
