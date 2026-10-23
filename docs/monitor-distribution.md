@@ -30,7 +30,11 @@ are checked on each report; the allowlist supplements rather than replaces them.
 Never derive human eligibility from a display name, email or a role alone: agents
 and break-glass accounts can also hold those roles. Owner-specific names/IDs live
 in the private overlay. Several principals may share one person identifier without
-merging their identity grants.
+merging their identity grants. Optional per-operator `devices` entries bind an
+observed installation UUID to a mode. A developer default fails closed until a
+specific non-developer installation is classified; it is not a permanent claim
+that all of that person's computers are developer devices. Do not infer device
+classification from a role or invent installation UUIDs.
 
 | Mode | Package behavior |
 | --- | --- |

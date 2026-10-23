@@ -6,6 +6,7 @@ export type UpdateMode = 'automatic' | 'mdm' | 'developer';
 export interface MonitorOperator {
   provider: string; provider_tenant_id: string; provider_user_id: string;
   person_id: string; update_mode: UpdateMode;
+  devices?: {installation_id:string;update_mode:UpdateMode}[];
 }
 export interface MonitorPolicy { version: 1; brain_id: string; operators: MonitorOperator[] }
 const modes = ['automatic','mdm','developer'];
@@ -23,6 +24,14 @@ export function parseMonitorPolicy(input: unknown, brainId: string): MonitorPoli
     const key = principalKey({provider:op.provider,providerTenantId:op.provider_tenant_id,providerUserId:op.provider_user_id});
     if (seen.has(key)) throw Error('duplicate_monitor_operator');
     seen.add(key);
+    if(op.devices!==undefined) {
+      if(!Array.isArray(op.devices) || op.devices.length>20)throw Error('invalid_monitor_devices');
+      const ids=new Set();
+      for(const device of op.devices) {
+        if(!device || !text(device.installation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,36) || !modes.includes(device.update_mode) || ids.has(device.installation_id.toLowerCase()))throw Error('invalid_monitor_devices');
+        ids.add(device.installation_id.toLowerCase());
+      }
+    }
   }
   return p;
 }
@@ -40,6 +49,9 @@ export interface InstallationReport {
   installation_id: string; app_version: string; build: string; source_revision: string;
   platform: 'darwin'; arch: 'arm64' | 'x64'; update_mode: UpdateMode;
   update_state: 'current' | 'checking' | 'available' | 'downloaded' | 'deferred' | 'failed' | 'unknown';
+}
+export function monitorUpdateMode(operator:MonitorOperator,installationId:string):UpdateMode {
+  return operator.devices?.find(device=>device.installation_id.toLowerCase()===installationId.toLowerCase())?.update_mode || operator.update_mode;
 }
 export function installationReport(body: unknown): InstallationReport {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw Error('invalid_installation_report');
@@ -63,7 +75,8 @@ export class MonitorInstallations {
     if (!operator) throw Error('monitor_operator_required');
     const report = installationReport(body);
     // A device cannot opt itself out of a developer or IT exclusion.
-    if (report.update_mode !== operator.update_mode) throw Error('monitor_update_policy_mismatch');
+    const mode=monitorUpdateMode(operator,report.installation_id);
+    if (report.update_mode !== mode) throw Error('monitor_update_policy_mismatch');
     if (this.active >= 4) throw Error('monitor_inventory_busy');
     this.active++;
     try {
@@ -82,7 +95,7 @@ export class MonitorInstallations {
         const existing=await this.pool.query({text:'select 1 from brain.monitor_installations where brain_id=$1 and provider=$2 and provider_tenant_id=$3 and provider_user_id=$4 and installation_id=$5',values:[this.policy.brain_id,p.provider,(p.providerTenantId || '').toLowerCase(),p.providerUserId,report.installation_id]});
         if (!existing.rows.length) throw Error('monitor_device_limit');
       }
-      return {accepted:true,recorded:result.rows.length > 0,update_mode:operator.update_mode};
+      return {accepted:true,recorded:result.rows.length > 0,update_mode:mode};
     } finally {this.active--;}
   }
   async list() {

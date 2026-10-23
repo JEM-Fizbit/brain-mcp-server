@@ -45,6 +45,14 @@ test('inventory reads are deployment bound, bounded and distinguish missing obse
   const html=installationsPage('brain', {...result,installations:[]});assert.match(html,/Installation unverified/);assert.doesNotMatch(html,/Installed successfully/);
   assert.match(installationsPage('<script>',{...result,operators:[],installations:[]}),/&lt;script&gt;/);
 });
+test('device exceptions apply to one observed installation without removing developer protection from another device',async()=>{
+  const value=report();const devicePolicy={...policy,operators:[{...policy.operators[0],devices:[{installation_id:value.installation_id.toUpperCase(),update_mode:'automatic'}]}]};
+  parseMonitorPolicy(devicePolicy,'test-brain');
+  const inventory=new MonitorInstallations({query:async()=>({rows:[{last_seen_at:new Date()}]})},devicePolicy);
+  assert.equal((await inventory.report(principal,'member',{...value,update_mode:'automatic'})).update_mode,'automatic');
+  await assert.rejects(inventory.report(principal,'member',{...value,installation_id:randomUUID(),update_mode:'automatic'}),/policy_mismatch/);
+  assert.equal((await inventory.report(principal,'member',{...value,installation_id:randomUUID()})).update_mode,'developer');
+});
 test('inventory reporting enforces bearer, tenant, current grant, scope, origin and admission',async t=>{
   let role='member',fail=false,count=0;
   const inventory=new MonitorInstallations({query:async()=>{if(fail)throw Error('postgres://SECRET');count++;return {rows:[{last_seen_at:new Date()}]};}},policy);

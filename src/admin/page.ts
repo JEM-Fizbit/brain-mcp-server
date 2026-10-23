@@ -375,13 +375,14 @@ async function refreshMonitors() {
       const operator = data.operators.find(value => monitorKey(value) === key);
       const reports = data.installations.filter(value => monitorKey(value) === key);
       for (const report of reports.length ? reports : [null]) {
+        const policyMode = operator && (operator.devices?.find(device => device.installation_id.toLowerCase() === report?.installation_id?.toLowerCase())?.update_mode || operator.update_mode);
         const row = document.createElement("tr");
         const recent = report && Date.now()-Date.parse(report.last_seen_at) < 86400000;
         row.append(td(grant.name || grant.email || grant.providerUserId),
           td(roleLabel(grant.role) + " · " + (operator && grant.status === "active" && grant.role !== "reader" ? "Operator cohort" : "Outside operator cohort")),
           td(report ? report.app_version + " (" + report.build + ") · " + report.source_revision.slice(0,12) + " · " + report.installation_id.slice(0,8) : "Installation unverified"),
           td(report ? new Date(report.last_seen_at).toLocaleString() + (recent ? " · recent" : " · stale / offline") : "No authenticated report"),
-          td(report ? report.update_mode + " · " + report.update_state : operator ? operator.update_mode : "Not targeted"));
+          td(report ? report.update_mode + " · " + report.update_state + (policyMode && policyMode !== report.update_mode ? " · policy: " + policyMode : "") : operator ? operator.update_mode : "Not targeted"));
         table.append(row);
       }
     }

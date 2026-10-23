@@ -121,7 +121,7 @@ Keychain-only credential custody, PKCE reporting client, exclusion-aware Sparkle
 startup and signed package/feed preparation with deploy-time hash verification.
 Private ERS operator IDs are prepared separately without activating the policy.
 
-Observed verification: the full clean Node 22 gate passed 656 tests with 13
+Observed verification: the full clean Node 22 gate passed 657 tests with 13
 optional integration skips; the separate isolated PostgreSQL test passed real
 RLS, runtime-privilege, deduplication, restart and Brain-isolation checks. Nine
 Chromium checks passed, including desktop/narrow inventory and unavailable-data
@@ -130,3 +130,11 @@ The synthetic native OAuth/refresh flow also passed. Production signing,
 feed verification/upgrade, migration/security re-gates and actual installation
 receipts remain pending; do not mark the work complete or deployed from these
 fixtures. The existing Apple certificate/notarisation profile is verified usable.
+
+
+Device policy clarification: a default developer hold preserves pre-inventory
+machines. Optional exceptions bind modes to observed installation UUIDs, not an
+entire person's role or every computer they own. The updater starts only after a
+matching authenticated policy receipt and requires a receipt under 20 minutes
+old for each check. Unknown or newly excluded devices cannot start automatic
+checks by merely installing the standard-channel binary.
