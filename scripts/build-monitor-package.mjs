@@ -51,6 +51,13 @@ if(mode==='automatic') {
 await fs.mkdir(path.join(contents,'MacOS'),{recursive:true});
 await fs.mkdir(path.join(resources,'scripts','lib'),{recursive:true});
 await fs.mkdir(path.join(resources,'runtime'),{recursive:true});
+const notices=path.join(resources,'ThirdPartyNotices');
+await fs.mkdir(notices,{recursive:true});
+await fs.copyFile(path.join(root,'LICENSE'),path.join(notices,'Brain-Monitor.txt'));
+const nodeLicense=path.resolve(node,'..','..','LICENSE');
+try {await fs.copyFile(nodeLicense,path.join(notices,'Node.txt'));}
+catch(error) {if(!fixture)throw Error('Official Node distribution LICENSE must accompany the runtime');}
+if(mode==='automatic')await fs.copyFile(path.join(path.dirname(framework),'LICENSE'),path.join(notices,'Sparkle.txt'));
 await fs.copyFile(node,path.join(resources,'runtime','node'));
 await fs.chmod(path.join(resources,'runtime','node'),0o755);
 // Homebrew Node links to external libraries and cannot be used in a portable app.

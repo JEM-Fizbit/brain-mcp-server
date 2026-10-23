@@ -28,7 +28,7 @@ test('portable developer fixture has real build metadata, no profile or updater,
   const built=JSON.parse((await exec(process.execPath,['scripts/build-monitor-package.mjs','--fixture'],{env})).stdout);
   assert.equal(built.distributable,false);assert.equal(built.release.build,'19');
   const resources=path.join(built.app,'Contents','Resources');
-  assert.deepEqual((await fs.readdir(resources)).sort(),['monitor-release.json','runtime','scripts']);
+  assert.deepEqual((await fs.readdir(resources)).sort(),['ThirdPartyNotices','monitor-release.json','runtime','scripts']);
   const info=await fs.readFile(path.join(built.app,'Contents','Info.plist'),'utf8');assert.doesNotMatch(info,/SUFeedURL|SUPublicEDKey/);
   const metadata=await fs.readFile(path.join(resources,'monitor-release.json'),'utf8');assert.doesNotMatch(metadata,/DATABASE|password|\/Users\//);
   await exec('/usr/bin/codesign',['--verify','--deep','--strict',built.app]);
