@@ -1,5 +1,25 @@
 # Hosted Client Cutover Runbook
 
+## Distribution after v1.13.3 — 23 October 2026
+
+Ordinary hosted users need no new binary/package. Their existing authorised MCP
+connections use the deployed server, and hosted monitor/history pages serve the
+current web code. Refresh an already-open page. Cached client tool definitions
+may need the normal metadata refresh or a fresh session for `brain_read_change`
+and the evidence fields; prior shared app refreshes do not prove every user's
+already-open chat is current. No reconnect or permission expansion is required
+by this release.
+
+John's optional local Monitor/cockpit profiles are updated and verified. Other
+machines' local versions were not audited. Native installations do not update
+from a Git push: their configured checkout/build must be updated, and changed
+native menu code requires regeneration. Local script-change detection only
+restarts files that have already changed on that computer. Broad native packaging
+and identity-based colleague sync remain in [BACKLOG.md](../BACKLOG.md); do not
+send owner profiles/database credentials as a user installer. Hosted colleagues
+can use the authenticated browser surface without native Monitor or database
+access. [Completed handoff](savepoints/2026-10-23-brain-write-admission-and-monitor-parity.md).
+
 **Spec 023 / v1.13.0:** enrolled Brains advertise capability manifest v2 and
 `brain_read_change`. Update requests carry observed `write_context`; source-backed
 corrections do not need a new human approval. Existing clients with cached schemas

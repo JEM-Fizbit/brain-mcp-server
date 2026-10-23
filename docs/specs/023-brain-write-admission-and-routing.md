@@ -1,5 +1,10 @@
 # 023 — Per-Brain write admission and Capture routing
 
+**Session closeout, 23 October 2026:** both full stacks now run v1.13.3;
+implementation, owner migrations and deployment are complete. See the
+[completed handoff](../savepoints/2026-10-23-brain-write-admission-and-monitor-parity.md)
+for final parity checks and the hosted-versus-local distribution boundary.
+
 **Status:** deployed — JEM and ERS independently run v1.13.0 with approved migrations/policies, passing security gates and live admission/routing/sync acceptance.
 
 **Source:** John's 22 October design request and correction: retain automatic source-backed updates, log changes for optional manual review, hard-block retired intake

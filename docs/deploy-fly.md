@@ -1,5 +1,11 @@
 # Fly Deployment
 
+**Session closed, 23 October 2026:** both complete stacks are deployed on
+v1.13.3 and final health/schema/parity checks pass. Read the
+[completed-session handoff](savepoints/2026-10-23-brain-write-admission-and-monitor-parity.md)
+for the verified baseline, custody limits and user-distribution answer. This
+documentation checkpoint does not change the application release.
+
 ## Browseable change history and cockpit navigation — v1.13.3
 
 **Deployed and live-verified, 23 October 2026 (Europe/London).** JEM guarded
