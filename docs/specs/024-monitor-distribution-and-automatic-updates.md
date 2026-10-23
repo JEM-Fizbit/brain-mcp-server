@@ -33,8 +33,8 @@ concurrent installation owners. No IT instruction is sent by this implementation
 
 - macOS native Monitor first: it is the only native implementation currently in
   this repository. Browser users and Windows users can use hosted status/Doctor
-  observations without installing a macOS package. Windows native packaging is
-  outside this work unit.
+  observations without installing a macOS package. Windows native packaging was
+  outside the original work unit; the requested extension is proposed below.
 - Use Sparkle 2 with HTTPS, Ed25519 signed archives and feeds, Developer ID signing
   and notarisation. Validate before extraction; signed-feed failures never expire
   into accepting an unsigned feed. No git-pull, remote shell or unsigned updater.
@@ -103,6 +103,43 @@ groups, or publish a feed as a workaround.
 Prepare and test the concrete changes before requesting the remaining deployment
 authority. The original v1.13.3 full-stack closeout remains complete; this is new
 work, not a reopened defect in that release.
+
+## Windows extension — proposed 24 October 2026
+
+The rollout request now includes a Windows package. The shipped client and
+release tooling are macOS-only; both the installation-report validator and
+private database constraint currently accept only `darwin`. Windows is not
+implemented, tested or deployed. Do not prescribe a Mac archive to an unknown
+or Windows device, or infer platform from an access grant.
+
+The Windows client should provide the same hosted Cockpit/Doctor, change log,
+existing identity sign-in, bounded installation reports and exact developer/MDM
+exclusions. Keep SQL credentials and local sync out of the package. Use the
+Windows user's protected credential store and existing OAuth/PKCE boundary.
+Extend the report API, database constraint and Owner inventory display to identify
+Windows and its actual architecture while retaining the current identity/RLS
+contract and explicit unverified/stale states.
+
+Prefer the existing IT deployment system for managed PCs. A standalone updater
+must verify the approved publisher/release and honour the current per-device
+update owner before installing. Do not turn on a generic OS background updater
+that can bypass developer/MDM exclusions or the required current policy receipt.
+MSIX is a candidate signed package format, not a selected implementation of that
+policy gate. Resolve the existing ERS Windows signing and build/test environment
+before production distribution; the Apple Developer ID is not Windows signing
+custody. Do not purchase signing, create credentials, target Intune groups or
+change machine certificate trust as a workaround.
+
+Acceptance needs real Windows bootstrap, Entra sign-in, accepted exact build
+report, diagnostics/history access, signed upgrade and rejection cases, protected
+state retention and developer/MDM exclusion tests. Prepare the exact additive
+platform migration and run the existing security gate after separate production
+approval. Packaging/build success alone is not Windows-device acceptance. No
+Windows installer or corrective communication should be described as delivered
+until its actual receipt exists.
+
+References: [Microsoft MSIX signing](https://learn.microsoft.com/en-us/windows/msix/package/signing-package-overview)
+and [Windows update/deployment controls](https://learn.microsoft.com/en-us/windows/msix/app-installer/auto-update-and-repair--overview).
 
 ## References
 
