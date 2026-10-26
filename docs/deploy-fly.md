@@ -1,5 +1,17 @@
 # Fly Deployment
 
+## JEM reconcile-lint release — v1.15.0, 26 October 2026
+
+JEM only. Annotated `v1.15.0` (`4f4e827b67d3e8ee7dd038560941ddd56980d537`)
+deployed through `deploy:guarded` at 21:08:58 UTC; the guard passed 682 tests
+(669 passed, 13 existing skips, 0 failures). Live health reports 1.15.0. Adds
+advisory reconcile candidates to `brain_lint` (spec 025); no schema, data,
+credential, permission or Monitor-asset change. The hosted JEM lint returned no
+candidates after the two flagged discrepancies were corrected in the Brain.
+`ers-brain-mcp` remains on its previous release pending a separate ERS decision.
+Operator note: with two Monitor profiles configured, run the guard with
+`BRAIN_ID=ai-brain-jem`.
+
 ## Current Monitor release — v1.14.2, 23 October 2026
 
 Both owner services and signed normal update feeds are deployed. JEM source
