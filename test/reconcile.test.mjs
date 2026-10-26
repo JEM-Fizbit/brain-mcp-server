@@ -136,3 +136,12 @@ test("candidate output is capped and reports the remainder", () => {
   assert.equal(report.candidates.length, 5);
   assert.equal(report.omittedCandidates, 10);
 });
+
+test("a participant's portion is not compared with the round size", () => {
+  const report = brain({
+    "quanta.md": "# Quanta\n\n- Co-led £9M Series A + £6M extension + bridges.\n",
+    "ref_track.md":
+      "| Company | Invested |\n|---|---|\n| [[quanta]] | EUR6.83M (NBGI portion: £2.5M Series A + £1.1M extension + bridges) |\n",
+  });
+  assert.deepEqual(report.candidates, [], JSON.stringify(report.candidates, null, 2));
+});

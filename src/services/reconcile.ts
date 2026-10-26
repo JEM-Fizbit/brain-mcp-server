@@ -284,6 +284,7 @@ function termsOf(text: string, exclude: Set<string>, periodText = text): string[
     .replace(QUALIFIER_RE, "$1-$2")
     .replace(/[$£€]\s?[\d.,]+\s?(?:thousand|million|billion|mm|mn|bn|k|m|b)?\+?/g, " ");
   const terms = new Set<string>();
+  if (SHARE_SCOPE_RE.test(periodText)) terms.add("scope:share");
   for (const period of periodText.toLowerCase().match(PERIOD_RE) || []) {
     terms.add(`period:${period.replace(/\s+/g, "")}`);
   }
@@ -320,6 +321,12 @@ function measureClasses(terms: string[]): string {
     .join(",");
 }
 
+/**
+ * A participant's portion of a round ("NBGI portion: £2.5M") is a different
+ * metric from the round size, for every figure in the clause.
+ */
+const SHARE_SCOPE_RE = /\b(?:portion|share|stake|participation)\b/i;
+
 const PERIOD_RE = /\b(?:(?:19|20)\d{2}|q[1-4]|h[12]|fy\s?\d{2,4}|ytd)\b/g;
 
 function periodsOf(terms: string[]): Set<string> {
@@ -347,6 +354,7 @@ export function sameMetric(leftTerms: string[], rightTerms: string[]): string[] 
     return map;
   };
   if (measureClasses(leftTerms) !== measureClasses(rightTerms)) return null;
+  if (leftTerms.includes("scope:share") !== rightTerms.includes("scope:share")) return null;
   const leftPeriods = periodsOf(leftTerms);
   const rightPeriods = periodsOf(rightTerms);
   if (
@@ -364,7 +372,7 @@ export function sameMetric(leftTerms: string[], rightTerms: string[]): string[] 
   }
   const right = new Set(rightTerms);
   const shared = leftTerms
-    .filter((term) => right.has(term) && !term.startsWith("period:"))
+    .filter((term) => right.has(term) && !term.includes(":"))
     .sort();
   if (shared.some(isQualifier) || shared.length >= 2) return shared;
   return null;
