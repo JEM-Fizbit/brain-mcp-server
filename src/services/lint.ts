@@ -35,6 +35,10 @@ import {
   type BrainGraphAnalysis,
 } from "./brain-graph.js";
 import {
+  findReconcileCandidates,
+  type ReconcileReport,
+} from "./reconcile.js";
+import {
   summarizeCaptureQueue,
   type CaptureQueueStatus,
 } from "./task-intake.js";
@@ -86,6 +90,11 @@ export interface LintReport {
       })
     | null;
   orphanMode: BrainLintReachabilityMode;
+  /**
+   * Advisory cross-file contradiction candidates (spec 025). Detection only:
+   * excluded from countLintIssues until false-positive rates are measured.
+   */
+  reconcile: ReconcileReport;
   suggestedSemanticChecks: string[];
   warnings: string[];
 }
@@ -509,8 +518,15 @@ export async function runLint(brainId?: string, assessmentStore?: BrainStore): P
     }
   }
 
+  const reconcile = findReconcileCandidates(fileContentMap);
+
   // Suggested semantic checks for Claude to perform
   const suggestedSemanticChecks: string[] = [];
+  if (reconcile.candidates.length > 0) {
+    suggestedSemanticChecks.push(
+      `Adjudicate ${reconcile.candidates.length + reconcile.omittedCandidates} reconcile candidate(s): read both passages and their sources; correct the stale copy with source evidence, or note why both hold (different metric, scope or period). Never pick a winner without evidence.`
+    );
+  }
   if (stale.length > 0) {
     suggestedSemanticChecks.push(
       `Review stale files for outdated claims: ${stale.map((s) => s.file).join(", ")}`
@@ -544,6 +560,7 @@ export async function runLint(brainId?: string, assessmentStore?: BrainStore): P
     bootstrapBudget,
     graphReachability,
     orphanMode,
+    reconcile,
     suggestedSemanticChecks,
     warnings,
   };
@@ -755,6 +772,29 @@ export function formatLintReport(report: LintReport): string {
     sections.push(`## Large domain packs (>${DOMAIN_PACK_LIMIT} files)`);
     for (const { dir, count } of report.largeDomainPacks) {
       sections.push(`- ${dir}/: ${count} files`);
+    }
+    sections.push("");
+  }
+
+  // Reconcile candidates (advisory)
+  const reconcile = report.reconcile;
+  if (reconcile && reconcile.candidates.length > 0) {
+    const total = reconcile.candidates.length + reconcile.omittedCandidates;
+    sections.push(`## Reconcile candidates (advisory, ${total})`);
+    sections.push(
+      "- Same subject and metric quoted with incompatible values in different files. Detection only: not counted as maintenance findings, and lint never edits content."
+    );
+    reconcile.candidates.forEach((candidate, index) => {
+      const subject = candidate.subject;
+      const metric = candidate.kind === "count" ? candidate.unit : candidate.kind === "money" ? `money (${candidate.unit})` : candidate.kind;
+      sections.push(
+        `${index + 1}. **${subject}** — ${metric}; shared context: ${candidate.sharedTerms.join(", ")}${candidate.relation === "different_lower_bounds" ? " (different lower bounds)" : ""}`
+      );
+      sections.push(`   - ${candidate.left.file}:${candidate.left.line} \`${candidate.left.raw}\` — ${candidate.left.excerpt}`);
+      sections.push(`   - ${candidate.right.file}:${candidate.right.line} \`${candidate.right.raw}\` — ${candidate.right.excerpt}`);
+    });
+    if (reconcile.omittedCandidates > 0) {
+      sections.push(`- ...and ${reconcile.omittedCandidates} more.`);
     }
     sections.push("");
   }

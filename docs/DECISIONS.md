@@ -1,5 +1,31 @@
 # Working Decisions Log
 
+## 2026-10-26 — Reconcile lint is deterministic, advisory and detection-only
+
+**Decision:** Detect cross-file contradictions (spec 025) with a deterministic
+extractor of quantified claims inside `brain_lint`, reported as advisory
+candidates with both locations and excerpts. Candidates are excluded from the
+maintenance count and Cockpit readiness, never produce fix plans, and are
+adjudicated by the agent or owner through the normal reviewed write path with
+source evidence.
+
+**Why:** The Brain repeats load-bearing facts in hubs and detail files, and
+staleness lint cannot see two reviewed pages that disagree. A deterministic
+pass runs identically on filesystem and hosted stores, adds no model call,
+key, cost or service, and found six real candidates (two genuine
+discrepancies) on `ai-brain-jem` with one false positive on `ers-brain`.
+Advisory status follows the `graph_shadow` precedent: measure before enforcing.
+
+**Alternatives rejected:** an in-server LLM pass (new credentials, cost and a
+non-deterministic lint); auto-correcting the minority copy (no evidence of
+which copy is right, and the 2026-08-23 decision rejects auto-refreshing
+semantic claims); counting candidates immediately (unmeasured false-positive
+rate would degrade a lint surface John was just relieved of); comparing
+operational history files (LOG, JOURNAL, archive), which legitimately hold
+superseded values.
+
+**Related:** `docs/specs/archive/025-reconcile-lint.md`; `src/services/reconcile.ts`.
+
 ## 2026-10-23 — Signed Monitor updates and observed installation inventory
 
 John approved automatic updates with developer exclusions and build visibility

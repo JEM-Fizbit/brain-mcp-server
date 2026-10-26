@@ -39,7 +39,7 @@ function formatFixSummary(summary: LintFixSummary): string {
 export function registerLintTools(server: McpServer): void {
   server.tool(
     "brain_lint",
-    "Run a read-only Brain health check. Detects bloat, stale files, legacy or graph-reachability orphans (per-Brain mode), bootstrap budget excess, drift, large domain packs, unindexed working binaries, and journal rotation due. graph_shadow reports legacy/graph deltas without changing enforcement. Pass fix=true to apply only ordinary-content task relocation/date-stamping/Done archiving; lint never auto-edits 00_loader.md or NOW.md. dry_run=true previews fixes without writing.",
+    "Run a read-only Brain health check. Detects bloat, stale files, legacy or graph-reachability orphans (per-Brain mode), bootstrap budget excess, drift, large domain packs, unindexed working binaries, journal rotation due, and advisory reconcile candidates (the same subject and metric quoted with incompatible values in different files; detection only, never counted or auto-fixed). graph_shadow reports legacy/graph deltas without changing enforcement. Pass fix=true to apply only ordinary-content task relocation/date-stamping/Done archiving; lint never auto-edits 00_loader.md or NOW.md. dry_run=true previews fixes without writing.",
     LintSchema.shape,
     async ({ brain_id, fix, dry_run }, extra) => {
       try {

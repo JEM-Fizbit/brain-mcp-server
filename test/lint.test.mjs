@@ -526,3 +526,27 @@ test("legacy lint remains the default and bootstrap budget excess is review-only
   assert.match(formatted, new RegExp(`\\*\\*${issueCount} maintenance finding\\(s\\)`));
   assert.match(formatted, /Review required:.*budget exceeded/i);
 });
+
+test("reconcile candidates are reported as advisory and never counted", async () => {
+  await writeFixture({
+    "00_loader.md": "# Loader\n\nReferences: `01_identity.md`, `nbgi.md`\n",
+    "NOW.md": "# NOW\n",
+    "01_identity.md":
+      "# Identity\n\n- [[nbgi|NBGI Ventures]] — two venture funds (Fund I: €30M; Fund II: €60M committed capital).\n",
+    "nbgi.md": "# NBGI\n\n- Funds: Fund I (€40M committed); Fund II (€60M committed)\n",
+  });
+
+  const report = await runLint();
+  assert.equal(report.reconcile.mode, "advisory");
+  assert.equal(report.reconcile.candidates.length, 1);
+  assert.equal(report.reconcile.candidates[0].subject, "nbgi");
+
+  const withoutReconcile = { ...report, reconcile: { ...report.reconcile, candidates: [] } };
+  assert.equal(countLintIssues(report), countLintIssues(withoutReconcile));
+
+  const formatted = formatLintReport(report);
+  assert.match(formatted, /## Reconcile candidates \(advisory, 1\)/);
+  assert.match(formatted, /01_identity\.md:3 `€30M`/);
+  assert.match(formatted, /nbgi\.md:3 `€40M`/);
+  assert.match(formatted, /Adjudicate 1 reconcile candidate/);
+});

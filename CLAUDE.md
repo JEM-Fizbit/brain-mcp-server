@@ -214,7 +214,7 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 - `brain_read_log` — Read recent change log entries
 - `brain_capture_item` — Generic compatibility tool for a Brain `TASKS.md` Capture / Triage Queue; use only where that Brain's current contract permits the scope. JEM general intake is retired and routes through Personal Capture; ERS tasks here are Brain-scoped only.
 - `brain_report_item` — Compatibility alias for `brain_capture_item`.
-- `brain_lint` — Health check: bloat, staleness, orphans, drift, capture queue, unindexed working binaries. Auto-logs the pass.
+- `brain_lint` — Health check: bloat, staleness, orphans, drift, capture queue, unindexed working binaries, plus advisory reconcile candidates (cross-file contradictions; detection only, not counted — spec 025). Auto-logs the pass.
 - `brain_prepare_ingest` — Read-only backend/category/capability preflight. Call before any ingestion-related write.
 - `brain_ingest` — Filesystem-backed source analysis/save. Postgres-backed Brains route source custody through their operator workflow.
 - `brain_ingest_complete` — Complete filesystem provenance and inbox cleanup after preflight. Hosted revision logging remains available through `brain_log`.
