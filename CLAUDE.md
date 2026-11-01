@@ -148,7 +148,7 @@ brain-mcp-server/
 │   │   ├── config.ts · metadata.ts · register.ts     # discovery + dynamic client registration
 │   │   ├── github.ts · pkce.ts · crypto.ts · jwt.ts · token.ts  # auth-code/PKCE/token flow
 │   │   └── state.ts · postgres-state.ts              # in-memory + Postgres-backed OAuth state
-│   ├── services/         # Core logic (32 modules). Highlights:
+│   ├── services/         # Core logic (42 modules). Highlights:
 │   │   ├── brain.ts · brain-store.ts · active-brain-store.ts · revision-brain-store.ts  # Brain access + multi-tenant store abstractions
 │   │   ├── git.ts · log.ts · task-intake.ts          # git ops, change log, TASKS capture/triage
 │   │   ├── lint.ts · lint-fix.ts · lint-apply.ts     # health checks + autofix
