@@ -1,7 +1,7 @@
 # 026 — Direct session source ingestion
 
-**Status:** JEM v1.16.2 deployed and verified, selected essay completed; ERS v1.16.2 prepared, activation blocked on existing admin sign-in
-**Release:** v1.16.2; JEM active, ERS still v1.15.0
+**Status:** deployed and hosted acceptance verified on both JEM and ERS; selected JEM essay completed
+**Release:** v1.16.2 on both independently owned services
 **Owner decision:** John, 3 November 2026: the working Claude/ChatGPT session is a primary Brain writer. Capture tracks to-dos, routes information and supports surfaces; it is not a mandatory intermediary for Brain work.
 
 ## Outcome
@@ -179,6 +179,9 @@ activation needs that existing account session, not a new key or account.
 
 ## JEM completed receipt and remaining ERS handoff
 
+**Historical pre-activation handoff:** the ERS prerequisite and browser-client
+checks below were subsequently resolved in the both-owner receipt that follows.
+
 JEM v1.16.2 deployed at **13:19:58.264 UTC**, annotated source
 `dfdf1d6ae46d205ad2b62e88caf791eb03864e1a`, image
 `registry.fly.io/jem-brain-mcp:deployment-01M6GRZY392EYP39QM0FW574SA`. The
@@ -236,3 +239,66 @@ run `deploy:guarded` with `BRAIN_DEPLOY_UPSTREAM_TAG=v1.16.2`, repeat the finite
 hosted acceptance, refresh its existing client metadata, then fast-forward
 `ers-main` only after verification. ERS has not been deployed or activated by
 this turn. Existing production and Monitor exclusions remain intact.
+
+## Both-owner deployment receipt — 3 November 2026
+
+The earlier ERS access prerequisite is resolved: John restored its existing
+Supabase admin session. The existing matching service-role key was transferred
+privately, validated against project `omnwbcdtmtvxasgdmvwr` and its private
+bucket, then staged on `ers-brain-mcp`. No key was generated, rotated, printed or
+committed. No migration, grant, bucket policy or general original-download
+permission changed. The temporary one-use loopback transfer server was stopped.
+
+ERS guarded v1.16.2 deployment completed at **14:18:12.001 UTC**, shared source
+`dfdf1d6ae46d205ad2b62e88caf791eb03864e1a`, private overlay
+`12bf72ae998057e3d17b94875b721c3bd58a3b77`, image
+`registry.fly.io/ers-brain-mcp:deployment-01M6GWACH7H41AHQ70E8324NC1`. Its
+mandatory gate passed 672 runnable tests, 14 existing fixture skips, zero
+failures. An initial invocation omitted the explicit app selector and was refused
+before deployment; use `BRAIN_ID=ers-brain BRAIN_FLY_APP=ers-brain-mcp
+BRAIN_DEPLOY_UPSTREAM_TAG=v1.16.2` for this private release. JEM's already verified
+deployment remains v1.16.2 on the same shared source.
+
+ERS production acceptance through a fresh authenticated Owner OAuth MCP client:
+
+| Case | Durable job | Accepted source revision | Result |
+| --- | --- | --- | --- |
+| Inline UTF-8 original | `43afee1f-e6f1-4244-be88-50c4eab22641` | `e4e133fe-86f3-42dd-832c-460f24d71f29` | Original hash/size verified, exact source read-back, same receipt on retry |
+| Exact-object signed binary PUT | `1823a3cc-b988-4f93-8c86-8db55d7a6e6d` | `de746074-e5f4-403d-95ae-af6d4c6393f9` | Original hash/size verified, inspected companion, exact read-back, same receipt on retry |
+
+Both fixtures are clearly synthetic examples, not ERS business knowledge. The
+real authenticated [ERS source diff](https://brain.ersgenomics.online/monitor/changes/e4e133fe-86f3-42dd-832c-460f24d71f29?brain_id=ers-brain)
+shows verified retained bytes, session authority, before/after text and cockpit
+navigation. Source capabilities are supported; the normal Brain-scoped task
+policy remains enforced. Health still reports `metadata_only` general artifact
+access, Postgres revisions/OAuth and private Supabase artifacts. Both local
+loopback cockpit doctor endpoints report pass; ERS sync reports zero conflicts.
+Read-only ERS lint retains its one existing stale-project finding and remains
+within its bootstrap budget. This is not a claim that all corpus maintenance
+findings or the separate colleague Monitor rollout are complete.
+
+A fresh ERS security gate confirms 21/21 Brain tables with RLS, zero client/public
+Brain grants, zero non-runtime Brain policies, zero Storage policies and a
+private artifact bucket. Security Advisor has no findings.
+
+The existing ERS Claude connector's **Refresh tools list** action loaded all four
+source tools without reconnecting or changing permissions. A
+[fresh Claude session](https://claude.ai/chat/f75d4d3c-7280-4d16-8d3e-6076f7ee6f3c)
+actually called `brain_describe` and `brain_source_status` and confirmed the
+completed text job and verified original. ERS's existing ChatGPT workspace app
+was independently refreshed through **Settings → Plugins → ERS Brain → Refresh
+tools**. A [fresh ERS ChatGPT session](https://chatgpt.com/c/6ae9ef6a-0668-83ed-a597-66e38c0000b0)
+then called describe/status successfully, found all four source tools supported,
+and read the complete job with matching verified-original hash. No native
+Monitor package, developer/MDM exclusion or workstation permission changed.
+
+JEM's existing connection in John's ERS Claude account was also refreshed and
+[a separate fresh Claude session](https://claude.ai/chat/974a722f-7af1-4168-8c30-4a709f277d08)
+called JEM describe/status successfully for its synthetic audit job. Only that
+connection was used; no ERS corpus or other personal file was read in that check.
+These native-client receipts prove refreshed discovery and real reads. They do
+not claim client-issued mutations, all colleagues' caches, or the personal
+Ultra desktop account's stored metadata. That desktop was in active user input
+and was left untouched. Existing chats/accounts with old declarations may need
+**Refresh tools list** in their existing connector and a fresh conversation; no
+connection deletion, permission widening or new Capture worker is required.

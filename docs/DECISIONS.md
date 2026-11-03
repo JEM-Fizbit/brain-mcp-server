@@ -13,8 +13,11 @@ normal roles, evidence, CAS and readable logs. Narrow source-backed corrections
 remain automatic. Retired intake remains blocked. The local inbox remains
 operator-owned; no ephemeral Fly filesystem is introduced. This supersedes the
 operator-only hosted source-upload assumption of spec 017 for enabled deployments.
-Implementation and isolated acceptance are complete; production activation and
-fresh client acceptance remain pending the separate security decision.
+John separately approved both owner activations and installation of each existing
+matching Storage key. Both v1.16.2 services are deployed; authenticated direct
+text/binary ingestion, exact read-back, real Monitor diffs and fresh intended
+client discovery/read acceptance passed. Source-backed updates remain automatic;
+no new migration, role, public access or original-download permission was added.
 
 [Contract and rollout](specs/026-direct-session-source-ingestion.md).
 

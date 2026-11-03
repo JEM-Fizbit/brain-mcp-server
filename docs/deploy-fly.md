@@ -1,5 +1,15 @@
 # Fly Deployment
 
+## Direct session ingestion — v1.16.2, 3 November 2026
+
+Both JEM and ERS are deployed on the same annotated shared source v1.16.2.
+Each owner's approved direct-source lane is active; authenticated text/binary
+ingestion, exact read-back, idempotent receipts and the real Monitor diff passed.
+General original downloads remain `metadata_only`; no schema or role changed.
+[Owner-separated deployment and security receipts](specs/026-direct-session-source-ingestion.md#both-owner-deployment-receipt--3-november-2026).
+
+Earlier release sections below are dated history.
+
 ## JEM reconcile-lint release — v1.15.0, 26 October 2026
 
 JEM only. Annotated `v1.15.0` (`4f4e827b67d3e8ee7dd038560941ddd56980d537`)

@@ -875,6 +875,12 @@ and excludes break-glass and agent accounts. It does not upgrade content roles.
 
 ## Selected sources from a working session
 
+**3 November 2026:** both hosted services run v1.16.2. Their authenticated source
+diffs show authority evidence, verified retained bytes, exact before/after text
+and working cockpit return links. Both existing loopback cockpit doctor endpoints
+report pass. No native app/feed or developer/MDM exclusion changed.
+[Owner-separated acceptance receipt](specs/026-direct-session-source-ingestion.md#both-owner-deployment-receipt--3-november-2026).
+
 An enabled hosted Brain now offers direct session ingestion through its MCP tools
 (spec 026). A Monitor/operator is not a mandatory source-upload intermediary; it
 continues to own local filesystem inbox observation and any explicitly selected

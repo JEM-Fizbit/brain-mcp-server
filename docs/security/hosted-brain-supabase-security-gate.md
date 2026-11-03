@@ -24,8 +24,8 @@ tables, all RLS enabled; zero client/public Brain grants, non-runtime Brain
 policies or Storage policies. Security Advisor reports no issues. ERS preflight
 confirms all 21 Brain tables have RLS, zero client/public Brain grants, zero
 non-runtime Brain policies, a private bucket, zero Storage policies and no
-Security Advisor findings; credential installation/deployment acceptance remains
-pending its existing admin session. No migration or grant change is part of spec 026.
+Security Advisor findings. The existing matching ERS Storage key was privately
+installed under the separate approval and its v1.16.2 source acceptance passed. No migration or grant change is part of spec 026.
 
 ### Monitor installation inventory — 23 October 2026
 
