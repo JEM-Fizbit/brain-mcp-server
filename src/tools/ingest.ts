@@ -1,3 +1,5 @@
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
+import { hostedIngestionAvailable } from "../ingestion/hosted-config.js";
 import { assertOperationSupported, describeCapabilities, capabilityFailure } from "../services/capabilities.js";
 import { activeBrainStore } from "../services/active-brain-store.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -38,12 +40,14 @@ export function registerIngestTools(server: McpServer): void {
     async ({ brain_id, source_label }, extra) => {
       try {
         const ctx = await resolveToolBrain(brain_id, extra);
+        ctx.brain = {...ctx.brain,write_policy:await writePolicyForBrain(ctx.brainId)};
         const analysis = await analyzeForIngest(source_label, ctx.brain);
         const capabilities = describeCapabilities(ctx.brain, ctx.role, activeBrainStore().capabilities);
         const filesystem = capabilities.operations.brain_ingest.supported;
         const categories = sourceCategoriesForBrain(ctx.brain);
         const authoritativeWorkflow = filesystem
           ? "Authoritative workflow: this server can save source Markdown, record SOURCES.md provenance, append the Brain log, and clean its own inbox after reviewed Brain updates."
+          : hostedIngestionAvailable(ctx.brain) ? "Authoritative workflow: this session can ingest directly with brain_source_prepare, brain_source_review and brain_source_apply. Preserve the selected original, review exact candidate changes, then apply under existing task authority and verify source and Brain read-back. Capture is optional for deferred or blocked handoffs. Local inbox cleanup remains separate; no Mac or Capture is required for hosted source ingestion."
           : "Authoritative workflow: use the selected Brain's local Monitor/operator workspace to preserve the source, update Postgres/Storage source metadata, and verify/clear the real inbox before Brain-content writes. Fly has no copy of that inbox or source tree. Return to hosted MCP only for reviewed Brain revision writes and revision-store logging; do not call the filesystem ingest mutation tools.";
         const capability = [
           `# Ingestion preflight: ${source_label}`,
@@ -52,6 +56,7 @@ export function registerIngestTools(server: McpServer): void {
           `- Backend: \`${ctx.brain.storage_backend}\``,
           `- Source categories: ${categories.map((item) => `\`${item}\``).join(", ")}`,
           `- Read-only analysis: supported`,
+          `- Direct session source ingestion: ${hostedIngestionAvailable(ctx.brain) ? "supported (brain_source_prepare → brain_source_review → brain_source_apply)" : "not enabled; discover brain_describe for the available workflow"}`,
           `- Server source-path read/write: ${filesystem ? "supported" : "not supported"}`,
           `- Server inbox scan/cleanup: ${filesystem ? "supported" : "not supported"}`,
           `- \`brain_ingest_complete\`: ${filesystem ? "supported" : "not supported"}`,
@@ -101,6 +106,7 @@ NEVER pass large text, raw binary, base64, or hex as source_content.`,
         assertToolRole(ctx, "brain_ingest");
         assertConfiguredSourceCategory(category, ctx.brain);
         if (dry_run) {
+          ctx.brain = {...ctx.brain,write_policy:await writePolicyForBrain(ctx.brainId)};
           const analysis = await analyzeForIngest(source_label, ctx.brain);
 
           // If content was provided, include it (short text only)

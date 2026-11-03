@@ -4,6 +4,11 @@
 **Source:** staged ingestion design in `docs/production-engineering-followthrough.md`
 **Decisions impact:** retries preserve original bytes and require exact review before Brain replacement
 
+**Direct session extension:** [spec 026](026-direct-session-source-ingestion.md)
+reuses these jobs for selected hosted sources without a required Capture/Mac
+handoff. Session review binds the exact candidate under existing authority;
+the operator CLI below retains its explicit review/approve workflow.
+
 ## Contract
 
 Provide an explicit-source local operator command: dry-run manifest, prepare durable job, verify immutable original upload, bounded extraction, produce reviewable candidate, approve exact changes, apply and report receipt. Persist owner/Brain-bound identity, stage, attempts, lease and receipts in private Postgres. Reuse source/artifact identity from spec 015 and existing configured byte custody. Never scan an implicit root, move/delete manual inbox items, invent reviewed semantic claims, or automatically retry a stale reviewed replacement.

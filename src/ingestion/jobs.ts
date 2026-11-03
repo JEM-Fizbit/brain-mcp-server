@@ -1,4 +1,4 @@
-import { internalWriteContext } from "../services/write-policy.js";
+import { internalWriteContext, type BrainWriteContext } from "../services/write-policy.js";
 import pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -14,7 +14,7 @@ export interface OriginalAdapter {
   put(key:string,bytes:Buffer,mime:string):Promise<void>;
 }
 const Change=z.object({filename:z.string().refine(v=>isSafeRelativePath(v)&&v.endsWith('.md')&&!v.includes('..')),expectedRevision:z.union([z.literal('new'),z.string().uuid()]),content:z.string().max(MAX_TEXT_BYTES)}).strict();
-const Actor=z.object({provider:z.literal('local_operator'),id:z.string().min(1).max(200)}).strict();
+const Actor=z.object({provider:z.enum(['local_operator','github','entra','stdio']),id:z.string().min(1).max(200),name:z.string().max(300).optional(),email:z.string().max(320).optional()}).strict();
 const Changes=z.array(Change).min(1).max(20);
 type Change=z.infer<typeof Change>;
 type Actor=z.infer<typeof Actor>;
@@ -40,18 +40,28 @@ export class IngestionJobs {
   }
   async prepare(input:unknown,bytes:Buffer):Promise<IngestionJob>{
     const manifest=SourceReferenceManifestSchema.parse(input),artifact=manifest.artifacts[0];
-    if(manifest.brainId!==this.brainId || manifest.artifacts.length!==1 || artifact.kind!=='original' || !artifact.provider || !artifact.providerId || !artifact.relativePath || !artifact.rootAlias)throw new IngestionError('explicit_original_identity_required');
-    if(!bytes.length||bytes.length>MAX_SOURCE_BYTES||manifest.contentMarkdown)throw new IngestionError('invalid_preparation');
     const hash=sha256(bytes);
+    if(!bytes.length||bytes.length>MAX_SOURCE_BYTES)throw new IngestionError('invalid_preparation');
     if(artifact.contentSha256 && artifact.contentSha256!==hash || artifact.byteSize!==undefined && artifact.byteSize!==bytes.length)throw new IngestionError('source_changed');
     artifact.contentSha256=hash;artifact.byteSize=bytes.length;
+    return this.reserve(manifest);
+  }
+  /** Durable declaration before a scoped upload; declaration is not verified custody. */
+  async reserve(input:unknown):Promise<IngestionJob>{
+    const manifest=SourceReferenceManifestSchema.parse(input),artifact=manifest.artifacts[0];
+    if(manifest.brainId!==this.brainId || manifest.artifacts.length!==1 || artifact.kind!=='original' || !artifact.provider || !artifact.providerId || !artifact.relativePath || !artifact.rootAlias)throw new IngestionError('explicit_original_identity_required');
+    if(!artifact.contentSha256 || !artifact.byteSize || artifact.byteSize>MAX_SOURCE_BYTES || manifest.contentMarkdown)throw new IngestionError('invalid_preparation');
+    const hash=artifact.contentSha256;
     const identity=sha256(JSON.stringify([artifact.provider,artifact.providerId]));
     return this.transaction(async client=>{
       // Identity remains stable across rename. Serializes competing preparations.
       await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`ingest:${manifest.sourceId}`]);
+      await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`ingest-companion:${this.brainId}:${manifest.companionPath}`]);
       await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))',[`ingest-identity:${this.ownerRef}:${this.brainId}:${identity}`]);
       const identities=await client.query('select source_id from brain.ingestion_jobs where owner_ref=$1 and brain_id=$2 and identity_key=$3',[this.ownerRef,this.brainId,identity]);
       if(identities.rows.some(row=>row.source_id!==manifest.sourceId))throw new IngestionError('reuse_existing_source_id');
+      const companions=await client.query("select id from brain.sources where brain_id=$1 and companion_path=$2 and id<>$3 union all select source_id as id from brain.ingestion_jobs where brain_id=$1 and manifest->>'companionPath'=$2 and source_id<>$3",[this.brainId,manifest.companionPath,manifest.sourceId]);
+      if(companions.rowCount)throw new IngestionError('companion_owned_by_other_source');
       const sources=await client.query('select brain_id,companion_path from brain.sources where id=$1',[manifest.sourceId]);
       if(sources.rows.some(row=>row.brain_id!==this.brainId))throw new IngestionError('source_owned_elsewhere');
       if(sources.rows.some(row=>row.companion_path && row.companion_path!==manifest.companionPath))throw new IngestionError('source_companion_mismatch');
@@ -82,7 +92,7 @@ export class IngestionJobs {
     });
   }
   private async release(id:string,token:string){await this.pool.query('update brain.ingestion_jobs set lease_token=null,lease_until=null where id=$1 and owner_ref=$2 and brain_id=$3 and lease_token=$4',[id,this.ownerRef,this.brainId,token]);}
-  async advance(id:string,adapter:OriginalAdapter,localBytes?:Buffer):Promise<IngestionJob>{
+  async advance(id:string,adapter:OriginalAdapter,localBytes?:Buffer,reviewedText?:string):Promise<IngestionJob>{
     const token=await this.claim(id);
     try{
       let job=await this.get(id);if(['review','approved','needs_review','complete'].includes(job.stage))return job;
@@ -104,7 +114,11 @@ export class IngestionJobs {
       await this.leased(id,token,async client=>{
         await client.query("update brain.ingestion_jobs set original=$2,stage='verified',error_code=null,updated_at=now() where id=$1",[id,{bucket:adapter.bucket,key,sha256:job.content_sha256,byteSize:bytes!.length,verified:true}]);
       });
-      const extraction=await extractLocalText(bytes,artifact.relativePath!);
+      // A session may supply its reviewed conversion for Office/binary originals.
+      // This is explicitly attributed client text, never claimed as server extraction.
+      const extraction=reviewedText===undefined ? await extractLocalText(bytes,artifact.relativePath!) :
+        {content:reviewedText,format:'markdown' as const,method:'session_reviewed_conversion'};
+      if(!extraction.content.trim() || extraction.content.includes('\0') || Buffer.byteLength(extraction.content)>MAX_TEXT_BYTES)throw new IngestionError('invalid_reviewed_text');
       await this.leased(id,token,async client=>{
         await client.query("update brain.ingestion_jobs set extraction=$2,stage='review',updated_at=now() where id=$1",[id,{...extraction,sha256:sha256(extraction.content)}]);
       });
@@ -114,14 +128,15 @@ export class IngestionJobs {
       await this.pool.query("update brain.ingestion_jobs set stage='blocked',error_code=$5,updated_at=now() where id=$1 and owner_ref=$2 and brain_id=$3 and lease_token=$4 and lease_until>now()",[id,this.ownerRef,this.brainId,token,code]);throw error;
     }finally{await this.release(id,token);}
   }
-  async review(id:string,reviewedContent:string,changes:Change[]=[]):Promise<IngestionJob>{
+  async review(id:string,reviewedContent:string,changes:Change[]=[],companionExpectedRevision?:string):Promise<IngestionJob>{
     return this.transaction(async client=>{
       const job=await this.get(id,client,true);
-      if(!['review','needs_review'].includes(job.stage)||!job.original||!job.extraction||job.lease_token)throw new IngestionError('job_not_ready_for_review');
+      if(!['review','needs_review','approved'].includes(job.stage)||!job.original||!job.extraction||job.lease_token)throw new IngestionError('job_not_ready_for_review');
       if(Buffer.byteLength(reviewedContent)>MAX_TEXT_BYTES)throw new IngestionError('candidate_too_large');
       const manifest=SourceReferenceManifestSchema.parse({...job.manifest,contentMarkdown:reviewedContent,status:'processed'});
       const compiled=compileSourceReference(manifest);
       const head=await client.query('select current_revision_id from brain.brain_files where brain_id=$1 and filename=$2',[this.brainId,manifest.companionPath]);
+      if(companionExpectedRevision!==undefined && (head.rows[0]?.current_revision_id||'new')!==companionExpectedRevision)throw new IngestionError('stale_companion_review');
       const all=Changes.parse([{filename:manifest.companionPath,expectedRevision:head.rows[0]?.current_revision_id||'new',content:compiled.markdown},...changes]);
       if(new Set(all.map(c=>c.filename)).size!==all.length || all.reduce((n,c)=>n+Buffer.byteLength(c.content),0)>MAX_TEXT_BYTES)throw new IngestionError('candidate_size_or_duplicate_target');
       // Bind every optional semantic edit to the exact supplied read, before approval.
@@ -144,7 +159,7 @@ export class IngestionJobs {
       await client.query("update brain.ingestion_jobs set stage='approved',approval=$2,updated_at=now() where id=$1",[id,{digest,actor:this.actor,approvedAt:new Date().toISOString()}]);return this.get(id,client);
     });
   }
-  async apply(id:string,adapter:OriginalAdapter):Promise<IngestionJob>{
+  async apply(id:string,adapter:OriginalAdapter,writeContext?:BrainWriteContext):Promise<IngestionJob>{
     const token=await this.claim(id);
     try{
       const job=await this.get(id);if(job.stage==='complete')return job;
@@ -171,9 +186,25 @@ export class IngestionJobs {
         await client.query(`insert into brain.source_artifact_text(artifact_id,text_format,content,content_sha256) values($1,$2,$3,$4) on conflict(artifact_id) do nothing`,[current.artifact_id,current.extraction.format,current.extraction.content,current.extraction.sha256]);
         const revisions=[];
         for(const change of changes){
-          const result=await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:change.filename,baseRevisionId:change.expectedRevision==='new'?null:change.expectedRevision,content:change.content,origin:'import',actor:current.approval.actor,writeContext:internalWriteContext('existing reviewed source ingestion')});
+          const result=await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:change.filename,baseRevisionId:change.expectedRevision==='new'?null:change.expectedRevision,content:change.content,origin:'import',actor:current.approval.actor,writeContext:change.filename===current.manifest.companionPath ? internalWriteContext('verified reviewed source companion') : writeContext ? {...writeContext,operation_id:hashValue([writeContext.operation_id,id,change.filename])} : internalWriteContext('existing reviewed source ingestion')});
           if(!result.ok)throw new IngestionError('write_conflict');
           revisions.push({filename:change.filename,revisionId:result.revision.revisionId,sha256:result.revision.contentHash});
+        }
+        if(writeContext){
+          // Source custody and its operation receipt share the same transaction.
+          // This is bounded metadata; full reviewed bytes stay in retained revisions.
+          await client.query("select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2,0))",[this.brainId,'LOG.md']);
+          const log=await client.query('select f.current_revision_id,r.content from brain.brain_files f join brain.brain_file_revisions r on r.id=f.current_revision_id where f.brain_id=$1 and f.filename=$2',[this.brainId,'LOG.md']);
+          const sourceRevision=revisions.find(r=>r.filename===current.manifest.companionPath)!;
+          const summary=['### Source ingestion — '+new Date().toISOString(),
+            'Source: '+current.source_id+'; job: '+current.id,
+            'Original: '+current.content_sha256+'; bytes: '+current.original.byteSize+'; verified before apply.',
+            'Reviewed companion: '+current.manifest.companionPath+'; revision: '+sourceRevision.revisionId,
+            'Curated files: '+changes.filter(c=>c.filename!==current.manifest.companionPath).map(c=>c.filename).join(', ').slice(0,650),
+            'Agent: '+this.actor.provider+':'+this.actor.id+'; session reviewed exact candidate '+digest+'.',
+            'Result: committed atomically; use brain_read_change for before/after; source and Brain read-back still required.'].join('\n');
+          await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:'LOG.md',baseRevisionId:log.rows[0]?.current_revision_id||null,
+            content:summary+'\n\n'+(log.rows[0]?.content||'# Brain operation log\n'),origin:'import',actor:this.actor,writeContext:internalWriteContext('bounded verified source ingestion receipt')});
         }
         const receipt={schema:'brain.ingestion-receipt/v1',jobId:id,ownerRef:this.ownerRef,brainId:this.brainId,sourceId:current.source_id,original:current.original,reviewDigest:digest,approvedBy:current.approval.actor,appliedBy:this.actor,completedAt:new Date().toISOString(),revisions,persisted};
         await client.query("update brain.ingestion_jobs set stage='complete',receipt=$2,error_code=null,updated_at=now() where id=$1",[id,receipt]);

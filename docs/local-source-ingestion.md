@@ -3,6 +3,11 @@
 **Version:** 1.0 — 11 September 2026
 **Release:** v1.11.0; owner-specific migration and acceptance results are recorded separately
 
+For sessions that can reach an enabled hosted Brain, prefer the [direct session
+source workflow](specs/026-direct-session-source-ingestion.md). Capture is an
+optional deferred handoff, not a prerequisite. The CLI below remains the supported
+local-source/operator path with its existing review policy.
+
 This operator command ingests one explicitly selected local original. It never scans an inbox, moves a file, starts a watcher, reads Graph or changes access. Manual local inbox custody remains independent of MCP roles. Use the existing owner-bound database profile and existing local Storage administration credential; do not distribute those credentials to colleagues or place them in a viewer.
 
 ## Working sequence

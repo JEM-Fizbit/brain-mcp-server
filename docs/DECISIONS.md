@@ -1,5 +1,23 @@
 # Working Decisions Log
 
+## 2026-11-03 — The working session is a primary Brain writer
+
+John clarified that Claude/ChatGPT sessions working with him or within authorised
+operational context should normally perform Brain updates directly. Capture
+tracks to-dos, routes information and supports surfaces; it is an optional
+deferred or blocked handoff, never a mandatory intermediary for Brain work.
+
+Spec 026 adds a separately enabled direct source lane using existing private
+Storage and durable ingestion jobs, with session-reviewed exact candidates,
+normal roles, evidence, CAS and readable logs. Narrow source-backed corrections
+remain automatic. Retired intake remains blocked. The local inbox remains
+operator-owned; no ephemeral Fly filesystem is introduced. This supersedes the
+operator-only hosted source-upload assumption of spec 017 for enabled deployments.
+Implementation and isolated acceptance are complete; production activation and
+fresh client acceptance remain pending the separate security decision.
+
+[Contract and rollout](specs/026-direct-session-source-ingestion.md).
+
 ## 2026-10-26 — Reconcile lint is deterministic, advisory and detection-only
 
 **Decision:** Detect cross-file contradictions (spec 025) with a deterministic

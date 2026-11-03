@@ -546,3 +546,14 @@ To keep hosted the default in practice: in Claude Code, allow-list only `mcp__br
 ### Authenticated monitoring
 
 Colleague status is available through the endpoint’s `/monitor` browser surface under existing Brain sign-in. Reader/Curator status and Admin/Owner diagnostics are distinct; local inbox custody remains outside the hosted observation boundary. This delivery does not close installed-client acceptance or lift the rollout hold. [Runbook](hosted-monitoring.md).
+
+## Spec 026 client metadata acceptance (pending)
+
+After approved deployment/activation, refresh each existing Brain connector and
+verify a fresh Claude/ChatGPT session advertises `brain_source_prepare`,
+`brain_source_review`, `brain_source_apply` and `brain_source_status`. Test a
+selected long text and, on a surface supporting outbound upload, an unchanged
+binary via its scoped PUT. Verify completed hosted read-back; neither tool-list
+presence nor an upload grant proves ingestion. Capture remains optional. Current
+implementation evidence is isolated MCP/Postgres, not fresh-client production
+acceptance. Follow [spec 026](specs/026-direct-session-source-ingestion.md).

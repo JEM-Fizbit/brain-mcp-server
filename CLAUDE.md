@@ -67,6 +67,15 @@ Brain supplies stable context; reading it does not authorise a write. Same-domai
 
 The reusable server still exposes `brain_capture_item` (`brain_report_item` compatibility alias) and lints legacy Capture / Triage queues. Tool availability is not routing permission: use those tools only when the selected Brain's current contract explicitly permits that scope; ERS `TASKS.md` is limited to Brain content/ingestion/maintenance. Do not recreate general intake in Brain when Capture is unavailable.
 
+Direct authorised session updates are primary. Capture is optional for deferred
+or blocked handoffs, not a mandatory intermediary. Discover `brain_source_*`
+capabilities for selected hosted sources; when enabled, the working session
+preserves the original, reviews the exact candidate, applies and verifies it.
+Narrow sourced corrections continue through `brain_update_file`. Source upload
+activation remains a per-owner security decision; keep general original downloads
+metadata-only and preserve normal role, evidence, CAS and retired-intake checks.
+See [direct session ingestion](docs/specs/026-direct-session-source-ingestion.md).
+
 ### Verification commands (cite in every spec)
 
 - `git diff --check` — whitespace sanity for docs/metadata-only changes
@@ -180,7 +189,7 @@ brain-mcp-server/
 └── dist/                 # Compiled output
 ```
 
-### Tools (26 total — 25 distinct + 1 alias)
+### Tools (discover the current registry and capabilities)
 
 Registered in `src/tools/index.ts` across the registry, semantic, sync, context, update, status, log, tasks, lint, ingest, and inbox modules.
 
@@ -208,6 +217,12 @@ Registered in `src/tools/index.ts` across the registry, semantic, sync, context,
 - `brain_list_files` — List all Brain vault files with staleness metadata
 - `brain_list_sources` — List files in the source archive, optionally filtered by category
 - `brain_search` — Search across files. Exact keyword matches are preferred; normalized fallback handles spacing, punctuation, camel-case, and common lookup wording. Accepts `scope`: "brain" (default), "sources", or "all".
+
+**Direct selected-source ingestion (enabled hosted deployments):**
+- `brain_source_prepare` — Reserve original identity and accept bounded UTF-8 text or issue a scoped binary upload grant.
+- `brain_source_review` — Verify original custody and inspect exact source/index/knowledge candidates.
+- `brain_source_apply` — Apply the session-reviewed digest atomically under existing authority; no extra per-fact approval.
+- `brain_source_status` — Read the caller-bound job, receipt and current companion baseline.
 
 **Operations:**
 - `brain_log` — Append an entry to the Brain change log (LOG.md)

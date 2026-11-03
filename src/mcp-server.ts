@@ -11,7 +11,10 @@ than one Brain is visible. It returns the slim loader/task router plus NOW.md. F
 route and read only the relevant hubs or files. Before ingestion, output capture, maintenance, or another \
 write workflow, read the on-demand operations guide named by that Brain's loader; detailed procedures do \
 not belong in the always-loaded bootstrap. Before any ingestion-related write, call brain_prepare_ingest: \
-it is read-only and identifies the selected Brain's backend, categories, and authoritative source/inbox workflow.
+it is read-only and identifies the selected Brain's backend, categories, and authoritative source/inbox workflow. \
+Direct session updates and selected source ingestion are primary: use brain_source_prepare/review/apply when \
+capability discovery reports them available. Capture is optional for deferred or blocked work, never a mandatory \
+intermediary. Source-backed corrections remain automatic under existing authority with readable change logs.
 
 Notes: brain_read_file and brain_search take a scope param ("brain" default, "sources", or "all") to \
 reach original ingested material; brain_sync_status reports hosted sync health. A Brain is authoritative \

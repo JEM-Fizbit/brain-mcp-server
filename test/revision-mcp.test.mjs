@@ -1026,3 +1026,21 @@ test("capability discovery agrees with unsupported semantic and inbox execution"
   assert.equal(context.structuredContent.observations.inbox.state, "unobserved");
   assert.doesNotMatch(context.content[0].text, /inbox unavailable|Inbox is empty/i);
 });
+
+
+test("ingestion preflight uses the same deployment policy as describe without blanket human approval",async()=>{
+ const harness=await setupHarness("preflight-policy-file",{storage_backend:"postgres",source_categories:["research"]});
+ const prior=process.env.BRAIN_WRITE_POLICY_CONFIG;
+ const file=path.join(tmpRoot,"preflight-policy.json");
+ const policy={version:1,mode:"enforce",intake:"retired",capture_route:"capture-personal"};
+ await fs.writeFile(file,JSON.stringify({version:1,brains:[{id:"ai-brain-jem",write_policy:policy}]}));
+ process.env.BRAIN_WRITE_POLICY_CONFIG=file;
+ try{
+  const d=await callRawTool(harness,"brain_describe",{brain_id:"ai-brain-jem"});
+  const p=await callRawTool(harness,"brain_prepare_ingest",{source_label:"Selected published source"});
+  assert.deepEqual(p.structuredContent.capabilities.write_policy,d.structuredContent.capabilities.write_policy);
+  assert.equal(p.structuredContent.capabilities.operations.brain_capture_item.policy.allowed,false);
+  assert.doesNotMatch(p.structuredContent.instructions,/Get human approval/);
+  assert.match(p.structuredContent.instructions,/no new human approval/);
+ }finally{if(prior===undefined)delete process.env.BRAIN_WRITE_POLICY_CONFIG;else process.env.BRAIN_WRITE_POLICY_CONFIG=prior;}
+});

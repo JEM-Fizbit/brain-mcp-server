@@ -1,3 +1,4 @@
+import { hostedIngestionAvailable } from "../ingestion/hosted-config.js";
 import type { BrainDefinition, BrainRole } from "./registry.js";
 import { roleAllows, TOOL_MINIMUM_ROLES, type BrainToolName } from "./tool-authority.js";
 
@@ -5,9 +6,9 @@ export interface StoreCapabilities { revisions: boolean }
 export interface OperationCapability {
   supported: boolean;
   policy: {allowed:boolean;reason_code:string;capture_route?:string;recheck_at_execution:true};
-  reason_code: "supported" | "operator_surface_required" | "revision_store_required";
+  reason_code: "supported" | "operator_surface_required" | "revision_store_required" | "hosted_ingestion_not_enabled";
   execution_surface: "endpoint" | "operator_workspace" | "revision_endpoint";
-  custody: "brain_store" | "operator_filesystem";
+  custody: "brain_store" | "operator_filesystem" | "private_artifact_store";
   effects: string[];
   authorization: { required_role: BrainRole; role_allowed: boolean; recheck_at_execution: true };
   preconditions: string[];
@@ -21,11 +22,13 @@ export function operationCapability(
   const filesystem = ["brain_scan_inbox", "brain_semantic_search", "brain_semantic_index", "brain_ingest", "brain_ingest_complete"];
   const sourceOperation = filesystem.includes(tool) && !(tool === "brain_ingest" && variant === "analysis");
   const needsRevision = ["brain_restore_file", "brain_resolve_conflict"].includes(tool);
-  const supported = (!sourceOperation || local) && (!needsRevision || store.revisions);
+  const sessionSource = tool.startsWith("brain_source_");
+  const supported = (!sessionSource || hostedIngestionAvailable(brain)) && (!sourceOperation || local) && (!needsRevision || store.revisions);
   const required = tool === "brain_lint" && variant === "apply" ? "member" : TOOL_MINIMUM_ROLES[tool];
   // Effects are independent of role: read access does not define purity, and
   // a mutation's content, derived-state and Git effects are separate promises.
   const mutations: Partial<Record<BrainToolName, string[]>> = {
+    brain_source_prepare: ["private_original_upload"], brain_source_review: ["ingestion_candidate_write"], brain_source_apply: ["brain_write", "source_metadata_write"],
     brain_update_file: ["brain_write"], brain_log: ["brain_write"],
     brain_capture_item: ["brain_write"], brain_report_item: ["brain_write"],
     brain_delete_file: ["brain_delete"], brain_rename_file: ["brain_write", "brain_delete"],
@@ -40,17 +43,17 @@ export function operationCapability(
   if (local && !store.revisions && effects.some(effect => ["brain_write", "brain_delete", "operator_filesystem_write"].includes(effect)) && !(tool === "brain_lint")) {
     effects.push("git_sync_if_configured");
   }
-  const preconditions = tool === "brain_update_file" ? ["replace_requires_reviewed_revision_or_new", "structural_files_require_admin"]
+  const preconditions = sessionSource ? ["explicit_source_selection", "same_principal_job", "verified_original_before_apply", "exact_review_digest", "reviewed_target_revisions", "no_inbox_cleanup"] : tool === "brain_update_file" ? ["replace_requires_reviewed_revision_or_new", "structural_files_require_admin"]
     : tool === "brain_resolve_conflict" ? ["current_reviewed_revision", "open_conflict", "reviewed_local_state_for_reconciliation"]
     : tool === "brain_semantic_search" ? ["existing_index_required"]
     : tool === "brain_commit" && store.revisions ? ["revision_store_no_git_commit"] : [];
-  return { supported, reason_code: supported ? "supported" : sourceOperation ? "operator_surface_required" : "revision_store_required",
-    execution_surface: supported ? "endpoint" : needsRevision ? "revision_endpoint" : "operator_workspace",
-    custody: sourceOperation ? "operator_filesystem" : "brain_store", effects,
+  return { supported, reason_code: supported ? "supported" : sessionSource ? "hosted_ingestion_not_enabled" : sourceOperation ? "operator_surface_required" : "revision_store_required",
+    execution_surface: supported || sessionSource ? "endpoint" : needsRevision ? "revision_endpoint" : "operator_workspace",
+    custody: sessionSource ? "private_artifact_store" : sourceOperation ? "operator_filesystem" : "brain_store", effects,
     policy: {allowed:!(['brain_capture_item','brain_report_item'].includes(tool) && brain.write_policy?.intake==='retired'),
       reason_code:['brain_capture_item','brain_report_item'].includes(tool) ?
         brain.write_policy?.intake==='retired' ? 'general_intake_retired' : brain.write_policy?.intake==='brain_scoped' ? 'brain_scope_required' : 'legacy_compatibility' :
-        effects.includes('brain_write') && brain.write_policy?.mode==='enforce' ? 'write_context_required' : 'allowed',
+        (effects.includes('brain_write') || sessionSource && tool!=='brain_source_status') && brain.write_policy?.mode==='enforce' ? 'write_context_required' : 'allowed',
       capture_route:brain.write_policy?.capture_route,recheck_at_execution:true},
     authorization: { required_role: required, role_allowed: roleAllows(role, required), recheck_at_execution: true }, preconditions };
 }

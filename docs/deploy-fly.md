@@ -694,3 +694,14 @@ tests. Docker admits only the named appcast/architecture archives and policy/
 manifest. Do not put profiles, credentials or Brain source bytes there. Set
 `BRAIN_MONITOR_RELEASE_DIR=/app/config/monitor-release-assets` only after a signed
 bootstrap/upgrade canary and the separately approved publication decision.
+
+## Direct session source ingestion activation
+
+Spec 026 is disabled by default. After the separate security approval, enable only
+the selected owner with `BRAIN_HOSTED_INGESTION_BRAINS` equal to `BRAIN_ID`. Reuse
+the existing private Storage credentials and bucket and the existing private
+ingestion-job table. Require matching `BRAIN_EXPECTED_SUPABASE_PROJECT_REF`,
+`BRAIN_SUPABASE_URL` and database/key project binding. Do not add public grants or
+change bucket limits implicitly. JEM and ERS activate and verify independently.
+Read [the exact exposure, checks and acceptance sequence](specs/026-direct-session-source-ingestion.md#activation-and-security-decision)
+before activating. Deploying code with this setting absent does not enable uploads.

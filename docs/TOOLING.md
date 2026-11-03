@@ -55,6 +55,8 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 
 ### Hosted/Postgres Mutating
 
+- Spec 026 `brain_source_prepare/review/apply` preserves selected originals and commits reviewed ingestion through the explicitly enabled hosted source lane. `brain_source_status` is a read. Upload grants are private bearer capabilities, not an ingestion receipt. Activation is security-affecting and requires the per-owner approval in the spec.
+
 - `npm run sync -- push`, `sync:canary:postgres`, `sync:seed:core:postgres`, `sync:seed:all-markdown:postgres`, and `sync:reconcile:duplicate-brain-paths` can write hosted revision/conflict state.
 - `npm run sources:upload:postgres` and `sources:extract-text:postgres` write source artifact metadata, Storage objects, or extracted text records depending on configuration.
 - `npm run smoke:http:postgres` is read-only by default, but writes when `BRAIN_HTTP_SMOKE_WRITE=1`.

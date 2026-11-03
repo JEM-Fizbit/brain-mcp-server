@@ -111,6 +111,24 @@ Doctor and Monitor distinguish admission holds from a broken sync process.
 A refusal provides a route; it does not create Capture custody or a receipt.
 Use the actual same-domain Capture/project tool and verify its filing receipt.
 
+## Direct session source ingestion (spec 026)
+
+The session working with the user or within authorised operational context is a
+primary Brain writer. Capture is optional for deferred or blocked work; it is
+never required merely because the destination is Brain. Use the existing
+`brain_update_file` lane for narrow sourced corrections. For a selected new source,
+discover `brain_source_prepare`, `brain_source_review`, `brain_source_apply` and
+`brain_source_status` support. Enabled deployments retain originals in private
+Storage and use the existing durable ingestion jobs; no Mac is required.
+Source prepare supports bounded UTF-8 text directly and a scoped binary upload.
+The session inspects exact before/after and applies its digest within existing
+authority, with no extra per-fact human approval. Status distinguishes reserved,
+original verified, review and complete. Verify exact source/Brain read-back.
+Local inbox access/cleanup and legacy filesystem ingest tools remain separate.
+
+[Limits, security activation and rollout](specs/026-direct-session-source-ingestion.md).
+This lane defaults off until each owner approves its private Storage activation.
+
 ## Select a workflow before approval
 
 Call `brain_describe({brain_id})`. Its structured response contains `capabilities.version = 2`, per-operation support, execution surface, custody, effects, role requirement and preconditions. `variants` distinguishes ingestion analysis from source-path execution and lint inspection from apply. `brain_prepare_ingest` uses the same resolver for its read-only workflow advice. Actual handlers recheck support and authority when called.
@@ -120,7 +138,7 @@ Call `brain_describe({brain_id})`. Its structured response contains `capabilitie
 | Inbox scan and related nudge | Read the configured operator inbox; report a measured count or failed scan | Unsupported on this endpoint; local inbox remains unobserved |
 | Semantic search / index | Existing local index / explicit derived-index write | Operator workspace required; no implicit hosted vector service |
 | Ingest analysis | Read-only analysis | Read-only analysis |
-| Ingest source path / complete | Configured local source workflow | Use operator source retention and receipt workflow |
+| Ingest source path / complete | Configured local source workflow | Legacy filesystem tools unsupported; prefer the enabled direct session lane, otherwise the operator workflow |
 | Conflict resolution / restore | Requires a revision provider | Revision-backed operation |
 
 Support does not grant permission. Role authorization does not prove support. Approval remains the host client's decision, and discovery cannot suppress its prompts. Neither governs a person's independent Finder, editor, SharePoint or filesystem access. Local inbox custody was settled by spec 017. The existing Monitor scans it; another watcher or repeated permanent warning is not needed.
@@ -131,7 +149,7 @@ Semantic search never silently builds an index. A missing index returns `semanti
 
 ## Preflight response parity (v1.11.1)
 
-`brain_prepare_ingest.structuredContent` retains `capabilities` and `source_categories` and adds `files` (sorted Brain filenames), `file_count`, `authoritative_workflow` and `instructions`. The workflow and instructions are the same strings included in the text response, generated from the same read-only inventory. Both response consumers receive the completion/verification guidance; filenames are not source bodies or a local-inbox observation. Hosted source custody still belongs to the operator workspace. The input schema and role/revision requirements are unchanged.
+`brain_prepare_ingest.structuredContent` retains `capabilities` and `source_categories` and adds `files` (sorted Brain filenames), `file_count`, `authoritative_workflow` and `instructions`. The workflow and instructions are the same strings included in the text response, generated from the same read-only inventory. Both response consumers receive the completion/verification guidance; filenames are not source bodies or a local-inbox observation. Hosted source custody uses the operator workflow unless direct session ingestion is explicitly enabled; discover its separate capability. The input schema and role/revision requirements are unchanged.
 
 ## Preserve the review boundary
 

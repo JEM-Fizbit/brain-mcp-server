@@ -6,6 +6,11 @@
 **Decisions impact:** formalises the split between hosted Brain writes and operator-side source-byte/inbox custody
 **Related:** [`012-ers-mcp-fork.md`](012-ers-mcp-fork.md); [`015-compiled-source-ingestion.md`](015-compiled-source-ingestion.md); [`../brain-content-linking-runbook.md`](../brain-content-linking-runbook.md)
 
+**3 November clarification:** the working session is a primary Brain writer.
+[Spec 026](026-direct-session-source-ingestion.md) supersedes the operator-only
+source-upload default for explicitly enabled hosted deployments. Local inbox
+custody and the legacy filesystem-tool guard remain unchanged. Capture is optional.
+
 ## Problem
 
 The ingest tools describe one filesystem workflow even when the selected Brain

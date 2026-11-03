@@ -86,6 +86,15 @@ Brain supplies stable context; reading it does not authorise a write. Same-domai
 
 The reusable server still exposes `brain_capture_item` (`brain_report_item` compatibility alias) and lints legacy Capture / Triage queues. Tool availability is not routing permission: use those tools only when the selected Brain's current contract explicitly permits that scope; ERS `TASKS.md` is limited to Brain content/ingestion/maintenance. Do not recreate general intake in Brain when Capture is unavailable.
 
+Direct authorised session updates are primary. Capture is optional for deferred
+or blocked handoffs, not a mandatory intermediary. Discover `brain_source_*`
+capabilities for selected hosted sources; when enabled, the working session
+preserves the original, reviews the exact candidate, applies and verifies it.
+Narrow sourced corrections continue through `brain_update_file`. Source upload
+activation remains a per-owner security decision; keep general original downloads
+metadata-only and preserve normal role, evidence, CAS and retired-intake checks.
+See [direct session ingestion](docs/specs/026-direct-session-source-ingestion.md).
+
 ## Verification
 
 Use the smallest meaningful verification for the change, then broaden when shared behaviour is touched.

@@ -416,3 +416,7 @@ Company-wide expansion remains held while [spec 020](specs/020-production-stabil
 ### Local ingestion delivery
 
 [Spec 022](specs/022-resumable-local-ingestion.md) now implements the approved explicit-source local worker. Graph automation remains future work requiring a separate permission and runner decision. Verification uses isolated sources and databases; the first production source requires explicit selection and its own retained review/receipt.
+
+Direct session ingestion: [spec 026](specs/026-direct-session-source-ingestion.md)
+is implemented and tested in isolation. Per-owner production Storage activation
+and fresh Claude/ChatGPT acceptance remain pending; Capture is optional.

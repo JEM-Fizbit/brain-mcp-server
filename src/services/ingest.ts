@@ -1,3 +1,4 @@
+import { hostedIngestionAvailable } from "../ingestion/hosted-config.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -60,7 +61,12 @@ export async function analyzeForIngest(
           "  4. Call `brain_ingest_complete` with both file paths and Brain files touched",
           "- **For short text (under 500 words):** Call `brain_ingest` with `dry_run=false` and `source_content`",
         ]
-      : [
+      : hostedIngestionAvailable(brain) ? [
+          "- Use brain_source_prepare for the selected original (text or scoped binary upload), then brain_source_review and brain_source_apply",
+          "- Review exact before/after bytes, apply within existing user/task authority, and verify hosted source and Brain read-back",
+          "- Capture is optional for deferred/blocked handoffs; never required for direct Brain updates",
+          "- Local inbox cleanup, if any, is separate and is never implied by a hosted receipt",
+        ] : [
           "- Preserve source bytes, the reviewed Markdown companion, provenance and inbox state through the selected Brain's local Monitor/operator workflow",
           "- Complete the Postgres/Storage source inventory before applying reviewed Brain-content changes through hosted revision tools",
           "- Do not call `brain_ingest` with `dry_run=false` or `brain_ingest_complete`; those mutation tools require a filesystem-backed Brain",
@@ -84,7 +90,7 @@ export async function analyzeForIngest(
     "### Next steps:",
     "- Read the per-Brain operations guide named by `brain_load_context` before writing",
     "- Use `brain_read_file` to read any files you expect the source touches",
-    "- Get human approval for proposed changes",
+    "- Act within the existing user/task authority; source-backed corrections need no new human approval. Ask only for ambiguous retention, conflicting evidence or reserved consequential changes.",
     ...completionSteps,
     "- Run `brain_lint` after ingesting to check for inconsistencies",
   ].join("\n");

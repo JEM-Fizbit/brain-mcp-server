@@ -9,6 +9,12 @@ export class SupabaseIngestionAdapter implements OriginalAdapter {
   constructor(url:string,key:string,readonly bucket='brain-artifacts'){
     this.client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:(input,init)=>fetch(input,{...init,signal:AbortSignal.any([AbortSignal.timeout(30_000),...(init?.signal?[init.signal]:[])])})}});
   }
+  async uploadGrant(key:string):Promise<string>{
+    assertStoragePath(key);
+    const {data,error}=await this.client.storage.from(this.bucket).createSignedUploadUrl(key,{upsert:false});
+    if(error||!data?.signedUrl)throw new IngestionError('upload_grant_failed');
+    return data.signedUrl;
+  }
   async read(key:string):Promise<Buffer|null>{
     assertStoragePath(key);
     const {data,error}=await this.client.storage.from(this.bucket).download(key).asStream();

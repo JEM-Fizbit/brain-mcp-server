@@ -4,6 +4,7 @@ import { registerUpdateTools } from "./update.js";
 import { registerStatusTools } from "./status.js";
 import { registerLogTools } from "./log.js";
 import { registerLintTools } from "./lint.js";
+import { registerSourceIngestionTools } from "./source-ingestion.js";
 import { registerIngestTools } from "./ingest.js";
 import { registerInboxTools } from "./inbox.js";
 import { registerRegistryTools } from "./registry.js";
@@ -22,5 +23,6 @@ export function registerAllTools(server: McpServer): void {
   registerTaskTools(server);
   registerLintTools(server);
   registerIngestTools(server);
+  registerSourceIngestionTools(server);
   registerInboxTools(server);
 }

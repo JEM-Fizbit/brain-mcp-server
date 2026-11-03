@@ -872,3 +872,12 @@ sign-in for hosted diagnostics and an authenticated metadata-only build report.
 An installation report is separate from a Brain access grant; no report means
 installation unverified. Explicit operator policy preserves developer/MDM modes
 and excludes break-glass and agent accounts. It does not upgrade content roles.
+
+## Selected sources from a working session
+
+An enabled hosted Brain now offers direct session ingestion through its MCP tools
+(spec 026). A Monitor/operator is not a mandatory source-upload intermediary; it
+continues to own local filesystem inbox observation and any explicitly selected
+cleanup. The hosted job receipt never claims a local inbox scan or deletion.
+Capture is an optional deferred handoff. Existing read-only Monitor behaviour and
+developer/update exclusions are unchanged. See [the source workflow](specs/026-direct-session-source-ingestion.md).
