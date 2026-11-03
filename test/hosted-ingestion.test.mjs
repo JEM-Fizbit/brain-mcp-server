@@ -15,6 +15,8 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {registerSourceIngestionTools} from '../dist/tools/source-ingestion.js';
 import {parseLogEntries} from '../dist/services/log.js';
 import {changeLogPage} from '../dist/monitor/change-log.js';
+import {changePage} from '../dist/monitor/change-page.js';
+import {changeRecord} from '../dist/services/write-admission.js';
 import {describeCapabilities} from '../dist/services/capabilities.js';
 
 const context=(brainId,role='owner')=>({brainId,brain:{id:brainId,storage_backend:'postgres',source_categories:['writing_samples']},role,principal:{provider:'entra',providerTenantId:randomUUID(),providerUserId:randomUUID()}});
@@ -78,7 +80,15 @@ test('session ingestion completes directly for both isolated Brains, retains pol
     assert.equal(reviewed.review.changes.length,3);assert.ok(reviewed.review.changes.some(c=>c.previousContent===null));
     await assert.rejects(service.apply(reserved.id,'0'.repeat(64),auth),/digest_mismatch/);
     const accepted=await service.apply(reserved.id,reviewed.review_digest,auth);assert.equal(accepted.stage,'complete');assert.equal(accepted.receipt.original.sha256,sha256(bytes));
-    assert.match((await jobs.revisions.readFile(id,m.companionPath)).content,/Reviewed published essay/);
+    const retained=await jobs.revisions.readFile(id,m.companionPath);
+    assert.match(retained.content,/Reviewed published essay/);
+    assert.equal(retained.writeContext.reason,auth.reason);
+    assert.deepEqual(retained.writeContext.evidence,auth.evidence);
+    assert.equal(retained.writeContext.verification,'verified');
+    const detail=changePage(changeRecord(retained,null));
+    assert.ok(detail.includes(auth.reason));
+    assert.ok(detail.includes('current user request'));
+    assert.ok(!detail.includes('historical revision'));
     const log=(await jobs.revisions.readFile(id,'LOG.md')).content;
     assert.match(parseLogEntries(log)[0],/Source ingestion/);
     const page=changeLogPage(log,id,'https://brain.example',{offset:0,kind:'all',q:'Source ingestion'});

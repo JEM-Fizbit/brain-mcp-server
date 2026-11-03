@@ -1,7 +1,7 @@
 # 026 — Direct session source ingestion
 
-**Status:** implemented and isolated acceptance passed; production activation pending security approval
-**Candidate release:** v1.16.1 (not deployed)
+**Status:** activation approved; JEM v1.16.1 direct ingestion passed; v1.16.2 audit correction in rollout; ERS activation pending existing admin access
+**Release:** v1.16.2 (audit correction following JEM v1.16.1 production canaries)
 **Owner decision:** John, 3 November 2026: the working Claude/ChatGPT session is a primary Brain writer. Capture tracks to-dos, routes information and supports surfaces; it is not a mandatory intermediary for Brain work.
 
 ## Outcome
@@ -144,3 +144,35 @@ and exact-change link, so the Monitor's All entries view opens its before/after
 record. This was checked through the existing change-log renderer against an
 actual fixture ingestion receipt. v1.16.1 supersedes the default-disabled
 v1.16.0 code tag before any production activation.
+
+## Approved activation and production acceptance — 3 November 2026
+
+John separately approved both deployments and installation of each existing
+owner Storage credential on Fly. JEM v1.16.1 deployed at 13:11:12 UTC, source
+`7d4d766332194c032f21f16dc60bfb6bd05daf17`. Its existing matching service key was
+staged privately, with the exact Brain/project binding. General original
+downloads remain `metadata_only`. No migration, bucket policy or role changed.
+
+A fresh owner OAuth client discovered all four tools, completed both inline text
+and signed PUT binary ingestion, then verified source read-back, original hashes,
+caller-bound status and identical completed-retry receipts. Text job
+`369f947f-0f52-471d-ad6a-184e128c64ad`; binary job
+`0af18268-3655-43d0-a773-e492edb429d3`. Both are explicitly labelled synthetic
+fixtures, with no personal or company fact promotion. The authenticated browser
+opened the real source diff and retained cockpit navigation.
+
+That browser check exposed a receipt-detail gap: the trusted companion import
+retained before/after bytes but omitted session authority metadata, so the
+review page incorrectly classified it as historical. v1.16.2 retains the actual
+user/task evidence on new companion revisions and verifies committed revision
+bytes separately from caller read-back. This does not subject original text to
+knowledge heuristics or add a human approval. Completed retries verify retained
+revision IDs rather than a newer file head. Existing v1.16.1 fixture receipts
+remain historical evidence; no audit evidence is retroactively invented.
+
+JEM Security Advisor: no issues; 20/20 Brain tables have RLS, zero client/public
+Brain grants, zero non-runtime Brain policies, zero Storage policies and a private
+artifact bucket. ERS preflight: private bucket, zero Storage policies and zero
+Security Advisor findings. The existing ERS browser admin session is expired;
+its connected SQL tools work, while the local CLI lacks ERS key access. ERS
+activation needs that existing account session, not a new key or account.

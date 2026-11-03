@@ -108,13 +108,26 @@ export class HostedIngestion {
     let job=await this.jobs.get(id);validateSessionManifest(this.ctx,job.manifest);
     if(job.stage==='complete'){
       if(job.receipt.reviewDigest!==digest)throw new IngestionError('review_digest_mismatch');
+      await this.verifyRetainedRevisions(job);
       return this.status(job);
     }
     if(!job.candidate || job.candidate.digest!==digest)throw new IngestionError('review_digest_mismatch');
     await this.targets(job.candidate.changes.filter((c:SourceChange)=>c.filename!==job.manifest.companionPath).map(({filename,expectedRevision,content}:SourceChange)=>({filename,expectedRevision,content})),context);
     if(job.stage==='review')job=await this.jobs.approve(id,digest);
     const applied=await this.jobs.apply(id,this.adapter,context);
+    if(applied.stage==='complete')await this.verifyRetainedRevisions(applied);
     return this.status(applied);
+  }
+  private async verifyRetainedRevisions(job:IngestionJob){
+    for(const retained of job.receipt.revisions){
+      // Read the committed revision, not a possibly newer head. This attests the
+      // server's persisted bytes; the caller still verifies its own hosted read.
+      const revision=await this.jobs.revisions.readRevision(this.ctx.brainId,retained.revisionId);
+      const expected=job.candidate.changes.find((c:SourceChange)=>c.filename===retained.filename);
+      const verified=Boolean(revision && expected && revision.content===expected.content && sha256(Buffer.from(revision.content))===retained.sha256);
+      await this.jobs.revisions.setWriteVerification(this.ctx.brainId,retained.revisionId,verified?'verified':'verification_failed');
+      if(!verified)throw new IngestionError('source_revision_readback_failed');
+    }
   }
   status(job:IngestionJob){
     return {job_id:job.id,brain_id:job.brain_id,source_id:job.source_id,stage:job.stage,original_verified:job.original?.verified===true,

@@ -15,6 +15,17 @@
 
 ## Gate Decision
 
+### Direct session source ingestion — 3 November 2026
+
+John separately approved activation and installation of each existing matching
+Storage key. JEM activation retains `metadata_only` general byte access, the
+private bucket and all existing roles/policies. Fresh read-only gate: 20 Brain
+tables, all RLS enabled; zero client/public Brain grants, non-runtime Brain
+policies or Storage policies. Security Advisor reports no issues. ERS preflight
+confirms its private bucket, zero Storage policies and no Security Advisor
+findings; credential installation/deployment acceptance remains pending its
+existing admin session. No migration or grant change is part of spec 026.
+
 ### Monitor installation inventory — 23 October 2026
 
 John separately approved the exact private inventory migration for both owners
@@ -204,7 +215,7 @@ The service role, database owner, Supabase project owners, dedicated `brain_runt
 - Do not grant `anon` or `authenticated` access to `brain` tables during ingestion or sync implementation.
 - Do not use the database owner or Supabase service-role database connection for routine hosted Brain revision traffic after a dedicated `brain_runtime` login is available.
 - Run Supabase security advisors after each migration that touches schemas, functions, RLS, Storage, or user data.
-- Source artifact byte uploads require `BRAIN_ARTIFACT_BYTE_ACCESS=admin` plus `BRAIN_SUPABASE_SERVICE_ROLE_KEY` in a local/deployment secret. Do not paste it into chat or commit it to the repository.
+- Local operator source uploads require `BRAIN_ARTIFACT_BYTE_ACCESS=admin` plus `BRAIN_SUPABASE_SERVICE_ROLE_KEY`. Separately approved spec 026 hosted session uploads require exact Brain/project activation and that existing server-only key while preserving `BRAIN_ARTIFACT_BYTE_ACCESS=metadata_only`; no general original downloads are enabled. Do not paste it into chat or commit it to the repository.
 - Auth telemetry (`hosted_mcp_auth` rows) may record the non-secret OAuth `clientId` and `grantType` for tracking and stale-connector classification (spec 005). A `clientId` is a public identifier already stored plaintext in `brain.oauth_state` `clients`; recording it is permitted. Do not record `User-Agent`, IP, or other network identifiers without an explicit gate review (deferred — see the BACKLOG observability item), and never record tokens, refresh tokens, authorization headers, request bodies, client secrets, or Brain content.
 
 ## Before Production Cutover
@@ -252,7 +263,7 @@ order by table_name, grantee, privilege_type;
 ```
 
 ```sql
-select bucket_id, name, public
+select id, name, public
 from storage.buckets
 where id = 'brain-artifacts';
 ```

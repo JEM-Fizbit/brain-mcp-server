@@ -190,6 +190,16 @@ export class IngestionJobs {
         for(const change of changes){
           const result=await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:change.filename,baseRevisionId:change.expectedRevision==='new'?null:change.expectedRevision,content:change.content,origin:'import',actor:current.approval.actor,writeContext:change.filename===current.manifest.companionPath ? internalWriteContext('verified reviewed source companion') : writeContext ? {...writeContext,operation_id:hashValue([writeContext.operation_id,id,change.filename])} : internalWriteContext('existing reviewed source ingestion')});
           if(!result.ok)throw new IngestionError('write_conflict');
+          if(writeContext && change.filename===current.manifest.companionPath){
+            // The selected original can contain transcript/task syntax, so its
+            // companion uses the trusted ingestion write, not knowledge admission.
+            // Retain the actual session authority separately for change review;
+            // otherwise a newly imported source looks like an unaudited old revision.
+            const context={...writeContext,operation_id:hashValue([writeContext.operation_id,id,change.filename]),
+              evidence:writeContext.evidence.map(e=>({...e,verification:'agent_observed' as const})),verification:'applied'};
+            await client.query("update brain.brain_file_revisions set metadata=coalesce(metadata,'{}'::jsonb)||jsonb_build_object('writeContext',$3::jsonb) where brain_id=$1 and id=$2",
+              [this.brainId,result.revision.revisionId,JSON.stringify(context)]);
+          }
           revisions.push({filename:change.filename,revisionId:result.revision.revisionId,sha256:result.revision.contentHash});
         }
         if(writeContext){
