@@ -1,5 +1,17 @@
 # Hosted Client Cutover Runbook
 
+## Direct session source ingestion — 3 November 2026
+
+JEM is deployed on v1.16.2. Its existing personal ChatGPT app's **Refresh tools**
+action completed and a fresh session discovered all four source tools and read
+a completed job. Authenticated owner MCP text/binary ingestion and exact
+read-back passed; the selected published essay is ingested. Claude desktop
+acceptance remains unverified because the Mac is locked. Old chats can retain
+cached schemas. ERS v1.16.2 is prepared but still awaits its existing Supabase
+admin sign-in before activation/deployment and independent client acceptance.
+No new Monitor package or OAuth reconnect is required for this tool update.
+[Evidence and remaining steps](specs/026-direct-session-source-ingestion.md#jem-completed-receipt-and-remaining-ers-handoff).
+
 ## Signed native Monitor distribution — v1.14.2
 
 Both hosted stacks and their signed update feeds are deployed. Browser/MCP users

@@ -1,5 +1,12 @@
 # Hosted Brain Roadmap
 
+**3 November 2026:** direct working-session source ingestion is implemented;
+JEM v1.16.2 is deployed and the selected published essay completed without a
+mandatory Capture handoff. The real Monitor diff and fresh ChatGPT discovery/read
+passed. ERS intake is prepared and separately approved, but activation awaits its
+existing admin sign-in. Claude desktop acceptance awaits the unlocked Mac.
+[Spec 026 and exact handoff](specs/026-direct-session-source-ingestion.md#jem-completed-receipt-and-remaining-ers-handoff).
+
 **23 October 2026 — Monitor distribution:** both owner stacks run v1.14.2 with
 private installation/build inventories and signed automatic update feeds. Native
 build 9 is signed/notarised; both canaries and final Doctors passed. Developer

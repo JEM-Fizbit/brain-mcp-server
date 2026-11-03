@@ -22,9 +22,10 @@ Storage key. JEM activation retains `metadata_only` general byte access, the
 private bucket and all existing roles/policies. Fresh read-only gate: 20 Brain
 tables, all RLS enabled; zero client/public Brain grants, non-runtime Brain
 policies or Storage policies. Security Advisor reports no issues. ERS preflight
-confirms its private bucket, zero Storage policies and no Security Advisor
-findings; credential installation/deployment acceptance remains pending its
-existing admin session. No migration or grant change is part of spec 026.
+confirms all 21 Brain tables have RLS, zero client/public Brain grants, zero
+non-runtime Brain policies, a private bucket, zero Storage policies and no
+Security Advisor findings; credential installation/deployment acceptance remains
+pending its existing admin session. No migration or grant change is part of spec 026.
 
 ### Monitor installation inventory — 23 October 2026
 
@@ -204,7 +205,7 @@ infrastructure separation remains governed by spec 012.
 
 Supabase Storage tables may show grants for Supabase's standard `anon` and `authenticated` roles. That does not make Brain artifacts public by itself. Storage object access is still gated by Storage RLS policies and bucket privacy. For this pilot, no policies grant anonymous or authenticated users access to `brain-artifacts` objects.
 
-The service role, database owner, Supabase project owners, dedicated `brain_runtime` database logins, and privileged database connection strings can still access Brain data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk. Prefer a dedicated `brain_runtime` login for `BRAIN_REVISION_DATABASE_URL`. Normal hosted runtime source access is metadata/extracted-text only and does not require `BRAIN_SUPABASE_SERVICE_ROLE_KEY`; set `BRAIN_ARTIFACT_BYTE_ACCESS=admin` and provide the service key only for ingestion/admin byte operations.
+The service role, database owner, Supabase project owners, dedicated `brain_runtime` database logins, and privileged database connection strings can still access Brain data. This is expected for administration and server-side operation, and it makes secret handling the primary remaining leakage risk. Prefer a dedicated `brain_runtime` login for `BRAIN_REVISION_DATABASE_URL`. Normal hosted runtime source access is metadata/extracted-text only and does not require `BRAIN_SUPABASE_SERVICE_ROLE_KEY`; local operator byte operations require `BRAIN_ARTIFACT_BYTE_ACCESS=admin`. The separately approved spec 026 hosted lane uses its server-only key and exact Brain/project binding while retaining general byte access as `metadata_only`.
 
 ## Required Handling Rules
 

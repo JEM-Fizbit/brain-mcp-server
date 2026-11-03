@@ -1,7 +1,7 @@
 # 026 — Direct session source ingestion
 
-**Status:** activation approved; JEM v1.16.1 direct ingestion passed; v1.16.2 audit correction in rollout; ERS activation pending existing admin access
-**Release:** v1.16.2 (audit correction following JEM v1.16.1 production canaries)
+**Status:** JEM v1.16.2 deployed and verified, selected essay completed; ERS v1.16.2 prepared, activation blocked on existing admin sign-in
+**Release:** v1.16.2; JEM active, ERS still v1.15.0
 **Owner decision:** John, 3 November 2026: the working Claude/ChatGPT session is a primary Brain writer. Capture tracks to-dos, routes information and supports surfaces; it is not a mandatory intermediary for Brain work.
 
 ## Outcome
@@ -176,3 +176,63 @@ artifact bucket. ERS preflight: private bucket, zero Storage policies and zero
 Security Advisor findings. The existing ERS browser admin session is expired;
 its connected SQL tools work, while the local CLI lacks ERS key access. ERS
 activation needs that existing account session, not a new key or account.
+
+## JEM completed receipt and remaining ERS handoff
+
+JEM v1.16.2 deployed at **13:19:58.264 UTC**, annotated source
+`dfdf1d6ae46d205ad2b62e88caf791eb03864e1a`, image
+`registry.fly.io/jem-brain-mcp:deployment-01M6GRZY392EYP39QM0FW574SA`. The
+mandatory guard passed all 672 runnable tests (14 existing fixture skips); a
+separate disposable database passed all 18 ingestion checks with zero skips and
+was stopped/removed. The public source release and prepared private ERS intake
+are committed and pushed. No Monitor binary/update feed was changed.
+
+New JEM audit canary job `5a6b5914-681d-42ff-b092-918a752b7973` completed with
+exact read-back and identical replay. Its actual authenticated
+[Monitor diff](https://jem-brain-mcp.fly.dev/monitor/changes/368da7c6-308d-4c8b-9edf-35b14999aa4a?brain_id=ai-brain-jem)
+shows `Result: verified`, the task authority and its source evidence, plus cockpit
+navigation. Existing companion receipts were not retroactively rewritten.
+
+The existing personal ChatGPT JEM app was refreshed through **Settings → Plugins
+→ JEM Brain → Refresh tools**, without reconnecting or changing permissions. A
+[fresh ChatGPT session](https://chatgpt.com/c/6ae9dfc2-1de8-83eb-a6c3-bf9c2fd56471)
+then discovered all four tools and actually called `brain_describe` and
+`brain_source_status` against that completed job. This is fresh discovery/read
+acceptance, not a ChatGPT-issued mutation. The production mutations were through
+a fresh authenticated owner OAuth MCP client. Claude desktop verification was
+blocked by the locked Mac; no lock was bypassed. Existing chats may retain older
+tool declarations.
+
+The selected **Turning the Crank Faster** essay was then ingested directly in
+JEM, job `37d3f478-a0fa-43ac-8ad8-c434fcd2f2d2`, source
+`fba76fb2-60ce-4a19-8d0b-867ed08219aa`. The Word original's 196,713 bytes and
+SHA-256 `d74bfa2d1bd9b21de989c95ff4b8e81fc71628c57c0620e2d5e9c3a02748c676`
+were verified in private Storage. The inspected Markdown exactly matched the
+29,522-byte frozen original retained in the project and existing Capture record.
+Exact hosted read-back passed for the source companion, `SOURCES.md`, the
+`07_interests_learning.md` AI-topic backlink and the `ref_publications_media.md`
+source backlink. No master publication inventory or live project tracker was
+changed. [Essay change record](https://jem-brain-mcp.fly.dev/monitor/changes/ff3ffd05-c285-47be-9aa7-136bc54706a2?brain_id=ai-brain-jem).
+The same Capture item `15bae6cb-ddb5-409d-b9f1-8122798658d1` is now
+`brain_processed`, version 8, with this result and no next review. Capture
+correctly labels this agent-reported (`remote_verified: false`); it does not
+independently verify Brain. No second Capture or duplicate ingestion was created.
+Its contract required assignment bookkeeping before accepting the result;
+inspection confirmed no work dispatch, then completion cleared the review date.
+
+JEM sync reports zero open conflicts. Read-only lint retains six existing
+maintenance findings, including the 2,534-token bootstrap over its 2,500 budget;
+these were not silently repaired or claimed clean.
+
+**Remaining input:** unlock the Mac and restore the existing ERS Supabase admin
+session in the opened project tab. The connected ERS SQL administration still
+works and confirms 21/21 Brain tables with RLS, zero client/public Brain grants,
+zero non-runtime Brain policies, zero Storage policies and a private bucket. Its
+Security Advisor is clean. The local personal Supabase CLI cannot retrieve ERS's
+existing Storage key, and neither owner Monitor runtime profile contains it.
+No new key, account, grant or migration is needed or authorised. After access is
+restored, stage only ERS's exact project/Brain config and existing matching key,
+run `deploy:guarded` with `BRAIN_DEPLOY_UPSTREAM_TAG=v1.16.2`, repeat the finite
+hosted acceptance, refresh its existing client metadata, then fast-forward
+`ers-main` only after verification. ERS has not been deployed or activated by
+this turn. Existing production and Monitor exclusions remain intact.
