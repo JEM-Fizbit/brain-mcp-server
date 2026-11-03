@@ -13,6 +13,8 @@ import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {registerSourceIngestionTools} from '../dist/tools/source-ingestion.js';
+import {parseLogEntries} from '../dist/services/log.js';
+import {changeLogPage} from '../dist/monitor/change-log.js';
 import {describeCapabilities} from '../dist/services/capabilities.js';
 
 const context=(brainId,role='owner')=>({brainId,brain:{id:brainId,storage_backend:'postgres',source_categories:['writing_samples']},role,principal:{provider:'entra',providerTenantId:randomUUID(),providerUserId:randomUUID()}});
@@ -51,7 +53,7 @@ test('session ingestion completes directly for both isolated Brains, retains pol
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'session-ingestion-test-'));
  const ids=['test-jem-'+randomUUID(),'test-ers-'+randomUUID()];
  const prior={BRAIN_WRITE_POLICY_CONFIG:process.env.BRAIN_WRITE_POLICY_CONFIG,BRAIN_PLATFORM_CONFIG:process.env.BRAIN_PLATFORM_CONFIG};
- const policy={version:1,mode:'enforce',intake:'retired',capture_route:'capture-personal',task_paths:['TASKS.md','capture-queue.md']};
+ const policy={review_base_url:'https://brain.example',version:1,mode:'enforce',intake:'retired',capture_route:'capture-personal',task_paths:['TASKS.md','capture-queue.md']};
  await fs.writeFile(path.join(root,'registry.json'),JSON.stringify({version:1,brains:ids.map(id=>({id,type:'personal',template_used:'personal',integration_mode:'vertical',storage_backend:'postgres',storage_config:{},source_categories:['writing_samples']}))}));
  await fs.writeFile(path.join(root,'policy.json'),JSON.stringify({version:1,brains:ids.map((id,index)=>({id,write_policy:{...policy,...(index?{intake:'brain_scoped',capture_route:'capture-ers'}:{})}}))}));
  process.env.BRAIN_PLATFORM_CONFIG=path.join(root,'registry.json');process.env.BRAIN_WRITE_POLICY_CONFIG=path.join(root,'policy.json');
@@ -77,7 +79,10 @@ test('session ingestion completes directly for both isolated Brains, retains pol
     await assert.rejects(service.apply(reserved.id,'0'.repeat(64),auth),/digest_mismatch/);
     const accepted=await service.apply(reserved.id,reviewed.review_digest,auth);assert.equal(accepted.stage,'complete');assert.equal(accepted.receipt.original.sha256,sha256(bytes));
     assert.match((await jobs.revisions.readFile(id,m.companionPath)).content,/Reviewed published essay/);
-    assert.match((await jobs.revisions.readFile(id,'LOG.md')).content,/Source ingestion/);
+    const log=(await jobs.revisions.readFile(id,'LOG.md')).content;
+    assert.match(parseLogEntries(log)[0],/Source ingestion/);
+    const page=changeLogPage(log,id,'https://brain.example',{offset:0,kind:'all',q:'Source ingestion'});
+    assert.match(page,/Open diff/);assert.ok(page.includes(accepted.receipt.revisions.find(r=>r.filename===m.companionPath).revisionId));
     assert.deepEqual((await service.apply(reserved.id,reviewed.review_digest,auth)).receipt,accepted.receipt);
     assert.equal(accepted.local_inbox,'unobserved; no cleanup performed');
    });

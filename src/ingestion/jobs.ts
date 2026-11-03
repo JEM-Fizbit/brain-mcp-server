@@ -1,4 +1,6 @@
 import { internalWriteContext, type BrainWriteContext } from "../services/write-policy.js";
+import { appendLogEntryToContent, formatLogEntry } from "../services/log.js";
+import { writePolicyForBrain } from "../services/write-policy-runtime.js";
 import pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -196,15 +198,21 @@ export class IngestionJobs {
           await client.query("select pg_advisory_xact_lock(hashtextextended($1 || '/' || $2,0))",[this.brainId,'LOG.md']);
           const log=await client.query('select f.current_revision_id,r.content from brain.brain_files f join brain.brain_file_revisions r on r.id=f.current_revision_id where f.brain_id=$1 and f.filename=$2',[this.brainId,'LOG.md']);
           const sourceRevision=revisions.find(r=>r.filename===current.manifest.companionPath)!;
-          const summary=['### Source ingestion — '+new Date().toISOString(),
+          const policy=await writePolicyForBrain(this.brainId);
+          const changeLink=policy?.review_base_url ? `[Full change and prior text](${policy.review_base_url.replace(/\/$/,'')}/monitor/changes/${sourceRevision.revisionId}?brain_id=${encodeURIComponent(this.brainId)})` : 'Read exact before/after with brain_read_change: '+sourceRevision.revisionId;
+          const summaryLines=['Source ingestion — '+new Date().toISOString(),
             'Source: '+current.source_id+'; job: '+current.id,
             'Original: '+current.content_sha256+'; bytes: '+current.original.byteSize+'; verified before apply.',
             'Reviewed companion: '+current.manifest.companionPath+'; revision: '+sourceRevision.revisionId,
             'Curated files: '+changes.filter(c=>c.filename!==current.manifest.companionPath).map(c=>c.filename).join(', ').slice(0,650),
             'Agent: '+this.actor.provider+':'+this.actor.id+'; session reviewed exact candidate '+digest+'.',
-            'Result: committed atomically; use brain_read_change for before/after; source and Brain read-back still required.'].join('\n');
+            'Result: committed atomically; source and Brain read-back still required.'].join('\n');
+          const filesLabel=changes.map(c=>c.filename).join(', ').slice(0,200);
+          const limit=policy?.max_receipt_chars||2000;
+          const budget=Math.max(0,limit-formatLogEntry('INGEST',[filesLabel],'').length-changeLink.length-2);
+          const summary=summaryLines.slice(0,budget)+'\n'+changeLink;
           await this.revisions.proposeRevisionInTransaction(client,{brainId:this.brainId,filename:'LOG.md',baseRevisionId:log.rows[0]?.current_revision_id||null,
-            content:summary+'\n\n'+(log.rows[0]?.content||'# Brain operation log\n'),origin:'import',actor:this.actor,writeContext:internalWriteContext('bounded verified source ingestion receipt')});
+            content:appendLogEntryToContent(log.rows[0]?.content||'',formatLogEntry('INGEST',[filesLabel],summary)),origin:'import',actor:this.actor,writeContext:internalWriteContext('bounded verified source ingestion receipt')});
         }
         const receipt={schema:'brain.ingestion-receipt/v1',jobId:id,ownerRef:this.ownerRef,brainId:this.brainId,sourceId:current.source_id,original:current.original,reviewDigest:digest,approvedBy:current.approval.actor,appliedBy:this.actor,completedAt:new Date().toISOString(),revisions,persisted};
         await client.query("update brain.ingestion_jobs set stage='complete',receipt=$2,error_code=null,updated_at=now() where id=$1",[id,receipt]);

@@ -1,7 +1,7 @@
 # 026 — Direct session source ingestion
 
 **Status:** implemented and isolated acceptance passed; production activation pending security approval
-**Candidate release:** v1.16.0 (not deployed)
+**Candidate release:** v1.16.1 (not deployed)
 **Owner decision:** John, 3 November 2026: the working Claude/ChatGPT session is a primary Brain writer. Capture tracks to-dos, routes information and supports surfaces; it is not a mandatory intermediary for Brain work.
 
 ## Outcome
@@ -138,3 +138,9 @@ freshness/maintenance findings (JEM six, ERS one), with no graph-unreachable ERS
 files and its bootstrap within budget; this is not a claim of a clean corpus.
 Final follow-up edits only qualified legacy ingestion wording in on-demand
 guides. No unrelated freshness repair or original ingestion was performed.
+
+The candidate's source-ingestion receipt uses the existing standard LOG format
+and exact-change link, so the Monitor's All entries view opens its before/after
+record. This was checked through the existing change-log renderer against an
+actual fixture ingestion receipt. v1.16.1 supersedes the default-disabled
+v1.16.0 code tag before any production activation.
