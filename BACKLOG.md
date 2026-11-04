@@ -15,6 +15,8 @@
 
 <!-- backlog items below; newest first -->
 
+- Adopt ai-knowledge ORCHESTRATED_SESSIONS (knowhub entry plus a contract trigger line). Evidence: parallel fix/release worktrees and `codex/*` spec branches through 23 Oct, plus cross-account JEM→ERS activation handoffs; no concurrent sessions now, so normal priority.
+
 
 - Deferred source-review sweep: compare source custody/index coverage, identify under-integrated material and consolidation candidates; consider a monthly operator review. Migrated from JEM TASKS Future (Karpathy gap 2); design context remains `sources/analysis/2026-04-14_brain-architecture-review-karpathy.md`. Inventory only, no scheduler or implementation authorized.
 - Deferred proactive lint follow-ons: staleness shipped (2026-08-23 freshness) and reconcile shipped as advisory candidates (spec 025). Next: after several real lint runs on both Brains, decide whether reconcile candidates count as findings and appear in Cockpit; then assess `--impute`, `--connections` and `--questions`, measuring false positives before any automatic change. Design source: JEM `sources/analysis/2026-04-14_brain-architecture-review-karpathy.md`.
