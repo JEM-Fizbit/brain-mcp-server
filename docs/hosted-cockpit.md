@@ -1,5 +1,39 @@
 # Hosted Brain Cockpit
 
+## Local runtime isolation — 6 November 2026
+
+The developer Monitor now owns a self-contained Node 22 binary inside its app
+bundle. Sync, supervisor, Cockpit, Doctor and mechanical lint actions all use
+that copy. Homebrew updates, changed `opt` symlinks, download-cache cleanup and
+removal of the original distribution no longer affect its runtime dependencies.
+The installer rejects external dylib links, the wrong Node major/architecture,
+or a missing Node licence before replacing the installed runtime. It stages and
+executes the copy before atomic promotion; no runtime download or Homebrew repair
+runs in the background. Node security updates require an explicit reinstall with
+a reviewed current Node 22 distribution; reusing the existing runtime does not
+update its patch version. Fleet packages retain their existing release process.
+
+**Incident cause:** `simdjson` 5.1.1 was installed on 5 November at 14:02 UTC.
+Homebrew's active `opt/simdjson` link pointed to its library ABI 36 while the old
+Node 22 build still requested ABI 34. The old ABI 34 file remained under
+`Cellar/simdjson/5.0.5/lib`; it had not been deleted. The storage-cleanup receipt
+records removal of the Homebrew download cache, not that installed library.
+The initiating Homebrew upgrade command was not established. Reinstalling
+Node 22 repaired the immediate mismatch; runtime isolation prevents recurrence
+of that dependency failure in Monitor.
+
+**Verification, 6 November at 23:58 UTC:** the laptop's existing two-profile
+Monitor was reinstalled with checksum-verified official Node v22.23.4 for arm64.
+The installed runtime has only system-library dependencies, its recorded digest
+matches the installed bytes, and deep/strict app signature verification passes.
+Both live supervisors, sync workers and Cockpits execute the private binary.
+Fresh automatic Doctors pass for JEM and ERS; both watchers report healthy sync,
+zero conflicts and no recovery retries. Existing profile bindings and the login
+item were preserved. The full Node 22 suite passes (673 passed, 14 skipped).
+Native fixtures also verify source removal/reinstall, rejection of external
+dylibs and the wrong major, and preservation of the installed runtime after a
+refused replacement. No hosted deployment or Brain-content change was needed.
+
 ## Installation inventory and native updates — v1.14.2
 
 ERS's existing Identity & Access page now includes **Installed Monitors**; JEM's
@@ -352,13 +386,23 @@ BRAIN_MENUBAR_BUNDLE_ID="com.example.<brain>-monitor" \
 npm run sync:menubar:install
 ```
 
-The installer defaults to the repo-supported Node 22 runtime. On Homebrew
-systems it prefers the stable `opt/node@22/bin/node` path so a routine formula
-upgrade cannot strand the monitor on a removed versioned `Cellar` executable.
-Set `BRAIN_MENUBAR_NODE` only when an explicit stable Node 22 path is required;
-do not configure a versioned `Cellar` path. If no stable Node 22 executable is
-available, installation fails instead of silently pinning an unsupported host
-Node. Managed child launch failures retry automatically, and doctor refreshes
+The installer bundles a self-contained Node 22 runtime at
+`Contents/Resources/runtime/node`; it never launches a Homebrew executable.
+For the first install or a runtime update, set `BRAIN_MENUBAR_NODE` to the
+`bin/node` of an official Node 22 macOS distribution for the current architecture.
+Its `LICENSE` is copied to `Contents/Resources/ThirdPartyNotices/Node.txt`;
+use `BRAIN_MENUBAR_NODE_LICENSE` if the licence is stored separately. A binary
+already inside a portable Monitor package can also supply its adjacent notice.
+Obtain the source from Node's official distribution and verify its archive against
+the release's `SHASUMS256.txt` before installation. The installer validates library
+dependencies, signs the private copy ad hoc like the developer app, verifies that
+signature and runs it using a minimal environment before promotion. This local
+signature is an integrity check, not upstream publisher authentication.
+Explicit Homebrew inputs are refused.
+Without an explicit input, reinstalls reuse the app's existing isolated runtime;
+a first install may use the installer process's Node only if it passes the same
+checks. No fallback to Homebrew or another Node major is allowed.
+Managed child launch failures retry automatically, and doctor refreshes
 write to temporary files before atomically promoting valid JSON, preserving the
 last usable report when a launch fails.
 

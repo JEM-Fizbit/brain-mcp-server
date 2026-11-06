@@ -6,6 +6,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { installPortableNodeRuntime } from "../scripts/lib/monitor-package.mjs";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +48,25 @@ const menuBarLaunchdScriptPath = path.join(
   "write-brain-menubar-launchd-plist.mjs"
 );
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "brain-launchd-test-"));
+
+// Native fixture with only system-library dependencies; never download a runtime
+// or depend on the developer's Homebrew installation in installer tests.
+async function portableNodeFixture(root, version = "v22.23.4") {
+  const node = path.join(root, "bin", "node");
+  await fs.mkdir(path.dirname(node), { recursive: true });
+  const source = path.join(root, "node.c");
+  await fs.writeFile(source, `#include <stdio.h>
+#include <string.h>
+int main(int argc, char **argv) {
+  if (argc > 1 && strcmp(argv[1], "--version") == 0) puts("${version}");
+  else puts("{\\\"version\\\":\\\"${version}\\\",\\\"arch\\\":\\\"${process.arch}\\\"}");
+  return 0;
+}\n`);
+  await exec("/usr/bin/cc", [source, "-o", node]);
+  await fs.writeFile(path.join(root, "LICENSE"), "Node fixture license\n");
+  return node;
+}
+const portableNodeSource = await portableNodeFixture(path.join(tmpRoot, "portable-node"));
 
 after(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
@@ -362,7 +382,7 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   const stateFile = path.join(tmpRoot, "state", "ers-brain", "state.json");
   const healthFile = path.join(tmpRoot, "state", "ers-brain", "state.health.json");
   const logDir = path.join(tmpRoot, "logs", "ers-brain");
-  const nodePath = "/opt/example/bin/node";
+  const nodePath = path.join(appPath, "Contents", "Resources", "runtime", "node");
   const doctorScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-doctor.mjs");
   const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
   const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
@@ -380,7 +400,7 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
       BRAIN_COCKPIT_LAUNCHD_LABEL: "com.example.ers-brain-cockpit",
       BRAIN_COCKPIT_URL: "http://127.0.0.1:8798/",
       BRAIN_SYNC_LAUNCHD_LOG_DIR: logDir,
-      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_NODE: portableNodeSource,
       BRAIN_MENUBAR_DOCTOR_SCRIPT: doctorScriptPath,
       BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
       BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
@@ -550,46 +570,70 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.notEqual(stat.mode & 0o111, 0);
 });
 
-test("menu-bar installer prefers a stable Homebrew Node 22 path", async () => {
-  const appPath = path.join(tmpRoot, "Applications", "Stable Node Brain Monitor.app");
-  const brainRoot = path.join(tmpRoot, "stable-node-brain");
-  const homebrewPrefix = path.join(tmpRoot, "homebrew");
-  const stableNodePath = path.join(homebrewPrefix, "opt", "node@22", "bin", "node");
-  await fs.mkdir(path.dirname(stableNodePath), { recursive: true });
-  await fs.writeFile(stableNodePath, "#!/bin/sh\nexit 0\n", "utf-8");
-  await fs.chmod(stableNodePath, 0o755);
+test("menu-bar runtime survives removal of its source and can reinstall without Homebrew", async () => {
+  const appPath = path.join(tmpRoot, "Applications", "Portable Node Brain Monitor.app");
+  const sourceRoot = path.join(tmpRoot, "removable-node-distribution");
+  const sourcePath = await portableNodeFixture(sourceRoot);
+  const env = {
+    ...process.env,
+    BRAIN_MENUBAR_APP: appPath,
+    BRAIN_MENUBAR_BUNDLE_ID: "com.example.portable-node-brain-monitor",
+    BRAIN_ID: "portable-node-brain",
+    BRAIN_REPO_ROOT: path.join(tmpRoot, "portable-node-brain"),
+    BRAIN_MENUBAR_NODE: sourcePath,
+    BRAIN_COCKPIT_LAUNCHD_NODE: "",
+  };
+  const result = JSON.parse((await exec(process.execPath, [menuBarScriptPath], {env})).stdout);
+  const nodePath = path.join(appPath, "Contents", "Resources", "runtime", "node");
+  const configPath = path.join(appPath, "Contents", "Resources", "brain-menubar-config.json");
+  const config = JSON.parse(await fs.readFile(configPath, "utf8"));
+  assert.equal(result.nodePath, nodePath);
+  assert.equal(config.nodePath, nodePath);
+  assert.equal(config.syncProcess.launchPath, nodePath);
+  assert.equal(config.cockpitProcess.launchPath, nodePath);
+  assert.equal(config.nodeRuntime.dependencies, "system_only");
+  assert.equal(config.nodeRuntime.version, "v22.23.4");
+  assert.match(config.nodeRuntime.sha256, /^[a-f0-9]{64}$/);
+  assert.equal((await fs.lstat(nodePath)).isSymbolicLink(), false);
+  await fs.rm(sourceRoot, {recursive: true});
+  assert.equal((await exec(nodePath, ["--version"], {env: {PATH: "/usr/bin:/bin"}})).stdout.trim(), "v22.23.4");
+  // A later reinstall reuses the owned copy and retained licence by default.
+  await exec(process.execPath, [menuBarScriptPath], {env: {...env, BRAIN_MENUBAR_NODE: ""}});
+  assert.equal(JSON.parse(await fs.readFile(configPath, "utf8")).nodeRuntime.sha256, config.nodeRuntime.sha256);
+  await exec("/usr/bin/codesign", ["--verify", "--deep", "--strict", appPath]);
+});
 
-  const { stdout } = await exec(process.execPath, [menuBarScriptPath], {
-    env: {
-      ...process.env,
-      HOMEBREW_PREFIX: homebrewPrefix,
-      BRAIN_MENUBAR_NODE: "",
-      BRAIN_COCKPIT_LAUNCHD_NODE: "",
-      BRAIN_MENUBAR_APP: appPath,
-      BRAIN_MENUBAR_BUNDLE_ID: "com.example.stable-node-brain-monitor",
-      BRAIN_ID: "stable-node-brain",
-      BRAIN_REPO_ROOT: brainRoot,
-    },
-  });
-
-  const result = JSON.parse(stdout);
-  const config = JSON.parse(
-    await fs.readFile(
-      path.join(appPath, "Contents", "Resources", "brain-menubar-config.json"),
-      "utf-8"
-    )
-  );
-  assert.equal(result.nodePath, stableNodePath);
-  assert.equal(config.nodePath, stableNodePath);
-  assert.equal(config.syncProcess.launchPath, stableNodePath);
-  assert.equal(config.cockpitProcess.launchPath, stableNodePath);
+test("invalid runtime upgrades preserve the existing installed binary", async () => {
+  const nodePath = path.join(tmpRoot, "runtime-validation", "runtime", "node");
+  await installPortableNodeRuntime({nodePath, sourcePath: portableNodeSource});
+  const original = await fs.readFile(nodePath);
+  const wrongMajor = await portableNodeFixture(path.join(tmpRoot, "wrong-node-major"), "v24.0.0");
+  await assert.rejects(installPortableNodeRuntime({nodePath, sourcePath: wrongMajor}), /Node 22/);
+  assert.deepEqual(await fs.readFile(nodePath), original);
+  // A non-portable dylib is refused before execution, even if still present.
+  const linkedRoot = path.join(tmpRoot, "linked-node");
+  await fs.mkdir(linkedRoot);
+  const library = path.join(linkedRoot, "libfixture.dylib");
+  const source = path.join(linkedRoot, "library.c");
+  await fs.writeFile(source, "void fixture(void) {}\n");
+  await exec("/usr/bin/cc", ["-dynamiclib", source, "-o", library]);
+  const linkedNode = path.join(linkedRoot, "node");
+  await exec("/usr/bin/cc", [path.join(tmpRoot, "portable-node", "node.c"), library, "-o", linkedNode]);
+  await assert.rejects(installPortableNodeRuntime({nodePath, sourcePath: linkedNode}), /externally linked/);
+  assert.deepEqual(await fs.readFile(nodePath), original);
+  const missingLicense = path.join(tmpRoot, "no-license", "bin", "node");
+  await fs.mkdir(path.dirname(missingLicense), {recursive: true});
+  await fs.copyFile(portableNodeSource, missingLicense);
+  await assert.rejects(installPortableNodeRuntime({nodePath, sourcePath: missingLicense}), /LICENSE is required/);
+  assert.deepEqual(await fs.readFile(nodePath), original);
+  assert.deepEqual(await fs.readdir(path.dirname(nodePath)), ["node"]);
 });
 
 test("menu-bar app can supervise multiple Brain local stacks", async () => {
   const appPath = path.join(tmpRoot, "Applications", "Brain Monitor.app");
   const jemRoot = path.join(tmpRoot, "ai-brain-jem");
   const ersRoot = path.join(tmpRoot, "ers-brain");
-  const nodePath = "/opt/example/bin/node";
+  const nodePath = path.join(appPath, "Contents", "Resources", "runtime", "node");
   const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
   const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
   const profiles = [
@@ -637,7 +681,7 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
       BRAIN_MENUBAR_APP: appPath,
       BRAIN_MENUBAR_BUNDLE_ID: "com.example.brain-monitor",
       BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
-      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_NODE: portableNodeSource,
       BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
       BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
     },
@@ -722,7 +766,7 @@ test("menu-bar app can run a cockpit-only profile when sync is disabled", async 
   const appPath = path.join(tmpRoot, "Applications", "Brain Monitor Cockpit Only.app");
   const jemRoot = path.join(tmpRoot, "ai-brain-jem-cockpit-only");
   const ersRoot = path.join(tmpRoot, "ers-brain-cockpit-only");
-  const nodePath = "/opt/example/bin/node";
+  const nodePath = path.join(appPath, "Contents", "Resources", "runtime", "node");
   const syncCliPath = path.join(tmpRoot, "repo", "dist", "sync", "cli.js");
   const cockpitScriptPath = path.join(tmpRoot, "repo", "scripts", "hosted-cockpit.mjs");
   const profiles = [
@@ -759,7 +803,7 @@ test("menu-bar app can run a cockpit-only profile when sync is disabled", async 
       BRAIN_MENUBAR_APP: appPath,
       BRAIN_MENUBAR_BUNDLE_ID: "com.example.brain-monitor-cockpit-only",
       BRAIN_MENUBAR_PROFILES_JSON: JSON.stringify(profiles),
-      BRAIN_MENUBAR_NODE: nodePath,
+      BRAIN_MENUBAR_NODE: portableNodeSource,
       BRAIN_MENUBAR_SYNC_CLI: syncCliPath,
       BRAIN_MENUBAR_COCKPIT_SCRIPT: cockpitScriptPath,
     },
@@ -871,6 +915,7 @@ test("multi-profile menu-bar install can read owner-custodied profiles from a fi
     env: {
       ...process.env,
       BRAIN_MENUBAR_APP: appPath,
+      BRAIN_MENUBAR_NODE: portableNodeSource,
       BRAIN_MENUBAR_PROFILES_FILE: profilesPath,
     },
   });

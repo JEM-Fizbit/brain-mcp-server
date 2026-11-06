@@ -1,5 +1,21 @@
 # Working Decisions Log
 
+## 2026-11-06 — Isolate the developer Monitor runtime from Homebrew
+
+The local supervisor app bundles its own self-contained Node 22 binary, using
+the same system-only dylib validation as portable Monitor releases. Every managed
+child and Doctor/lint invocation uses the owned copy. Installation validates the
+staged executable, major and architecture and retains the Node licence; invalid
+inputs leave the previous runtime intact. Explicit runtime updates remain part
+of installation, not an unattended download or Homebrew mutation.
+
+The Homebrew `simdjson` ABI change stranded a still-running older Node build when
+its processes restarted. A stable `opt/node@22` executable path did not protect
+that executable's library dependencies. Retrying launches or preserving an old
+Homebrew keg does not remove this coupling. Copying only the Homebrew executable,
+inventing compatibility symlinks between library ABIs and automatically running
+`brew reinstall` are rejected. [Incident, behavior and installation](hosted-cockpit.md#local-runtime-isolation--6-november-2026).
+
 ## 2026-11-03 — The working session is a primary Brain writer
 
 John clarified that Claude/ChatGPT sessions working with him or within authorised

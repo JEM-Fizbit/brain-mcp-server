@@ -17,7 +17,7 @@ This file records the local, hosted, and system-tool assumptions for `brain-mcp-
 - The Mac's default shell may have a newer Node/npm. Do not treat that as the supported Brain MCP baseline unless the Docker/Fly path is deliberately revalidated.
 - This is an npm project. `package-lock.json` is the lockfile; do not introduce pnpm, yarn, Bun, or a monorepo runner as tooling cleanup.
 - Use `npm ci` for a clean reproducible install. Use `npm install` only when intentionally changing dependencies or regenerating `package-lock.json`.
-- Local operator app and LaunchAgent generators capture the absolute Node executable used when they run. Regenerate those artifacts after changing the Node installation or switching runtime versions.
+- The developer Brain Monitor bundles a self-contained Node 22 runtime and rejects Homebrew/external dylib dependencies. `BRAIN_MENUBAR_NODE` selects the source distribution for installation/update; reinstalls otherwise reuse the isolated copy. See [runtime isolation and installation](hosted-cockpit.md#local-runtime-isolation--6-november-2026). Legacy standalone helper/LaunchAgent generators still capture an external Node path and need regeneration when that installation changes.
 
 ## System And Hosted Dependencies
 

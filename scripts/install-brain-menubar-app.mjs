@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { installPortableNodeRuntime } from "./lib/monitor-package.mjs";
 
 const exec = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,55 +15,8 @@ const appPath =
 const appName = path.basename(appPath, ".app") || "Brain Monitor";
 const bundleId =
   process.env.BRAIN_MENUBAR_BUNDLE_ID || "com.jem.brain-menubar";
-const supportedNodeMajor = 22;
-
-async function isExecutable(filePath) {
-  try {
-    await fs.access(filePath, fsConstants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveManagedNodePath() {
-  const configuredPath =
-    process.env.BRAIN_MENUBAR_NODE ||
-    process.env.BRAIN_COCKPIT_LAUNCHD_NODE;
-  if (configuredPath) {
-    return configuredPath;
-  }
-
-  const homebrewPrefixes = [
-    process.env.HOMEBREW_PREFIX,
-    "/opt/homebrew",
-    "/usr/local",
-  ].filter(Boolean);
-  const stableCandidates = [
-    ...new Set(
-      homebrewPrefixes.map((prefix) =>
-        path.join(prefix, "opt", `node@${supportedNodeMajor}`, "bin", "node")
-      )
-    ),
-  ];
-  for (const candidate of stableCandidates) {
-    if (await isExecutable(candidate)) {
-      return candidate;
-    }
-  }
-
-  const currentMajor = Number(process.versions.node.split(".")[0]);
-  if (currentMajor === supportedNodeMajor && (await isExecutable(process.execPath))) {
-    return process.execPath;
-  }
-
-  throw new Error(
-    `Brain Monitor requires Node ${supportedNodeMajor}. ` +
-      `Install node@${supportedNodeMajor} or set BRAIN_MENUBAR_NODE to a stable Node ${supportedNodeMajor} executable.`
-  );
-}
-
-const nodePath = await resolveManagedNodePath();
+// All child processes use an app-owned binary, never a Homebrew opt/Cellar path.
+const nodePath = path.join(appPath, "Contents", "Resources", "runtime", "node");
 const doctorScriptPath =
   process.env.BRAIN_MENUBAR_DOCTOR_SCRIPT ||
   path.join(repoRoot, "scripts", "hosted-doctor.mjs");
@@ -1968,6 +1921,11 @@ int main(int argc, const char *argv[]) {
 }
 `;
 
+config.nodeRuntime = await installPortableNodeRuntime({
+  nodePath,
+  sourcePath: process.env.BRAIN_MENUBAR_NODE || process.env.BRAIN_COCKPIT_LAUNCHD_NODE,
+  licensePath: process.env.BRAIN_MENUBAR_NODE_LICENSE,
+});
 await fs.mkdir(macosDir, { recursive: true });
 await fs.mkdir(resourcesDir, { recursive: true });
 for (const profile of brainProfiles) {
