@@ -15,6 +15,8 @@
 
 <!-- backlog items below; newest first -->
 
+- Migrate the project's supported Node 22 baseline to a newer supported LTS by early January 2027, ahead of Node 22 end-of-life on 30 April 2027; choose the target during promotion and validate hosted server, local sync and both Monitor profiles together, preserving the private bundled runtime and JEM/ERS isolation.
+
 - Adopt ai-knowledge ORCHESTRATED_SESSIONS (knowhub entry plus a contract trigger line). Evidence: parallel fix/release worktrees and `codex/*` spec branches through 23 Oct, plus cross-account JEM→ERS activation handoffs; no concurrent sessions now, so normal priority.
 
 
