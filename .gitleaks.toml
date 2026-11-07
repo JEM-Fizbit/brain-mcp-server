@@ -1,0 +1,58 @@
+# Secret scanning for this repository (gitleaks v8.30+): the global rules plus any allowlist it needs.
+# Copied from ~/Projects/ai-knowledge/hooks/gitleaks/global.toml. CI runs it in .github/workflows/secret-scan.yml;
+# the global git hooks on John's Mac use it too. A live credential is rotated, never allowlisted
+# (ai-knowledge protocols/SECRET_HANDLING.md).
+
+title = "brain-mcp-server gitleaks config"
+
+[extend]
+useDefault = true
+
+# The default rules only catch ElevenLabs keys next to a keyword; this catches a bare one.
+[[rules]]
+id = "elevenlabs-api-key"
+description = "ElevenLabs API key"
+regex = '''\bsk_[a-f0-9]{48}\b'''
+keywords = ["sk_"]
+
+# Supabase publishable keys are public by design; secret keys are not.
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase secret API key"
+regex = '''\bsb_secret_[A-Za-z0-9_-]{20,}'''
+keywords = ["sb_secret_"]
+
+# Supabase Management API and CLI access tokens.
+[[rules]]
+id = "supabase-access-token"
+description = "Supabase personal access token"
+regex = '''\bsbp_[a-f0-9]{40}\b'''
+keywords = ["sbp_"]
+
+# The default rules miss a password inline in a connection string (postgres, mysql, redis, amqp, mongodb...).
+[[rules]]
+id = "url-embedded-password"
+description = "Password embedded in a connection URL"
+regex = '''\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'"]{1,64}:([^@\s\[\]<>"'$/]{8,})@[^\s/]+'''
+secretGroup = 1
+keywords = ["://"]
+
+[[rules.allowlists]]
+regexes = ['''(?i)^(postgres|password|passw0rd|your[-_]?password|changeme|example|secret|xxx+|\*+)$''']
+
+[[allowlists]]
+description = "Documentation placeholders, not credentials"
+regexTarget = "secret"
+regexes = [
+  '''^YOUR_[A-Z_]+$''',
+  '''^<[^>]+>$''',
+  '''^\$\{?[A-Z_][A-Z0-9_]*\}?$''',
+]
+
+[[allowlists]]
+description = "Sparkle EdDSA public key that verifies Monitor updates: public by design, not a credential"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "match"
+paths = ['''^config/monitor-signing\.json$''']
+regexes = ['''public_ed_key"\s*:\s*"[A-Za-z0-9+/]{43}=''']
