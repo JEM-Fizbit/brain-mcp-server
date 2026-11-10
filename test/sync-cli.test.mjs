@@ -211,6 +211,19 @@ test("sync CLI status reports state, hosted files, and open conflicts", async ()
   assert.equal(output.openConflicts[0].filename, "NOW.md");
 });
 
+test("sync polling defaults to ten seconds and respects explicit overrides", async () => {
+  const config = dirs("poll-interval");
+  await writeBrainFile(config.brainDir, "NOW.md", "base\n");
+  const defaultRun = await runCliWithEnv("summary", config, {
+    BRAIN_SYNC_LOAD_LOCAL_ENV: "0", BRAIN_SYNC_INTERVAL_MS: "",
+  });
+  assert.equal(defaultRun.config.watchIntervalMs, 10000);
+  const override = await runCliWithEnv("summary", config, {
+    BRAIN_SYNC_LOAD_LOCAL_ENV: "0", BRAIN_SYNC_INTERVAL_MS: "15000",
+  });
+  assert.equal(override.config.watchIntervalMs, 15000);
+});
+
 test("sync CLI summary reports compact counts without file payloads", async () => {
   const config = dirs("summary");
   await writeBrainFile(config.brainDir, "NOW.md", "CLI summary base\n");

@@ -95,6 +95,7 @@ test("launchd plist runs the sync CLI with an absolute Node path", async () => {
   assert.equal(result.outputPath, outputPath);
   assert.equal(result.nodePath, nodePath);
   assert.equal(result.syncCliPath, syncCliPath);
+  assert.match(plist, /<key>BRAIN_SYNC_INTERVAL_MS<\/key>\s*<string>10000<\/string>/);
   assert.match(plist, new RegExp(`<string>${nodePath}</string>`));
   assert.match(plist, new RegExp(`<string>${syncCliPath}</string>`));
   assert.doesNotMatch(plist, /<string>\/usr\/bin\/env<\/string>/);
@@ -451,6 +452,7 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.equal(config.doctorTimeoutMs, 45000);
   assert.equal(config.stackStatusFile, path.join(logDir, "brain-monitor-stack.json"));
   assert.equal(config.env.BRAIN_SYNC_SUPERVISOR, "menubar");
+  assert.equal(config.syncProcess.env.BRAIN_SYNC_INTERVAL_MS, "10000");
   assert.equal(config.env.BRAIN_PROFILE_NAME, "ers-brain");
   assert.equal(config.env.BRAIN_COCKPIT_URL, "http://127.0.0.1:8798/");
   assert.equal(config.env.BRAIN_SYNC_LOG_DIR, logDir);
@@ -705,6 +707,7 @@ test("menu-bar app can supervise multiple Brain local stacks", async () => {
     ["ai-brain-jem", "ers-brain"]
   );
   assert.equal(config.brains.length, 2);
+  for (const brain of config.brains) assert.equal(brain.syncProcess.env.BRAIN_SYNC_INTERVAL_MS, "10000");
   assert.equal(config.brains[0].brainId, "ai-brain-jem");
   assert.equal(config.brains[0].displayName, "JEM");
   assert.equal(config.brains[0].brainDir, path.join(jemRoot, "brain"));

@@ -1,5 +1,26 @@
 # Working Decisions Log
 
+## 2026-11-10 — Brain sync needs quasi real-time freshness
+
+**Implementation choice agreed later in the same discussion:** metadata-only
+inventory with a 10-second polling pause. This keeps typical detection near five
+seconds while halving cycle frequency. John authorised implementation and thorough
+testing, with a recommendation brought back before rollout. John subsequently authorised activation on both Brains; the local two-profile
+pilot was updated and verified in both directions on 10 November. Production pilot
+volume and user count warrant a straightforward update.
+
+John clarified during the egress investigation that roughly 30 seconds of sync
+lag is acceptable for the small user base and low volume of changes. This
+supersedes the five-second interval constraint retained on 19 August as a design
+requirement; it does not claim a deployed interval change or approve a rollout.
+Automatic propagation, local Markdown usability, explicit conflicts, recovery
+and owner isolation remain requirements. Hosted clients using the same hosted
+store do not need to wait for the local mirror to receive a committed write.
+
+The current investigation is measurement and design review. Candidate changes
+must distinguish a configured polling delay from observed propagation latency,
+including cycle execution, offline/sleep recovery and OneDrive propagation.
+
 ## 2026-11-06 — Isolate the developer Monitor runtime from Homebrew
 
 The local supervisor app bundles its own self-contained Node 22 binary, using

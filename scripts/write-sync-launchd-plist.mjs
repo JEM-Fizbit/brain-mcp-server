@@ -15,7 +15,7 @@ const lockFile = process.env.BRAIN_SYNC_LOCK_FILE;
 const healthFile = process.env.BRAIN_SYNC_HEALTH_FILE;
 const logDir = process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR || syncDir;
 const label = process.env.BRAIN_SYNC_LAUNCHD_LABEL || "com.jem.brain-sync";
-const intervalSeconds = Number(process.env.BRAIN_SYNC_LAUNCHD_INTERVAL_SECONDS || 5);
+const intervalSeconds = Number(process.env.BRAIN_SYNC_LAUNCHD_INTERVAL_SECONDS || 10);
 const nodePath = process.env.BRAIN_SYNC_LAUNCHD_NODE || process.execPath;
 const syncCliPath =
   process.env.BRAIN_SYNC_LAUNCHD_SYNC_CLI ||

@@ -44,7 +44,7 @@ const stateFile = process.env.BRAIN_SYNC_STATE_FILE || path.join(syncDir, "state
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE;
 const healthFile = process.env.BRAIN_SYNC_HEALTH_FILE || `${stateFile}.health.json`;
 const logDir = process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR || syncDir;
-const intervalMs = Number(process.env.BRAIN_SYNC_INTERVAL_MS || 5000);
+const intervalMs = Number(process.env.BRAIN_SYNC_INTERVAL_MS || 10000);
 const syncLaunchdLabel =
   process.env.BRAIN_SYNC_HELPER_LAUNCHD_LABEL ||
   process.env.BRAIN_SYNC_LAUNCHD_LABEL ||

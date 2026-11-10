@@ -73,7 +73,7 @@ function usage(): string {
     "  BRAIN_SYNC_HEALTH_FILE    Local sync daemon health JSON path",
     "  BRAIN_SYNC_STORE_FILE     File-backed hosted revision store path",
     "  BRAIN_SYNC_INCLUDE_FILES  Optional comma-separated .md file list",
-    "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 5000)",
+    "  BRAIN_SYNC_INTERVAL_MS    Watch interval in milliseconds (default: 10000)",
     "  BRAIN_SYNC_WATCH_CYCLES   Optional finite watch cycles for tests/jobs",
     "  BRAIN_SYNC_WATCH_OUTPUT   Watch output mode: summary|full (default: summary)",
     "  BRAIN_SYNC_CYCLE_TIMEOUT_MS",
@@ -143,7 +143,7 @@ function readConfig(): SyncCliConfig {
     includeFiles: includeFiles && includeFiles.length > 0 ? includeFiles : undefined,
     watchIntervalMs: Math.max(
       250,
-      Number(process.env.BRAIN_SYNC_INTERVAL_MS || 5000)
+      Number(process.env.BRAIN_SYNC_INTERVAL_MS || 10000)
     ),
     watchCycles: process.env.BRAIN_SYNC_WATCH_CYCLES
       ? Math.max(1, Number(process.env.BRAIN_SYNC_WATCH_CYCLES))

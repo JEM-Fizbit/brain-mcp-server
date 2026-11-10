@@ -114,6 +114,15 @@ interface HeadRow extends RevisionRow {
   updated_at: Date;
 }
 
+// Inventory never transports content or write-context evidence. Counts are
+// computed in Postgres; changed files are fetched separately by revision ID.
+type InventoryRow = Omit<HeadRow, "content" | "metadata" | "parent_revision_id"> & {
+  line_count: number;
+  byte_count: number;
+  renamed_from: string | null;
+  renamed_to: string | null;
+};
+
 interface SearchRevisionRow extends RevisionRow {
   search_rank: number | string;
 }
@@ -138,7 +147,7 @@ interface ConflictRow {
   resolved_at: Date | null;
 }
 
-function actorFromRow(row: RevisionRow): RevisionActor | undefined {
+function actorFromRow(row: Pick<RevisionRow, "actor_provider" | "actor_id" | "actor_name" | "actor_email">): RevisionActor | undefined {
   if (!row.actor_provider || !row.actor_id) return undefined;
   return {
     provider: row.actor_provider,
@@ -175,24 +184,25 @@ function revisionFromRow(row: RevisionRow): RevisionContent {
   };
 }
 
-function headFromRow(row: HeadRow | RevisionRow): FileHead {
+function headFromRow(row: HeadRow | RevisionRow | InventoryRow): FileHead {
   const updatedAt =
     "updated_at" in row ? row.updated_at.toISOString() : row.created_at.toISOString();
   const deleted = row.deleted === true;
+  const inventory = "line_count" in row;
   return {
     brainId: row.brain_id,
     filename: row.filename,
     revisionId: row.id,
     contentHash: row.content_sha256 ?? TOMBSTONE_HASH,
-    lineCount: deleted || row.content === null ? 0 : lineCount(row.content),
-    byteCount: deleted || row.content === null ? 0 : byteCount(row.content),
+    lineCount: inventory ? row.line_count : deleted || row.content === null ? 0 : lineCount(row.content),
+    byteCount: inventory ? row.byte_count : deleted || row.content === null ? 0 : byteCount(row.content),
     updatedAt,
     origin: row.origin,
     actor: actorFromRow(row),
     cursor: row.created_at.toISOString(),
     deleted,
-    renamedFrom: row.metadata?.renamedFrom,
-    renamedTo: row.metadata?.renamedTo,
+    renamedFrom: inventory ? row.renamed_from ?? undefined : row.metadata?.renamedFrom,
+    renamedTo: inventory ? row.renamed_to ?? undefined : row.metadata?.renamedTo,
   };
 }
 
@@ -399,9 +409,19 @@ export class PostgresRevisionStore implements RevisionStore {
     brainId: string,
     options: ListFilesOptions = {}
   ): Promise<FileHead[]> {
-    const result = await this.pool.query<HeadRow>(
+    const result = await this.pool.query<InventoryRow>(
       `
-        select r.*, f.updated_at
+        select r.id, r.brain_id, r.filename, r.content_sha256, r.deleted,
+          r.origin, r.actor_provider, r.actor_id, r.actor_name, r.actor_email,
+          r.created_at, f.updated_at,
+          r.metadata->>'renamedFrom' as renamed_from,
+          r.metadata->>'renamedTo' as renamed_to,
+          case when r.deleted or r.content is null then 0
+            else length(r.content) - length(replace(r.content, chr(10), '')) + 1
+          end as line_count,
+          case when r.deleted or r.content is null then 0
+            else octet_length(r.content)
+          end as byte_count
         from brain.brain_files f
         join brain.brain_file_revisions r on r.id = f.current_revision_id
         where f.brain_id = $1 and ($2 or r.deleted = false)

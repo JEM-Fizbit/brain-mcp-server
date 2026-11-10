@@ -23,7 +23,7 @@ const stateFile = process.env.BRAIN_SYNC_STATE_FILE;
 const lockFile = process.env.BRAIN_SYNC_LOCK_FILE;
 const healthFile = process.env.BRAIN_SYNC_HEALTH_FILE;
 const logDir = process.env.BRAIN_SYNC_LAUNCHD_LOG_DIR || syncDir;
-const intervalMs = Number(process.env.BRAIN_SYNC_INTERVAL_MS || 5000);
+const intervalMs = Number(process.env.BRAIN_SYNC_INTERVAL_MS || 10000);
 const nodePath =
   process.env.BRAIN_SYNC_HELPER_NODE ||
   process.env.BRAIN_SYNC_LAUNCHD_NODE ||

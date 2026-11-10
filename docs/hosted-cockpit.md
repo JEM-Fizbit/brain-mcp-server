@@ -1,5 +1,31 @@
 # Hosted Brain Cockpit
 
+## Inventory transfer and polling — activated 10 November 2026
+
+Postgres file inventories now return metadata and server-computed line/byte
+counts; complete content is fetched only when sync needs a revision. This does
+not change conflict handling, deletion guards, source custody or owner binding.
+The CLI, developer Monitor installer and legacy helper/LaunchAgent generators
+default to a 10,000 ms pause between completed cycles. Explicit overrides still
+win. Heartbeat and Doctor timing are unchanged.
+
+**Local pilot activation, 10 November:** both existing developer Monitor profiles
+were updated to explicit `10000` ms settings and restarted on the tested build.
+Their separate owner bindings, paths and bundled Node runtime were verified
+unchanged. Both profiles passed hosted-to-local and local-to-hosted acceptance,
+fixture deletion propagation and automatic health checks, with zero conflicts.
+The worker inventory transfer reduction was observed directly on the network.
+Hosted server deployment and billing-rollup acceptance are separate observations;
+no database migration was needed.
+
+Existing installations with explicit intervals require a Monitor configuration
+refresh; changing the CLI default alone does not override them. Both developer
+workers may share one checkout while retaining isolated owner credentials.
+
+Ten seconds is a polling pause, not a strict propagation deadline. Add cycle
+execution and any OneDrive delay; inferred local deletions retain the existing
+two-scan debounce and therefore normally take roughly 10–20 seconds plus work.
+
 ## Local runtime isolation — 6 November 2026
 
 The developer Monitor now owns a self-contained Node 22 binary inside its app
@@ -554,7 +580,7 @@ Historical operation telemetry is reused for 15 minutes by default
 (`BRAIN_DOCTOR_OPERATION_REFRESH_MS`); manual `Refresh Doctor` bypasses that
 cache for an immediate deep check.
 
-For Postgres-backed profiles, the five-second sync loop coalesces successful
+For Postgres-backed profiles, the sync loop coalesces successful
 liveness into one metadata-only `brain.sync_heartbeats` row per Brain, upserted
 at most once per minute (`BRAIN_SYNC_HEARTBEAT_INTERVAL_MS`). The row contains
 counts, duration, and guard status only—never filenames, content, database
