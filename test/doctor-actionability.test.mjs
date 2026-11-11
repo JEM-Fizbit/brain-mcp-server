@@ -17,6 +17,26 @@ import {
   TRANSIENT_FAILURE_ESCALATION_CYCLES,
 } from "../scripts/lib/doctor-actionability.mjs";
 
+test("doctor and sync health recognize nested connection failures without hiding durable faults", () => {
+  const network=code=>Object.assign(new Error(""),{code});
+  const aggregate=new AggregateError([network("EADDRNOTAVAIL"),network("ENETDOWN")]);
+  assert.equal(classifyPostgresError(aggregate).class,"connectivity");
+  assert.equal(classifyPostgresError(aggregate).durable,false);
+  assert.equal(classifyPostgresError(new Error("wrapper",{cause:network("ETIMEDOUT")})).class,"timeout");
+  const mixed=new AggregateError([network("ETIMEDOUT"),network("28P01")],"connection terminated");
+  assert.equal(classifyPostgresError(mixed).durable,true);
+  const now=Date.now();
+  const health=evaluateSyncHealth({status:"error",checkedAt:new Date(now).toISOString(),
+    error:"Temporary database connection failure (EADDRNOTAVAIL)",errorCode:"EADDRNOTAVAIL"},null,{now,maxAgeMs:120000});
+  assert.equal(health.status,"warn");assert.equal(health.details.errorClass,"connectivity");
+  const action=syncHealthAction({...health,status:"fail"});
+  assert.match(action.title,/retries automatically/);
+  assert.match(action.detail,/continues automatic retries/);
+  const mixedHealth=evaluateSyncHealth({status:"error",checkedAt:new Date(now).toISOString(),
+    error:"connection terminated",networkRetryable:false},null,{now,maxAgeMs:120000});
+  assert.equal(mixedHealth.status,"fail");assert.equal(mixedHealth.details.errorClass,"unknown");
+});
+
 test("lint alarms distinguish operator actions from maintainer-only findings", () => {
   assert.deepEqual(
     classifyLintFindings({ issueCount: 0, automaticFixCount: 0 }),

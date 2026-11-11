@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { retryableConnectionCode } from "../services/connection-error.js";
 
 export interface SupervisorOptions {
   brainId: string;
@@ -16,15 +17,6 @@ export interface SupervisorOptions {
   retryDelays?: number[];
   networkRetryDelays?: number[];
 }
-
-// Mirrors the doctor's transient resolution/connectivity/timeout classes
-// (scripts/lib/doctor-actionability.mjs). An unreachable network is not a
-// worker fault: a sleep/DarkWake gap must not exhaust the restart budget.
-const NETWORK_ERROR = new RegExp([
-  String.raw`\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ENETDOWN|ETIMEDOUT|EPIPE)\b`,
-  "getaddrinfo", "connection terminated", "connection refused", "socket hang up",
-  "timeout exceeded when trying to connect", "query read timeout",
-].join("|"), "i");
 
 // Exposed for deterministic sleep/wake tests. Large scheduling gaps grant one
 // grace window; old worker health is never promoted to a new observation.
@@ -123,7 +115,10 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
       void read(o.healthFile).then((health) => {
         if (shuttingDown || child) return;
         const network = health?.pid === worker.pid && health.status === "error" &&
-          health.reason !== "sync_cycle_timeout" && NETWORK_ERROR.test(String(health.error ?? ""));
+          health.reason !== "sync_cycle_timeout" && (health.networkRetryable === true ||
+            (health.networkRetryable == null && retryableConnectionCode({
+              message: health.error, code: health.errorCode,
+            }) !== null));
         if (network) networkWait(); else failed("worker_error");
       });
     });

@@ -1,3 +1,5 @@
+import { connectionErrorMetadata } from "./connection-error.js";
+
 type ErrorEmitting = {
   on(event: "error", listener: (error: Error) => void): unknown;
 };
@@ -13,7 +15,7 @@ export function attachPoolErrorLogger<T extends ErrorEmitting>(
   label: string
 ): T {
   pool.on("error", (error) => {
-    console.error(`[pg-pool:${label}] idle client error`, error);
+    console.error(`[pg-pool:${label}] idle client error`, connectionErrorMetadata(error));
   });
   return pool;
 }

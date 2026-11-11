@@ -1,5 +1,36 @@
 # Hosted Brain Cockpit
 
+## Connectivity recovery — 11 November 2026
+
+The local sync worker preserves transport codes from nested `AggregateError`
+and `cause` chains in its PID-bound health report. This includes macOS
+`EADDRNOTAVAIL` and `ENETDOWN`, alongside DNS, refused/reset connection and
+timeout errors. A known connectivity failure follows the existing paced
+network retry path (15, 30, 60, 120, then 300 seconds), without exhausting
+the three-attempt fault budget. Reconnection resumes normal sync automatically;
+no new daemon, shorter healthy polling interval or database change is needed.
+
+Every branch in a wrapped error must be a recognized transport failure.
+Empty, mixed, cyclic, overly deep or unknown aggregates retain fault handling;
+authentication, permission, schema errors and sync-cycle deadlines must not be
+hidden by indefinite retries. Doctor uses the same transport recognition and
+retains its repeated-outage warnings/failures while automatic recovery continues.
+Pool idle-error logs contain only bounded error identifiers, never attached
+database client objects, connection parameters or cancellation keys.
+
+This addresses the 11 November incident: intermittent connectivity left both
+workers reporting only `AggregateError`; the supervisor treated that as an
+unknown fault and exhausted recovery despite connectivity returning. Operator
+retry restored both profiles and fresh Doctors passed before this fix was built.
+
+The tested build was activated on both existing local profiles at approximately
+17:05 Europe/Berlin on 11 November. Multiple successful cycles and fresh Doctors
+passed for both, with zero conflicts and the 10-second cadence retained. The full
+Node 22 regression suite passed (679 tests, 15 optional skips); isolated fault
+injection proved nested network outages outlast the fault budget and then converge,
+while mixed authentication failures still require attention. No live network outage
+was induced. Hosted Fly services, database schema and credentials were unchanged.
+
 ## Inventory transfer and polling — activated 10 November 2026
 
 Postgres file inventories now return metadata and server-computed line/byte

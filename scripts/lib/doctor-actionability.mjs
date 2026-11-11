@@ -1,3 +1,5 @@
+import { retryableConnectionCode } from "../../dist/services/connection-error.js";
+
 const FLY_AUTH_UNAVAILABLE_PATTERN =
   /no access token available|please login with ['"]?flyctl auth login|not logged in|authentication required|access token[^\n]*(?:missing|expired|invalid)|(?:401|403)[^\n]*(?:unauthorized|forbidden)/i;
 
@@ -82,7 +84,7 @@ export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeM
   const failedObservations = error ? (same ? Math.max(1, previousCount)
     : adjacent ? previousCount + 1 : 1) : 0;
   const classification = error ? classifyPostgresError({
-    message: health.error, code: health.errorCode,
+    message: health.error, code: health.errorCode, networkRetryable: health.networkRetryable,
   }) : null;
   const recoveryPercent = Number.isFinite(health.recovery?.percent) ? health.recovery.percent : null;
   const recoveryNearBudget = recoveryPercent !== null && recoveryPercent >= RECOVERY_BUDGET_WARN_PERCENT;
@@ -118,14 +120,16 @@ export function syncHealthAction(sync) {
   if (details.errorClass) return {
     level: sync.status,
     reason: sync.status === "fail" ? "sync_health_failed" : "sync_health_degraded",
-    title: sync.status === "fail" ? "Restore local sync." : "Watch local sync recovery.",
+    title: sync.status === "fail"
+      ? details.transient ? "Restore connectivity; sync retries automatically." : "Restore local sync."
+      : "Watch local sync recovery.",
     detail: [
       `Last sync error: ${details.errorClass}.`,
       details.observedAt ? `Observed ${details.observedAt}.` : "Observation time unavailable.",
       `${details.failedObservations || 1} distinct failed attempt(s) observed since the last observed recovery or gap.`,
       details.state === "stale" ? "This observation is stale; current sync health is unknown." : "",
-      details.transient && sync.status === "warn"
-        ? "Monitor supervises retry; check connectivity and the profile sync log if recovery does not follow."
+      details.transient
+        ? "Monitor continues automatic retries; check connectivity and the profile sync log if recovery does not follow. No manual restart is needed for a network outage."
         : "Inspect this profile's sync log and resolve the reported error, then restart its local stack in Brain Monitor.",
     ].filter(Boolean).join(" "),
   };
@@ -267,6 +271,8 @@ const POSTGRES_ERROR_CLASSES = [
       code === "ECONNRESET" ||
       code === "EHOSTUNREACH" ||
       code === "ENETUNREACH" ||
+      code === "ENETDOWN" ||
+      code === "EADDRNOTAVAIL" ||
       code === "EPIPE" ||
       /connection terminated|connection refused|socket hang up/i.test(text),
     summary: "The database connection was refused or dropped.",
@@ -291,9 +297,11 @@ const POSTGRES_ERROR_CLASSES = [
  */
 export function classifyPostgresError(error) {
   const text = String(error?.message || error || "").slice(0, 400);
-  const code = String(error?.code || "");
+  const retryCode = retryableConnectionCode(error);
+  const code = retryCode || String(error?.code || "");
+  const unknownWrapper = (Array.isArray(error?.errors) || error?.cause != null) && !retryCode;
   const matched = POSTGRES_ERROR_CLASSES.find((candidate) =>
-    candidate.test(text, code)
+    ((!unknownWrapper && error?.networkRetryable !== false) || candidate.durable) && candidate.test(text, code)
   );
   if (!matched) {
     return {

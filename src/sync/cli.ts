@@ -17,6 +17,7 @@ import {
   projectRefFromDatabaseUrl,
 } from "./runtime-binding.js";
 import { applyRecoveryPrune, planRecoveryPrune, recoveryUsage } from "./recoverable-file.js";
+import { connectionErrorMetadata } from "../services/connection-error.js";
 
 type SyncCommand =
   | "push"
@@ -537,12 +538,17 @@ async function runWithConfig(
                 process.exit(1);
               }
             }
+            const failure = connectionErrorMetadata(error);
             await writeSyncHealth(config, {
               command,
               status: "error",
               cycle,
               checkedAt: new Date().toISOString(),
-              error: error?.message || String(error),
+              error: failure.networkRetryable
+                ? `Temporary database connection failure (${failure.code})`
+                : error?.message || String(error),
+              errorCode: failure.code,
+              networkRetryable: failure.networkRetryable,
             });
             throw error;
           } finally {
@@ -643,6 +649,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  process.stderr.write(`[brain-sync] Fatal error: ${error?.message || error}\n`);
+  const failure = connectionErrorMetadata(error);
+  process.stderr.write(`[brain-sync] Fatal error: ${failure.networkRetryable
+    ? `Temporary database connection failure (${failure.code})`
+    : error?.message || error}\n`);
   process.exit(1);
 });

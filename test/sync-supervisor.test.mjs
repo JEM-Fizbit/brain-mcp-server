@@ -28,6 +28,15 @@ async function fixture(t,mode) {
     if(${JSON.stringify(mode)}==='once') {
       const original=LocalSyncAgent.prototype.syncOnce; let calls=0;
       LocalSyncAgent.prototype.syncOnce=async function(){if(calls++)while(true){};return original.call(this);};
+    } else if(${JSON.stringify(mode)}==='aggregate-network'&&a.length<=4){
+      const network=(code)=>Object.assign(new Error(''),{code});
+      const errors=[new AggregateError([network('ETIMEDOUT'),network('ENETUNREACH')]),
+        new Error('Connection failed',{cause:new AggregateError([network('EADDRNOTAVAIL'),network('ECONNRESET')])}),
+        network('ENETDOWN'),new AggregateError([network('ECONNREFUSED'),network('EHOSTUNREACH')])];
+      LocalSyncAgent.prototype.syncOnce=async()=>{throw errors[a.length-1];};
+    } else if(${JSON.stringify(mode)}==='mixed-network'){
+      LocalSyncAgent.prototype.syncOnce=async()=>{throw new AggregateError([
+        Object.assign(new Error(''),{code:'ETIMEDOUT'}),Object.assign(new Error(''),{code:'28P01'})]);};
     } else if(${JSON.stringify(mode)}==='network'&&a.length<=4){
       const errors=['getaddrinfo ENOTFOUND db.invalid','Connection terminated due to connection timeout','Query read timeout','connect ECONNREFUSED 127.0.0.1:6543'];
       LocalSyncAgent.prototype.syncOnce=async()=>{throw Error(errors[a.length-1]);};
@@ -94,11 +103,21 @@ test('sleep/wake grace lets a suspended worker resume without a false restart',a
  assert.equal((await json(f.marker)).length,1);
 });
 
-test('network outage longer than the fault budget waits without needing intervention',async t=>{
- const f=await fixture(t,'network');
+for(const mode of ['network','aggregate-network'])test(`${mode} outage longer than the fault budget self heals`,async t=>{
+ const f=await fixture(t,mode);
  const d=await waitFor(async()=>{const d=await f.report();return d?.state==='running'&&d.lastSuccessAt&&d;});
  assert.equal((await json(f.marker)).length,5);assert.equal(d.attempts,0);
  assert.equal(d.history.filter(e=>e.kind==='network_wait').length,4);
  assert.ok(!d.history.some(e=>e.kind==='needs_attention'||e.kind==='retry_scheduled'));
  assert.equal(await fs.readFile(path.join(f.brainDir,'NOW.md'),'utf8'),'Local work survives\n');
+ assert.equal(await fs.readFile(path.join(f.brainDir,'remote.md'),'utf8'),'Remote change\n');
+ assert.equal((await json(f.health)).report.conflicts,0);
+});
+
+test('mixed authentication and network aggregate still stops for attention',async t=>{
+ const f=await fixture(t,'mixed-network');
+ const d=await waitFor(async()=>{const d=await f.report();return d?.state==='needs_attention'&&d;});
+ assert.equal(d.attempts,2);assert.equal((await json(f.marker)).length,3);
+ assert.equal((await json(f.health)).networkRetryable,false);
+ assert.ok(!d.history.some(e=>e.kind==='network_wait'));
 });
