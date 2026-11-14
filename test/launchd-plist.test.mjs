@@ -550,8 +550,10 @@ test("menu-bar app surfaces sync health and operator controls", async () => {
   assert.match(source, /profileStatusForProfile/);
   assert.match(source, /Sync status: %@/);
   assert.match(source, /styleProfileItem:profileItem name:shortName status:overallStatus/);
-  assert.match(source, /item.title = \[NSString stringWithFormat:@"%@ · %@", name, label\]/);
-  assert.match(source, /configurationWithPaletteColors/);
+  assert.match(source, /item.title = \[NSString stringWithFormat:@"%@ %@ · %@", indicator, name, label\]/);
+  for (const indicator of ["🟢", "🟠", "🔴", "⚪"]) {
+    assert.ok(source.includes('indicator = @"' + indicator + '"'));
+  }
   assert.match(source, /Last completed sync: %@/);
   assert.match(source, /Deployed version: %@/);
   assert.match(source, /Version observed: %@/);

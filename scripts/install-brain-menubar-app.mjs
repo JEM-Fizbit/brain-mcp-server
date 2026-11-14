@@ -1403,31 +1403,22 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
 
 - (void)styleProfileItem:(NSMenuItem *)item name:(NSString *)name status:(NSString *)status {
   NSString *label = @"Unknown";
-  NSString *symbol = @"questionmark.circle";
-  NSColor *color = [NSColor secondaryLabelColor];
+  // macOS can omit NSMenuItem images on submenu rows. Keep the colour in the title.
+  NSString *indicator = @"⚪";
   if ([status isEqualToString:@"ok"]) {
     label = @"OK";
-    symbol = @"checkmark.circle.fill";
-    color = [NSColor systemGreenColor];
+    indicator = @"🟢";
   } else if ([status isEqualToString:@"fail"]) {
     label = @"Failed";
-    symbol = @"xmark.circle.fill";
-    color = [NSColor systemRedColor];
+    indicator = @"🔴";
   } else if ([@[@"warn", @"action", @"offline"] containsObject:status]) {
     label = [status isEqualToString:@"offline"] ? @"Offline" :
       [status isEqualToString:@"action"] ? @"Action needed" : @"Warning";
-    symbol = @"exclamationmark.triangle.fill";
-    color = [NSColor systemOrangeColor];
+    indicator = @"🟠";
   } else if ([status isEqualToString:@"checking"]) {
     label = @"Checking";
-    symbol = @"clock";
   }
-  item.title = [NSString stringWithFormat:@"%@ · %@", name, label];
-  NSImage *image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
-  NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPaletteColors:@[color]];
-  image = [image imageWithSymbolConfiguration:configuration];
-  image.template = NO;
-  item.image = image;
+  item.title = [NSString stringWithFormat:@"%@ %@ · %@", indicator, name, label];
 }
 
 - (NSMenu *)addSubmenu:(NSMenu *)menu title:(NSString *)title {
