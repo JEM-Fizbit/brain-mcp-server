@@ -91,6 +91,36 @@ Native fixtures also verify source removal/reinstall, rejection of external
 dylibs and the wrong major, and preservation of the installed runtime after a
 refused replacement. No hosted deployment or Brain-content change was needed.
 
+## Monitor runtime and ERS recovery savepoint — 14 November 2026
+
+ERS sync resumed after OneDrive reopened and made its recovery files readable.
+The startup failure was reproduced reading an online-only OneDrive recovery
+file. Independent read-only checks against the ERS database passed. Finder
+confirmed the ERS Brain folder was **Always Available on This Device**, and
+all 789 non-empty recovery files had local storage allocated at verification.
+
+The Mac is running the simplified profile menu with coloured status dots
+([menu fix](https://github.com/JEM-Fizbit/brain-mcp-server/commit/307bd3e)),
+OneDrive-specific timeout reporting
+([warning fix](https://github.com/JEM-Fizbit/brain-mcp-server/commit/a7737c0)),
+and one background OneDrive launch per incident when the app is absent
+([recovery fix](https://github.com/JEM-Fizbit/brain-mcp-server/commit/caaa6f3)).
+The Node.js 22.23.5 Apple Silicon runtime was installed on 12 November using
+the official archive and signed checksums. The installed app passed signature
+verification. At 21:34 UK time on 14 November, both profiles reported zero
+conflicts, passing Doctor results and current hosted heartbeats. The supervisor
+tests reproduced the timeout, the single launch request, and automatic sync
+recovery. A real outage after installation has yet to exercise automatic
+relaunch. The implementation changes are on personal `main` and active on
+the Mac. Hosted deployments were outside this rollout.
+
+For the next scheduled read-only runtime review, verify the bundled version
+against official Node.js 22 release notes and check each profile's Doctor,
+sync and heartbeat independently. If a OneDrive timeout has recurred, inspect
+the ERS supervisor history for the launch request and a later successful
+cycle. Local health reports and the Finder pin are machine state. Keep the
+Node major-version migration in the [project backlog](../BACKLOG.md).
+
 ## Installation inventory and native updates — v1.14.2
 
 ERS's existing Identity & Access page now includes **Installed Monitors**; JEM's
