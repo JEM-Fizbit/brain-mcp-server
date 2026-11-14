@@ -8,7 +8,7 @@ import { admitRevision } from "../services/write-admission.js";
 import { writePolicyForBrain } from "../services/write-policy-runtime.js";
 import { WritePolicyError, policyDigest } from "../services/write-policy.js";
 import { contentHash } from "./hash.js";
-import { mutateLocalFile, inspectLocalRecovery } from "./recoverable-file.js";
+import { mutateLocalFile, inspectLocalRecovery, withVaultIo } from "./recoverable-file.js";
 import type {
   ConflictRecord,
   LocalSyncReport,
@@ -210,7 +210,7 @@ function filterIncludedHeads<T extends { filename: string }>(
 export class LocalSyncAgent {
   private timed<T>(report: LocalSyncReport, operation: SyncOperation, phase: SyncTimingPhase, fn: () => Promise<T>): Promise<T> {
     this.options.onProgress?.(operation, phase);
-    return timed(report, operation, phase, fn);
+    return timed(report, operation, phase, phase.startsWith("local_") ? () => withVaultIo(fn) : fn);
   }
 
   constructor(private readonly options: LocalSyncAgentOptions) {}
@@ -328,7 +328,7 @@ export class LocalSyncAgent {
   }
 
   private async unresolvedRecoveries() {
-    const observations = await inspectLocalRecovery(this.options.brainDir);
+    const observations = await withVaultIo(() => inspectLocalRecovery(this.options.brainDir));
     if (!observations.length) return observations;
     const resolved = await this.options.store.listConflicts(this.options.brainId, "resolved");
     return observations.filter(item => !resolved.some(conflict =>
@@ -346,11 +346,11 @@ export class LocalSyncAgent {
           !tracked || tracked.revisionId !== conflict.localBaseRevisionId) continue;
       const head = await this.options.store.getHead(this.options.brainId, conflict.filename);
       if (!head || head.deleted || head.revisionId !== conflict.resolutionRevisionId) continue;
-      const localHash = await readFileHash(safeMarkdownPath(this.options.brainDir, conflict.filename));
+      const localHash = await withVaultIo(() => readFileHash(safeMarkdownPath(this.options.brainDir, conflict.filename)));
       if (localHash !== conflict.localContentHash) continue;
       const revision = await this.options.store.readRevision(this.options.brainId, head.revisionId);
       if (!revision || revision.deleted) continue;
-      const applied = await mutateLocalFile(this.options.brainDir, conflict.filename, revision.content, localHash);
+      const applied = await withVaultIo(() => mutateLocalFile(this.options.brainDir, conflict.filename, revision.content, localHash));
       if (!applied.ok) {
         report.guardTripped = `local_recovery: preserved edit at ${applied.recoveryPath}`;
         continue;
@@ -382,7 +382,7 @@ export class LocalSyncAgent {
       return report;
     }
 
-    const journals=await readWriteJournals(this.options.brainDir,this.options.brainId);
+    const journals = await withVaultIo(() => readWriteJournals(this.options.brainDir, this.options.brainId));
     const generatedLog=await generatedLogCandidate(this.options.brainDir,this.options.brainId,state,this.options.store,journals);
     for (const filename of filenames) {
       if(filename==="LOG.md" && generatedLog) continue;
@@ -465,7 +465,7 @@ export class LocalSyncAgent {
       }
       if(completed) {
         const remote=await this.options.store.readFile(this.options.brainId,"LOG.md");
-        const applied=await mutateLocalFile(this.options.brainDir,"LOG.md",remote.content,contentHash(generatedLog.local));
+        const applied = await withVaultIo(() => mutateLocalFile(this.options.brainDir, "LOG.md", remote.content, contentHash(generatedLog.local)));
         if(applied.ok) {
           state.files["LOG.md"]={revisionId:remote.revisionId,contentHash:remote.contentHash,localHash:remote.contentHash};
           if(state.admissionHolds)delete state.admissionHolds["LOG.md"];
@@ -615,9 +615,9 @@ export class LocalSyncAgent {
       }
       if(pullPolicy && (pullPolicy.mode==="enforce" || pullPolicy.intake==="retired") && localHash!==null && localHash!==head.contentHash && (!tracked || localHash!==tracked.localHash)) {
         try {
-          const content=await fs.readFile(fullPath,"utf8");
+          const content = await withVaultIo(() => fs.readFile(fullPath, "utf8"));
           const sidecar=await readSidecarContext(this.options.stateFile,this.options.brainId,filename,tracked?.revisionId||null,contentHash(content));
-          const records=await readWriteJournals(this.options.brainDir,this.options.brainId);
+          const records = await withVaultIo(() => readWriteJournals(this.options.brainDir, this.options.brainId));
           const journal=journalContext(records,filename,contentHash(content),tracked?.localHash||null);
           const prior=tracked?.revisionId ? await this.options.store.readRevision(this.options.brainId,tracked.revisionId):null;
           await admitRevision({brainId:this.options.brainId,filename,content,baseRevisionId:tracked?.revisionId||null,

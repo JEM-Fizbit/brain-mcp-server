@@ -1627,7 +1627,11 @@ function buildOperatorActions(status) {
       title: "Sync needs intervention: automatic recovery has stopped.",
       detail: "Inspect the recovery history and current sync error, correct the cause, then choose Retry Sync Recovery in Brain Monitor. Local edits, conflicts and recovery copies are retained." });
   }
-  if (launchd?.status === "warn") {
+  const oneDriveBackoff = syncAction?.reason === "sync_onedrive_timeout" &&
+    launchd?.details?.recovery?.state === "backoff" &&
+    launchd.details.recovery.reason === "onedrive_unavailable" &&
+    launchd.details.brainIdMatches && launchd.details.syncPidAlive && launchd.details.cockpitPidAlive;
+  if (launchd?.status === "warn" && !oneDriveBackoff) {
     const supervisorKind = launchd.details?.supervisor || supervisor;
     actions.push({
       level: "warn",
@@ -1652,7 +1656,7 @@ function buildOperatorActions(status) {
         detail:
           "Sync liveness is working through the temporary append-only fallback. Apply db/migrations/2026-08-19_001_bounded_sync_observability.sql to this profile's database, rerun the Supabase security gate, then refresh Brain Monitor.",
       });
-    } else {
+    } else if (!oneDriveBackoff || heartbeat.details?.state !== "stale") {
       actions.push({
         level: "warn",
         reason: "sync_heartbeat_stale",

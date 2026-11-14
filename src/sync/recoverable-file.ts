@@ -4,6 +4,24 @@ import os from "node:os";
 import { randomUUID } from "node:crypto";
 import { contentHash } from "./hash.js";
 
+export class VaultReadWriteTimeout extends Error {
+  constructor() {
+    super("Reading or writing the local Brain mirror timed out (ETIMEDOUT)");
+  }
+}
+
+/** Mark file I/O at its source, since a filesystem and a socket can both time out. */
+export async function withVaultIo<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === "ETIMEDOUT") {
+      throw new VaultReadWriteTimeout();
+    }
+    throw error;
+  }
+}
+
 interface Intent {
   version: 1;
   filename: string;

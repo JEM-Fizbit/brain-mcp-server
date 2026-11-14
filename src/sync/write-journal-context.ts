@@ -4,6 +4,7 @@ import { WritePolicyError } from "../services/write-policy.js";
 import { WriteContextSchema } from "../schemas/tools.js";
 import { appendLogEntryToContent, formatLogEntry, LOG_HEADER } from "../services/log.js";
 import { contentHash } from "./hash.js";
+import { withVaultIo } from "./recoverable-file.js";
 import type { BrainWriteContext } from "../services/write-policy.js";
 import type { LocalSyncState, RevisionActor, RevisionStore } from "./types.js";
 export async function readSidecarContext(stateFile:string,brainId:string,filename:string,base:string|null,resultHash:string) {
@@ -68,7 +69,7 @@ export function journalContext(records: LocalWriteJournal[], filename: string, r
 export async function generatedLogCandidate(root: string, brainId: string, state: LocalSyncState, store: RevisionStore, records: LocalWriteJournal[]) {
     if (!records.length)
         return null;
-    const local = await fs.readFile(path.join(root, "LOG.md"), "utf8").catch((e: any) => { if (e.code === "ENOENT")
+    const local = await withVaultIo(() => fs.readFile(path.join(root, "LOG.md"), "utf8")).catch((e: any) => { if (e.code === "ENOENT")
         return null; throw e; });
     if (local === null || contentHash(local) === state.files["LOG.md"]?.localHash)
         return null;

@@ -858,6 +858,13 @@ The `fly_credentials` check reports the selected app's managed credential expiry
 
 #### Independent sync recovery (v1.12.0)
 
+When file access to a SharePoint/OneDrive Brain mirror times out, Doctor and
+Brain Monitor show **OneDrive file access timed out**. Open OneDrive and make
+sure the Brain mirror and its recovery files are available on the Mac. Monitor
+records `onedrive_unavailable` and follows the same retry delays as a network
+outage, without counting these retries against the worker restart budget. The
+stale heartbeat remains visible in Checks while sync is paused.
+
 **26 September 2026 release verification:** annotated public tag `v1.12.0` (tag object `d814722c5e42903c2e327d9e9e2fad31218a38be`, source `14a06d3d305f220786982c1523d73e4ee468d939`) was deployed through the guarded path to both isolated services. JEM deployed at 11:35:24 UTC; the separately owned overlay deployed at 11:38:52 UTC and retains its private provenance. Each release gate passed 583 Node 22 tests: 572 passed, 11 optional skips, zero failures. A separate disposable PostgreSQL lifecycle run passed all 9 tests, including ingestion, manifest-verified companion reads, lint, sync, rollback and receipt replay.
 
 The installed native Monitor was rebuilt from this release and restarted with the existing two owner profiles. Identity, paths and runtime credentials were compared unchanged. All old workers exited before the new supervisors started. Both profiles subsequently reported current PID-bound successful cycles, zero recovery attempts and zero conflicts; the Cockpit showed **Safe to use hosted**, no required action and deployed **v1.12.0** for each. Hosted read-only lint completed on both; the personal source-companion abort is resolved. Ordinary content-maintenance findings remain separate from operational readiness. Sleep/freeze/outage/exhaustion behavior was proven with controlled subprocess fixtures; macOS notification delivery and the cause of the original September 24 stall are not established by these checks.

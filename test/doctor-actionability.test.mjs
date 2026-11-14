@@ -323,6 +323,24 @@ test('durable sync errors and guards retain actionability, missing health is not
   assert.equal(syncHealthAction(syncSample(0, undefined, {status: 'ok'})), null);
 });
 
+test('OneDrive file timeouts have a provider-specific action even when the observation is stale', () => {
+  const error = {errorSource: 'onedrive', errorCode: 'ETIMEDOUT', networkRetryable: false};
+  const fresh = syncSample(0, undefined, error);
+  const stale = syncSample(0, fresh.observation, error, syncTime + 100_000);
+  for (const result of [fresh, stale]) {
+    assert.equal(result.status, 'warn');
+    assert.equal(result.details.errorClass, 'onedrive_timeout');
+    const action = syncHealthAction(result);
+    assert.equal(action.reason, 'sync_onedrive_timeout');
+    assert.match(action.title, /OneDrive file access timed out/);
+    assert.match(action.detail, /retries automatically/);
+    assert.doesNotMatch(action.detail, /database|network outage/i);
+  }
+  const local = syncSample(0, undefined, {...error, errorSource: 'local_filesystem'});
+  assert.equal(local.details.errorClass, 'local_filesystem_timeout');
+  assert.equal(local.status, 'fail');
+});
+
 test("sync health warns when local recovery retention nears its budget", () => {
   const base = { status: "ok", checkedAt: new Date().toISOString(), report: {} };
   const fine = evaluateSyncHealth({ ...base, recovery: { entries: 10, bytes: 1, entryLimit: 10000, byteLimit: 100, percent: 1 } }, undefined, { maxAgeMs: 60_000 });

@@ -16,7 +16,13 @@ import {
   loadLocalEnv as loadAmbientEnv,
   projectRefFromDatabaseUrl,
 } from "./runtime-binding.js";
-import { applyRecoveryPrune, planRecoveryPrune, recoveryUsage } from "./recoverable-file.js";
+import {
+  applyRecoveryPrune,
+  planRecoveryPrune,
+  recoveryUsage,
+  VaultReadWriteTimeout,
+  withVaultIo,
+} from "./recoverable-file.js";
 import { connectionErrorMetadata } from "../services/connection-error.js";
 
 type SyncCommand =
@@ -57,6 +63,26 @@ interface StoreHandle {
 interface SyncLockPayload {
   pid: number;
   startedAt: string;
+}
+
+function syncFailure(error: unknown, surface: string | undefined) {
+  if (error instanceof VaultReadWriteTimeout) {
+    const oneDrive = surface === "sharepoint";
+    return {
+      error: oneDrive ? "OneDrive file access timed out (ETIMEDOUT)" : error.message,
+      errorCode: "ETIMEDOUT",
+      networkRetryable: false,
+      errorSource: oneDrive ? "onedrive" : "local_filesystem",
+    };
+  }
+  const failure = connectionErrorMetadata(error);
+  return {
+    error: failure.networkRetryable
+      ? "Temporary database connection failure (" + failure.code + ")"
+      : error instanceof Error ? error.message : String(error),
+    errorCode: failure.code,
+    networkRetryable: failure.networkRetryable,
+  };
 }
 
 function usage(): string {
@@ -507,7 +533,7 @@ async function runWithConfig(
                 if (timedOut) return;
                 const summary = summarizeReport(report);
                 stage = "sync.recovery_usage";
-                const recovery = await recoveryUsage(config.brainDir);
+                const recovery = await withVaultIo(() => recoveryUsage(config.brainDir));
                 if (timedOut) return;
                 await writeSyncHealth(config, {
                   command,
@@ -538,17 +564,12 @@ async function runWithConfig(
                 process.exit(1);
               }
             }
-            const failure = connectionErrorMetadata(error);
             await writeSyncHealth(config, {
               command,
               status: "error",
               cycle,
               checkedAt: new Date().toISOString(),
-              error: failure.networkRetryable
-                ? `Temporary database connection failure (${failure.code})`
-                : error?.message || String(error),
-              errorCode: failure.code,
-              networkRetryable: failure.networkRetryable,
+              ...syncFailure(error, config.localEditSurface),
             });
             throw error;
           } finally {
@@ -649,9 +670,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  const failure = connectionErrorMetadata(error);
-  process.stderr.write(`[brain-sync] Fatal error: ${failure.networkRetryable
-    ? `Temporary database connection failure (${failure.code})`
-    : error?.message || error}\n`);
+  const failure = syncFailure(error, process.env.BRAIN_SYNC_LOCAL_EDIT_SURFACE);
+  process.stderr.write(`[brain-sync] Fatal error: ${failure.error}\n`);
   process.exit(1);
 });

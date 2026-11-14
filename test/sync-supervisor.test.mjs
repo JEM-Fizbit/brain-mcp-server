@@ -21,13 +21,28 @@ async function fixture(t,mode) {
   const state=path.join(root,'state.json'),health=state+'.health.json',marker=path.join(root,'starts.json');
   const storeFile=path.join(root,'store.json');const store=new FileRevisionStore(storeFile);
   await store.proposeRevision({brainId:'fixture',filename:'remote.md',baseRevisionId:null,content:'Remote change\n',origin:'hosted_mcp'});
+  if (mode === 'onedrive') {
+    const recovery = path.join(brainDir, '.brain-sync-recovery', 'operation-fixture');
+    await fs.mkdir(recovery, {recursive: true});
+    await fs.writeFile(path.join(recovery, 'intent.json'), JSON.stringify({
+      version: 1, filename: 'NOW.md', expectedHash: null, replacementHash: null, complete: true,
+    }));
+  }
   const preload=path.join(root,'preload.mjs');
-  await fs.writeFile(preload,`import fs from 'node:fs';import {LocalSyncAgent} from ${JSON.stringify(url('local-sync-agent'))};
+  await fs.writeFile(preload,`import fs from 'node:fs';import fsp from 'node:fs/promises';import {LocalSyncAgent} from ${JSON.stringify(url('local-sync-agent'))};
     const marker=${JSON.stringify(marker)}; let a=[];try{a=JSON.parse(fs.readFileSync(marker));}catch{};
     a.push(process.pid);fs.writeFileSync(marker,JSON.stringify(a));
     if(${JSON.stringify(mode)}==='once') {
       const original=LocalSyncAgent.prototype.syncOnce; let calls=0;
       LocalSyncAgent.prototype.syncOnce=async function(){if(calls++)while(true){};return original.call(this);};
+    } else if(${JSON.stringify(mode)}==='onedrive') {
+      const readFile = fsp.readFile;
+      fsp.readFile = async function(file, ...args) {
+        if (String(file).endsWith('/operation-fixture/intent.json') && !fs.existsSync(marker + '.available')) {
+          throw Object.assign(new Error('Read timed out at /private/mirror'), { code:'ETIMEDOUT' });
+        }
+        return readFile.call(this, file, ...args);
+      };
     } else if(${JSON.stringify(mode)}==='aggregate-network'&&a.length<=4){
       const network=(code)=>Object.assign(new Error(''),{code});
       const errors=[new AggregateError([network('ETIMEDOUT'),network('ENETUNREACH')]),
@@ -52,7 +67,8 @@ async function fixture(t,mode) {
   const env={...process.env,BRAIN_ID:'fixture',BRAIN_DIR:brainDir,BRAIN_SYNC_STATE_FILE:state,
     BRAIN_SYNC_HEALTH_FILE:health,BRAIN_SYNC_STORE_FILE:storeFile,BRAIN_REVISION_STORE:'file',
     BRAIN_REVISION_DATABASE_URL:'',BRAIN_SYNC_LOAD_LOCAL_ENV:'0',BRAIN_MONITOR_CONFIG_FILE:'',
-    BRAIN_SYNC_INTERVAL_MS:'250',BRAIN_SYNC_CYCLE_TIMEOUT_MS:'10000'};
+    BRAIN_SYNC_INTERVAL_MS:'250',BRAIN_SYNC_CYCLE_TIMEOUT_MS:'10000',
+    BRAIN_SYNC_LOCAL_EDIT_SURFACE: mode === 'onedrive' ? 'sharepoint' : 'local_filesystem'};
   let child; const start=()=>{child=spawn(process.execPath,[harness],{env,stdio:'ignore'});return child;};start();
   t.after(async()=>{if(child.exitCode===null){const ended=once(child,'exit');child.kill('SIGTERM');await ended;}await fs.rm(root,{recursive:true,force:true});});
   return {root,brainDir,health,marker,start,get child(){return child;},report:()=>json(health+'.supervision.json')};
@@ -120,4 +136,26 @@ test('mixed authentication and network aggregate still stops for attention',asyn
  assert.equal(d.attempts,2);assert.equal((await json(f.marker)).length,3);
  assert.equal((await json(f.health)).networkRetryable,false);
  assert.ok(!d.history.some(e=>e.kind==='network_wait'));
+});
+
+test('OneDrive vault timeout is reported separately and sync resumes when the file provider recovers', async t => {
+  const f = await fixture(t, 'onedrive');
+  const waiting = await waitFor(async () => {
+    const report = await f.report();
+    return report?.state === 'backoff' && report.history.filter(e => e.kind === 'onedrive_wait').length >= 4 && report;
+  });
+  assert.equal(waiting.reason, 'onedrive_unavailable');
+  assert.equal(waiting.attempts, 0);
+  assert.ok(!waiting.history.some(e => e.kind === 'network_wait' || e.kind === 'needs_attention'));
+  const error = await json(f.health);
+  assert.equal(error.errorSource, 'onedrive');
+  assert.equal(error.errorCode, 'ETIMEDOUT');
+  assert.equal(error.networkRetryable, false);
+  assert.equal(error.error, 'OneDrive file access timed out (ETIMEDOUT)');
+
+  await fs.writeFile(f.marker + '.available', '');
+  await waitFor(async () => (await f.report())?.state === 'running');
+  assert.equal(await fs.readFile(path.join(f.brainDir, 'NOW.md'), 'utf8'), 'Local work survives\n');
+  assert.equal(await fs.readFile(path.join(f.brainDir, 'remote.md'), 'utf8'), 'Remote change\n');
+  assert.equal((await json(f.health)).report.conflicts, 0);
 });

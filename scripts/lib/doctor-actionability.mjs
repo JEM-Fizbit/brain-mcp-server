@@ -83,9 +83,13 @@ export function evaluateSyncHealth(health, previous, { now = Date.now(), maxAgeM
     !(health.command === "watch" && health.cycle > 1);
   const failedObservations = error ? (same ? Math.max(1, previousCount)
     : adjacent ? previousCount + 1 : 1) : 0;
-  const classification = error ? classifyPostgresError({
-    message: health.error, code: health.errorCode, networkRetryable: health.networkRetryable,
-  }) : null;
+  const classification = error
+    ? health.errorSource === "onedrive" ? { class: "onedrive_timeout", durable: false }
+      : health.errorSource === "local_filesystem" ? { class: "local_filesystem_timeout", durable: true }
+      : classifyPostgresError({
+        message: health.error, code: health.errorCode, networkRetryable: health.networkRetryable,
+      })
+    : null;
   const recoveryPercent = Number.isFinite(health.recovery?.percent) ? health.recovery.percent : null;
   const recoveryNearBudget = recoveryPercent !== null && recoveryPercent >= RECOVERY_BUDGET_WARN_PERCENT;
   const status = error
@@ -117,6 +121,16 @@ export function syncHealthAction(sync) {
   };
   if (details.guardTripped) return { level: "warn", reason: "sync_guard",
     title: "Review protected local sync state.", detail: String(details.guardTripped) };
+  if (details.errorClass === "onedrive_timeout") return {
+    level: sync.status,
+    reason: "sync_onedrive_timeout",
+    title: "OneDrive file access timed out.",
+    detail: [
+      details.observedAt ? "Last observed " + details.observedAt + "." : "",
+      "Open OneDrive and make sure the Brain folder and its recovery files are available on this Mac.",
+      "Brain Monitor retries automatically once the files are readable.",
+    ].filter(Boolean).join(" "),
+  };
   if (details.errorClass) return {
     level: sync.status,
     reason: sync.status === "fail" ? "sync_health_failed" : "sync_health_degraded",

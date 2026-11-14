@@ -81,10 +81,13 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
   };
   // Paced indefinitely without consuming the fault budget; a persistent
   // resolution failure still escalates through the doctor's sync_health check.
-  const networkWait = () => {
+  const dependencyWait = (oneDrive: boolean) => {
     stableSince = 0;
     nextStart = Date.now() + networkRetryDelays[Math.min(networkWaits++, networkRetryDelays.length - 1)];
-    state = "backoff"; reason = "network_unavailable"; event("network_wait"); void publish();
+    state = "backoff";
+    reason = oneDrive ? "onedrive_unavailable" : "network_unavailable";
+    event(oneDrive ? "onedrive_wait" : "network_wait");
+    void publish();
   };
   const alive = (pid: number) => {
     try { process.kill(pid, 0); return true; } catch (e: any) { return e.code !== "ESRCH"; }
@@ -114,12 +117,14 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
       state = "backoff"; nextStart = Infinity;
       void read(o.healthFile).then((health) => {
         if (shuttingDown || child) return;
-        const network = health?.pid === worker.pid && health.status === "error" &&
+        const workerError = health?.pid === worker.pid && health.brainId === o.brainId && health.status === "error";
+        const oneDrive = workerError && health.errorSource === "onedrive" && health.errorCode === "ETIMEDOUT";
+        const network = workerError &&
           health.reason !== "sync_cycle_timeout" && (health.networkRetryable === true ||
             (health.networkRetryable == null && retryableConnectionCode({
               message: health.error, code: health.errorCode,
             }) !== null));
-        if (network) networkWait(); else failed("worker_error");
+        if (oneDrive || network) dependencyWait(oneDrive); else failed("worker_error");
       });
     });
     void publish();
