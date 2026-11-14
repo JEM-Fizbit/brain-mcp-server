@@ -858,12 +858,18 @@ The `fly_credentials` check reports the selected app's managed credential expiry
 
 #### Independent sync recovery (v1.12.0)
 
-When file access to a SharePoint/OneDrive Brain mirror times out, Doctor and
-Brain Monitor show **OneDrive file access timed out**. Open OneDrive and make
-sure the Brain mirror and its recovery files are available on the Mac. Monitor
-records `onedrive_unavailable` and follows the same retry delays as a network
-outage, without counting these retries against the worker restart budget. The
-stale heartbeat remains visible in Checks while sync is paused.
+Keep the SharePoint/OneDrive Brain folder available offline using Finder's
+**Always Keep on This Device**. When file access times out, Doctor and Brain
+Monitor show **OneDrive file access timed out**. On the Mac, the supervisor
+checks whether OneDrive is running for the signed-in user and requests one
+background launch per incident if it is closed. The next successful sync
+rearms the launch. A running OneDrive is left alone. If the warning persists,
+check OneDrive and the folder's offline availability.
+
+Monitor records `onedrive_unavailable` and uses the network-outage retry
+delays without spending the worker restart budget. Launch requests and
+process-check or launch failures appear in the supervisor's bounded history.
+The stale heartbeat remains visible in Checks while sync is paused.
 
 **26 September 2026 release verification:** annotated public tag `v1.12.0` (tag object `d814722c5e42903c2e327d9e9e2fad31218a38be`, source `14a06d3d305f220786982c1523d73e4ee468d939`) was deployed through the guarded path to both isolated services. JEM deployed at 11:35:24 UTC; the separately owned overlay deployed at 11:38:52 UTC and retains its private provenance. Each release gate passed 583 Node 22 tests: 572 passed, 11 optional skips, zero failures. A separate disposable PostgreSQL lifecycle run passed all 9 tests, including ingestion, manifest-verified companion reads, lint, sync, rollback and receipt replay.
 

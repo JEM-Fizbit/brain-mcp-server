@@ -14,7 +14,7 @@ async function waitFor(fn, ms=12000) {
   throw Error('condition timed out');
 }
 async function json(file) {try{return JSON.parse(await fs.readFile(file,'utf8'));}catch{return null;}}
-async function fixture(t,mode) {
+async function fixture(t,mode,{oneDriveRunning = false} = {}) {
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'sync-supervisor-')); const brainDir=path.join(root,'brain');
   await fs.mkdir(brainDir);await fs.writeFile(path.join(brainDir,'NOW.md'),'Local work survives\n');
   await fs.writeFile(path.join(brainDir,'00_loader.md'),'Loader\n');
@@ -61,9 +61,16 @@ async function fixture(t,mode) {
     }`);
   const harness=path.join(root,'supervisor.mjs');
   await fs.writeFile(harness,`import {runSupervisor} from ${JSON.stringify(url('supervisor'))};
-    await runSupervisor(${JSON.stringify({brainId:'fixture',healthFile:health,lockFile:state+'.lock',
+    import fs from 'node:fs/promises';
+    const marker = ${JSON.stringify(marker)};
+    const options = ${JSON.stringify({brainId:'fixture',healthFile:health,lockFile:state+'.lock',
       worker:['--import',preload,new URL('../dist/sync/cli.js',import.meta.url).pathname,'watch'],
-      tickMs:25,deadlineMs:1500,stopGraceMs:100,wakeGraceMs:1500,stableMs:200,retryDelays:[60,120],networkRetryDelays:[50,100]})});`);
+      tickMs:25,deadlineMs:1500,stopGraceMs:100,wakeGraceMs:1500,stableMs:200,retryDelays:[60,120],networkRetryDelays:[50,100]})};
+    options.oneDrive = {
+      isRunning: async () => ${JSON.stringify(oneDriveRunning)},
+      open: async () => { await fs.appendFile(marker + '.launches', 'launch\\n'); },
+    };
+    await runSupervisor(options);`);
   const env={...process.env,BRAIN_ID:'fixture',BRAIN_DIR:brainDir,BRAIN_SYNC_STATE_FILE:state,
     BRAIN_SYNC_HEALTH_FILE:health,BRAIN_SYNC_STORE_FILE:storeFile,BRAIN_REVISION_STORE:'file',
     BRAIN_REVISION_DATABASE_URL:'',BRAIN_SYNC_LOAD_LOCAL_ENV:'0',BRAIN_MONITOR_CONFIG_FILE:'',
@@ -128,6 +135,7 @@ for(const mode of ['network','aggregate-network'])test(`${mode} outage longer th
  assert.equal(await fs.readFile(path.join(f.brainDir,'NOW.md'),'utf8'),'Local work survives\n');
  assert.equal(await fs.readFile(path.join(f.brainDir,'remote.md'),'utf8'),'Remote change\n');
  assert.equal((await json(f.health)).report.conflicts,0);
+ await assert.rejects(fs.stat(f.marker + '.launches'), {code: 'ENOENT'});
 });
 
 test('mixed authentication and network aggregate still stops for attention',async t=>{
@@ -152,10 +160,35 @@ test('OneDrive vault timeout is reported separately and sync resumes when the fi
   assert.equal(error.errorCode, 'ETIMEDOUT');
   assert.equal(error.networkRetryable, false);
   assert.equal(error.error, 'OneDrive file access timed out (ETIMEDOUT)');
+  assert.equal(await fs.readFile(f.marker + '.launches', 'utf8'), 'launch\n');
+
+  const ended = once(f.child, 'exit');
+  f.child.kill('SIGTERM');
+  await ended;
+  f.start();
+  await waitFor(async () => {
+    const report = await f.report();
+    return report?.supervisorPid === f.child.pid && report.state === 'backoff';
+  });
+  assert.equal(await fs.readFile(f.marker + '.launches', 'utf8'), 'launch\n');
 
   await fs.writeFile(f.marker + '.available', '');
-  await waitFor(async () => (await f.report())?.state === 'running');
+  const recovered = await waitFor(async () => {
+    const report = await f.report();
+    return report?.state === 'running' && report;
+  });
+  assert.equal(recovered.oneDriveLaunchAttempted, false);
   assert.equal(await fs.readFile(path.join(f.brainDir, 'NOW.md'), 'utf8'), 'Local work survives\n');
   assert.equal(await fs.readFile(path.join(f.brainDir, 'remote.md'), 'utf8'), 'Remote change\n');
   assert.equal((await json(f.health)).report.conflicts, 0);
+});
+
+test('OneDrive timeouts leave an already running client alone', async t => {
+  const f = await fixture(t, 'onedrive', {oneDriveRunning: true});
+  await waitFor(async () => {
+    const report = await f.report();
+    return report?.history.filter(event => event.kind === 'onedrive_wait').length >= 2;
+  });
+  await assert.rejects(fs.stat(f.marker + '.launches'), {code: 'ENOENT'});
+  assert.equal((await f.report()).oneDriveLaunchAttempted, false);
 });

@@ -1,8 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { retryableConnectionCode } from "../services/connection-error.js";
+
+const exec = promisify(execFile);
+const APP_COMMAND_TIMEOUT_MS = 5_000;
+
+interface OneDriveRecovery {
+  isRunning: () => Promise<boolean>;
+  open: () => Promise<void>;
+}
 
 export interface SupervisorOptions {
   brainId: string;
@@ -16,6 +25,27 @@ export interface SupervisorOptions {
   stableMs?: number;
   retryDelays?: number[];
   networkRetryDelays?: number[];
+  oneDrive?: OneDriveRecovery;
+}
+
+function macOneDriveRecovery(uid: number): OneDriveRecovery {
+  return {
+    async isRunning() {
+      try {
+        await exec("/usr/bin/pgrep", ["-q", "-U", String(uid), "-x", "OneDrive"],
+          { timeout: APP_COMMAND_TIMEOUT_MS });
+        return true;
+      } catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === 1) {
+          return false;
+        }
+        throw error;
+      }
+    },
+    async open() {
+      await exec("/usr/bin/open", ["-g", "-a", "OneDrive"], { timeout: APP_COMMAND_TIMEOUT_MS });
+    },
+  };
 }
 
 // Exposed for deterministic sleep/wake tests. Large scheduling gaps grant one
@@ -45,6 +75,8 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
   let child: ChildProcess | null = null;
   let startedAt = 0, lastCompletion = 0, lastTick = Date.now(), graceUntil = 0, nextStart = Date.now();
   let stableSince = 0, stopAt = 0, shuttingDown = false, ticking = false, networkWaits = 0;
+  let oneDriveLaunchAttempted = prior?.brainId === o.brainId && prior.oneDriveLaunchAttempted === true;
+  let checkingOneDrive = false;
   let lastStage: string | null = null, lastSuccessAt: string | null = prior?.lastSuccessAt ?? null;
   const history: any[] = prior?.brainId === o.brainId && Array.isArray(prior.history) ? prior.history.slice(-29) : [];
   let writing = false;
@@ -60,7 +92,8 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
       const value = { version: 1, brainId: o.brainId, supervisorPid: process.pid,
         workerPid: child?.pid ?? null, checkedAt: new Date().toISOString(), state, reason,
         attempts, maxRestarts: retryDelays.length, attentionId, lastStage, lastSuccessAt,
-        nextRetryAt: state === "backoff" ? new Date(nextStart).toISOString() : null, history };
+        oneDriveLaunchAttempted,
+        nextRetryAt: state === "backoff" && Number.isFinite(nextStart) ? new Date(nextStart).toISOString() : null, history };
       const tmp = `${output}.${process.pid}.tmp`;
       await fs.writeFile(tmp, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
       await fs.rename(tmp, output);
@@ -79,6 +112,25 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
     nextStart = Date.now() + delay;
     state = "backoff"; reason = why; event("retry_scheduled"); void publish();
   };
+  const reopenOneDriveIfClosed = async () => {
+    if (!o.oneDrive || checkingOneDrive || oneDriveLaunchAttempted) return;
+    checkingOneDrive = true;
+    try {
+      if (await o.oneDrive.isRunning() || shuttingDown || state !== "backoff" ||
+          reason !== "onedrive_unavailable") return;
+      oneDriveLaunchAttempted = true;
+      event("onedrive_launch_requested");
+      await publish();
+      if (!shuttingDown && state === "backoff" && reason === "onedrive_unavailable") {
+        await o.oneDrive.open();
+      }
+    } catch {
+      event(oneDriveLaunchAttempted ? "onedrive_launch_failed" : "onedrive_process_check_failed");
+    } finally {
+      checkingOneDrive = false;
+      await publish();
+    }
+  };
   // Paced indefinitely without consuming the fault budget; a persistent
   // resolution failure still escalates through the doctor's sync_health check.
   const dependencyWait = (oneDrive: boolean) => {
@@ -88,6 +140,7 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
     reason = oneDrive ? "onedrive_unavailable" : "network_unavailable";
     event(oneDrive ? "onedrive_wait" : "network_wait");
     void publish();
+    if (oneDrive) void reopenOneDriveIfClosed();
   };
   const alive = (pid: number) => {
     try { process.kill(pid, 0); return true; } catch (e: any) { return e.code !== "ESRCH"; }
@@ -170,6 +223,7 @@ export async function runSupervisor(o: SupervisorOptions): Promise<void> {
           const advanced = completed > lastCompletion;
           if (advanced) lastCompletion = completed;
           lastSuccessAt = health.checkedAt;
+          oneDriveLaunchAttempted = false;
           if (!stableSince) { stableSince = completed; event("progress_restored"); }
           if (advanced && completed - stableSince >= stableMs && Date.now() - completed < Math.min(deadlineMs, 120_000)) {
             if (attempts) event("recovered");
@@ -199,6 +253,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const brainId = process.env.BRAIN_ID;
   if (!brainId || !healthFile || !stateFile || !process.argv[2]) throw new Error("Supervisor requires an explicit Brain profile and worker path");
   const cycleMs = Math.min(2_147_400_000, Math.max(1, Number(process.env.BRAIN_SYNC_CYCLE_TIMEOUT_MS) || 300_000));
+  const oneDrive = process.platform === "darwin" && process.env.BRAIN_SYNC_SUPERVISOR === "menubar" &&
+    process.env.BRAIN_SYNC_LOCAL_EDIT_SURFACE === "sharepoint" && process.getuid
+    ? macOneDriveRecovery(process.getuid())
+    : undefined;
   await runSupervisor({ brainId, healthFile, lockFile: process.env.BRAIN_SYNC_LOCK_FILE || `${stateFile}.lock`,
-    worker: process.argv.slice(2), deadlineMs: cycleMs + 30_000 });
+    worker: process.argv.slice(2), deadlineMs: cycleMs + 30_000, oneDrive });
 }
