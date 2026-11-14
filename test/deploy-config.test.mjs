@@ -349,9 +349,8 @@ test("hosted doctor emits normalized user-action indicators", async () => {
   assert.doesNotMatch(cockpit, /reason: "check_failed"/);
   assert.doesNotMatch(cockpit, /needs review/i);
   assert.doesNotMatch(cockpit, /Inspect the details in the checks table/i);
-  assert.match(menuBar, /action\[@"next_action"\]/);
-  assert.match(menuBar, /action\[@"reason"\]/);
-  assert.match(menuBar, /action\[@"urgency"\]/);
+  assert.match(menuBar, /doctorActions.firstObject\[@"title"\]/);
+  assert.match(menuBar, /title:@"Open Cockpit" action:@selector\(openCockpit:\) profile:profile/);
 });
 
 test("cockpit labels the active multi-Brain profile explicitly", async () => {
@@ -378,7 +377,7 @@ test("cockpit labels the active multi-Brain profile explicitly", async () => {
   assert.match(cockpit, /profile\.profileLabel/);
   assert.match(cockpit, /item\.switcherLabel/);
   assert.match(menuBar, /displayNameWithBrainIdForProfile/);
-  assert.match(menuBar, /Brains: %lu profiles/);
+  assert.match(menuBar, /addDisabledItem:detailsMenu title:displayName/);
 });
 
 test("cockpit surfaces active Brain identity and action queue above the fold", async () => {

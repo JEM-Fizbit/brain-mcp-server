@@ -209,7 +209,8 @@ servers, and it exposes each local cockpit as a loopback browser surface:
 - the menu-bar app is the sole automatic doctor owner in the consolidated stack: it refreshes each profile every 60 seconds, while Cockpit reloads that last-good report rather than launching a duplicate doctor; historical operation telemetry is cached for 15 minutes, but health, sync, auth, and other lightweight checks remain on the one-minute cadence;
 - the top-level menu includes `Open Cockpit` for the default/first configured Brain so the operator can reach the browser cockpit immediately, then switch profiles from the cockpit selector if needed;
 - `Open Cockpit` is the supported entrypoint: Brain Monitor starts and supervises the local cockpit server itself, checks whether the cockpit script changed before opening the page, and restarts stale cockpit child processes automatically during the normal stack heartbeat;
-- the top-level `Last monitor action` is app-wide across the consolidated Brain Monitor process, not per-Brain and not doctor-only; it includes the timestamp and latest monitor-recorded action from either configured Brain on separate indented rows so the dropdown stays narrow;
+- the top-level profile list shows a coloured symbol and short status label for each Brain. Green means OK, amber covers warnings, offline and action needed, and red means failed. Checking and unknown are neutral;
+- `Monitor Details` shows the Doctor refresh interval and latest app-wide monitor action, and holds the all-profile restart control;
 - operator-facing timestamps use `YYYY-MMM-DD; HH:MM:SS UTC+/-HH:MM`, rendered in the local machine timezone with an explicit UTC offset for global readability;
 - the menu-bar status uses color plus text: green for `Brain OK`, orange/yellow for action, warning, offline, or initial checking states, and red for `Brain Fail`; routine automatic doctor polling does not switch a known-good status to yellow just because a poll is in flight;
 - the menu-bar status distinguishes local connectivity loss (`Brain Offline`, local device cannot reach hosted Brain) from a hosted Brain stack fault (`Brain Fail`, hosted health responded unhealthy or another real check failed);
@@ -565,9 +566,11 @@ npm run sync:menubar:install
 ```
 
 Launch the generated app once to put `Brain OK`, `Brain Action`, `Brain Warn`,
-or `Brain Fail` in the macOS menu bar. The status text is colored by severity,
-and each configured Brain gets a nested menu with Overview, Actions, Controls,
-and Diagnostics sections. `Open Cockpit` also appears at the top level and opens
+or `Brain Fail` in the macOS menu bar. Each profile menu provides quick access
+to its Cockpit and Doctor refresh. `Status Details` shows the deployed version,
+sync diagnostics and the last completed sync, including during retry backoff.
+`Tools` contains hosted status, logs, recovery, restart and lint actions.
+`Open Cockpit` also appears at the top level and opens
 the default/first configured Brain cockpit; use the cockpit selector to switch
 to another Brain. The app is config-driven and per-Brain.
 For CloudStorage Brains, grant the monitor app Full Disk Access; the sync

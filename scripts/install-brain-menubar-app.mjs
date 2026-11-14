@@ -1401,6 +1401,43 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self addDisabledItem:menu title:[NSString stringWithFormat:@"  %@", [self truncatedMenuText:[self lastActionTextSummary] maxLength:52]]];
 }
 
+- (void)styleProfileItem:(NSMenuItem *)item name:(NSString *)name status:(NSString *)status {
+  NSString *label = @"Unknown";
+  NSString *symbol = @"questionmark.circle";
+  NSColor *color = [NSColor secondaryLabelColor];
+  if ([status isEqualToString:@"ok"]) {
+    label = @"OK";
+    symbol = @"checkmark.circle.fill";
+    color = [NSColor systemGreenColor];
+  } else if ([status isEqualToString:@"fail"]) {
+    label = @"Failed";
+    symbol = @"xmark.circle.fill";
+    color = [NSColor systemRedColor];
+  } else if ([@[@"warn", @"action", @"offline"] containsObject:status]) {
+    label = [status isEqualToString:@"offline"] ? @"Offline" :
+      [status isEqualToString:@"action"] ? @"Action needed" : @"Warning";
+    symbol = @"exclamationmark.triangle.fill";
+    color = [NSColor systemOrangeColor];
+  } else if ([status isEqualToString:@"checking"]) {
+    label = @"Checking";
+    symbol = @"clock";
+  }
+  item.title = [NSString stringWithFormat:@"%@ · %@", name, label];
+  NSImage *image = [NSImage imageWithSystemSymbolName:symbol accessibilityDescription:nil];
+  NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPaletteColors:@[color]];
+  image = [image imageWithSymbolConfiguration:configuration];
+  image.template = NO;
+  item.image = image;
+}
+
+- (NSMenu *)addSubmenu:(NSMenu *)menu title:(NSString *)title {
+  NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+  NSMenu *submenu = [[NSMenu alloc] initWithTitle:title];
+  item.submenu = submenu;
+  [menu addItem:item];
+  return submenu;
+}
+
 - (NSDictionary *)topLevelCockpitProfile {
   return [self firstBrainProfile];
 }
@@ -1435,8 +1472,14 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   if (lastSyncAt.length == 0) {
     lastSyncAt = [self stringFromValue:health[@"lastSuccessfulSyncAt"] fallback:nil];
   }
+  if (lastSyncAt.length == 0 && report) {
+    lastSyncAt = checkedAt;
+  }
   if (lastSyncAt.length == 0) {
-    lastSyncAt = checkedAt.length > 0 ? checkedAt : @"not reported";
+    NSDictionary *recovery = [self readJsonAtPath:[[self stringFromValue:profile[@"healthFile"] fallback:@""] stringByAppendingString:@".supervision.json"]];
+    if ([recovery[@"brainId"] isEqual:[self brainIdForProfile:profile]]) {
+      lastSyncAt = [self stringFromValue:recovery[@"lastSuccessAt"] fallback:nil];
+    }
   }
   NSString *lastSyncAtDisplay = [self displayTimestamp:lastSyncAt];
   NSString *conflicts = [self stringFromValue:health[@"openConflicts"] fallback:nil];
@@ -1466,79 +1509,58 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   NSString *overallStatus = [self profileStatusForProfile:profile];
 
   NSString *deployedVersion = [self deployedVersionForDoctorReport:doctorReport];
-  NSString *profileTitle = [NSString stringWithFormat:@"%@: %@ · %@", displayName, overallStatus,
-    [deployedVersion isEqualToString:@"unknown"] ? @"version unknown" : deployedVersion];
-  NSMenuItem *profileItem = [[NSMenuItem alloc] initWithTitle:profileTitle action:nil keyEquivalent:@""];
+  NSMenuItem *profileItem = [[NSMenuItem alloc] initWithTitle:displayName action:nil keyEquivalent:@""];
+  NSString *shortName = [self displayNameForProfile:profile];
+  for (NSDictionary *other in profiles) {
+    if (other != profile && [[self displayNameForProfile:other] isEqualToString:shortName]) {
+      shortName = displayName;
+      break;
+    }
+  }
+  [self styleProfileItem:profileItem name:shortName status:overallStatus];
   NSMenu *profileMenu = [[NSMenu alloc] initWithTitle:displayName];
   [profileItem setSubmenu:profileMenu];
   [menu addItem:profileItem];
 
-  [self addDisabledItem:profileMenu title:@"Overview"];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Deployed version: %@", deployedVersion]];
+  [self addActionItem:profileMenu title:@"Open Cockpit" action:@selector(openCockpit:) profile:profile];
+  [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
+  [profileMenu addItem:[NSMenuItem separatorItem]];
+  if (doctorActions.count > 0) {
+    NSString *title = [self stringFromValue:doctorActions.firstObject[@"title"] fallback:@"Review Cockpit warnings"];
+    [self addDisabledItem:profileMenu title:[self truncatedMenuText:title maxLength:52]];
+  }
+
+  NSMenu *detailsMenu = [self addSubmenu:profileMenu title:@"Status Details"];
+  [self addDisabledItem:detailsMenu title:displayName];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Deployed version: %@", deployedVersion]];
   NSDictionary *hostedVersionCheck = [self doctorCheckNamed:@"hosted_health" report:doctorReport];
   id hostedVersionDetails = hostedVersionCheck[@"details"];
   if ([hostedVersionDetails isKindOfClass:[NSDictionary class]] && ![deployedVersion isEqualToString:@"unknown"]) {
     NSString *observedAt = [self stringFromValue:hostedVersionDetails[@"versionObservedAt"] fallback:@"not reported"];
-    [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Version observed: %@", [self displayTimestamp:observedAt]]];
+    [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Version observed: %@", [self displayTimestamp:observedAt]]];
   }
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Overall status: %@", overallStatus]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Sync status: %@", syncStatus]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last sync: %@", lastSyncAtDisplay]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAtDisplay]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Sync status: %@", syncStatus]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Last completed sync: %@", lastSyncAtDisplay]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Open conflicts: %@", conflicts]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Local stack: sync %@ / cockpit %@", syncState, cockpitState]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Doctor: %@ (%@)", doctorStatus, doctorCheckedAtDisplay]];
   if ([connectivityState isEqualToString:@"local_offline"]) {
-    [self addDisabledItem:profileMenu title:@"Connectivity: local device cannot reach hosted Brain"];
+    [self addDisabledItem:detailsMenu title:@"Connectivity: local device cannot reach hosted Brain"];
   } else if ([connectivityState isEqualToString:@"hosted_stack"]) {
-    [self addDisabledItem:profileMenu title:@"Connectivity: hosted stack responded unhealthy"];
+    [self addDisabledItem:detailsMenu title:@"Connectivity: hosted stack responded unhealthy"];
   }
 
-  [profileMenu addItem:[NSMenuItem separatorItem]];
-  [self addDisabledItem:profileMenu title:@"Actions"];
-  if (doctorActions.count > 0) {
-    [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Action required: %lu", (unsigned long)doctorActions.count]];
-    NSUInteger shown = 0;
-    for (NSDictionary *action in doctorActions) {
-      NSString *level = [[self stringFromValue:action[@"status"] fallback:[self stringFromValue:action[@"level"] fallback:@"warn"]] uppercaseString];
-      NSString *urgency = [self stringFromValue:action[@"urgency"] fallback:@"soon"];
-      NSString *reason = [self truncatedMenuText:[self stringFromValue:action[@"reason"] fallback:@"check_review"] maxLength:72];
-      NSString *title = [self truncatedMenuText:[self stringFromValue:action[@"title"] fallback:@"Review doctor action"] maxLength:84];
-      NSString *nextAction = [self truncatedMenuText:[self stringFromValue:action[@"next_action"] fallback:[self stringFromValue:action[@"detail"] fallback:@""]] maxLength:96];
-      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"%@/%@: %@", level, urgency, title]];
-      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Reason: %@", reason]];
-      if (nextAction.length > 0) {
-        [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Next: %@", nextAction]];
-      }
-      shown += 1;
-      if (shown >= 2) {
-        break;
-      }
-    }
-    if (doctorActions.count > shown) {
-      [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"%lu more actions in cockpit", (unsigned long)(doctorActions.count - shown)]];
-    }
-    [self addActionItem:profileMenu title:@"Open Cockpit for details" action:@selector(openCockpit:) profile:profile];
-  } else if (doctorReport) {
-    [self addDisabledItem:profileMenu title:@"Action required: none"];
-  } else {
-    [self addDisabledItem:profileMenu title:@"Action required: run Refresh Doctor"];
-  }
+  [detailsMenu addItem:[NSMenuItem separatorItem]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Last check: %@", checkedAtDisplay]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
+  [self addDisabledItem:detailsMenu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
 
-  [profileMenu addItem:[NSMenuItem separatorItem]];
-  [self addDisabledItem:profileMenu title:@"Controls"];
-  [self addActionItem:profileMenu title:@"Open Cockpit" action:@selector(openCockpit:) profile:profile];
-  [self addActionItem:profileMenu title:@"Open Hosted Status" action:@selector(openHostedStatus:) profile:profile];
-  [self addActionItem:profileMenu title:@"Refresh Doctor" action:@selector(refreshDoctor:) profile:profile];
-  [self addActionItem:profileMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
-  [self addActionItem:profileMenu title:@"Retry Sync Recovery" action:@selector(retrySyncRecovery:) profile:profile];
-  [self addActionItem:profileMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];
-  [self addActionItem:profileMenu title:@"Apply Lint Fixes..." action:@selector(applyLintFixes:) profile:profile];
-
-  [profileMenu addItem:[NSMenuItem separatorItem]];
-  [self addDisabledItem:profileMenu title:@"Diagnostics"];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Last check: %@", checkedAtDisplay]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Cycle: %@ (%@)", cycle, duration]];
-  [self addDisabledItem:profileMenu title:[NSString stringWithFormat:@"Changes: +%@ / -%@ / same %@", pushed, pulled, unchanged]];
+  NSMenu *toolsMenu = [self addSubmenu:profileMenu title:@"Tools"];
+  [self addActionItem:toolsMenu title:@"Open Hosted Status" action:@selector(openHostedStatus:) profile:profile];
+  [self addActionItem:toolsMenu title:@"Open Sync Logs" action:@selector(openLogs:) profile:profile];
+  [self addActionItem:toolsMenu title:@"Retry Sync Recovery" action:@selector(retrySyncRecovery:) profile:profile];
+  [self addActionItem:toolsMenu title:@"Restart Local Stack" action:@selector(restartLocalStack:) profile:profile];
+  [self addActionItem:toolsMenu title:@"Apply Lint Fixes..." action:@selector(applyLintFixes:) profile:profile];
 }
 
 - (void)rebuildMenu:(id)sender {
@@ -1548,12 +1570,6 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   [self setStatusTitle:statusTitle];
 
   NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Brain Monitor"];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Status: %@", statusTitle]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Brains: %lu profiles", (unsigned long)profiles.count]];
-  [self addDisabledItem:menu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
-  [self addLastMonitorActionItems:menu];
-  [menu addItem:[NSMenuItem separatorItem]];
-
   [self addActionItem:menu title:@"Open Cockpit" action:@selector(openCockpit:) profile:[self topLevelCockpitProfile]];
   [menu addItem:[NSMenuItem separatorItem]];
 
@@ -1567,10 +1583,14 @@ const nativeSource = `#import <Cocoa/Cocoa.h>
   refresh.target = self;
   [menu addItem:refresh];
 
+  NSMenu *monitorMenu = [self addSubmenu:menu title:@"Monitor Details"];
+  [self addDisabledItem:monitorMenu title:[NSString stringWithFormat:@"Doctor auto-refresh: every %.0fs", [self numberConfig:@"doctorIntervalMs" fallback:60000.0] / 1000.0]];
+  [self addLastMonitorActionItems:monitorMenu];
   if (profiles.count > 1) {
+    [monitorMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *restartAll = [[NSMenuItem alloc] initWithTitle:@"Restart All Local Stacks" action:@selector(restartAllLocalStacks:) keyEquivalent:@""];
     restartAll.target = self;
-    [menu addItem:restartAll];
+    [monitorMenu addItem:restartAll];
   }
 
   [menu addItem:[NSMenuItem separatorItem]];
