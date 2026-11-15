@@ -10,7 +10,9 @@ conflicts. The revised alert text was checked in iPhone WebKit and against the
 recorded JEM alert in the running release.
 
 The Slack card and linked page explain what happened and what action is needed.
-ERS Slack delivery requires separate bot credential activation.
+On 15 November, ERS activated its dedicated workspace-owned Slack app with
+`chat:write`. Labelled tests from the live ERS alert dispatcher verified both
+the warning channel and the urgent DM through Slack's Web API.
 
 ## JEM sync resilience and mobile Slack alerts — v1.16.3, 15 November 2026
 
