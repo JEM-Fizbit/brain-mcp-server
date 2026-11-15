@@ -14,10 +14,12 @@
 // and counts — never tokens, headers, bodies, SQL, or payloads.
 
 import pg from "pg";
+import { randomUUID } from "node:crypto";
 import { classifyAuthReasons } from "./auth-reason-policy.js";
 import { postSlackMessage, type SlackBlock, type SlackMessage } from "./slack.js";
 import { runtimeBrainId } from "./runtime-env.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
+import { monitorAuthAlertId } from "../monitor/navigation.js";
 
 const { Pool } = pg;
 
@@ -149,7 +151,7 @@ export interface AuthAlertMessageInput {
   windowMinutes: number;
   reasonSummary: string;
   httpStatus: string | null;
-  cockpitUrl: string;
+  alertUrl?: string;
   brainId?: string;
   category?: "anonymous" | "credentials";
 }
@@ -164,18 +166,14 @@ function escapeSlack(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function authFailuresLink(cockpitUrl: string): { url: URL; local: boolean } | null {
+function publicAlertUrl(value?: string): URL | undefined {
+  if (!value) return undefined;
   try {
-    const url = new URL(cockpitUrl);
-    const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
-    if ((url.protocol !== "https:" && !(local && url.protocol === "http:")) ||
-        url.username || url.password || url.href.length > 1000 || /[<>|]/u.test(url.href)) {
-      return null;
-    }
-    url.hash = "auth-failures";
-    return { url, local };
+    const url = new URL(value);
+    if (url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash &&
+        monitorAuthAlertId(url.pathname) && !/[<>|]/u.test(url.href)) return url;
   } catch {
-    return null;
+    // A missing or invalid configuration cannot produce a useful link.
   }
 }
 
@@ -206,11 +204,8 @@ export function buildAuthAlertMessage(input: AuthAlertMessageInput): SlackMessag
     section(`${icon} *${anonymous ? "Anonymous traffic" : "Authentication requests"}* · ${urgent ? "needs review" : "elevated"} · ${volume}`),
     section(urgent ? `👉 *Needs you:* ${ask}` : `*Next:* ${ask}`),
   );
-  const link = authFailuresLink(input.cockpitUrl);
-  if (link) {
-    const label = link.local ? "Open Auth Failures on the Monitor Mac" : "Open Auth Failures";
-    blocks.push(section(`🔗 *<${escapeSlack(link.url.href)}|${label}>*`));
-  }
+  const link = publicAlertUrl(input.alertUrl);
+  if (link) blocks.push(section(`🔗 *<${escapeSlack(link.href)}|Open auth alert>*`));
   blocks.push(context(`${brain} · Hosted auth monitor`));
   const previewBrain = brain.replace(/[^\w.-]/gu, "_");
   const text = shortLine(`[${previewBrain}:auth]${urgent ? " [Action needed]" : ""} ${icon} ${verdict}. ${volume}. ${ask}`, 200);
@@ -237,7 +232,7 @@ export interface AuthAlertConfig {
   dm: string;
   thresholds: AuthAlertThresholds;
   brainId: string;
-  cockpitUrl: string;
+  monitorBaseUrl?: string;
 }
 
 export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthAlertConfig {
@@ -259,8 +254,8 @@ export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthA
     dm,
     thresholds: readAuthAlertThresholds(env),
     brainId,
-    cockpitUrl: env.BRAIN_HOSTED_COCKPIT_URL ||
-      (brainId === "ers-brain" ? "http://127.0.0.1:8788/" : "http://127.0.0.1:8787/"),
+    ...(env.BRAIN_MONITORING_ENABLED !== "0" && env.MCP_OAUTH_PUBLIC_BASE
+      ? { monitorBaseUrl: env.MCP_OAUTH_PUBLIC_BASE } : {}),
   };
 }
 
@@ -300,6 +295,7 @@ export function shouldRepeatAuthAlert(input: {
 }
 
 export interface AuthAlertDispatchRow {
+  id: string;
   severity: AuthAlertSeverity;
   count: number;
   windowMinutes: number;
@@ -510,11 +506,11 @@ async function defaultRecordDispatch(
   await pool.query(
     `
       insert into brain.sync_events (
-        brain_id, event_type, filename, duration_ms, metadata, created_at
+        id, brain_id, event_type, filename, duration_ms, metadata, created_at
       )
-      values ($1, 'hosted_mcp_auth_alert', null, 0, $2::jsonb, now())
+      values ($1, $2, 'hosted_mcp_auth_alert', null, 0, $3::jsonb, now())
     `,
-    [config.brainId, JSON.stringify(metadata)]
+    [row.id, config.brainId, JSON.stringify(metadata)]
   );
 }
 
@@ -596,10 +592,12 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
     if (!decision.fire) return { fired: false, reason: decision.reason };
   }
   const channel = severity === "fail" ? resolved.config.dm : resolved.config.channel;
+  const id = randomUUID();
+  const monitorBase = resolved.config.monitorBaseUrl?.replace(/\/+$/u, "");
   const message = buildAuthAlertMessage({ severity, category, brainId: resolved.config.brainId,
     failureCount: count, windowMinutes: resolved.config.thresholds.windowMinutes,
     reasonSummary: formatReasonSummary(reasons), httpStatus: state.httpStatus,
-    cockpitUrl: resolved.config.cockpitUrl });
+    ...(monitorBase ? { alertUrl: `${monitorBase}/monitor/auth-alerts/${id}` } : {}) });
 
   let posted = false;
   try {
@@ -613,6 +611,7 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
   // rows, so a failed post does not start a cooldown and the next failure retries.
   try {
     await resolved.recordDispatch({
+      id,
       severity,
       count,
       category,

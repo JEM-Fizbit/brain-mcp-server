@@ -64,7 +64,7 @@ test('history HTTP uses the selected Brain only, rechecks revoked roles and refu
  const routes=new MonitoringRoutes(config,state,async()=>({}),async()=>role?{[brain]:role}:{},()=>({readFile:async(id,file)=>{reads++;assert.equal(id,brain);assert.equal(file,'LOG.md');if(fail)throw Error('PRIVATE secret');return receipt('one');},readChange:async()=>'{"before":"old","after":"new"}'}));
  const login=await routes.sessions.begin(),params=new URL(login.location).searchParams;
  await state.put('auth_codes','fixture-code',{client_id:routes.sessions.clientId,redirect_uri:routes.sessions.callback,code_challenge:params.get('code_challenge'),code_challenge_method:'S256',resource:config.resourceUri,scope:'mcp:tools',provider:'github',provider_user_id:'fixture',expires_at:Date.now()/1000+60});
- const cookies=await routes.sessions.complete(new URLSearchParams({code:'fixture-code',state:params.get('state')}),login.cookie.split(';')[0]),cookie=cookies[0].split(';')[0];
+ const {cookies}=await routes.sessions.complete(new URLSearchParams({code:'fixture-code',state:params.get('state')}),login.cookie.split(';')[0]),cookie=cookies[0].split(';')[0];
  const server=http.createServer((req,res)=>void routes.handle(req,res,new URL(req.url,issuer)));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
  const base='http://127.0.0.1:'+server.address().port;

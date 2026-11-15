@@ -15,6 +15,8 @@ const {
   maybeAlertOnAuthFailure,
 } = await import(path.join(__dirname, "..", "dist", "services", "auth-alert.js"));
 
+const ALERT_ID = "11111111-1111-4111-8111-111111111111";
+const ALERT_PATH = "/monitor/auth-alerts/" + ALERT_ID;
 const THRESHOLDS = { warnThreshold: 3, failThreshold: 10 };
 
 // --- severityForCount (pure) ---------------------------------------------
@@ -239,7 +241,7 @@ test("auth cards keep the phone banner short and long reason text inert", () => 
     windowMinutes: 60,
     reasonSummary: ("invalid_client <@U-FIXTURE> & *literal*\n").repeat(100),
     httpStatus: "401",
-    cockpitUrl: "http://127.0.0.1:8787/",
+    alertUrl: "https://jem.example" + ALERT_PATH,
     brainId: "ai-brain-jem",
   });
 
@@ -256,12 +258,12 @@ test("auth cards keep the phone banner short and long reason text inert", () => 
   assert.ok(summary.text.length <= 160);
   assert.ok(summary.text.endsWith("…"));
   assert.ok(!summary.text.includes("\n"));
-  assert.match(card.blocks[5].text.text, /127\.0\.0\.1:8787\/#auth-failures\|Open Auth Failures on the Monitor Mac/);
+  assert.ok(card.blocks[5].text.text.includes("https://jem.example" + ALERT_PATH + "|Open auth alert"));
 });
 
-test("auth cards omit invalid links and use the ERS cockpit when configured for ERS", () => {
-  const config = readAuthAlertConfig({ BRAIN_ID: "ers-brain" });
-  assert.equal(config.cockpitUrl, "http://127.0.0.1:8788/");
+test("auth cards use the owner origin and reject a local or unsafe alert link", () => {
+  const config = readAuthAlertConfig({ BRAIN_ID: "ers-brain", MCP_OAUTH_PUBLIC_BASE: "https://ers.example" });
+  assert.equal(config.monitorBaseUrl, "https://ers.example");
   const input = {
     severity: "warn",
     failureCount: 4,
@@ -270,10 +272,12 @@ test("auth cards omit invalid links and use the ERS cockpit when configured for 
     httpStatus: null,
     brainId: config.brainId,
   };
-  const valid = buildAuthAlertMessage({ ...input, cockpitUrl: config.cockpitUrl });
-  assert.ok(valid.blocks.some((block) => block.text?.text.includes("8788/#auth-failures")));
-  const invalid = buildAuthAlertMessage({ ...input, cockpitUrl: "https://user:secret@example.invalid/" });
-  assert.ok(!invalid.blocks.some((block) => block.text?.text.includes("🔗")));
+  const valid = buildAuthAlertMessage({ ...input, alertUrl: config.monitorBaseUrl + ALERT_PATH });
+  assert.ok(valid.blocks.some((block) => block.text?.text.includes("https://ers.example" + ALERT_PATH)));
+  for (const base of ["http://127.0.0.1:8788", "https://user:fixture@example.invalid"]) {
+    const invalid = buildAuthAlertMessage({ ...input, alertUrl: base + ALERT_PATH });
+    assert.ok(!invalid.blocks.some((block) => block.text?.text.includes("🔗")));
+  }
 });
 
 // --- maybeAlertOnAuthFailure (orchestrator, injected fakes) ---------------
@@ -295,7 +299,7 @@ function fakeDeps(overrides = {}) {
         cooldownMinutes: 30,
       },
       brainId: "ai-brain-jem",
-      cockpitUrl: "http://127.0.0.1:8787/",
+      monitorBaseUrl: "https://jem.example",
     },
     loadState: async () => ({
       failureCount: 4,
@@ -337,6 +341,8 @@ test("maybeAlertOnAuthFailure posts a warn to the channel and records the dispat
   assert.equal(dispatches[0].severity, "warn");
   assert.equal(dispatches[0].channel, "C-OPS");
   assert.equal(dispatches[0].ok, true);
+  assert.ok(posts[0].message.blocks.some(block => block.text?.text.includes(
+    "https://jem.example/monitor/auth-alerts/" + dispatches[0].id + "|Open auth alert")));
 });
 
 test("maybeAlertOnAuthFailure routes a fail to the operator DM", async () => {

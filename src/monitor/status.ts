@@ -7,6 +7,42 @@ import type { BrainRole } from '../services/registry.js';
 export class MonitoringStatus {
   private active = 0;
   constructor(readonly pool: pg.Pool) {}
+
+  async readAuthAlert(brainId: string, id: string) {
+    if (this.active >= 4) throw new Error('monitor_busy');
+    this.active++;
+    try {
+      const result = await this.pool.query({
+        text: `select created_at, metadata->>'category' as category,
+          metadata->>'severity' as severity, metadata->>'count' as count,
+          metadata->>'window_minutes' as window_minutes, metadata->>'httpStatus' as http_status,
+          metadata->'reasons' as reasons
+          from brain.sync_events
+          where id=$1 and brain_id=$2 and event_type='hosted_mcp_auth_alert'
+            and metadata->>'ok'='true'`,
+        values: [id, brainId],
+      });
+      const alert = result.rows[0];
+      if (!alert) return null;
+      const entries: Array<{ reason?: unknown; n?: unknown } | null> = Array.isArray(alert.reasons) ? alert.reasons : [];
+      const reasons = entries.slice(0, 5).flatMap(item =>
+        typeof item?.reason === 'string' && /^[a-z0-9_]{1,80}$/.test(item.reason)
+          && typeof item.n === 'number' && Number.isSafeInteger(item.n) && item.n > 0
+          ? [{ reason: item.reason, count: item.n }] : []);
+      return {
+        observedAt: new Date(alert.created_at).toISOString(),
+        anonymous: alert.category === 'anonymous',
+        urgent: alert.severity === 'fail' && alert.category !== 'anonymous',
+        count: Number(alert.count),
+        windowMinutes: Number(alert.window_minutes),
+        httpStatus: /^\d{3}$/.test(alert.http_status ?? '') ? String(alert.http_status) : null,
+        reasons,
+      };
+    } finally {
+      this.active--;
+    }
+  }
+
   async read(brainId: string, role: BrainRole, operator = false) {
     if (this.active >= 4) throw new Error('monitor_busy');
     this.active++;

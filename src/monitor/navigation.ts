@@ -1,6 +1,13 @@
 export const escapeHtml = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 
+const authAlertPath = /^\/monitor\/auth-alerts\/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})$/;
+
+export function monitorAuthAlertId(path: string): string | undefined {
+  const match = authAlertPath.exec(path);
+  return match?.[0] === path ? match[1] : undefined;
+}
+
 /** A user-clicked route back to a local cockpit, never a redirect or an API call. */
 export function safeCockpitUrl(value: unknown): string | undefined {
   if (typeof value !== 'string' || value.length > 200) return undefined;

@@ -6,6 +6,7 @@ import { handleToken } from '../oauth/token.js';
 import { hashRefreshToken } from '../oauth/jwt.js';
 import { resolveAuth } from '../http/mcp-auth.js';
 import { principalFromAuthInfo, type BrainPrincipal } from '../services/registry.js';
+import { monitorAuthAlertId } from './navigation.js';
 
 const random = () => randomBytes(32).toString('base64url');
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -32,7 +33,7 @@ export class MonitorSessions {
     const value = values[0].slice(name.length+1);
     return /^[A-Za-z0-9_-]{43}$/.test(value) ? value : null;
   }
-  async begin(cookieHeader?: string): Promise<{ location: string; cookie: string }> {
+  async begin(cookieHeader?: string, returnTo?: string): Promise<{ location: string; cookie: string }> {
     const now = Date.now();
     this.admissions = this.admissions.filter(time=>time>now-60_000);
     if (this.admissions.length >= 30) throw new Error('monitor_login_rate_limited');
@@ -44,12 +45,13 @@ export class MonitorSessions {
     const old = this.readCookie(cookieHeader, LOGIN);
     if (old) await this.state.del('oauth_states', 'monitor-login:'+digest(old));
     const token = random(), verifier = random();
-    await this.state.put('oauth_states', 'monitor-login:'+digest(token), {kind: 'monitor_login', verifier, issuer: this.config.issuer, expires_at: Math.floor(now/1000)+600});
+    const returnPath = returnTo && monitorAuthAlertId(returnTo) ? returnTo : '/monitor';
+    await this.state.put('oauth_states', 'monitor-login:'+digest(token), {kind: 'monitor_login', verifier, issuer: this.config.issuer, expires_at: Math.floor(now/1000)+600, returnPath});
     const url = new URL(this.config.authorizationEndpoint);
     url.search = new URLSearchParams({response_type:'code', client_id:this.clientId, redirect_uri:this.callback, scope:'mcp:tools', state:token, code_challenge:createHash('sha256').update(verifier).digest('base64url'), code_challenge_method:'S256', resource:this.config.resourceUri}).toString();
     return {location:url.href, cookie:this.cookie(LOGIN,token,600)};
   }
-  async complete(params: URLSearchParams, cookieHeader?: string): Promise<string[]> {
+  async complete(params: URLSearchParams, cookieHeader?: string): Promise<{ cookies: string[]; returnPath: string }> {
     const token = this.readCookie(cookieHeader, LOGIN);
     if (!token || params.get('state') !== token || !params.get('code')) throw new Error('monitor_login_invalid');
     const pending = await this.state.consumeOnce('oauth_states', 'monitor-login:'+digest(token));
@@ -64,7 +66,9 @@ export class MonitorSessions {
     if (previous) await this.state.del('oauth_states','monitor-session:'+digest(previous));
     const session = random();
     await this.state.put('oauth_states','monitor-session:'+digest(session), {kind:'monitor_session',principal:principalFromAuthInfo(auth.authInfo),issuer:this.config.issuer,expires_at:Math.floor(Date.now()/1000)+3600} satisfies MonitorSession);
-    return [this.cookie(SESSION,session,3600),this.cookie(LOGIN,'',0)];
+    const returnPath = typeof pending.returnPath === 'string' && monitorAuthAlertId(pending.returnPath)
+      ? pending.returnPath : '/monitor';
+    return { cookies: [this.cookie(SESSION,session,3600),this.cookie(LOGIN,'',0)], returnPath };
   }
   async get(cookieHeader?: string): Promise<MonitorSession | null> {
     const token = this.readCookie(cookieHeader,SESSION);

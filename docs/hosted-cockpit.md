@@ -178,9 +178,11 @@ The Auth panel separates anonymous and credential/other rejection counts. Its re
 Hosted authentication alerts use a short phone preview and a Slack card with a
 status, rejection count, recorded reasons, and one next step. Both owner
 deployments use the same format and their separately configured alert destinations.
-The card links directly to **Activity → Auth → Auth Failures**. The default link
-opens Cockpit on the Monitor Mac, using port 8787 for JEM and 8788 for ERS. An
-operator can set `BRAIN_HOSTED_COCKPIT_URL` for a different Cockpit address.
+The card opens the recorded alert on the sending Brain's HTTPS Monitor. It
+returns to the same alert after sign-in and checks the current Owner role
+before reading the receipt. The page shows the alert's count, window, reason
+codes and next step. Local Cockpit still exposes the current **Activity → Auth**
+view for live diagnostics.
 
 Tests use isolated anonymous/expired-token/mixed/unknown-reason, escalation, cooldown, clearing, retry, concurrency and owner-isolation fixtures, plus desktop/mobile UI. Never generate anonymous production probes just to test alerts. Deployment and live observation receipts are separate from fixture evidence.
 

@@ -9,14 +9,16 @@ import { activeBrainStore } from '../services/active-brain-store.js';
 import { changePage } from './change-page.js';
 import { changeLogOptions, changeLogPage } from './change-log.js';
 import type { BrainStore } from '../services/brain-store.js';
-import { safeCockpitUrl } from './navigation.js';
-import { monitoringPage, monitoringCss, monitoringJs, changeHistoryCss } from './page.js';
+import { monitorAuthAlertId, safeCockpitUrl } from './navigation.js';
+import { authAlertDetail, authAlertPage, monitoringPage, monitoringCss, monitoringJs, changeHistoryCss } from './page.js';
+import type { MonitoringStatus } from './status.js';
 import { monitorOperator, type MonitorInstallations } from './installations.js';
 import { installationsPage, installationInventoryCss } from './installations-page.js';
 
 const headers = {'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'};
 export class MonitoringRoutes {
   installations?: MonitorInstallations;
+  readAuthAlert?: MonitoringStatus['readAuthAlert'];
   readonly sessions: MonitorSessions;
   private historyReads=0;
   constructor(readonly config: OauthConfig, state: StateProvider,
@@ -44,19 +46,46 @@ export class MonitoringRoutes {
       if (url.pathname==='/monitor/style.css') {send(200,monitoringCss + changeHistoryCss + installationInventoryCss,'text/css');return;}
       if (url.pathname==='/monitor/app.js') {send(200,monitoringJs,'text/javascript');return;}
       if (url.pathname==='/monitor/login') {
-        const result=await this.sessions.begin(req.headers.cookie);redirect(result.location,[result.cookie]);return;
+        const result=await this.sessions.begin(req.headers.cookie,url.searchParams.get('return_to') ?? undefined);
+        redirect(result.location,[result.cookie]);return;
       }
       if (url.pathname==='/monitor/callback') {
-        redirect('/monitor',await this.sessions.complete(url.searchParams,req.headers.cookie));return;
+        const result=await this.sessions.complete(url.searchParams,req.headers.cookie);
+        redirect(result.returnPath,result.cookies);return;
       }
+      const alertId = monitorAuthAlertId(url.pathname);
       const changeMatch=/^\/monitor\/changes\/([A-Za-z0-9_-]{1,160})$/.exec(url.pathname);
       const changeLog=url.pathname==='/monitor/changes';
       const inventoryPage=url.pathname==='/monitor/installations';
-      if (!changeMatch && !changeLog && !['/monitor/api/status','/monitor/api/installations','/monitor/installations'].includes(url.pathname)) {send(404,'{"error":"not_found"}');return;}
+      if (!alertId && !changeMatch && !changeLog && !['/monitor/api/status','/monitor/api/installations','/monitor/installations'].includes(url.pathname)) {send(404,'{"error":"not_found"}');return;}
       const session=await this.sessions.get(req.headers.cookie);
       if (!session) {
+        if (alertId) {
+          send(401,authAlertPage('Sign in to view the alert',
+            `<p>Use the Owner account for this Brain.</p><a class="button" href="/monitor/login?return_to=${encodeURIComponent(url.pathname)}">Sign in</a>`),
+          'text/html; charset=utf-8');
+          return;
+        }
         if(changeMatch || changeLog || inventoryPage) send(401,`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain sign-in</title><link rel="stylesheet" href="/monitor/style.css"></head><body><main><h1>Sign in to ${inventoryPage?'view installed Monitors':'read Brain changes'}</h1><p>Sign in with your Brain account, then select ${inventoryPage?'Installed Monitors':'Change log'} on Brain status.</p><a class="button" href="/monitor/login">Sign in</a></main></body></html>`,'text/html; charset=utf-8');
         else send(401,'{"error":"sign_in_required"}');
+        return;
+      }
+      if (alertId) {
+        const brainId = runtimeBrainId();
+        if ((await this.roles(session.principal))[brainId] !== 'owner') {
+          send(403,authAlertPage('Owner access required','<p>Use the Owner account for this Brain.</p>'),'text/html; charset=utf-8');
+          return;
+        }
+        if (!this.readAuthAlert) {
+          send(503,authAlertPage('Alert temporarily unavailable','<p>Reload this page to try again.</p>'),'text/html; charset=utf-8');
+          return;
+        }
+        const alert = await this.readAuthAlert(brainId,alertId);
+        if (!alert) {
+          send(404,authAlertPage('Alert unavailable','<p>If this alert just arrived, reload this page.</p>'),'text/html; charset=utf-8');
+          return;
+        }
+        send(200,authAlertDetail(brainId,alert),'text/html; charset=utf-8');
         return;
       }
       const brainId=url.searchParams.get('brain_id') || runtimeBrainId();
@@ -94,6 +123,10 @@ export class MonitoringRoutes {
       const reason=error instanceof Error?error.message:'';
       if (reason==='monitor_login_rate_limited') send(429,'{"error":"try_later"}','application/json',{'Retry-After':'60'});
       else if (/^monitor_login_(invalid|expired|refused)$/.test(reason)) send(400,'Sign-in did not complete. Return to /monitor and start again.','text/plain');
+      else if (monitorAuthAlertId(url.pathname)) {
+        send(503,authAlertPage('Alert temporarily unavailable','<p>Reload this page to try again.</p>'),
+          'text/html; charset=utf-8',{'Retry-After':'5'});
+      }
       else send(503,'{"error":"status_unavailable"}','application/json',{'Retry-After':'5'});
     }
   }

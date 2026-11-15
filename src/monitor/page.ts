@@ -1,3 +1,33 @@
+import { escapeHtml } from './navigation.js';
+import type { MonitoringStatus } from './status.js';
+
+type AuthAlert = NonNullable<Awaited<ReturnType<MonitoringStatus['readAuthAlert']>>>;
+
+export function authAlertPage(title: string, content: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${escapeHtml(title)}</title><link rel="stylesheet" href="/monitor/style.css"></head>
+    <body><main><h1>${escapeHtml(title)}</h1>${content}</main></body></html>`;
+}
+
+export function authAlertDetail(brainId: string, alert: AuthAlert): string {
+  const title = alert.anonymous ? 'Anonymous rejections' : 'Authentication rejections';
+  const verdict = alert.anonymous ? 'Security review' : alert.urgent ? 'Needs attention' : 'Degraded';
+  const ask = alert.anonymous ? 'Review the rejected traffic. Caller origin is unknown.'
+    : alert.urgent ? 'Check whether the affected connector can authenticate.'
+      : 'Review the most frequent rejection reasons.';
+  const updated = new Intl.DateTimeFormat('en-GB', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
+  }).format(new Date(alert.observedAt));
+  const reasons = alert.reasons.map(item => `<dt><code>${escapeHtml(item.reason)}</code></dt><dd>${item.count}</dd>`).join('');
+  return authAlertPage(title, `<p class="muted">${escapeHtml(brainId)} · ${updated} UTC</p>
+    <section class="card"><h2>${verdict}</h2><p>${alert.count} rejected in ${alert.windowMinutes} minutes.</p>
+    ${alert.httpStatus ? `<p>HTTP ${escapeHtml(alert.httpStatus)}</p>` : ''}
+    <p>${ask}</p></section>
+    ${reasons ? `<section class="card"><h2>Recorded reasons</h2><dl>${reasons}</dl></section>` : ''}
+    <p><a class="button" href="/monitor">Brain status</a></p>`);
+}
+
 export const monitoringPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain status</title><link rel="stylesheet" href="/monitor/style.css"><script src="/monitor/app.js" defer></script></head><body><main>
 <header><div><p class="eyebrow">BRAIN MONITORING</p><h1>Brain status</h1><p class="muted">Service health and observed sync activity.</p></div><button id="theme" type="button" aria-label="Switch colour theme">Theme</button></header>
 <section id="access" class="card"><h2 id="access-title">Checking your session…</h2><p id="access-message">Sign in with the account you use for this Brain.</p><a class="button" href="/monitor/login">Sign in</a></section>

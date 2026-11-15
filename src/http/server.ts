@@ -443,6 +443,7 @@ export async function startHttpServer(): Promise<void> {
     const status = createMonitoringStatus(process.env.BRAIN_REVISION_DATABASE_URL);
     ctx.monitor = new MonitoringRoutes(config, state, (brainId, role, operator) => status.read(brainId, role, operator));
     ctx.monitor.installations = installations;
+    ctx.monitor.readAuthAlert = (brainId, id) => status.readAuthAlert(brainId, id);
   }
   if (
     runtimeBrainId() === "ers-brain" &&

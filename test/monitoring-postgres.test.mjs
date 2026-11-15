@@ -26,7 +26,7 @@ test('monitor Entra session survives reconstruction and obeys real Postgres gran
   const routes=new MonitoringRoutes(config,state,(id,role)=>status.read(id,role));
   const login=await routes.sessions.begin();const params=new URL(login.location).searchParams;
   const code=randomUUID();await state.put('auth_codes',code,{client_id:routes.sessions.clientId,redirect_uri:routes.sessions.callback,code_challenge:params.get('code_challenge'),code_challenge_method:'S256',resource:config.resourceUri,scope:'mcp:tools',provider:'entra',provider_tenant_id:tenant,provider_user_id:principal.providerUserId,entra_role:'Brain.Reader',expires_at:Date.now()/1000+60});
-  const cookies=await routes.sessions.complete(new URLSearchParams({code,state:params.get('state')}),login.cookie.split(';')[0]);const cookie=cookies[0].split(';')[0];
+  const {cookies}=await routes.sessions.complete(new URLSearchParams({code,state:params.get('state')}),login.cookie.split(';')[0]);const cookie=cookies[0].split(';')[0];
   const reconstructed=new MonitoringRoutes(config,state,(id,role)=>status.read(id,role));
   server=http.createServer((req,res)=>void reconstructed.handle(req,res,new URL(req.url,config.issuer)));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base='http://127.0.0.1:'+server.address().port;const call=id=>fetch(base+'/monitor/api/status?brain_id='+id,{headers:{cookie}});

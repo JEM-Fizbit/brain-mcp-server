@@ -32,7 +32,7 @@ test("actual authenticated change reader works on desktop/mobile, escapes source
   await page.goto(url);await expect(page.getByRole("link",{name:"Sign in",exact:true})).toBeVisible();
   const login=await routes.sessions.begin(),params=new URL(login.location).searchParams;
   await state.put("auth_codes","change-code",{client_id:routes.sessions.clientId,redirect_uri:routes.sessions.callback,code_challenge:params.get("code_challenge"),code_challenge_method:"S256",resource:config.resourceUri,scope:"mcp:tools",provider:"github",provider_user_id:"fixture",expires_at:Date.now()/1000+60});
-  const cookies=await routes.sessions.complete(new URLSearchParams({code:"change-code",state:params.get("state")}),login.cookie.split(";")[0]),session=cookies[0].split(";")[0].split("=");
+  const {cookies}=await routes.sessions.complete(new URLSearchParams({code:"change-code",state:params.get("state")}),login.cookie.split(";")[0]),session=cookies[0].split(";")[0].split("=");
   await context.addCookies([{name:session[0],value:session[1],url:base,httpOnly:true,sameSite:"Lax"}]);
   for(const colorScheme of ["light","dark"])for(const width of [1280,390]) {
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:900});await page.goto(url);

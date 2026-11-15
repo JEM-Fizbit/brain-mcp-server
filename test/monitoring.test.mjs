@@ -14,12 +14,12 @@ import {handleAuthorizeGet,handleGitHubCallback} from '../dist/oauth/github.js';
 const config={issuer:'https://brain.example',authorizationEndpoint:'https://brain.example/authorize',resourceUri:'https://brain.example/mcp',identityProviders:['github'],identityDefaultProvider:'github',scopes:['mcp:tools'],signingSecret:'isolated-monitor-test-only',accessTokenTtlSec:3600,refreshTokenTtlSec:3600,oauthStateTtlSec:600,authCodeTtlSec:60,githubClientId:'fixture',githubCallbackUrl:'https://brain.example/oauth/github/callback'};
 const sha=value=>createHash('sha256').update(value).digest('hex');
 async function fixture(t){const root=await mkdtemp(path.join(os.tmpdir(),'brain-monitor-test-'));t.after(()=>rm(root,{recursive:true,force:true}));return {root,state:makeFileStateProvider(root)};}
-async function signIn(sessions,state){
- const login=await sessions.begin();const params=new URL(login.location).searchParams;
+async function signIn(sessions,state,returnTo){
+ const login=await sessions.begin(undefined,returnTo);const params=new URL(login.location).searchParams;
  await state.put('auth_codes','code',{client_id:sessions.clientId,redirect_uri:sessions.callback,code_challenge:params.get('code_challenge'),code_challenge_method:'S256',resource:config.resourceUri,scope:'mcp:tools',provider:'github',provider_user_id:'fixture-user',github_login:'fixture',expires_at:Date.now()/1000+60});
  const callback=new URLSearchParams({code:'code',state:params.get('state')});
- const cookies=await sessions.complete(callback,login.cookie.split(';')[0]);
- return {cookie:cookies[0].split(';')[0],cookies,callback,login};
+ const {cookies,returnPath}=await sessions.complete(callback,login.cookie.split(';')[0]);
+ return {cookie:cookies[0].split(';')[0],cookies,callback,login,returnPath};
 }
 
 test('monitor login binds browser state and PKCE, consumes callbacks, stores no MCP tokens and logs out durably',async t=>{
@@ -83,4 +83,45 @@ test('monitor reports unknown/stale observations and bounds concurrent reads and
  let release;const pending=new Promise(resolve=>release=resolve);const bounded=new MonitoringStatus({query:async()=>{await pending;return {rows:[{sync_at:null,conflicts:0}]};}});
  const reads=Array.from({length:4},()=>bounded.read('test-monitor','reader'));
  await assert.rejects(bounded.read('test-monitor','reader'),/busy/);release();await Promise.all(reads);
+});
+
+test('a shared alert link survives sign-in and reads only the current owner’s recorded alert', async t => {
+ const {state}=await fixture(t);
+ const id='11111111-1111-4111-8111-111111111111';
+ const alertPath='/monitor/auth-alerts/'+id;
+ const runtimeId=process.env.BRAIN_ID;
+ process.env.BRAIN_ID='test-monitor';
+ t.after(()=>{if(runtimeId===undefined)delete process.env.BRAIN_ID;else process.env.BRAIN_ID=runtimeId;});
+ let role='owner', reads=0;
+ const monitor=new MonitoringStatus({query:async ({text,values})=>{
+  reads++;
+  assert.deepEqual(values,[id,'test-monitor']);
+  assert.match(text,/event_type='hosted_mcp_auth_alert'/);
+  return {rows:[{created_at:new Date(),category:'credentials',severity:'fail',count:'12',window_minutes:'60',
+    http_status:'401',reasons:[{reason:'token_expired',n:12},{reason:'<script>private</script>',n:1}]}]};
+ }});
+ const routes=new MonitoringRoutes(config,state,async()=>({}),async()=>({'test-monitor':role,other:'owner'}));
+ routes.readAuthAlert=(brainId,alertId)=>monitor.readAuthAlert(brainId,alertId);
+ const server=http.createServer((req,res)=>void routes.handle(req,res,new URL(req.url,config.issuer)));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+ const base='http://127.0.0.1:'+server.address().port;
+ const unsigned=await fetch(base+alertPath);
+ assert.equal(unsigned.status,401);
+ assert.match(await unsigned.text(),/Sign in to view the alert/);
+ assert.equal(reads,0);
+ const {cookie,returnPath}=await signIn(routes.sessions,state,alertPath);
+ assert.equal(returnPath,alertPath);
+ const unsafe=await signIn(routes.sessions,state,'//other.example'+alertPath);
+ assert.equal(unsafe.returnPath,'/monitor');
+ const detail=await fetch(base+alertPath+'?brain_id=other',{headers:{cookie}});
+ assert.equal(detail.status,200);
+ assert.equal(detail.headers.get('cache-control'),'no-store');
+ const body=await detail.text();
+ assert.match(body,/12 rejected in 60 minutes/);
+ assert.match(body,/token_expired/);
+ assert.doesNotMatch(body,/private|<script>/);
+ role='admin';
+ assert.equal((await fetch(base+alertPath,{headers:{cookie}})).status,403);
+ assert.equal(reads,1);
 });

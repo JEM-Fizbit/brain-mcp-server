@@ -40,7 +40,7 @@ test('cleared incident can alert again and newly observed reason can warrant rev
 function fixture(brainId,reason,count,previous=[]){
  const posts=[],dispatches=[];
  return {posts,dispatches,deps:{now:()=>now,
-  config:{enabled:true,botToken:'fixture-only',channel:'C-FIXTURE',dm:'U-FIXTURE',brainId,cockpitUrl:brainId==='ers-brain'?'http://127.0.0.1:8788/':'http://127.0.0.1:8787/',thresholds},
+  config:{enabled:true,botToken:'fixture-only',channel:'C-FIXTURE',dm:'U-FIXTURE',brainId,monitorBaseUrl:brainId==='ers-brain'?'https://ers.example':'https://jem.example',thresholds},
   loadState:async()=>({failureCount:count,reasons:[{reason,n:count}],httpStatus:'401',staleConnector:false,
    firstFailureAt:ago(20),lastFailureAt:ago(1),lastWarnAt:null,lastFailAt:null,recentDispatches:[...dispatches.map(d=>({...d,at:now})),...previous]}),
   postMessage:async(channel,message)=>{posts.push({channel,message});return {ok:true}},recordDispatch:async row=>dispatches.unshift(row)}};
