@@ -1,5 +1,15 @@
 # Fly Deployment
 
+## JEM sync resilience and mobile Slack alerts — v1.16.3, 15 November 2026
+
+JEM deployed [annotated v1.16.3](https://github.com/JEM-Fizbit/brain-mcp-server/tree/v1.16.3)
+at 13:45 UTC through the guarded release path. The Node 22 gate passed 683
+tests with 15 optional skips, and live health, OAuth discovery, authenticated
+sync status and the protected alert route passed. The Slack sample linked to
+an existing recorded alert. iPhone confirmation from Slack is pending.
+
+ERS continues to serve v1.16.2 while the iPhone check is pending.
+
 ## Direct session ingestion — v1.16.2, 3 November 2026
 
 Both JEM and ERS are deployed on the same annotated shared source v1.16.2.
