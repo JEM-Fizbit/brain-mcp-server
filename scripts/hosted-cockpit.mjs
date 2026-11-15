@@ -4026,12 +4026,20 @@ const page = String.raw`<!doctype html>
         setupSubtabGroup("latency");
       }
 
+      function openLinkedAuthView() {
+        if (location.hash !== "#auth-failures") return;
+        activateTab("tab-activity");
+        activateSubtab("activity-subtab-auth", "activity");
+      }
+
       // Pass an explicit options object: a bare listener receives the click Event,
       // whose .fresh is undefined, which silently downgraded Reload to the cached
       // report. The periodic poll below deliberately stays cached.
       document.getElementById("refresh").addEventListener("click", () => refresh({ fresh: true }));
       setupTabs();
       setupActivityViews();
+      openLinkedAuthView();
+      window.addEventListener("hashchange", openLinkedAuthView);
       setupFixes();
       refresh();
       setInterval(refresh, 60000);

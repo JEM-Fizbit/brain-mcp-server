@@ -232,33 +232,48 @@ test("formatReasonSummary renders reason codes with counts", () => {
   );
 });
 
-test("buildAuthAlertMessage builds a warn line for #claude-ops", () => {
-  assert.equal(
-    buildAuthAlertMessage({
-      severity: "warn",
-      failureCount: 4,
-      windowMinutes: 60,
-      reasonSummary: "invalid_client ×3, token_expired ×1",
-      httpStatus: "401",
-      isoDate: "2026-06-23",
-      cockpitUrl: "http://127.0.0.1:8787/",
-      brainId: "ai-brain-jem",
-    }),
-    "[brain-auth-alert] [ai-brain-jem] 2026-06-23 — ⚠️ 4 credential/authentication rejections in last 60m (invalid_client ×3, token_expired ×1; HTTP 401). Inspect the recorded reasons and affected client; reconnect only when authenticated calls fail. Cockpit: http://127.0.0.1:8787/"
-  );
-});
-
-test("buildAuthAlertMessage adds the [Action needed] prefix for fail DMs", () => {
-  const text = buildAuthAlertMessage({
+test("auth cards keep the phone banner short and long reason text inert", () => {
+  const card = buildAuthAlertMessage({
     severity: "fail",
     failureCount: 12,
     windowMinutes: 60,
-    reasonSummary: "invalid_client ×12",
+    reasonSummary: ("invalid_client <@U-FIXTURE> & *literal*\n").repeat(100),
     httpStatus: "401",
-    isoDate: "2026-06-23",
     cockpitUrl: "http://127.0.0.1:8787/",
+    brainId: "ai-brain-jem",
   });
-  assert.match(text, /^\[brain-auth-alert\] \[Action needed\] \[unobserved-brain\] 2026-06-23 — 🚨 12 /);
+
+  assert.match(card.text, /^\[ai-brain-jem:auth\] \[Action needed\] 🔴/);
+  assert.ok(card.text.length <= 200);
+  assert.match(card.text, /12 rejected in 60 min/);
+  assert.match(card.text, /Check whether the affected connector can authenticate/);
+  assert.deepEqual(card.blocks.map(({ type }) => type),
+    ["header", "section", "context", "section", "section", "section", "context"]);
+  assert.match(card.blocks[1].text.text, /^🔴 \*Authentication needs attention\*$/);
+  const [summary] = card.blocks[2].elements;
+  assert.equal(summary.type, "plain_text");
+  assert.match(summary.text, /HTTP 401.*<@U-FIXTURE>/);
+  assert.ok(summary.text.length <= 160);
+  assert.ok(summary.text.endsWith("…"));
+  assert.ok(!summary.text.includes("\n"));
+  assert.match(card.blocks[5].text.text, /127\.0\.0\.1:8787\/#auth-failures\|Open Auth Failures on the Monitor Mac/);
+});
+
+test("auth cards omit invalid links and use the ERS cockpit when configured for ERS", () => {
+  const config = readAuthAlertConfig({ BRAIN_ID: "ers-brain" });
+  assert.equal(config.cockpitUrl, "http://127.0.0.1:8788/");
+  const input = {
+    severity: "warn",
+    failureCount: 4,
+    windowMinutes: 60,
+    reasonSummary: "",
+    httpStatus: null,
+    brainId: config.brainId,
+  };
+  const valid = buildAuthAlertMessage({ ...input, cockpitUrl: config.cockpitUrl });
+  assert.ok(valid.blocks.some((block) => block.text?.text.includes("8788/#auth-failures")));
+  const invalid = buildAuthAlertMessage({ ...input, cockpitUrl: "https://user:secret@example.invalid/" });
+  assert.ok(!invalid.blocks.some((block) => block.text?.text.includes("🔗")));
 });
 
 // --- maybeAlertOnAuthFailure (orchestrator, injected fakes) ---------------
@@ -268,7 +283,6 @@ function fakeDeps(overrides = {}) {
   const dispatches = [];
   const deps = {
     now: () => NOW,
-    isoDate: () => "2026-06-23",
     config: {
       enabled: true,
       botToken: "xoxb-test",
@@ -290,8 +304,8 @@ function fakeDeps(overrides = {}) {
       lastWarnAt: null,
       lastFailAt: null,
     }),
-    postMessage: async (channel, text) => {
-      posts.push({ channel, text });
+    postMessage: async (channel, message) => {
+      posts.push({ channel, message });
       return { ok: true };
     },
     recordDispatch: async (row) => {
@@ -318,7 +332,7 @@ test("maybeAlertOnAuthFailure posts a warn to the channel and records the dispat
   assert.equal(outcome.posted, true);
   assert.equal(posts.length, 1);
   assert.equal(posts[0].channel, "C-OPS");
-  assert.match(posts[0].text, /⚠️ 4 credential\/authentication rejections/);
+  assert.match(posts[0].message.text, /🟡 Authentication degraded.*4 rejected/);
   assert.equal(dispatches.length, 1);
   assert.equal(dispatches[0].severity, "warn");
   assert.equal(dispatches[0].channel, "C-OPS");
@@ -338,7 +352,7 @@ test("maybeAlertOnAuthFailure routes a fail to the operator DM", async () => {
   const outcome = await maybeAlertOnAuthFailure(deps);
   assert.equal(outcome.severity, "fail");
   assert.equal(posts[0].channel, "U-JOHN");
-  assert.match(posts[0].text, /\[Action needed\]/);
+  assert.match(posts[0].message.text, /\[Action needed\]/);
 });
 
 test("maybeAlertOnAuthFailure records ok:false when the post fails and still does not throw", async () => {
@@ -359,8 +373,7 @@ test("maybeAlertOnAuthFailure fires once for a concurrent burst (cooldown race)"
   function burstDeps() {
     return {
       now: () => NOW2,
-      isoDate: () => "2026-06-23",
-      config,
+        config,
       // Reflects dispatches recorded so far, like the DB cooldown read.
       loadState: async () => ({
         failureCount: 5,

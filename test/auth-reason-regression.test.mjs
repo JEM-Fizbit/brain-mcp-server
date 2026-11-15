@@ -39,18 +39,18 @@ test('cleared incident can alert again and newly observed reason can warrant rev
 });
 function fixture(brainId,reason,count,previous=[]){
  const posts=[],dispatches=[];
- return {posts,dispatches,deps:{now:()=>now,isoDate:()=> '2026-10-04',
+ return {posts,dispatches,deps:{now:()=>now,
   config:{enabled:true,botToken:'fixture-only',channel:'C-FIXTURE',dm:'U-FIXTURE',brainId,cockpitUrl:brainId==='ers-brain'?'http://127.0.0.1:8788/':'http://127.0.0.1:8787/',thresholds},
   loadState:async()=>({failureCount:count,reasons:[{reason,n:count}],httpStatus:'401',staleConnector:false,
    firstFailureAt:ago(20),lastFailureAt:ago(1),lastWarnAt:null,lastFailAt:null,recentDispatches:[...dispatches.map(d=>({...d,at:now})),...previous]}),
-  postMessage:async(channel,text)=>{posts.push({channel,text});return {ok:true}},recordDispatch:async row=>dispatches.unshift(row)}};
+  postMessage:async(channel,message)=>{posts.push({channel,message});return {ok:true}},recordDispatch:async row=>dispatches.unshift(row)}};
 }
 test('tokenless fixture sends one labelled channel security review and no failure DM',async()=>{
  const f=fixture('ers-brain','missing_bearer',11);
  await Promise.all(Array.from({length:5},()=>maybeAlertOnAuthFailure(f.deps)));
  assert.equal(f.posts.length,1);assert.equal(f.posts[0].channel,'C-FIXTURE');
- assert.match(f.posts[0].text,/\[ers-brain\].*11 anonymous requests rejected/);
- assert.match(f.posts[0].text,/caller origin is unknown/);
+ assert.match(f.posts[0].message.text,/\[ers-brain:auth\].*🟡 Security review.*11 rejected/);
+ assert.ok(f.posts[0].message.blocks.some(block=>block.elements?.[0].text.includes("Caller origin is unknown.")));
  assert.equal(f.dispatches[0].category,'anonymous');
  assert.equal(f.dispatches[0].severity,'warn');
 });
@@ -59,7 +59,7 @@ test('same policies preserve independent owner/category notification state',asyn
  const jem=fixture('ai-brain-jem','token_expired',10);
  await Promise.all([maybeAlertOnAuthFailure(ers.deps),maybeAlertOnAuthFailure(jem.deps)]);
  assert.equal(ers.posts.length,1);assert.equal(jem.posts.length,1);
- assert.equal(jem.posts[0].channel,'U-FIXTURE');assert.match(jem.posts[0].text,/\[ai-brain-jem\]/);
+ assert.equal(jem.posts[0].channel,'U-FIXTURE');assert.match(jem.posts[0].message.text,/\[ai-brain-jem:auth\] \[Action needed\]/);
  const cred=fixture('ai-brain-jem','token_expired',10,[{...repeat.previous,at:ago(1)}]);
  await maybeAlertOnAuthFailure(cred.deps);assert.equal(cred.posts.length,1);
 });

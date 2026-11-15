@@ -642,6 +642,29 @@ test("cockpit renders deterministic status on desktop and narrow viewports", asy
   }
 });
 
+test("the Slack alert link opens Auth Failures in Cockpit", async ({ page }, testInfo) => {
+  const { buildAuthAlertMessage } = await import("../dist/services/auth-alert.js");
+  const { child, url } = await startCockpit(testInfo);
+  try {
+    const card = buildAuthAlertMessage({
+      severity: "warn",
+      failureCount: 4,
+      windowMinutes: 60,
+      reasonSummary: "invalid_client ×4",
+      httpStatus: "401",
+      brainId: "ai-brain-jem",
+      cockpitUrl: url,
+    });
+    const link = card.blocks.find((block) => block.text?.text.includes("#auth-failures|"));
+    const [destination] = link.text.text.match(/https?:[^|]+/);
+    await page.goto(destination);
+    await expect(page.getByRole("tab", { name: "Auth", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("heading", { name: "Auth Failures" })).toBeVisible();
+  } finally {
+    await stopCockpit(child);
+  }
+});
+
 test("ERS Cockpit is the clear entry point for Identity & Access", async ({ page }, testInfo) => {
   const { child, url } = await startCockpit(testInfo, { brainId: "ers-brain" });
   try {

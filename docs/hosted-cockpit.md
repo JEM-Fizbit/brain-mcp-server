@@ -175,6 +175,13 @@ Reason-aware auth reporting (v1.12.5): only `missing_bearer` events are classifi
 
 The Auth panel separates anonymous and credential/other rejection counts. Its rejection share describes recorded auth events, not the success rate of authenticated tool calls. Low anonymous counts do not create an operator action or an unusable verdict. Elevated anonymous traffic remains a security-review warning; authentic credential failures retain actionability. A 100% auth-event rejection share is not evidence that successful MCP tools stopped working.
 
+Hosted authentication alerts use a short phone preview and a Slack card with a
+status, rejection count, recorded reasons, and one next step. Both owner
+deployments use the same format and their separately configured alert destinations.
+The card links directly to **Activity → Auth → Auth Failures**. The default link
+opens Cockpit on the Monitor Mac, using port 8787 for JEM and 8788 for ERS. An
+operator can set `BRAIN_HOSTED_COCKPIT_URL` for a different Cockpit address.
+
 Tests use isolated anonymous/expired-token/mixed/unknown-reason, escalation, cooldown, clearing, retry, concurrency and owner-isolation fixtures, plus desktop/mobile UI. Never generate anonymous production probes just to test alerts. Deployment and live observation receipts are separate from fixture evidence.
 
 **Status:** active operator guide

@@ -14,9 +14,19 @@ export interface PostSlackOptions {
 
 const SLACK_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
 
+export type SlackBlock =
+  | { type: "header"; text: { type: "plain_text"; text: string } }
+  | { type: "section"; text: { type: "mrkdwn"; text: string; verbatim: true } }
+  | { type: "context"; elements: [{ type: "plain_text"; text: string }] };
+
+export interface SlackMessage {
+  text: string;
+  blocks: SlackBlock[];
+}
+
 export async function postSlackMessage(
   channel: string,
-  text: string,
+  message: SlackMessage | string,
   opts: PostSlackOptions = {}
 ): Promise<{ ok: boolean; error?: string }> {
   const token = opts.token;
@@ -32,7 +42,9 @@ export async function postSlackMessage(
         "Content-Type": "application/json; charset=utf-8",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ channel, text }),
+      body: JSON.stringify(typeof message === "string"
+        ? { channel, text: message }
+        : { channel, ...message, unfurl_links: false, unfurl_media: false }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     const body = (await response.json().catch(() => ({}))) as {

@@ -15,7 +15,7 @@
 
 import pg from "pg";
 import { classifyAuthReasons } from "./auth-reason-policy.js";
-import { postSlackMessage } from "./slack.js";
+import { postSlackMessage, type SlackBlock, type SlackMessage } from "./slack.js";
 import { runtimeBrainId } from "./runtime-env.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
 
@@ -149,27 +149,72 @@ export interface AuthAlertMessageInput {
   windowMinutes: number;
   reasonSummary: string;
   httpStatus: string | null;
-  isoDate: string;
   cockpitUrl: string;
   brainId?: string;
   category?: "anonymous" | "credentials";
 }
 
-export function buildAuthAlertMessage(input: AuthAlertMessageInput): string {
-  const prefix =
-    input.severity === "fail"
-      ? "[brain-auth-alert] [Action needed]"
-      : "[brain-auth-alert]";
-  const icon = input.severity === "fail" ? "🚨" : "⚠️";
-  const parts: string[] = [];
-  if (input.reasonSummary) parts.push(input.reasonSummary);
-  if (input.httpStatus) parts.push(`HTTP ${input.httpStatus}`);
-  const paren = parts.length ? ` (${parts.join("; ")})` : "";
-  const label = input.category === "anonymous" ? "anonymous requests rejected" : "credential/authentication rejections";
-  const guidance = input.category === "anonymous"
-    ? "Authentication was enforced; caller origin is unknown. Review unusual anonymous activity; this does not demonstrate a broken connector."
-    : "Inspect the recorded reasons and affected client; reconnect only when authenticated calls fail.";
-  return `${prefix} [${input.brainId || "unobserved-brain"}] ${input.isoDate} — ${icon} ${input.failureCount} ${label} in last ${input.windowMinutes}m${paren}. ${guidance} Cockpit: ${input.cockpitUrl}`;
+function shortLine(value: string, max: number): string {
+  const line = value.replace(/\s+/gu, " ").trim();
+  if (line.length <= max) return line;
+  return line.slice(0, max - 1).replace(/[\uD800-\uDBFF]$/u, "").trimEnd() + "…";
+}
+
+function escapeSlack(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+function authFailuresLink(cockpitUrl: string): { url: URL; local: boolean } | null {
+  try {
+    const url = new URL(cockpitUrl);
+    const local = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+    if ((url.protocol !== "https:" && !(local && url.protocol === "http:")) ||
+        url.username || url.password || url.href.length > 1000 || /[<>|]/u.test(url.href)) {
+      return null;
+    }
+    url.hash = "auth-failures";
+    return { url, local };
+  } catch {
+    return null;
+  }
+}
+
+export function buildAuthAlertMessage(input: AuthAlertMessageInput): SlackMessage {
+  const anonymous = input.category === "anonymous";
+  const urgent = input.severity === "fail" && !anonymous;
+  const brain = shortLine(input.brainId || "unobserved-brain", 56);
+  const icon = urgent ? "🔴" : "🟡";
+  const header = anonymous ? "Anonymous rejections elevated" : "Authentication rejections elevated";
+  const verdict = anonymous ? "Security review" : urgent ? "Authentication needs attention" : "Authentication degraded";
+  const volume = `${input.failureCount} rejected in ${input.windowMinutes} min`;
+  const ask = anonymous ? "Review the rejected traffic."
+    : urgent ? "Check whether the affected connector can authenticate."
+      : "Review the most frequent rejection reasons.";
+  const status = /^\d{3}$/u.test(input.httpStatus ?? "") ? `HTTP ${input.httpStatus}` : "";
+  const detail = [status, shortLine(input.reasonSummary, 90)].filter(Boolean).join(" · ");
+  const summary = [anonymous ? "Caller origin is unknown." : "", detail].filter(Boolean).join(" ");
+  const section = (text: string): SlackBlock =>
+    ({ type: "section", text: { type: "mrkdwn", text, verbatim: true } });
+  const context = (text: string): SlackBlock =>
+    ({ type: "context", elements: [{ type: "plain_text", text }] });
+  const blocks: SlackBlock[] = [
+    { type: "header", text: { type: "plain_text", text: header } },
+    section(`${icon} *${verdict}*`),
+  ];
+  if (summary) blocks.push(context(shortLine(summary, 160)));
+  blocks.push(
+    section(`${icon} *${anonymous ? "Anonymous traffic" : "Authentication requests"}* · ${urgent ? "needs review" : "elevated"} · ${volume}`),
+    section(urgent ? `👉 *Needs you:* ${ask}` : `*Next:* ${ask}`),
+  );
+  const link = authFailuresLink(input.cockpitUrl);
+  if (link) {
+    const label = link.local ? "Open Auth Failures on the Monitor Mac" : "Open Auth Failures";
+    blocks.push(section(`🔗 *<${escapeSlack(link.url.href)}|${label}>*`));
+  }
+  blocks.push(context(`${brain} · Hosted auth monitor`));
+  const previewBrain = brain.replace(/[^\w.-]/gu, "_");
+  const text = shortLine(`[${previewBrain}:auth]${urgent ? " [Action needed]" : ""} ${icon} ${verdict}. ${volume}. ${ask}`, 200);
+  return { text, blocks };
 }
 
 export interface AuthFailureState {
@@ -202,6 +247,7 @@ export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthA
       : null;
   const channel = env.BRAIN_SLACK_ALERT_CHANNEL?.trim() || "";
   const dm = env.BRAIN_SLACK_ALERT_DM?.trim() || "";
+  const brainId = runtimeBrainId(env);
   return {
     enabled:
       Boolean(botToken) &&
@@ -212,8 +258,9 @@ export function readAuthAlertConfig(env: NodeJS.ProcessEnv = process.env): AuthA
     channel,
     dm,
     thresholds: readAuthAlertThresholds(env),
-    brainId: runtimeBrainId(env),
-    cockpitUrl: env.BRAIN_HOSTED_COCKPIT_URL || "http://127.0.0.1:8787/",
+    brainId,
+    cockpitUrl: env.BRAIN_HOSTED_COCKPIT_URL ||
+      (brainId === "ers-brain" ? "http://127.0.0.1:8788/" : "http://127.0.0.1:8787/"),
   };
 }
 
@@ -266,10 +313,9 @@ export interface AuthAlertDispatchRow {
 
 export interface AuthAlertDeps {
   now(): Date;
-  isoDate(): string;
   config: AuthAlertConfig;
   loadState(windowMinutes: number): Promise<AuthFailureState>;
-  postMessage(channel: string, text: string): Promise<{ ok: boolean; error?: string }>;
+  postMessage(channel: string, message: SlackMessage): Promise<{ ok: boolean; error?: string }>;
   recordDispatch(row: AuthAlertDispatchRow): Promise<void>;
 }
 
@@ -476,13 +522,12 @@ function resolveDeps(deps?: Partial<AuthAlertDeps>): AuthAlertDeps {
   const config = deps?.config ?? readAuthAlertConfig();
   return {
     now: deps?.now ?? (() => new Date()),
-    isoDate: deps?.isoDate ?? (() => new Date().toISOString().slice(0, 10)),
     config,
     loadState: deps?.loadState ?? ((windowMinutes) => defaultLoadState(config, windowMinutes)),
     postMessage:
       deps?.postMessage ??
-      ((channel, text) =>
-        postSlackMessage(channel, text, { token: config.botToken ?? undefined })),
+      ((channel, message) =>
+        postSlackMessage(channel, message, { token: config.botToken ?? undefined })),
     recordDispatch: deps?.recordDispatch ?? ((row) => defaultRecordDispatch(config, row)),
   };
 }
@@ -551,14 +596,14 @@ async function evaluateAndAlert(resolved: AuthAlertDeps): Promise<AuthAlertOutco
     if (!decision.fire) return { fired: false, reason: decision.reason };
   }
   const channel = severity === "fail" ? resolved.config.dm : resolved.config.channel;
-  const text = buildAuthAlertMessage({ severity, category, brainId: resolved.config.brainId,
+  const message = buildAuthAlertMessage({ severity, category, brainId: resolved.config.brainId,
     failureCount: count, windowMinutes: resolved.config.thresholds.windowMinutes,
     reasonSummary: formatReasonSummary(reasons), httpStatus: state.httpStatus,
-    isoDate: resolved.isoDate(), cockpitUrl: resolved.config.cockpitUrl });
+    cockpitUrl: resolved.config.cockpitUrl });
 
   let posted = false;
   try {
-    const result = await resolved.postMessage(channel, text);
+    const result = await resolved.postMessage(channel, message);
     posted = result.ok;
   } catch {
     posted = false;

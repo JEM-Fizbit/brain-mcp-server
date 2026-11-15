@@ -24,7 +24,11 @@ test("postSlackMessage is a no-op (no network) when no token is provided", async
 
 test("postSlackMessage posts to chat.postMessage and reports Slack ok", async () => {
   let seen = null;
-  const result = await postSlackMessage("C-OPS", "hello", {
+  const card = {
+    text: "[fixture:auth] 🟡 Authentication degraded",
+    blocks: [{ type: "header", text: { type: "plain_text", text: "Authentication rejections elevated" } }],
+  };
+  const result = await postSlackMessage("C-OPS", card, {
     token: "xoxb-test",
     fetchImpl: async (url, init) => {
       seen = { url, init };
@@ -35,8 +39,7 @@ test("postSlackMessage posts to chat.postMessage and reports Slack ok", async ()
   assert.equal(seen.url, "https://slack.com/api/chat.postMessage");
   assert.equal(seen.init.headers.Authorization, "Bearer xoxb-test");
   const body = JSON.parse(seen.init.body);
-  assert.equal(body.channel, "C-OPS");
-  assert.equal(body.text, "hello");
+  assert.deepEqual(body, { channel: "C-OPS", ...card, unfurl_links: false, unfurl_media: false });
 });
 
 test("postSlackMessage surfaces a Slack API error without throwing", async () => {
