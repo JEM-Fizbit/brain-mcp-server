@@ -2,24 +2,20 @@
 
 ## 2026-11-10 — Brain sync needs quasi real-time freshness
 
-**Implementation choice agreed later in the same discussion:** metadata-only
-inventory with a 10-second polling pause. This keeps typical detection near five
-seconds while halving cycle frequency. John authorised implementation and thorough
-testing, with a recommendation brought back before rollout. John subsequently authorised activation on both Brains; the local two-profile
-pilot was updated and verified in both directions on 10 November. Production pilot
-volume and user count warrant a straightforward update.
+Roughly 30 seconds of sync lag is acceptable at the current pilot volume. This
+supersedes the five-second interval constraint retained on 19 August. The
+implementation uses metadata-only inventory and a 10-second pause between
+cycles. End-to-end latency also includes cycle execution, offline or sleep
+recovery, and any OneDrive propagation delay.
 
-John clarified during the egress investigation that roughly 30 seconds of sync
-lag is acceptable for the small user base and low volume of changes. This
-supersedes the five-second interval constraint retained on 19 August as a design
-requirement; it does not claim a deployed interval change or approve a rollout.
-Automatic propagation, local Markdown usability, explicit conflicts, recovery
-and owner isolation remain requirements. Hosted clients using the same hosted
-store do not need to wait for the local mirror to receive a committed write.
+Both local profiles were updated and verified in both directions on 10 November.
+Worker traffic fell after the rollout, and the first full-day provider readings
+showed lower egress for both owner deployments. Invoice and quota verification
+is tracked in the [backlog](../BACKLOG.md). See the [local rollout receipt](hosted-cockpit.md#inventory-transfer-and-polling--activated-10-november-2026).
 
-The current investigation is measurement and design review. Candidate changes
-must distinguish a configured polling delay from observed propagation latency,
-including cycle execution, offline/sleep recovery and OneDrive propagation.
+Automatic propagation, local Markdown usability, explicit conflicts, recovery,
+and owner isolation remain requirements. Hosted clients can read a committed
+revision as soon as it is available in the hosted store.
 
 ## 2026-11-06 — Isolate the developer Monitor runtime from Homebrew
 
