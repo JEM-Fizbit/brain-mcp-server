@@ -15,7 +15,7 @@
 
 import pg from "pg";
 import { randomUUID } from "node:crypto";
-import { classifyAuthReasons } from "./auth-reason-policy.js";
+import { authAlertGuidance, classifyAuthReasons } from "./auth-reason-policy.js";
 import { postSlackMessage, type SlackBlock, type SlackMessage } from "./slack.js";
 import { runtimeBrainId } from "./runtime-env.js";
 import { attachPoolErrorLogger } from "./pg-pool.js";
@@ -182,33 +182,29 @@ export function buildAuthAlertMessage(input: AuthAlertMessageInput): SlackMessag
   const urgent = input.severity === "fail" && !anonymous;
   const brain = shortLine(input.brainId || "unobserved-brain", 56);
   const icon = urgent ? "🔴" : "🟡";
-  const header = anonymous ? "Anonymous rejections elevated" : "Authentication rejections elevated";
-  const verdict = anonymous ? "Security review" : urgent ? "Authentication needs attention" : "Authentication degraded";
-  const volume = `${input.failureCount} rejected in ${input.windowMinutes} min`;
-  const ask = anonymous ? "Review the rejected traffic."
-    : urgent ? "Check whether the affected connector can authenticate."
-      : "Review the most frequent rejection reasons.";
+  const guidance = authAlertGuidance(anonymous, urgent);
+  const volume = `${input.failureCount} ${guidance.outcome} in ${input.windowMinutes} min`;
   const status = /^\d{3}$/u.test(input.httpStatus ?? "") ? `HTTP ${input.httpStatus}` : "";
   const detail = [status, shortLine(input.reasonSummary, 90)].filter(Boolean).join(" · ");
-  const summary = [anonymous ? "Caller origin is unknown." : "", detail].filter(Boolean).join(" ");
+  const summary = anonymous || !detail ? guidance.impact : `${guidance.impact} ${detail}`;
   const section = (text: string): SlackBlock =>
     ({ type: "section", text: { type: "mrkdwn", text, verbatim: true } });
   const context = (text: string): SlackBlock =>
     ({ type: "context", elements: [{ type: "plain_text", text }] });
   const blocks: SlackBlock[] = [
-    { type: "header", text: { type: "plain_text", text: header } },
-    section(`${icon} *${verdict}*`),
+    { type: "header", text: { type: "plain_text", text: guidance.title } },
+    section(`${icon} *${guidance.verdict}*`),
+    context(shortLine(summary, 160)),
   ];
-  if (summary) blocks.push(context(shortLine(summary, 160)));
   blocks.push(
-    section(`${icon} *${anonymous ? "Anonymous traffic" : "Authentication requests"}* · ${urgent ? "needs review" : "elevated"} · ${volume}`),
-    section(urgent ? `👉 *Needs you:* ${ask}` : `*Next:* ${ask}`),
+    section(`${icon} *${guidance.subject}* · ${volume}`),
+    section(`*Action:* ${guidance.action}`),
   );
   const link = publicAlertUrl(input.alertUrl);
   if (link) blocks.push(section(`🔗 *<${escapeSlack(link.href)}|Open auth alert>*`));
   blocks.push(context(`${brain} · Hosted auth monitor`));
   const previewBrain = brain.replace(/[^\w.-]/gu, "_");
-  const text = shortLine(`[${previewBrain}:auth]${urgent ? " [Action needed]" : ""} ${icon} ${verdict}. ${volume}. ${ask}`, 200);
+  const text = shortLine(`[${previewBrain}:auth]${urgent ? " [Action needed]" : ""} ${icon} ${guidance.title}. ${volume}. ${guidance.phoneAction}`, 200);
   return { text, blocks };
 }
 

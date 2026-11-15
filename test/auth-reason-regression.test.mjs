@@ -49,8 +49,9 @@ test('tokenless fixture sends one labelled channel security review and no failur
  const f=fixture('ers-brain','missing_bearer',11);
  await Promise.all(Array.from({length:5},()=>maybeAlertOnAuthFailure(f.deps)));
  assert.equal(f.posts.length,1);assert.equal(f.posts[0].channel,'C-FIXTURE');
- assert.match(f.posts[0].message.text,/\[ers-brain:auth\].*🟡 Security review.*11 rejected/);
- assert.ok(f.posts[0].message.blocks.some(block=>block.elements?.[0].text.includes("Caller origin is unknown.")));
+ assert.match(f.posts[0].message.text,/\[ers-brain:auth\].*11 blocked in 60 min.*No immediate action/);
+ assert.ok(f.posts[0].message.blocks.some(block=>block.elements?.[0].text.includes("Brain blocked every request in this alert. The sender is unknown.")));
+ assert.ok(f.posts[0].message.blocks.some(block=>block.text?.text.includes('If these notices recur')));
  assert.equal(f.dispatches[0].category,'anonymous');
  assert.equal(f.dispatches[0].severity,'warn');
 });

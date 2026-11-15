@@ -178,6 +178,10 @@ The Auth panel separates anonymous and credential/other rejection counts. Its re
 Hosted authentication alerts use a short phone preview and a Slack card with a
 status, rejection count, recorded reasons, and one next step. Both owner
 deployments use the same format and their separately configured alert destinations.
+Alerts about requests without access tokens explain that Brain blocked the
+requests and that a single burst needs no immediate action. If notices recur,
+check known monitors or connectors. Alerts about sign-in errors ask the operator
+to try a normal Brain action and reconnect the connector only if sign-in fails.
 The card opens the recorded alert on the sending Brain's HTTPS Monitor. It
 returns to the same alert after sign-in and checks the current Owner role
 before reading the receipt. The page shows the alert's count, window, reason

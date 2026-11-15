@@ -5,10 +5,10 @@
 JEM deployed [annotated v1.16.3](https://github.com/JEM-Fizbit/brain-mcp-server/tree/v1.16.3)
 at 13:45 UTC through the guarded release path. The Node 22 gate passed 683
 tests with 15 optional skips, and live health, OAuth discovery, authenticated
-sync status and the protected alert route passed. The Slack sample linked to
-an existing recorded alert. iPhone confirmation from Slack is pending.
+sync status and the protected alert route passed. John confirmed that the Slack
+sample opened the existing recorded alert on his iPhone.
 
-ERS continues to serve v1.16.2 while the iPhone check is pending.
+ERS continues to serve v1.16.2 pending the rollout with clearer alert guidance.
 
 ## Direct session ingestion — v1.16.2, 3 November 2026
 

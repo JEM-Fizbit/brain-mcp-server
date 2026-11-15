@@ -248,15 +248,14 @@ test("auth cards keep the phone banner short and long reason text inert", () => 
   assert.match(card.text, /^\[ai-brain-jem:auth\] \[Action needed\] 🔴/);
   assert.ok(card.text.length <= 200);
   assert.match(card.text, /12 rejected in 60 min/);
-  assert.match(card.text, /Check whether the affected connector can authenticate/);
+  assert.match(card.text, /Reconnect if sign-in fails/);
   assert.deepEqual(card.blocks.map(({ type }) => type),
     ["header", "section", "context", "section", "section", "section", "context"]);
-  assert.match(card.blocks[1].text.text, /^🔴 \*Authentication needs attention\*$/);
+  assert.match(card.blocks[1].text.text, /^🔴 \*Check your connector now\*$/);
   const [summary] = card.blocks[2].elements;
   assert.equal(summary.type, "plain_text");
-  assert.match(summary.text, /HTTP 401.*<@U-FIXTURE>/);
+  assert.match(summary.text, /A connector may be unable to sign in to Brain.*HTTP 401.*<@U-FIXTURE>/);
   assert.ok(summary.text.length <= 160);
-  assert.ok(summary.text.endsWith("…"));
   assert.ok(!summary.text.includes("\n"));
   assert.ok(card.blocks[5].text.text.includes("https://jem.example" + ALERT_PATH + "|Open auth alert"));
 });
@@ -336,7 +335,7 @@ test("maybeAlertOnAuthFailure posts a warn to the channel and records the dispat
   assert.equal(outcome.posted, true);
   assert.equal(posts.length, 1);
   assert.equal(posts[0].channel, "C-OPS");
-  assert.match(posts[0].message.text, /🟡 Authentication degraded.*4 rejected/);
+  assert.match(posts[0].message.text, /🟡 Brain sign-in errors.*4 rejected/);
   assert.equal(dispatches.length, 1);
   assert.equal(dispatches[0].severity, "warn");
   assert.equal(dispatches[0].channel, "C-OPS");

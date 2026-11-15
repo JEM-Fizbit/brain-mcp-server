@@ -1,5 +1,6 @@
 import { escapeHtml } from './navigation.js';
 import type { MonitoringStatus } from './status.js';
+import { authAlertGuidance } from '../services/auth-reason-policy.js';
 
 type AuthAlert = NonNullable<Awaited<ReturnType<MonitoringStatus['readAuthAlert']>>>;
 
@@ -11,21 +12,20 @@ export function authAlertPage(title: string, content: string): string {
 }
 
 export function authAlertDetail(brainId: string, alert: AuthAlert): string {
-  const title = alert.anonymous ? 'Anonymous rejections' : 'Authentication rejections';
-  const verdict = alert.anonymous ? 'Security review' : alert.urgent ? 'Needs attention' : 'Degraded';
-  const ask = alert.anonymous ? 'Review the rejected traffic. Caller origin is unknown.'
-    : alert.urgent ? 'Check whether the affected connector can authenticate.'
-      : 'Review the most frequent rejection reasons.';
+  const guidance = authAlertGuidance(alert.anonymous, alert.urgent);
   const updated = new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
   }).format(new Date(alert.observedAt));
-  const reasons = alert.reasons.map(item => `<dt><code>${escapeHtml(item.reason)}</code></dt><dd>${item.count}</dd>`).join('');
-  return authAlertPage(title, `<p class="muted">${escapeHtml(brainId)} · ${updated} UTC</p>
-    <section class="card"><h2>${verdict}</h2><p>${alert.count} rejected in ${alert.windowMinutes} minutes.</p>
-    ${alert.httpStatus ? `<p>HTTP ${escapeHtml(alert.httpStatus)}</p>` : ''}
-    <p>${ask}</p></section>
-    ${reasons ? `<section class="card"><h2>Recorded reasons</h2><dl>${reasons}</dl></section>` : ''}
-    <p><a class="button" href="/monitor">Brain status</a></p>`);
+  const reasons = alert.reasons.map(item =>
+    `<dt>${item.reason === 'missing_bearer' ? 'No access token supplied' : `<code>${escapeHtml(item.reason)}</code>`}</dt><dd>${item.count}</dd>`).join('');
+  return authAlertPage(guidance.title, `<p class="muted">${escapeHtml(brainId)} · Recorded ${updated} UTC</p>
+    <section class="card"><h2>${guidance.verdict}</h2>
+    <p>${alert.count} ${guidance.outcome} in ${alert.windowMinutes} minutes.</p>
+    <p>${guidance.impact}</p><p><strong>Action</strong> ${guidance.action}</p></section>
+    ${reasons || alert.httpStatus ? `<details class="card"><summary>Technical details</summary>
+      ${alert.httpStatus ? `<p>HTTP ${escapeHtml(alert.httpStatus)}</p>` : ''}
+      ${reasons ? `<dl>${reasons}</dl>` : ''}</details>` : ''}
+    <p><a class="button" href="/monitor">Current Brain status</a></p>`);
 }
 
 export const monitoringPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain status</title><link rel="stylesheet" href="/monitor/style.css"><script src="/monitor/app.js" defer></script></head><body><main>

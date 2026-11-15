@@ -22,3 +22,26 @@ export function classifyAuthReasons(input: {
   const effectiveStatus = rank[credentialStatus] >= rank[anonymousStatus] ? credentialStatus : anonymousStatus;
   return { anonymousCount, credentialCount, credentialStatus, anonymousStatus, effectiveStatus };
 }
+
+export function authAlertGuidance(anonymous: boolean, urgent: boolean) {
+  if (anonymous) {
+    return {
+      title: "Requests without access tokens blocked",
+      verdict: "Review threshold reached",
+      subject: "Requests without access tokens",
+      outcome: "blocked",
+      impact: "Brain blocked every request in this alert. The sender is unknown.",
+      action: "No immediate action. If these notices recur, check whether a known monitor or connector is sending requests without a token.",
+      phoneAction: "No immediate action.",
+    };
+  }
+  return {
+    title: "Brain sign-in errors",
+    verdict: urgent ? "Check your connector now" : "Check your connector",
+    subject: "Authentication requests",
+    outcome: "rejected",
+    impact: "A connector may be unable to sign in to Brain.",
+    action: "Try a normal Brain action in your connector. Reconnect it only if you see a sign-in error.",
+    phoneAction: "Test your connector. Reconnect if sign-in fails.",
+  };
+}

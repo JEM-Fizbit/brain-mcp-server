@@ -39,8 +39,10 @@ test('hosted monitoring is usable in both themes and sizes and clears revoked or
  const status=new MonitoringStatus({query:async query=>{if(failed)throw new Error('private error');return{rows:[query.text.startsWith('with')?{operations:250,failed_operations:0,auth_events:1,p95_ms:780}:{sync_at:new Date(),conflicts:0}]};}});
  routes=new MonitoringRoutes(config,state,(id,role)=>status.read(id,role),async()=>role?{'test-monitor':role}:{});
  const alertPath='/monitor/auth-alerts/11111111-1111-4111-8111-111111111111';
- routes.readAuthAlert=async()=>({observedAt:'2026-11-15T13:30:00Z',anonymous:false,urgent:true,
-  count:12,windowMinutes:60,httpStatus:'401',reasons:[{reason:'token_expired',count:12}]});
+ let anonymous=false;
+ routes.readAuthAlert=async()=>({observedAt:'2026-11-15T13:30:00Z',anonymous,urgent:!anonymous,
+  count:anonymous?10:12,windowMinutes:60,httpStatus:'401',
+  reasons:[anonymous?{reason:'missing_bearer',count:10}:{reason:'token_expired',count:12}]});
  const login=await routes.sessions.begin(),params=new URL(login.location).searchParams;
  await state.put('auth_codes','ui-code',{client_id:routes.sessions.clientId,redirect_uri:routes.sessions.callback,code_challenge:params.get('code_challenge'),code_challenge_method:'S256',resource:config.resourceUri,scope:'mcp:tools',provider:'github',provider_user_id:'fixture',expires_at:Date.now()/1000+60});
  const {cookies}=await routes.sessions.complete(new URLSearchParams({code:'ui-code',state:params.get('state')}),login.cookie.split(';')[0]);
@@ -62,11 +64,20 @@ test('hosted monitoring is usable in both themes and sizes and clears revoked or
   for(const colorScheme of ['light','dark'])for(const width of [1280,390]){
    await page.emulateMedia({colorScheme});await page.setViewportSize({width,height:844});
    await page.goto(base+alertPath);
-   await expect(page.getByRole('heading',{name:'Authentication rejections'})).toBeVisible();
+   await expect(page.getByRole('heading',{name:'Brain sign-in errors'})).toBeVisible();
    await expect(page.getByText('12 rejected in 60 minutes.')).toBeVisible();
+   await expect(page.getByText(/Reconnect it only if you see a sign-in error/)).toBeVisible();
+   await expect(page.getByText('token_expired')).toBeHidden();
+   await page.getByText('Technical details').click();
    await expect(page.getByText('token_expired')).toBeVisible();
    await expect(page.locator('body')).toHaveJSProperty('scrollWidth',width);
+   anonymous=true;
+   await page.reload();
+   await expect(page.getByText('10 blocked in 60 minutes.')).toBeVisible();
+   await expect(page.getByText(/No immediate action/)).toBeVisible();
+   await expect(page.locator('body')).toHaveJSProperty('scrollWidth',width);
    await page.screenshot({path:testInfo.outputPath('auth-alert-'+colorScheme+'-'+width+'.png'),fullPage:true});
+   anonymous=false;
   }
   await context.clearCookies();await page.reload();
   await expect(page.getByRole('link',{name:'Sign in'})).toHaveAttribute('href',
