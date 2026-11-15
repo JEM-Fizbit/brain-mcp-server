@@ -14,6 +14,20 @@ On 15 November, ERS activated its dedicated workspace-owned Slack app with
 `chat:write`. Labelled tests from the live ERS alert dispatcher verified both
 the warning channel and the urgent DM through Slack's Web API.
 
+### Session savepoint — 15 November 2026
+
+The sync changes landed on `main` and the urgent branch is gone locally and
+remotely. Both Fly health endpoints reported the annotated `v1.16.4` release at
+closeout. The ERS asset register entry was verified and the registration task
+was closed. The alert cards ship with this release. The standalone notification
+protocol mirror and full egress investigation are outside the release.
+
+The [sync rollout receipt](hosted-cockpit.md#inventory-transfer-and-polling--activated-10-november-2026)
+and [decision record](DECISIONS.md#2026-11-10--brain-sync-needs-quasi-real-time-freshness)
+capture the sync and first full-day egress results. Use the maintainer backlog
+for invoice and quota follow-up, comparing JEM and ERS separately. The private
+ERS operations record holds the Slack delivery receipts.
+
 ## JEM sync resilience and mobile Slack alerts — v1.16.3, 15 November 2026
 
 JEM deployed [annotated v1.16.3](https://github.com/JEM-Fizbit/brain-mcp-server/tree/v1.16.3)
