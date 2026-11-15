@@ -24,7 +24,7 @@ if [ ! -f BACKLOG.md ]; then
 fi
 
 if grep -qF '<!-- private maintainer backlog -->' BACKLOG.md; then
-  echo "error: use BACKLOG.md in the private Brain MCP Server backlog repository" >&2
+  echo "error: file this item with your Personal GitHub connection at https://github.com/JEM-Fizbit/brain-mcp-server-backlog/blob/main/BACKLOG.md" >&2
   exit 1
 fi
 

@@ -76,7 +76,7 @@ Use Supabase Postgres for hosted operational telemetry.
 
 This project uses the layered backlog/spec system:
 
-- The one-line open-work inbox is `BACKLOG.md` in the [private Personal backlog repository](https://github.com/JEM-Fizbit/brain-mcp-server-backlog/blob/main/BACKLOG.md). The public file is a notice.
+- The one-line open-work inbox is `BACKLOG.md` in the [private Personal backlog repository](https://github.com/JEM-Fizbit/brain-mcp-server-backlog/blob/main/BACKLOG.md). Use the Personal GitHub connection to edit that file on `main`. If you lack direct write access, submit the request through Personal Capture with that exact file URL as its destination.
 - `docs/specs/NNN-slug.md` is for promoted implementation briefs.
 - `docs/DECISIONS.md` records durable decisions and rejected alternatives.
 
