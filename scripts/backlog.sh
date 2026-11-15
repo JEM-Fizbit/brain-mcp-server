@@ -23,6 +23,11 @@ if [ ! -f BACKLOG.md ]; then
   exit 1
 fi
 
+if grep -qF '<!-- private maintainer backlog -->' BACKLOG.md; then
+  echo "error: use BACKLOG.md in the private Brain MCP Server backlog repository" >&2
+  exit 1
+fi
+
 SENTINEL="<!-- backlog items below; newest first -->"
 if ! grep -qF "$SENTINEL" BACKLOG.md; then
   echo "error: sentinel marker missing from BACKLOG.md; cannot determine insertion point" >&2

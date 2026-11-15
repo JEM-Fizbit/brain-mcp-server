@@ -57,7 +57,7 @@ This project uses the layered roadmap/backlog/spec system. Universal protocol: [
 
 ### Sources (this project)
 
-- `BACKLOG.md` — lightweight one-line capture (canonical inbox).
+- `BACKLOG.md` in the [private Personal backlog repository](https://github.com/JEM-Fizbit/brain-mcp-server-backlog/blob/main/BACKLOG.md) is the canonical inbox for Personal open work. The public file is a notice.
 - `docs/specs/NNN-slug.md` — promoted work briefs; archive at `docs/specs/archive/`.
 - `docs/DECISIONS.md` — locked design decisions with rationale.
 

@@ -34,7 +34,9 @@ section() { printf '\n=== %s ===\n' "$1"; }
 
 # 1. BACKLOG.md (always)
 section "BACKLOG.md items"
-if [ -f BACKLOG.md ]; then
+if [ -f BACKLOG.md ] && grep -qF '<!-- private maintainer backlog -->' BACKLOG.md; then
+  echo "  (see BACKLOG.md in the private Brain MCP Server backlog repository)"
+elif [ -f BACKLOG.md ]; then
   awk '
     /<!-- backlog items below; newest first -->/ { flag=1; next }
     flag && /^- / { i++; print "  " i ". " substr($0, 3) }

@@ -76,11 +76,11 @@ Use Supabase Postgres for hosted operational telemetry.
 
 This project uses the layered backlog/spec system:
 
-- `BACKLOG.md` is the one-line open-work inbox.
+- The one-line open-work inbox is `BACKLOG.md` in the [private Personal backlog repository](https://github.com/JEM-Fizbit/brain-mcp-server-backlog/blob/main/BACKLOG.md). The public file is a notice.
 - `docs/specs/NNN-slug.md` is for promoted implementation briefs.
 - `docs/DECISIONS.md` records durable decisions and rejected alternatives.
 
-For user requests that capture open work, update `BACKLOG.md` narrowly. For shipped backlog work, remove the shipped line and leave durable detail in specs, docs, decisions, or commit history as appropriate.
+For Personal requests that capture open work, update the private companion `BACKLOG.md` narrowly. For shipped backlog work, remove the shipped line and leave durable detail in specs, docs, decisions, or commit history as appropriate.
 
 Brain supplies stable context; reading it does not authorise a write. Same-domain Capture preserves incoming requests/originals and tracks blocked filing; project backlogs, Asana and existing workspaces retain their work. General personal intake in JEM Brain `TASKS.md` is retired: use `capture-personal`; use `capture-ers` for private ERS intake. Curate only selected durable knowledge, never transient status, session handoffs or draft dumps. An attachment or “save this” alone does not select Brain ingestion. Follow the selected Brain's loader/operations guide and the [Capture boundary decision](docs/DECISIONS.md#2026-10-22--capture-owns-intake-brain-holds-selected-durable-knowledge).
 
