@@ -1,5 +1,17 @@
 # Fly Deployment
 
+## Plain-language authentication alerts — v1.16.4, 15 November 2026
+
+Both Brain servers run [annotated v1.16.4](https://github.com/JEM-Fizbit/brain-mcp-server/tree/v1.16.4).
+JEM deployed at 13:59 UTC and ERS at 14:02 UTC. Both guarded Node 22 release
+suites passed 683 tests with 15 optional skips. Live health and the protected
+alert route passed for both owners. Authenticated ERS sync status reported zero
+conflicts. The revised alert text was checked in iPhone WebKit and against the
+recorded JEM alert in the running release.
+
+The Slack card and linked page explain what happened and what action is needed.
+ERS Slack delivery requires separate bot credential activation.
+
 ## JEM sync resilience and mobile Slack alerts — v1.16.3, 15 November 2026
 
 JEM deployed [annotated v1.16.3](https://github.com/JEM-Fizbit/brain-mcp-server/tree/v1.16.3)
@@ -8,7 +20,7 @@ tests with 15 optional skips, and live health, OAuth discovery, authenticated
 sync status and the protected alert route passed. John confirmed that the Slack
 sample opened the existing recorded alert on his iPhone.
 
-ERS continues to serve v1.16.2 pending the rollout with clearer alert guidance.
+ERS was running v1.16.2 at the time of this JEM rollout.
 
 ## Direct session ingestion — v1.16.2, 3 November 2026
 
