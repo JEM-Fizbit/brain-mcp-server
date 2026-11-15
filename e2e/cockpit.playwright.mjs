@@ -715,6 +715,8 @@ test("sync warnings, recurring failures and recovery render with source provenan
     await route.fulfill({response, json: payload});
   });
   try {
+    const retryTitle = 'Restore connectivity; sync retries automatically.';
+    const actions = page.locator('#actions');
     for (const width of [1280, 390]) {
       await page.setViewportSize({width, height: 844});
       let previous;
@@ -723,16 +725,17 @@ test("sync warnings, recurring failures and recovery render with source provenan
         sample = evaluateSyncHealth({status: 'error', checkedAt: new Date(now).toISOString(), error: 'Connection terminated due to connection timeout'}, previous, {now, maxAgeMs: 60_000});
         previous = sample.observation;
         await page.goto(url);
-        await expect(page.locator('#actions')).toContainText(attempt < 3 ? 'Watch local sync recovery.' : 'Restore local sync.');
-        await expect(page.locator('#actions')).toContainText(`${attempt} distinct failed attempt(s)`);
-        await expect(page.locator('#actions')).toContainText('Observed 2026-09-11');
+        await expect(actions).toContainText(attempt < 3 ? 'Watch local sync recovery.' : retryTitle);
+        await expect(actions).toContainText('Monitor continues automatic retries');
+        await expect(actions).toContainText(`${attempt} distinct failed attempt(s)`);
+        await expect(actions).toContainText('Observed 2026-09-11');
       }
       await expect(page.locator("body")).toHaveJSProperty("scrollWidth", width);
       await page.screenshot({path: testInfo.outputPath(`sync-recurring-${width}.png`), fullPage: true});
       sample = evaluateSyncHealth({status: 'ok', checkedAt: new Date().toISOString()}, previous, {maxAgeMs: 60_000});
       await page.goto(url);
-      await expect(page.locator('#actions')).toContainText('No operator action required.');
-      await expect(page.locator('#actions')).not.toContainText('Restore local sync.');
+      await expect(actions).toContainText('No operator action required.');
+      await expect(actions).not.toContainText(retryTitle);
     }
   } finally { await stopCockpit(child); }
 });
